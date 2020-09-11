@@ -1,37 +1,26 @@
 {
-    "name": "test",
-    "scripts": {
-      "build": "truffle build && yarn run networks-reset && yarn run ts",
-      "test": "yarn run test-contracts && yarn run test-ts",
-      "test-stablex": "yarn run test-contracts test/stablex/*",
-      "test-contracts": "truffle test",
-      "test-ts": "mocha -r ts-node/register 'test/models/**/*spec.ts'",
-      "test-streamed-orderbook": "TEST_STREAMED_ORDERBOOK_E2E=1 mocha -r ts-node/register test/models/streamed/index.spec.ts",
-      "coverage": "truffle run coverage --network coverage",
-      "networks-extract": "CONF_FILE=$(pwd)'/migration_conf.js'  node node_modules/@gnosis.pm/util-contracts/src/extract_network_info.js",
-      "networks-inject": "CONF_FILE=$(pwd)'/migration_conf.js'  node node_modules/@gnosis.pm/util-contracts/src/inject_network_info.js",
-      "networks-reset": "mkdir -p build/contracts && truffle networks --clean && yarn run networks-inject",
-      "verify-stablex": "truffle run verify BatchExchange",
-      "lint": "yarn run lint:solidity && yarn run lint:ts",
-      "lint:solidity": "solhint \"contracts/**/*.sol\"",
-      "lint:ts": "eslint . --ext .js,.ts",
-      "prepack": "yarn run build",
-      "prettier": "yarn run prettier:solidity && yarn run prettier:ts",
-      "prettier:solidity": "prettier --write 'contracts/**/*.sol'",
-      "prettier:ts": "prettier --write './**/*.{js,ts}'",
-      "spread-orders": "npx truffle exec scripts/place_spread_orders.js",
-      "ts": "yarn ts-contracts && yarn tsc:commonjs && yarn tsc:esm",
-      "tsc:commonjs": "rimraf build/common && tsc --outDir build/common",
-      "tsc:esm": "rimraf build/esm && tsc -m es6 -t esnext --outDir build/esm",
-      "ts-contracts": "yarn ts-contracts:web3 && yarn ts-contracts:truffle",
-      "ts-contracts:truffle": "typechain --target truffle-v5 --outDir build/truffle-typings \"build/contracts/*.json\"",
-      "ts-contracts:web3": "typechain --target web3-v1 --outDir build/types \"build/contracts/{BatchExchange,BatchExchangeViewer}.json\"",
-      "ganache": "ganache-cli --host 0.0.0.0 --gasLimit 8e6 --deterministic",
-      "truffle-exec": "sh -c 'npx truffle exec build/common/${0%.*}.js $@'"
-    },
-    "dependencies": {
-    },
-    "devDependencies": {
-      "truffle": "^5.1.43"
-    }
+  "name": "test",
+  "scripts": {
+    "build": "waffle",
+    "test": "export NODE_ENV=test && mocha -r ts-node/register 'test/*.ts'",
+    "lint": "eslint '{src,test}/**/*.ts'",
+    "lint:fix": "eslint --fix '{src,test}/**/*.ts'",
+    "ganache": "ganache-cli --host 0.0.0.0 --gasLimit 8e6 --deterministic"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/chai": "^4.2.3",
+    "@types/mocha": "^5.2.7",
+    "@typescript-eslint/eslint-plugin": "^2.30.0",
+    "@typescript-eslint/parser": "^2.30.0",
+    "chai": "^4.2.0",
+    "eslint": "^6.8.0",
+    "eslint-plugin-import": "^2.20.2",
+    "ethereum-waffle": "^3.1.0",
+    "ethers": "^5.0.12",
+    "mocha": "^8.1.3",
+    "prettier": "^2.1.1",
+    "ts-node": "^8.9.1",
+    "typescript": "^3.8.3"
   }
+}

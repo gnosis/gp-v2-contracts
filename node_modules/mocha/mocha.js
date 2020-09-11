@@ -16838,6 +16838,356 @@
 	});
 	var object_assign = polyfill$1;
 
+	var format$1 = util.format;
+	/**
+	 * Factory functions to create throwable error objects
+	 * @module Errors
+	 */
+
+	/**
+	 * When Mocha throw exceptions (or otherwise errors), it attempts to assign a
+	 * `code` property to the `Error` object, for easier handling.  These are the
+	 * potential values of `code`.
+	 */
+
+	var constants = {
+	  /**
+	   * An unrecoverable error.
+	   */
+	  FATAL: 'ERR_MOCHA_FATAL',
+
+	  /**
+	   * The type of an argument to a function call is invalid
+	   */
+	  INVALID_ARG_TYPE: 'ERR_MOCHA_INVALID_ARG_TYPE',
+
+	  /**
+	   * The value of an argument to a function call is invalid
+	   */
+	  INVALID_ARG_VALUE: 'ERR_MOCHA_INVALID_ARG_VALUE',
+
+	  /**
+	   * Something was thrown, but it wasn't an `Error`
+	   */
+	  INVALID_EXCEPTION: 'ERR_MOCHA_INVALID_EXCEPTION',
+
+	  /**
+	   * An interface (e.g., `Mocha.interfaces`) is unknown or invalid
+	   */
+	  INVALID_INTERFACE: 'ERR_MOCHA_INVALID_INTERFACE',
+
+	  /**
+	   * A reporter (.e.g, `Mocha.reporters`) is unknown or invalid
+	   */
+	  INVALID_REPORTER: 'ERR_MOCHA_INVALID_REPORTER',
+
+	  /**
+	   * `done()` was called twice in a `Test` or `Hook` callback
+	   */
+	  MULTIPLE_DONE: 'ERR_MOCHA_MULTIPLE_DONE',
+
+	  /**
+	   * No files matched the pattern provided by the user
+	   */
+	  NO_FILES_MATCH_PATTERN: 'ERR_MOCHA_NO_FILES_MATCH_PATTERN',
+
+	  /**
+	   * Known, but unsupported behavior of some kind
+	   */
+	  UNSUPPORTED: 'ERR_MOCHA_UNSUPPORTED',
+
+	  /**
+	   * Invalid state transition occurring in `Mocha` instance
+	   */
+	  INSTANCE_ALREADY_RUNNING: 'ERR_MOCHA_INSTANCE_ALREADY_RUNNING',
+
+	  /**
+	   * Invalid state transition occurring in `Mocha` instance
+	   */
+	  INSTANCE_ALREADY_DISPOSED: 'ERR_MOCHA_INSTANCE_ALREADY_DISPOSED',
+
+	  /**
+	   * Use of `only()` w/ `--forbid-only` results in this error.
+	   */
+	  FORBIDDEN_EXCLUSIVITY: 'ERR_MOCHA_FORBIDDEN_EXCLUSIVITY'
+	};
+	/**
+	 * Creates an error object to be thrown when no files to be tested could be found using specified pattern.
+	 *
+	 * @public
+	 * @param {string} message - Error message to be displayed.
+	 * @param {string} pattern - User-specified argument value.
+	 * @returns {Error} instance detailing the error condition
+	 */
+
+	function createNoFilesMatchPatternError(message, pattern) {
+	  var err = new Error(message);
+	  err.code = constants.NO_FILES_MATCH_PATTERN;
+	  err.pattern = pattern;
+	  return err;
+	}
+	/**
+	 * Creates an error object to be thrown when the reporter specified in the options was not found.
+	 *
+	 * @public
+	 * @param {string} message - Error message to be displayed.
+	 * @param {string} reporter - User-specified reporter value.
+	 * @returns {Error} instance detailing the error condition
+	 */
+
+
+	function createInvalidReporterError(message, reporter) {
+	  var err = new TypeError(message);
+	  err.code = constants.INVALID_REPORTER;
+	  err.reporter = reporter;
+	  return err;
+	}
+	/**
+	 * Creates an error object to be thrown when the interface specified in the options was not found.
+	 *
+	 * @public
+	 * @param {string} message - Error message to be displayed.
+	 * @param {string} ui - User-specified interface value.
+	 * @returns {Error} instance detailing the error condition
+	 */
+
+
+	function createInvalidInterfaceError(message, ui) {
+	  var err = new Error(message);
+	  err.code = constants.INVALID_INTERFACE;
+	  err["interface"] = ui;
+	  return err;
+	}
+	/**
+	 * Creates an error object to be thrown when a behavior, option, or parameter is unsupported.
+	 *
+	 * @public
+	 * @param {string} message - Error message to be displayed.
+	 * @returns {Error} instance detailing the error condition
+	 */
+
+
+	function createUnsupportedError(message) {
+	  var err = new Error(message);
+	  err.code = constants.UNSUPPORTED;
+	  return err;
+	}
+	/**
+	 * Creates an error object to be thrown when an argument is missing.
+	 *
+	 * @public
+	 * @param {string} message - Error message to be displayed.
+	 * @param {string} argument - Argument name.
+	 * @param {string} expected - Expected argument datatype.
+	 * @returns {Error} instance detailing the error condition
+	 */
+
+
+	function createMissingArgumentError(message, argument, expected) {
+	  return createInvalidArgumentTypeError(message, argument, expected);
+	}
+	/**
+	 * Creates an error object to be thrown when an argument did not use the supported type
+	 *
+	 * @public
+	 * @param {string} message - Error message to be displayed.
+	 * @param {string} argument - Argument name.
+	 * @param {string} expected - Expected argument datatype.
+	 * @returns {Error} instance detailing the error condition
+	 */
+
+
+	function createInvalidArgumentTypeError(message, argument, expected) {
+	  var err = new TypeError(message);
+	  err.code = constants.INVALID_ARG_TYPE;
+	  err.argument = argument;
+	  err.expected = expected;
+	  err.actual = _typeof(argument);
+	  return err;
+	}
+	/**
+	 * Creates an error object to be thrown when an argument did not use the supported value
+	 *
+	 * @public
+	 * @param {string} message - Error message to be displayed.
+	 * @param {string} argument - Argument name.
+	 * @param {string} value - Argument value.
+	 * @param {string} [reason] - Why value is invalid.
+	 * @returns {Error} instance detailing the error condition
+	 */
+
+
+	function createInvalidArgumentValueError(message, argument, value, reason) {
+	  var err = new TypeError(message);
+	  err.code = constants.INVALID_ARG_VALUE;
+	  err.argument = argument;
+	  err.value = value;
+	  err.reason = typeof reason !== 'undefined' ? reason : 'is invalid';
+	  return err;
+	}
+	/**
+	 * Creates an error object to be thrown when an exception was caught, but the `Error` is falsy or undefined.
+	 *
+	 * @public
+	 * @param {string} message - Error message to be displayed.
+	 * @returns {Error} instance detailing the error condition
+	 */
+
+
+	function createInvalidExceptionError(message, value) {
+	  var err = new Error(message);
+	  err.code = constants.INVALID_EXCEPTION;
+	  err.valueType = _typeof(value);
+	  err.value = value;
+	  return err;
+	}
+	/**
+	 * Creates an error object to be thrown when an unrecoverable error occurs.
+	 *
+	 * @public
+	 * @param {string} message - Error message to be displayed.
+	 * @returns {Error} instance detailing the error condition
+	 */
+
+
+	function createFatalError(message, value) {
+	  var err = new Error(message);
+	  err.code = constants.FATAL;
+	  err.valueType = _typeof(value);
+	  err.value = value;
+	  return err;
+	}
+	/**
+	 * Dynamically creates a plugin-type-specific error based on plugin type
+	 * @param {string} message - Error message
+	 * @param {"reporter"|"interface"} pluginType - Plugin type. Future: expand as needed
+	 * @param {string} [pluginId] - Name/path of plugin, if any
+	 * @throws When `pluginType` is not known
+	 * @public
+	 * @returns {Error}
+	 */
+
+
+	function createInvalidPluginError(message, pluginType, pluginId) {
+	  switch (pluginType) {
+	    case 'reporter':
+	      return createInvalidReporterError(message, pluginId);
+
+	    case 'interface':
+	      return createInvalidInterfaceError(message, pluginId);
+
+	    default:
+	      throw new Error('unknown pluginType "' + pluginType + '"');
+	  }
+	}
+	/**
+	 * Creates an error object to be thrown when a mocha object's `run` method is executed while it is already disposed.
+	 * @param {string} message The error message to be displayed.
+	 * @param {boolean} cleanReferencesAfterRun the value of `cleanReferencesAfterRun`
+	 * @param {Mocha} instance the mocha instance that throw this error
+	 */
+
+
+	function createMochaInstanceAlreadyDisposedError(message, cleanReferencesAfterRun, instance) {
+	  var err = new Error(message);
+	  err.code = constants.INSTANCE_ALREADY_DISPOSED;
+	  err.cleanReferencesAfterRun = cleanReferencesAfterRun;
+	  err.instance = instance;
+	  return err;
+	}
+	/**
+	 * Creates an error object to be thrown when a mocha object's `run` method is called while a test run is in progress.
+	 * @param {string} message The error message to be displayed.
+	 */
+
+
+	function createMochaInstanceAlreadyRunningError(message, instance) {
+	  var err = new Error(message);
+	  err.code = constants.INSTANCE_ALREADY_RUNNING;
+	  err.instance = instance;
+	  return err;
+	}
+	/*
+	 * Creates an error object to be thrown when done() is called multiple times in a test
+	 *
+	 * @public
+	 * @param {Runnable} runnable - Original runnable
+	 * @param {Error} [originalErr] - Original error, if any
+	 * @returns {Error} instance detailing the error condition
+	 */
+
+
+	function createMultipleDoneError(runnable, originalErr) {
+	  var title;
+
+	  try {
+	    title = format$1('<%s>', runnable.fullTitle());
+
+	    if (runnable.parent.root) {
+	      title += ' (of root suite)';
+	    }
+	  } catch (ignored) {
+	    title = format$1('<%s> (of unknown suite)', runnable.title);
+	  }
+
+	  var message = format$1('done() called multiple times in %s %s', runnable.type ? runnable.type : 'unknown runnable', title);
+
+	  if (runnable.file) {
+	    message += format$1(' of file %s', runnable.file);
+	  }
+
+	  if (originalErr) {
+	    message += format$1('; in addition, done() received error: %s', originalErr);
+	  }
+
+	  var err = new Error(message);
+	  err.code = constants.MULTIPLE_DONE;
+	  err.valueType = _typeof(originalErr);
+	  err.value = originalErr;
+	  return err;
+	}
+	/**
+	 * Creates an error object to be thrown when `.only()` is used with
+	 * `--forbid-only`.
+	 * @public
+	 * @param {Mocha} mocha - Mocha instance
+	 * @returns {Error} Error with code {@link constants.FORBIDDEN_EXCLUSIVITY}
+	 */
+
+
+	function createForbiddenExclusivityError(mocha) {
+	  var err = new Error(mocha.isWorker ? '`.only` is not supported in parallel mode' : '`.only` forbidden by --forbid-only');
+	  err.code = constants.FORBIDDEN_EXCLUSIVITY;
+	  return err;
+	}
+
+	var errors = {
+	  createInvalidArgumentTypeError: createInvalidArgumentTypeError,
+	  createInvalidArgumentValueError: createInvalidArgumentValueError,
+	  createInvalidExceptionError: createInvalidExceptionError,
+	  createInvalidInterfaceError: createInvalidInterfaceError,
+	  createInvalidReporterError: createInvalidReporterError,
+	  createMissingArgumentError: createMissingArgumentError,
+	  createNoFilesMatchPatternError: createNoFilesMatchPatternError,
+	  createUnsupportedError: createUnsupportedError,
+	  createInvalidPluginError: createInvalidPluginError,
+	  createMochaInstanceAlreadyDisposedError: createMochaInstanceAlreadyDisposedError,
+	  createMochaInstanceAlreadyRunningError: createMochaInstanceAlreadyRunningError,
+	  createFatalError: createFatalError,
+	  createMultipleDoneError: createMultipleDoneError,
+	  createForbiddenExclusivityError: createForbiddenExclusivityError,
+	  constants: constants
+	};
+
+	var _nodeResolve_empty = {};
+
+	var _nodeResolve_empty$1 = /*#__PURE__*/Object.freeze({
+		__proto__: null,
+		'default': _nodeResolve_empty
+	});
+
+	var require$$11 = getCjsExportFromNamespace(_nodeResolve_empty$1);
+
 	var utils = createCommonjsModule(function (module, exports) {
 	  /**
 	   * Various utility functions used throughout Mocha's codebase.
@@ -17470,13 +17820,33 @@
 	  exports.isBrowser = function isBrowser() {
 	    return Boolean(browser$1);
 	  };
-	});
+	  /**
+	   * Lookup file names at the given `path`.
+	   *
+	   * @description
+	   * Filenames are returned in _traversal_ order by the OS/filesystem.
+	   * **Make no assumption that the names will be sorted in any fashion.**
+	   *
+	   * @public
+	   * @alias module:lib/cli.lookupFiles
+	   * @param {string} filepath - Base path to start searching from.
+	   * @param {string[]} [extensions=[]] - File extensions to look for.
+	   * @param {boolean} [recursive=false] - Whether to recurse into subdirectories.
+	   * @return {string[]} An array of paths.
+	   * @throws {Error} if no files match pattern.
+	   * @throws {TypeError} if `filepath` is directory and `extensions` not provided.
+	   * @deprecated Moved to {@link module:lib/cli.lookupFiles}
+	   */
 
-	var _nodeResolve_empty = {};
 
-	var _nodeResolve_empty$1 = /*#__PURE__*/Object.freeze({
-		__proto__: null,
-		'default': _nodeResolve_empty
+	  exports.lookupFiles = function () {
+	    if (exports.isBrowser()) {
+	      throw errors.createUnsupportedError('lookupFiles() is only supported in Node.js!');
+	    }
+
+	    exports.deprecate('`lookupFiles()` in module `mocha/lib/utils` has moved to module `mocha/lib/cli` and will be removed in the next major revision of Mocha');
+	    return require$$11.lookupFiles.apply(require$$11, arguments);
+	  };
 	});
 
 	/**
@@ -17938,347 +18308,6 @@
 	    }
 	  };
 	});
-
-	var format$1 = util.format;
-	/**
-	 * Factory functions to create throwable error objects
-	 * @module Errors
-	 */
-
-	/**
-	 * When Mocha throw exceptions (or otherwise errors), it attempts to assign a
-	 * `code` property to the `Error` object, for easier handling.  These are the
-	 * potential values of `code`.
-	 */
-
-	var constants = {
-	  /**
-	   * An unrecoverable error.
-	   */
-	  FATAL: 'ERR_MOCHA_FATAL',
-
-	  /**
-	   * The type of an argument to a function call is invalid
-	   */
-	  INVALID_ARG_TYPE: 'ERR_MOCHA_INVALID_ARG_TYPE',
-
-	  /**
-	   * The value of an argument to a function call is invalid
-	   */
-	  INVALID_ARG_VALUE: 'ERR_MOCHA_INVALID_ARG_VALUE',
-
-	  /**
-	   * Something was thrown, but it wasn't an `Error`
-	   */
-	  INVALID_EXCEPTION: 'ERR_MOCHA_INVALID_EXCEPTION',
-
-	  /**
-	   * An interface (e.g., `Mocha.interfaces`) is unknown or invalid
-	   */
-	  INVALID_INTERFACE: 'ERR_MOCHA_INVALID_INTERFACE',
-
-	  /**
-	   * A reporter (.e.g, `Mocha.reporters`) is unknown or invalid
-	   */
-	  INVALID_REPORTER: 'ERR_MOCHA_INVALID_REPORTER',
-
-	  /**
-	   * `done()` was called twice in a `Test` or `Hook` callback
-	   */
-	  MULTIPLE_DONE: 'ERR_MOCHA_MULTIPLE_DONE',
-
-	  /**
-	   * No files matched the pattern provided by the user
-	   */
-	  NO_FILES_MATCH_PATTERN: 'ERR_MOCHA_NO_FILES_MATCH_PATTERN',
-
-	  /**
-	   * Known, but unsupported behavior of some kind
-	   */
-	  UNSUPPORTED: 'ERR_MOCHA_UNSUPPORTED',
-
-	  /**
-	   * Invalid state transition occurring in `Mocha` instance
-	   */
-	  INSTANCE_ALREADY_RUNNING: 'ERR_MOCHA_INSTANCE_ALREADY_RUNNING',
-
-	  /**
-	   * Invalid state transition occurring in `Mocha` instance
-	   */
-	  INSTANCE_ALREADY_DISPOSED: 'ERR_MOCHA_INSTANCE_ALREADY_DISPOSED',
-
-	  /**
-	   * Use of `only()` w/ `--forbid-only` results in this error.
-	   */
-	  FORBIDDEN_EXCLUSIVITY: 'ERR_MOCHA_FORBIDDEN_EXCLUSIVITY'
-	};
-	/**
-	 * Creates an error object to be thrown when no files to be tested could be found using specified pattern.
-	 *
-	 * @public
-	 * @param {string} message - Error message to be displayed.
-	 * @param {string} pattern - User-specified argument value.
-	 * @returns {Error} instance detailing the error condition
-	 */
-
-	function createNoFilesMatchPatternError(message, pattern) {
-	  var err = new Error(message);
-	  err.code = constants.NO_FILES_MATCH_PATTERN;
-	  err.pattern = pattern;
-	  return err;
-	}
-	/**
-	 * Creates an error object to be thrown when the reporter specified in the options was not found.
-	 *
-	 * @public
-	 * @param {string} message - Error message to be displayed.
-	 * @param {string} reporter - User-specified reporter value.
-	 * @returns {Error} instance detailing the error condition
-	 */
-
-
-	function createInvalidReporterError(message, reporter) {
-	  var err = new TypeError(message);
-	  err.code = constants.INVALID_REPORTER;
-	  err.reporter = reporter;
-	  return err;
-	}
-	/**
-	 * Creates an error object to be thrown when the interface specified in the options was not found.
-	 *
-	 * @public
-	 * @param {string} message - Error message to be displayed.
-	 * @param {string} ui - User-specified interface value.
-	 * @returns {Error} instance detailing the error condition
-	 */
-
-
-	function createInvalidInterfaceError(message, ui) {
-	  var err = new Error(message);
-	  err.code = constants.INVALID_INTERFACE;
-	  err["interface"] = ui;
-	  return err;
-	}
-	/**
-	 * Creates an error object to be thrown when a behavior, option, or parameter is unsupported.
-	 *
-	 * @public
-	 * @param {string} message - Error message to be displayed.
-	 * @returns {Error} instance detailing the error condition
-	 */
-
-
-	function createUnsupportedError(message) {
-	  var err = new Error(message);
-	  err.code = constants.UNSUPPORTED;
-	  return err;
-	}
-	/**
-	 * Creates an error object to be thrown when an argument is missing.
-	 *
-	 * @public
-	 * @param {string} message - Error message to be displayed.
-	 * @param {string} argument - Argument name.
-	 * @param {string} expected - Expected argument datatype.
-	 * @returns {Error} instance detailing the error condition
-	 */
-
-
-	function createMissingArgumentError(message, argument, expected) {
-	  return createInvalidArgumentTypeError(message, argument, expected);
-	}
-	/**
-	 * Creates an error object to be thrown when an argument did not use the supported type
-	 *
-	 * @public
-	 * @param {string} message - Error message to be displayed.
-	 * @param {string} argument - Argument name.
-	 * @param {string} expected - Expected argument datatype.
-	 * @returns {Error} instance detailing the error condition
-	 */
-
-
-	function createInvalidArgumentTypeError(message, argument, expected) {
-	  var err = new TypeError(message);
-	  err.code = constants.INVALID_ARG_TYPE;
-	  err.argument = argument;
-	  err.expected = expected;
-	  err.actual = _typeof(argument);
-	  return err;
-	}
-	/**
-	 * Creates an error object to be thrown when an argument did not use the supported value
-	 *
-	 * @public
-	 * @param {string} message - Error message to be displayed.
-	 * @param {string} argument - Argument name.
-	 * @param {string} value - Argument value.
-	 * @param {string} [reason] - Why value is invalid.
-	 * @returns {Error} instance detailing the error condition
-	 */
-
-
-	function createInvalidArgumentValueError(message, argument, value, reason) {
-	  var err = new TypeError(message);
-	  err.code = constants.INVALID_ARG_VALUE;
-	  err.argument = argument;
-	  err.value = value;
-	  err.reason = typeof reason !== 'undefined' ? reason : 'is invalid';
-	  return err;
-	}
-	/**
-	 * Creates an error object to be thrown when an exception was caught, but the `Error` is falsy or undefined.
-	 *
-	 * @public
-	 * @param {string} message - Error message to be displayed.
-	 * @returns {Error} instance detailing the error condition
-	 */
-
-
-	function createInvalidExceptionError(message, value) {
-	  var err = new Error(message);
-	  err.code = constants.INVALID_EXCEPTION;
-	  err.valueType = _typeof(value);
-	  err.value = value;
-	  return err;
-	}
-	/**
-	 * Creates an error object to be thrown when an unrecoverable error occurs.
-	 *
-	 * @public
-	 * @param {string} message - Error message to be displayed.
-	 * @returns {Error} instance detailing the error condition
-	 */
-
-
-	function createFatalError(message, value) {
-	  var err = new Error(message);
-	  err.code = constants.FATAL;
-	  err.valueType = _typeof(value);
-	  err.value = value;
-	  return err;
-	}
-	/**
-	 * Dynamically creates a plugin-type-specific error based on plugin type
-	 * @param {string} message - Error message
-	 * @param {"reporter"|"interface"} pluginType - Plugin type. Future: expand as needed
-	 * @param {string} [pluginId] - Name/path of plugin, if any
-	 * @throws When `pluginType` is not known
-	 * @public
-	 * @returns {Error}
-	 */
-
-
-	function createInvalidPluginError(message, pluginType, pluginId) {
-	  switch (pluginType) {
-	    case 'reporter':
-	      return createInvalidReporterError(message, pluginId);
-
-	    case 'interface':
-	      return createInvalidInterfaceError(message, pluginId);
-
-	    default:
-	      throw new Error('unknown pluginType "' + pluginType + '"');
-	  }
-	}
-	/**
-	 * Creates an error object to be thrown when a mocha object's `run` method is executed while it is already disposed.
-	 * @param {string} message The error message to be displayed.
-	 * @param {boolean} cleanReferencesAfterRun the value of `cleanReferencesAfterRun`
-	 * @param {Mocha} instance the mocha instance that throw this error
-	 */
-
-
-	function createMochaInstanceAlreadyDisposedError(message, cleanReferencesAfterRun, instance) {
-	  var err = new Error(message);
-	  err.code = constants.INSTANCE_ALREADY_DISPOSED;
-	  err.cleanReferencesAfterRun = cleanReferencesAfterRun;
-	  err.instance = instance;
-	  return err;
-	}
-	/**
-	 * Creates an error object to be thrown when a mocha object's `run` method is called while a test run is in progress.
-	 * @param {string} message The error message to be displayed.
-	 */
-
-
-	function createMochaInstanceAlreadyRunningError(message, instance) {
-	  var err = new Error(message);
-	  err.code = constants.INSTANCE_ALREADY_RUNNING;
-	  err.instance = instance;
-	  return err;
-	}
-	/*
-	 * Creates an error object to be thrown when done() is called multiple times in a test
-	 *
-	 * @public
-	 * @param {Runnable} runnable - Original runnable
-	 * @param {Error} [originalErr] - Original error, if any
-	 * @returns {Error} instance detailing the error condition
-	 */
-
-
-	function createMultipleDoneError(runnable, originalErr) {
-	  var title;
-
-	  try {
-	    title = format$1('<%s>', runnable.fullTitle());
-
-	    if (runnable.parent.root) {
-	      title += ' (of root suite)';
-	    }
-	  } catch (ignored) {
-	    title = format$1('<%s> (of unknown suite)', runnable.title);
-	  }
-
-	  var message = format$1('done() called multiple times in %s %s', runnable.type ? runnable.type : 'unknown runnable', title);
-
-	  if (runnable.file) {
-	    message += format$1(' of file %s', runnable.file);
-	  }
-
-	  if (originalErr) {
-	    message += format$1('; in addition, done() received error: %s', originalErr);
-	  }
-
-	  var err = new Error(message);
-	  err.code = constants.MULTIPLE_DONE;
-	  err.valueType = _typeof(originalErr);
-	  err.value = originalErr;
-	  return err;
-	}
-	/**
-	 * Creates an error object to be thrown when `.only()` is used with
-	 * `--forbid-only`.
-	 * @public
-	 * @param {Mocha} mocha - Mocha instance
-	 * @returns {Error} Error with code {@link constants.FORBIDDEN_EXCLUSIVITY}
-	 */
-
-
-	function createForbiddenExclusivityError(mocha) {
-	  var err = new Error(mocha.isWorker ? '`.only` is not supported in parallel mode' : '`.only` forbidden by --forbid-only');
-	  err.code = constants.FORBIDDEN_EXCLUSIVITY;
-	  return err;
-	}
-
-	var errors = {
-	  createInvalidArgumentTypeError: createInvalidArgumentTypeError,
-	  createInvalidArgumentValueError: createInvalidArgumentValueError,
-	  createInvalidExceptionError: createInvalidExceptionError,
-	  createInvalidInterfaceError: createInvalidInterfaceError,
-	  createInvalidReporterError: createInvalidReporterError,
-	  createMissingArgumentError: createMissingArgumentError,
-	  createNoFilesMatchPatternError: createNoFilesMatchPatternError,
-	  createUnsupportedError: createUnsupportedError,
-	  createInvalidPluginError: createInvalidPluginError,
-	  createMochaInstanceAlreadyDisposedError: createMochaInstanceAlreadyDisposedError,
-	  createMochaInstanceAlreadyRunningError: createMochaInstanceAlreadyRunningError,
-	  createFatalError: createFatalError,
-	  createMultipleDoneError: createMultipleDoneError,
-	  createForbiddenExclusivityError: createForbiddenExclusivityError,
-	  constants: constants
-	};
 
 	var EventEmitter$1 = EventEmitter.EventEmitter;
 	var debug$1 = browser$2('mocha:runnable');
@@ -20738,8 +20767,6 @@
 
 	Runner.constants = constants$2;
 
-	var require$$9 = getCjsExportFromNamespace(_nodeResolve_empty$1);
-
 	var base = createCommonjsModule(function (module, exports) {
 	  /**
 	   * @module Base
@@ -20782,7 +20809,7 @@
 	   * Enable coloring by default, except in the browser interface.
 	   */
 
-	  exports.useColors = !isBrowser && (require$$9.stdout || process$1.env.MOCHA_COLORS !== undefined);
+	  exports.useColors = !isBrowser && (require$$11.stdout || process$1.env.MOCHA_COLORS !== undefined);
 	  /**
 	   * Inline diffs instead of +/-
 	   */
@@ -23541,7 +23568,7 @@
 	});
 
 	var name = "mocha";
-	var version$2 = "8.1.2";
+	var version$2 = "8.1.3";
 	var homepage = "https://mochajs.org/";
 	var notifyLogo = "https://ibin.co/4QuRuGjXvl36.png";
 	var _package = {
@@ -23560,7 +23587,7 @@
 		'default': _package
 	});
 
-	var require$$8 = getCjsExportFromNamespace(_package$1);
+	var require$$10 = getCjsExportFromNamespace(_package$1);
 
 	/**
 	 * Web Notifications module.
@@ -23690,7 +23717,7 @@
 	    cross: "\u274C",
 	    tick: "\u2705"
 	  };
-	  var logo = require$$8.notifyLogo;
+	  var logo = require$$10.notifyLogo;
 
 	  var _message;
 
@@ -24647,11 +24674,12 @@
 	   * MIT Licensed
 	   */
 
-	  var esmUtils = utils.supportsEsModules(true) ? require$$9 : undefined;
-	  var createInvalidReporterError = errors.createInvalidReporterError;
-	  var createInvalidInterfaceError = errors.createInvalidInterfaceError;
-	  var createMochaInstanceAlreadyDisposedError = errors.createMochaInstanceAlreadyDisposedError;
-	  var createMochaInstanceAlreadyRunningError = errors.createMochaInstanceAlreadyRunningError;
+	  var esmUtils = utils.supportsEsModules(true) ? require$$11 : undefined;
+	  var createUnsupportedError = errors.createUnsupportedError,
+	      createInvalidInterfaceError = errors.createInvalidInterfaceError,
+	      createInvalidReporterError = errors.createInvalidReporterError,
+	      createMochaInstanceAlreadyDisposedError = errors.createMochaInstanceAlreadyDisposedError,
+	      createMochaInstanceAlreadyRunningError = errors.createMochaInstanceAlreadyRunningError;
 	  var EVENT_FILE_PRE_REQUIRE = suite.constants.EVENT_FILE_PRE_REQUIRE;
 	  var EVENT_FILE_POST_REQUIRE = suite.constants.EVENT_FILE_POST_REQUIRE;
 	  var EVENT_FILE_REQUIRE = suite.constants.EVENT_FILE_REQUIRE;
@@ -25041,7 +25069,11 @@
 
 
 	  Mocha.unloadFile = function (file) {
-	    delete require.cache[require.resolve(file)];
+	    if (utils.isBrowser()) {
+	      throw createUnsupportedError('unloadFile() is only suported in a Node.js environment');
+	    }
+
+	    return require$$11.unloadFile(file);
 	  };
 	  /**
 	   * Unloads `files` from Node's `require` cache.
@@ -25523,7 +25555,7 @@
 
 
 	  Object.defineProperty(Mocha.prototype, 'version', {
-	    value: require$$8.version,
+	    value: require$$10.version,
 	    configurable: false,
 	    enumerable: true,
 	    writable: false
@@ -25675,7 +25707,7 @@
 
 	  Mocha.prototype.parallelMode = function parallelMode(enable) {
 	    if (utils.isBrowser()) {
-	      throw errors.createUnsupportedError('parallel mode is only supported in Node.js');
+	      throw createUnsupportedError('parallel mode is only supported in Node.js');
 	    }
 
 	    var parallel = enable === true;
@@ -25685,12 +25717,12 @@
 	    }
 
 	    if (this._state !== mochaStates.INIT) {
-	      throw errors.createUnsupportedError('cannot change parallel mode after having called run()');
+	      throw createUnsupportedError('cannot change parallel mode after having called run()');
 	    }
 
 	    this.options.parallel = parallel; // swap Runner class
 
-	    this._runnerClass = parallel ? require$$9 : exports.Runner; // lazyLoadFiles may have been set `true` otherwise (for ESM loading),
+	    this._runnerClass = parallel ? require$$11 : exports.Runner; // lazyLoadFiles may have been set `true` otherwise (for ESM loading),
 	    // so keep `true` if so.
 
 	    return this.lazyLoadFiles(this._lazyLoadFiles || parallel);
