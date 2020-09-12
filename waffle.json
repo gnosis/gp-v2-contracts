@@ -1,6 +1,6 @@
 {
-  "compilerType": "solcjs",
-  "compilerVersion": "0.6.2",
+  "compilerVersion": "0.5.16",
+  "compilerType": "dockerized-solc",
   "sourceDirectory": "./src/contracts",
   "outputDirectory": "./build"
 }

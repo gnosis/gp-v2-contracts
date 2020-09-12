@@ -1,13 +1,21 @@
 pragma experimental ABIEncoderV2;
-pragma solidity ^0.6.2;
+pragma solidity ^0.5.16;
+import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
+import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@uniswap/v2-core/contracts/libraries/Math.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
 
 contract PreAMMBatcher {
-    uint256 public x_uniswap = 10000;
-    uint256 public y_uniswap = 20000;
+    using SafeMath for uint256;
+    IUniswapV2Factory uniswapFactory;
 
     struct Order {
         uint256 buyAmount;
         uint256 sellAmount;
+        address sellToken;
+        address buyToken;
         address owner;
     }
 
@@ -16,26 +24,189 @@ contract PreAMMBatcher {
         uint256 denominator;
     }
 
-    constructor() public {}
+    event BatchSettlement(
+        address token0,
+        address token1,
+        uint256 sellAmountToken0,
+        uint256 sellAmountToken1
+    );
 
-    /*
-     * calculates the price by settling a fraction of the orders by against each other and then the rest against the uniswap pool
-     * assumes all ordres are fully covered
-     * @buyOrders, orders that are willing to sell a good A for a good B sorted by their price
-     * @sellOrders, orders that are willing to sell a good B for a good A sorted by their price
-     */
-    function calculatePrice(Order[] memory buyOrders, Order[] memory sellOrders)
+    constructor(IUniswapV2Factory _uniswapFactory) public {
+        uniswapFactory = _uniswapFactory;
+    }
+
+    function preBatchTrade(bytes memory order0bytes, bytes memory order1bytes)
         public
-        returns (Fraction memory price)
+        returns (Fraction memory clearingPrice)
     {
-        Fraction memory lowerPriceBound = Fraction(
-            buyOrders[0].buyAmount,
-            buyOrders[0].sellAmount
+        Order memory sellOrderToken0 = parseOrderBytes(order0bytes);
+        Order memory sellOrderToken1 = parseOrderBytes(order1bytes);
+        require(
+            orderChecks(sellOrderToken0, sellOrderToken1),
+            "orders-checks are not succesful"
         );
-        Fraction memory higherPriceBound = Fraction(
-            sellOrders[0].sellAmount,
-            sellOrders[0].buyAmount
+        receiveTradeAmounts(sellOrderToken0, sellOrderToken1);
+        IUniswapV2Pair uniswapPool = IUniswapV2Pair(
+            uniswapFactory.getPair(
+                sellOrderToken0.sellToken,
+                sellOrderToken1.sellToken
+            )
         );
-        //... further logic to come
+        clearingPrice = calculateSettlementPrice(
+            sellOrderToken0,
+            sellOrderToken1,
+            uniswapPool
+        );
+        uint256 unmatchedAmountToken0 = sellOrderToken0.sellAmount.sub(
+            sellOrderToken1.sellAmount.mul(clearingPrice.denominator).div(
+                clearingPrice.numerator
+            )
+        );
+        settleUnmatchedAmountsToUniswap(
+            unmatchedAmountToken0,
+            clearingPrice,
+            sellOrderToken0,
+            uniswapPool
+        );
+        payOutTradeProceedings(sellOrderToken0, sellOrderToken1);
+        emit BatchSettlement(
+            sellOrderToken0.sellToken,
+            sellOrderToken1.sellToken,
+            sellOrderToken0.sellAmount.sub(unmatchedAmountToken0),
+            sellOrderToken1.sellAmount
+        );
+    }
+
+    function orderChecks(
+        Order memory sellOrderToken0,
+        Order memory sellOrderToken1
+    ) public pure returns (bool) {
+        // later the signature verification should happen here as well
+        return
+            sellOrderToken0.sellToken == sellOrderToken1.buyToken &&
+            sellOrderToken1.sellToken == sellOrderToken0.buyToken;
+    }
+
+    function parseOrderBytes(bytes memory orderBytes)
+        public
+        pure
+        returns (Order memory order)
+    {
+        // very trivial parsing
+        (
+            uint256 sellAmount,
+            uint256 buyAmount,
+            address sellToken,
+            address buyToken,
+            address owner
+        ) = abi.decode(
+            orderBytes,
+            (uint256, uint256, address, address, address)
+        );
+        order = Order({
+            sellAmount: sellAmount,
+            buyAmount: buyAmount,
+            buyToken: buyToken,
+            sellToken: sellToken,
+            owner: owner
+        });
+    }
+
+    function calculateSettlementPrice(
+        Order memory sellOrderToken0,
+        Order memory sellOrderToken1,
+        IUniswapV2Pair uniswapPool
+    ) public view returns (Fraction memory clearingPrice) {
+        (uint112 reserve0, uint112 reserve1, ) = uniswapPool.getReserves();
+        uint256 uniswapK = uint256(reserve0).mul(reserve1);
+        // if deltaUniswapToken0 will be > 0
+        // if(sellOrderToken1.sellAmount * serve0 / reserve1 > sellToken2Order.sellAmount)
+        uint256 newReserve0 = Math.sqrt(
+            uniswapK.mul((sellOrderToken0.sellAmount + uint256(reserve0))).div(
+                (sellOrderToken1.sellAmount + uint256(reserve1))
+            )
+        ); // deltaUniswapToken0 should be positive
+        uint256 newReserve1 = uniswapK.div(newReserve0); // deltaUniswapToken1 should be negative
+        clearingPrice = Fraction({
+            numerator: newReserve0,
+            denominator: newReserve1
+        });
+        // else: deltaUniswapToken0 will be < 0
+        // // {}
+        require(
+            clearingPrice.numerator.mul(sellOrderToken0.sellAmount) >=
+                clearingPrice.denominator.mul(sellOrderToken0.buyAmount),
+            "sellOrderToken0 price violations"
+        );
+        require(
+            clearingPrice.numerator.mul(sellOrderToken1.sellAmount) >
+                clearingPrice.denominator.mul(sellOrderToken1.buyAmount),
+            "sellOrderToken1 price violations"
+        );
+    }
+
+    function settleUnmatchedAmountsToUniswap(
+        uint256 unsettledDirectAmountToken0,
+        Fraction memory clearingPrice,
+        Order memory sellOrderToken0,
+        IUniswapV2Pair uniswapPool
+    ) internal {
+        require(
+            IERC20(sellOrderToken0.sellToken).transfer(
+                address(uniswapPool),
+                unsettledDirectAmountToken0
+            ),
+            "transfer to uniswap failed"
+        );
+        uniswapPool.swap(
+            0,
+            unsettledDirectAmountToken0.mul(clearingPrice.numerator).div(
+                clearingPrice.denominator
+            ),
+            address(this),
+            abi.encode(0)
+        );
+    }
+
+    function receiveTradeAmounts(
+        Order memory sellOrderToken0,
+        Order memory sellOrderToken1
+    ) internal {
+        require(
+            IERC20(sellOrderToken0.sellToken).transferFrom(
+                sellOrderToken0.owner,
+                address(this),
+                sellOrderToken0.sellAmount
+            ),
+            "transferFrom for token0 was not succesful"
+        );
+        require(
+            IERC20(sellOrderToken0.buyToken).transferFrom(
+                sellOrderToken1.owner,
+                address(this),
+                sellOrderToken1.sellAmount
+            ),
+            "transferFrom for token1 was not succesful"
+        );
+    }
+
+    function payOutTradeProceedings(
+        Order memory sellOrderToken0,
+        Order memory sellOrderToken1
+    ) internal {
+        require(
+            IERC20(sellOrderToken0.sellToken).transfer(
+                sellOrderToken1.owner,
+                IERC20(sellOrderToken0.sellToken).balanceOf(address(this))
+            ),
+            "final token transfer failed"
+        );
+        require(
+            IERC20(sellOrderToken0.buyToken).transfer(
+                sellOrderToken0.owner,
+                IERC20(sellOrderToken0.buyToken).balanceOf(address(this))
+            ),
+            "final token1 transfer failed"
+        );
     }
 }
