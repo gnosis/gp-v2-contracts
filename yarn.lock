@@ -1684,15 +1684,10 @@ bn.js@^4.0.0, bn.js@^4.1.0, bn.js@^4.10.0, bn.js@^4.11.0, bn.js@^4.11.1, bn.js@^
   resolved "https://registry.yarnpkg.com/bn.js/-/bn.js-4.11.9.tgz#26d556829458f9d1e81fc48952493d0ba3507828"
   integrity sha512-E6QoYqCKZfgatHTdHzs1RRKP7ip4vvm+EyRUeE2RF0NblwVvb0p6jSVeNTOFxPn26QXN2o6SMfNxKp6kU8zQaw==
 
-bn.js@^5.1.1, bn.js@^5.1.2:
+bn.js@^5.1.1, bn.js@^5.1.2, bn.js@^5.1.3:
   version "5.1.3"
   resolved "https://registry.yarnpkg.com/bn.js/-/bn.js-5.1.3.tgz#beca005408f642ebebea80b042b4d18d2ac0ee6b"
   integrity sha512-GkTiFpjFtUzU9CbMeJ5iazkCzGL3jrhzerzZIuqLABjbwRaFt33I9tUdSNryIptM+RxDet6OKm2WnLXzW51KsQ==
-
-bn@^1.0.5:
-  version "1.0.5"
-  resolved "https://registry.yarnpkg.com/bn/-/bn-1.0.5.tgz#fdf5fdeede044884ea7ee62adff763ee99144fa5"
-  integrity sha512-7TvGbqbZb6lDzsBtNz1VkdXXV0BVmZKPPViPmo2IpvwaryF7P+QKYKACyVkwo2mZPr2CpFiz7EtgPEcc3o/JFQ==
 
 body-parser@1.19.0, body-parser@^1.16.0:
   version "1.19.0"
@@ -3368,7 +3363,7 @@ ethereumjs-util@^6.0.0, ethereumjs-util@^6.1.0, ethereumjs-util@^6.2.0:
     ethjs-util "0.1.6"
     rlp "^2.2.3"
 
-ethereumjs-util@^7.0.2:
+ethereumjs-util@^7.0.2, ethereumjs-util@^7.0.5:
   version "7.0.5"
   resolved "https://registry.yarnpkg.com/ethereumjs-util/-/ethereumjs-util-7.0.5.tgz#bc6e178dedbccc4b188c9ae6ae38db1906884b7b"
   integrity sha512-gLLZVXYUHR6pamO3h/+M1jzKz7qE20PKFyFKtq1PrIHA6wcLI96mDz96EMkkhXfrpk30rhpkw0iRnzxKhqaIdQ==
@@ -3449,7 +3444,7 @@ ethers@4.0.0-beta.3:
     uuid "2.0.1"
     xmlhttprequest "1.8.0"
 
-ethers@^5.0.0, ethers@^5.0.1, ethers@^5.0.12:
+ethers@5.0.12, ethers@^5.0.0, ethers@^5.0.1:
   version "5.0.12"
   resolved "https://registry.yarnpkg.com/ethers/-/ethers-5.0.12.tgz#8986cf53a425d1a00af6bda886e9098b0448d1fb"
   integrity sha512-mgF1ZLd1y5r+hS1IPATKwKx5k/PCSqz4PEQjMR+er+Hhu6IefVVcoYATUMjmK4FG+3PAkorRMA9rJ4Y/fdW0UA==

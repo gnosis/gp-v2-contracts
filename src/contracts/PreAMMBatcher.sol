@@ -11,9 +11,12 @@ contract PreAMMBatcher {
     using SafeMath for uint256;
     IUniswapV2Factory uniswapFactory;
 
+    bytes32 public constant DOMAIN_SEPARATOR = keccak256("preBatcher-V1");
+    mapping(address => uint8) public nonces; // probably a nonce per tokenpair would be better
+
     struct Order {
-        uint256 buyAmount;
         uint256 sellAmount;
+        uint256 buyAmount;
         address sellToken;
         address buyToken;
         address owner;
@@ -89,20 +92,50 @@ contract PreAMMBatcher {
 
     function parseOrderBytes(bytes memory orderBytes)
         public
-        pure
         returns (Order memory order)
     {
-        // very trivial parsing
         (
             uint256 sellAmount,
             uint256 buyAmount,
             address sellToken,
             address buyToken,
-            address owner
+            address owner,
+            uint8 nonce,
+            uint8 v,
+            bytes32 r,
+            bytes32 s
         ) = abi.decode(
             orderBytes,
-            (uint256, uint256, address, address, address)
+            (
+                uint256,
+                uint256,
+                address,
+                address,
+                address,
+                uint8,
+                uint8,
+                bytes32,
+                bytes32
+            )
         );
+        bytes32 digest = keccak256(
+            abi.encode(
+                DOMAIN_SEPARATOR,
+                sellAmount,
+                buyAmount,
+                sellToken,
+                buyToken,
+                owner,
+                nonce
+            )
+        );
+        address recoveredAddress = ecrecover(digest, v, r, s);
+        require(
+            recoveredAddress != address(0) && recoveredAddress == owner,
+            "invalid_signature"
+        );
+        require(nonces[owner] < nonce, "nonce already used");
+        nonces[owner] = nonce;
         order = Order({
             sellAmount: sellAmount,
             buyAmount: buyAmount,
