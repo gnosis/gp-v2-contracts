@@ -9,7 +9,6 @@ import UniswapV2Factory from '../node_modules/@uniswap/v2-core/build/UniswapV2Fa
 import ERC20 from '../build/UniswapV2ERC20.json';
 import {Order} from '../src/js/orders.spec';
 import BN from 'bn.js';
-
 use(solidity);
 
 describe('BasicToken', () => {
@@ -49,15 +48,14 @@ describe('BasicToken', () => {
     await token1.mock.transfer.returns(true);
 
     // uniswap should have 'leftover' token0
-    await token0.mock.balanceOf.withArgs(uniswapPairAddress).returns(utils.parseEther('0.5'));
-    await token1.mock.balanceOf.withArgs(uniswapPairAddress).returns(utils.parseEther('0'));
+    await token0.mock.balanceOf.withArgs(uniswapPairAddress).returns(new BN('10477272727272727272'));
+    await token1.mock.balanceOf.withArgs(uniswapPairAddress).returns(utils.parseEther('9547272727272727272'));
 
     // await token0.mock.transferFrom.withArgs(walletTrader1.address, uniswapPair.address, sellToken0Order.sellAmount).returns(true);
     // await token1.mock.transferFrom.withArgs(walletTrader2.address, uniswapPair.address, sellToken1Order.sellAmount).returns(true);
     await expect(batcher.preBatchTrade(sellToken0Order.encode(), sellToken1Order.encode(), {gasLimit: 6000000}))
       .to.emit(batcher, 'BatchSettlement')
-      .withArgs(token0.address, token1.address, new BN('477272727272727272'), utils.parseEther('0.5').toString());
-    await batcher.preBatchTrade(sellToken0Order.encode(), sellToken1Order.encode(), {gasLimit: 6000000});
+      .withArgs(token0.address, token1.address, '523809523809523809', utils.parseEther('0.5').toString());
 
     expect((await uniswapPair.getReserves())[0]).to.equal(120);
   });

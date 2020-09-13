@@ -58,8 +58,8 @@ contract PreAMMBatcher {
             uniswapPool
         );
         uint256 unmatchedAmountToken0 = sellOrderToken0.sellAmount.sub(
-            sellOrderToken1.sellAmount.mul(clearingPrice.denominator).div(
-                clearingPrice.numerator
+            sellOrderToken1.sellAmount.mul(clearingPrice.numerator).div(
+                clearingPrice.denominator
             )
         );
         settleUnmatchedAmountsToUniswap(
@@ -121,18 +121,23 @@ contract PreAMMBatcher {
         uint256 uniswapK = uint256(reserve0).mul(reserve1);
         // if deltaUniswapToken0 will be > 0
         // if(sellOrderToken1.sellAmount * serve0 / reserve1 > sellToken2Order.sellAmount)
-        uint256 newReserve0 = Math.sqrt(
-            uniswapK.mul((sellOrderToken0.sellAmount + uint256(reserve0))).div(
-                (sellOrderToken1.sellAmount + uint256(reserve1))
+        uint256 p = uniswapK.div(
+            uint256(2).mul(uint256(reserve1).add(sellOrderToken1.sellAmount))
+        );
+        uint256 newReserve0 = p.add(
+            Math.sqrt(
+                p.mul(p).add(
+                    uniswapK.mul(sellOrderToken0.sellAmount).div(
+                        uint256(reserve1).add(sellOrderToken1.sellAmount)
+                    )
+                )
             )
-        ); // deltaUniswapToken0 should be positive
-        uint256 newReserve1 = uniswapK.div(newReserve0); // deltaUniswapToken1 should be negative
+        );
+        uint256 newReserve1 = uniswapK.div(newReserve0);
         clearingPrice = Fraction({
             numerator: newReserve0,
             denominator: newReserve1
         });
-        // else: deltaUniswapToken0 will be < 0
-        // // {}
         require(
             clearingPrice.numerator.mul(sellOrderToken0.sellAmount) >=
                 clearingPrice.denominator.mul(sellOrderToken0.buyAmount),
@@ -160,11 +165,13 @@ contract PreAMMBatcher {
         );
         uniswapPool.swap(
             0,
-            unsettledDirectAmountToken0.mul(clearingPrice.numerator).div(
-                clearingPrice.denominator
-            ),
+            unsettledDirectAmountToken0
+                .mul(clearingPrice.denominator)
+                .mul(997)
+                .div(clearingPrice.numerator)
+                .div(1000),
             address(this),
-            abi.encode(0)
+            ""
         );
     }
 
@@ -181,7 +188,7 @@ contract PreAMMBatcher {
             "transferFrom for token0 was not succesful"
         );
         require(
-            IERC20(sellOrderToken0.buyToken).transferFrom(
+            IERC20(sellOrderToken1.sellToken).transferFrom(
                 sellOrderToken1.owner,
                 address(this),
                 sellOrderToken1.sellAmount
