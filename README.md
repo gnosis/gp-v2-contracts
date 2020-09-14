@@ -1,5 +1,5 @@
 
-## PreBatcher!
+## One Block Auctions (OBA):
 
 To run the project execute:
 
