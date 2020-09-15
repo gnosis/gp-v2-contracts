@@ -44,6 +44,8 @@ contract PreAMMBatcher {
     {
         Order memory sellOrderToken0 = parseOrderBytes(order0bytes);
         Order memory sellOrderToken1 = parseOrderBytes(order1bytes);
+        sellOrderToken0 = reduceOrder(sellOrderToken0);
+        sellOrderToken1 = reduceOrder(sellOrderToken1);
         require(
             orderChecks(sellOrderToken0, sellOrderToken1),
             "orders-checks are not succesful"
@@ -84,10 +86,26 @@ contract PreAMMBatcher {
         Order memory sellOrderToken0,
         Order memory sellOrderToken1
     ) public pure returns (bool) {
-        // later the signature verification should happen here as well
         return
             sellOrderToken0.sellToken == sellOrderToken1.buyToken &&
             sellOrderToken1.sellToken == sellOrderToken0.buyToken;
+    }
+
+    function reduceOrder(Order memory order)
+        public
+        view
+        returns (Order memory)
+    {
+        IERC20 sellToken = IERC20(order.sellToken);
+        uint256 newSellAmount = Math.min(
+            sellToken.allowance(order.owner, address(this)),
+            sellToken.balanceOf(order.owner)
+        );
+        order.buyAmount = newSellAmount.mul(order.buyAmount).div(
+            order.sellAmount
+        );
+        order.sellAmount = newSellAmount;
+        return order;
     }
 
     function parseOrderBytes(bytes memory orderBytes)
