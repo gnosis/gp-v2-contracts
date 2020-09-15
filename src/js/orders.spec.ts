@@ -4,7 +4,7 @@ const abi = require('ethereumjs-abi');
 import {utils, Wallet} from 'ethers';
 import {ecsign} from 'ethereumjs-util';
 
-const DOMAIN_SEPARATOR = '0x24a654ed47680d6a76f087ec92b3a0f0fe4c9c82c26bff3bb22dffe0f120c7f0';
+export const DOMAIN_SEPARATOR = '0x24a654ed47680d6a76f087ec92b3a0f0fe4c9c82c26bff3bb22dffe0f120c7f0';
 
 export class Order {
   sellAmount: BN;
