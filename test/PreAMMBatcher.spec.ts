@@ -41,7 +41,7 @@ describe('PreAMMBatcher', () => {
   };
 
   beforeEach(async () => {
-    \\ deploy all relevant contracts and setup the uniswap pool
+    // deploy all relevant contracts and setup the uniswap pool
     token0 = await deployMockContract(walletDeployer, ERC20.abi);
     token1 = await deployMockContract(walletDeployer, ERC20.abi);
     uniswapFactory = await deployContract(walletDeployer, UniswapV2Factory, [walletDeployer.address]);
