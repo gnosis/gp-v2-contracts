@@ -1,10 +1,10 @@
 
 import BN from 'bn.js';
-const abi = require('ethereumjs-abi');
+import abi from 'ethereumjs-abi';
 import {utils, Wallet} from 'ethers';
 import {ecsign} from 'ethereumjs-util';
 
-const DOMAIN_SEPARATOR = '0x24a654ed47680d6a76f087ec92b3a0f0fe4c9c82c26bff3bb22dffe0f120c7f0';
+export const DOMAIN_SEPARATOR = '0x24a654ed47680d6a76f087ec92b3a0f0fe4c9c82c26bff3bb22dffe0f120c7f0';
 
 export class Order {
   sellAmount: BN;
@@ -24,7 +24,7 @@ export class Order {
     this.nonce = new BN(nonce);
   }
 
-  encode(): string {
+  encode(): Buffer {
     const digest = this.getOrderDigest();
     const {v, r, s} = ecsign(Buffer.from(digest.slice(2), 'hex'), Buffer.from(this.wallet.privateKey.slice(2), 'hex'));
     return abi.rawEncode(['uint256', 'uint256', 'address', 'address',
