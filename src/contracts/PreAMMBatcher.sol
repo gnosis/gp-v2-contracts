@@ -226,7 +226,7 @@ contract PreAMMBatcher {
                 address(this),
                 sellOrderToken1.sellAmount
             ),
-            "transferFrom for token1 was not successful"
+            "unsuccessful transferFrom for token1"
         );
     }
 
