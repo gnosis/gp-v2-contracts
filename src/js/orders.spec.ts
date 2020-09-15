@@ -1,6 +1,6 @@
 
 import BN from 'bn.js';
-const abi = require('ethereumjs-abi');
+import abi from 'ethereumjs-abi';
 import {utils, Wallet} from 'ethers';
 import {ecsign} from 'ethereumjs-util';
 
