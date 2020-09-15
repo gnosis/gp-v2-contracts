@@ -11,7 +11,7 @@ import BN from 'bn.js';
 
 use(solidity);
 
-describe('BasicToken', () => {
+describe('PreAMMBatcher-e2e', () => {
   const [walletDeployer, walletTrader1, walletTrader2] = new MockProvider().getWallets();
   let batcher: Contract;
   let token0: Contract;
