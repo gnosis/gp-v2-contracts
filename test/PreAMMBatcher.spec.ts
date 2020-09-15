@@ -29,8 +29,10 @@ describe('PreAMMBatcher', () => {
     await token1.mock.transferFrom.returns(true);
     await token0.mock.transfer.returns(true);
     await token1.mock.transfer.returns(true);
-    await token0.mock.allowance.withArgs(sellOrder1.wallet.address, batcher.address).returns(sellOrder1.sellAmount.toString());
-    await token1.mock.allowance.withArgs(sellOrder2.wallet.address, batcher.address).returns(sellOrder2.sellAmount.toString());
+    await token0.mock.allowance.withArgs(sellOrder1.wallet.address, batcher.address)
+      .returns(sellOrder1.sellAmount.toString());
+    await token1.mock.allowance.withArgs(sellOrder2.wallet.address, batcher.address)
+      .returns(sellOrder2.sellAmount.toString());
     await token0.mock.balanceOf.withArgs(sellOrder1.wallet.address).returns(sellOrder1.sellAmount.toString());
     await token1.mock.balanceOf.withArgs(sellOrder2.wallet.address).returns(sellOrder2.sellAmount.toString());
     await token0.mock.balanceOf.withArgs(batcher.address).returns('1');
