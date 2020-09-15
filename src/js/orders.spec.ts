@@ -24,7 +24,7 @@ export class Order {
     this.nonce = new BN(nonce);
   }
 
-  encode(): string {
+  encode(): Buffer {
     const digest = this.getOrderDigest();
     const {v, r, s} = ecsign(Buffer.from(digest.slice(2), 'hex'), Buffer.from(this.wallet.privateKey.slice(2), 'hex'));
     return abi.rawEncode(['uint256', 'uint256', 'address', 'address',
