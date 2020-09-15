@@ -218,7 +218,7 @@ contract PreAMMBatcher {
                 address(this),
                 sellOrderToken0.sellAmount
             ),
-            "transferFrom for token0 was not succesful"
+            "transferFrom for token0 was not successful"
         );
         require(
             IERC20(sellOrderToken1.sellToken).transferFrom(
@@ -226,7 +226,7 @@ contract PreAMMBatcher {
                 address(this),
                 sellOrderToken1.sellAmount
             ),
-            "transferFrom for token1 was not succesful"
+            "transferFrom for token1 was not successful"
         );
     }
 
