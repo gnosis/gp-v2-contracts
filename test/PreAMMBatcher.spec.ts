@@ -80,23 +80,6 @@ describe('PreAMMBatcher', () => {
       .to.revertedWith('sellOrderToken1 are not compatible in sellToken'); ;
   });
 
-  it('parseOrderBytes runs through smoothly for 1 order', async () => {
-    const sellToken0Order = new Order(utils.parseEther('1'),
-      utils.parseEther('0.9'), token0, token1, walletTrader1, 1);
-
-    await batcher.parseOrderBytes(sellToken0Order.encode(), {gasLimit: 6000000});
-  });
-
-  it('parseOrderBytes runs through smoothly for 2 orders', async () => {
-    const sellToken0Order = new Order(utils.parseEther('1'),
-      utils.parseEther('0.9'), token0, token1, walletTrader1, 1);
-    const sellToken0Order2 = new Order(utils.parseEther('1'),
-      utils.parseEther('0.9'), token0, token1, walletTrader1, 2);
-
-    await batcher.parseOrderBytes(Buffer.concat([sellToken0Order.encode(), sellToken0Order2.encode()]),
-      {gasLimit: 6000000});
-  });
-
   it('receiveTradeAmounts reverts if transferFrom fails for token0', async () => {
     const testCaseInput = baseTestInput(token0, token1, [walletTrader1], [walletTrader2]);
 
