@@ -8,7 +8,7 @@ import UniswapV2Factory from '../node_modules/@uniswap/v2-core/build/UniswapV2Fa
 import ERC20 from '../build/ERC20Mintable.json';
 import {Order} from '../src/js/orders.spec';
 import BN from 'bn.js';
-import {baseTestInput, generateTestCase} from './resources/index';
+import {baseTestInput, fourOrderTestInput, generateTestCase} from './resources/index';
 import {TestCase} from './resources/models';
 
 use(solidity);
@@ -25,6 +25,7 @@ const setupOrders = async (orders: Order[], batcher: Contract) => {
     await order.sellToken.connect(order.wallet).approve(batcher.address, order.sellAmount);
   });
 };
+
 const fundUniswap = async (testCase: TestCase, walletDeployer: Wallet, uniswapPair: Contract) => {
   const token0 = testCase.sellOrdersToken0[0].sellToken;
   const token1 = testCase.sellOrdersToken0[0].buyToken;
@@ -35,7 +36,7 @@ const fundUniswap = async (testCase: TestCase, walletDeployer: Wallet, uniswapPa
   await uniswapPair.mint(walletDeployer.address, {gasLimit: 500000});
 };
 describe('PreAMMBatcher-e2e', () => {
-  const [walletDeployer, walletTrader1, walletTrader2] = new MockProvider().getWallets();
+  const [walletDeployer, walletTrader1, walletTrader2, walletTrader3, walletTrader4] = new MockProvider().getWallets();
   let batcher: Contract;
   let token0: Contract;
   let token1: Contract;
@@ -74,5 +75,41 @@ describe('PreAMMBatcher-e2e', () => {
       (new BN('10084092542732199005').mul(new BN('1000')).div(new BN('9916608715780969175'))).toString());
     console.log('uniswap clearing price:',
       ((await uniswapPair.getReserves())[0]).mul(1000).div((await uniswapPair.getReserves())[1]).toString());
+
+    await asyncForEach(basicTestCase.sellOrdersToken0, async (order: Order) => {
+      expect(await order.buyToken.balanceOf(order.wallet.address)).to.be.equal(order.sellAmount
+        .mul(basicTestCase.solution.clearingPrice.denominator).div(basicTestCase.solution.clearingPrice.numerator)
+        .mul(332).div(333));
+    });
+    await asyncForEach(basicTestCase.sellOrdersToken1, async (order: Order) => {
+      expect(await order.buyToken.balanceOf(order.wallet.address)).to.be.equal(order.sellAmount
+        .mul(basicTestCase.solution.clearingPrice.numerator).div(basicTestCase.solution.clearingPrice.denominator)
+        .mul(332).div(333));
+    });
+  });
+
+  it('pre-batches four orders and settles left-overs to uniswap', async () => {
+    basicTestCase = generateTestCase(fourOrderTestInput(token0, token1,
+      [walletTrader1, walletTrader2], [walletTrader3, walletTrader4]));
+    await fundUniswap(basicTestCase, walletDeployer, uniswapPair);
+
+    await setupOrders(basicTestCase.sellOrdersToken0.concat(basicTestCase.sellOrdersToken1), batcher);
+
+    await expect(batcher.batchTrade(basicTestCase.getSellOrdersToken0Encoded(),
+      basicTestCase.getSellOrdersToken1Encoded(), {gasLimit: 6000000}))
+      .to.emit(batcher, 'BatchSettlement')
+      .withArgs(token0.address, token1.address,
+        basicTestCase.solution.clearingPrice.denominator, basicTestCase.solution.clearingPrice.numerator);
+
+    await asyncForEach(basicTestCase.sellOrdersToken0, async (order: Order) => {
+      expect(await order.buyToken.balanceOf(order.wallet.address)).to.be.equal(order.sellAmount
+        .mul(basicTestCase.solution.clearingPrice.denominator).div(basicTestCase.solution.clearingPrice.numerator)
+        .mul(332).div(333));
+    });
+    await asyncForEach(basicTestCase.sellOrdersToken1, async (order: Order) => {
+      expect(await order.buyToken.balanceOf(order.wallet.address)).to.be.equal(order.sellAmount
+        .mul(basicTestCase.solution.clearingPrice.numerator).div(basicTestCase.solution.clearingPrice.denominator)
+        .mul(332).div(333));
+    });
   });
 });

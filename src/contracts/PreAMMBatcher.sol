@@ -135,10 +135,10 @@ contract PreAMMBatcher {
     }
 
     function parseOrderBytes(bytes calldata orderBytes)
-        public
+        internal
         returns (Order[] memory orders)
     {
-        orders = new Order[](orderBytes.length / 190);
+        orders = new Order[](orderBytes.length / 288);
         uint256 count = 0;
         while (orderBytes.length > 189) {
             bytes calldata singleOrder = orderBytes[:288];
@@ -202,6 +202,7 @@ contract PreAMMBatcher {
         IUniswapV2Pair uniswapPool
     )
         public
+        view
         returns (uint256 unmatchedAmountToken0, Fraction memory clearingPrice)
     {
         uint256 totalSellAmountToken0 = 0;
