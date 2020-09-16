@@ -5,7 +5,6 @@ To run the project execute:
 
 ```
 yarn
-docker pull ethereum/solc:0.5.16
 yarn build
 ```
 
