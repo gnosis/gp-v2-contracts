@@ -6,6 +6,13 @@ import {ecsign} from 'ethereumjs-util';
 
 export const DOMAIN_SEPARATOR = '0x24a654ed47680d6a76f087ec92b3a0f0fe4c9c82c26bff3bb22dffe0f120c7f0';
 
+export declare type SmartContractOrder ={
+  sellAmount: BN;
+  buyAmount: BN;
+  sellToken: string;
+  buyToken: string;
+  owner: string;
+}
 export class Order {
   sellAmount: BN;
   buyAmount: BN;
@@ -31,6 +38,19 @@ export class Order {
       'address', 'uint8', 'uint8', 'bytes32', 'bytes32'],
     [this.sellAmount.toString(), this.buyAmount.toString(), this.sellToken, this.buyToken,
       this.wallet.address, this.nonce.toString(), v, utils.hexlify(r), utils.hexlify(s)]);
+  }
+
+  getSmartContractOrder(): SmartContractOrder {
+    return {sellAmount: this.sellAmount,
+      buyAmount: this.buyAmount,
+      sellToken: this.sellToken,
+      buyToken: this.buyToken,
+      owner: this.wallet.address};
+  }
+
+  asArray(): [string, string, string, string, string] {
+    return [this.sellAmount.toString(), this.buyAmount.toString(),
+      this.sellToken, this.buyToken, this.wallet.address];
   }
 
   getOrderDigest(): string {

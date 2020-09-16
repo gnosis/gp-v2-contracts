@@ -1,10 +1,10 @@
 pragma experimental ABIEncoderV2;
-pragma solidity ^0.5.16;
+pragma solidity ^0.6.2;
 import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@uniswap/v2-core/contracts/libraries/Math.sol";
+import "./libraries/Math.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 
 contract PreAMMBatcher {
@@ -12,7 +12,11 @@ contract PreAMMBatcher {
     IUniswapV2Factory uniswapFactory;
 
     bytes32 public constant DOMAIN_SEPARATOR = keccak256("preBatcher-V1");
+    uint256 public constant feeFactor = 333; // Charged fee is (feeFactor-1)/feeFactor
     mapping(address => uint8) public nonces; // probably a nonce per tokenpair would be better
+
+    event Log(bytes b);
+    event Log2(bytes b);
 
     struct Order {
         uint256 sellAmount;
@@ -38,60 +42,86 @@ contract PreAMMBatcher {
         uniswapFactory = _uniswapFactory;
     }
 
-    function preBatchTrade(bytes memory order0bytes, bytes memory order1bytes)
+    function batchTrade(bytes calldata order0bytes, bytes calldata order1bytes)
         public
         returns (Fraction memory clearingPrice)
     {
-        Order memory sellOrderToken0 = parseOrderBytes(order0bytes);
-        Order memory sellOrderToken1 = parseOrderBytes(order1bytes);
-        // sellOrderToken0 = reduceOrder(sellOrderToken0);
-        sellOrderToken1 = reduceOrder(sellOrderToken1);
-        require(
-            orderChecks(sellOrderToken0, sellOrderToken1),
-            "orders-checks are not succesful"
-        );
-        receiveTradeAmounts(sellOrderToken0, sellOrderToken1);
+        Order[] memory sellOrdersToken0 = parseOrderBytes(order0bytes);
+        Order[] memory sellOrdersToken1 = parseOrderBytes(order1bytes);
+        for (uint256 i = 0; i < sellOrdersToken0.length; i++) {
+            sellOrdersToken0[i] = reduceOrder(sellOrdersToken0[i]);
+        }
+        for (uint256 i = 0; i < sellOrdersToken1.length; i++) {
+            sellOrdersToken1[i] = reduceOrder(sellOrdersToken1[i]);
+        }
+        orderChecks(sellOrdersToken0, sellOrdersToken1);
+        receiveTradeAmounts(sellOrdersToken0);
+        receiveTradeAmounts(sellOrdersToken1);
         IUniswapV2Pair uniswapPool = IUniswapV2Pair(
             uniswapFactory.getPair(
-                sellOrderToken0.sellToken,
-                sellOrderToken1.sellToken
+                sellOrdersToken0[0].sellToken,
+                sellOrdersToken1[0].sellToken
             )
         );
-        clearingPrice = calculateSettlementPrice(
-            sellOrderToken0,
-            sellOrderToken1,
+        uint256 unmatchedAmountToken0 = 0;
+        (unmatchedAmountToken0, clearingPrice) = calculateSettlementPrice(
+            sellOrdersToken0,
+            sellOrdersToken1,
             uniswapPool
-        );
-        uint256 unmatchedAmountToken0 = sellOrderToken0.sellAmount.sub(
-            sellOrderToken1.sellAmount.mul(clearingPrice.numerator).div(
-                clearingPrice.denominator
-            )
         );
         settleUnmatchedAmountsToUniswap(
             unmatchedAmountToken0,
             clearingPrice,
-            sellOrderToken0,
+            sellOrdersToken0[0],
             uniswapPool
         );
-        payOutTradeProceedings(sellOrderToken0, sellOrderToken1);
+        payOutTradeProceedings(sellOrdersToken0, clearingPrice);
+        payOutTradeProceedings(sellOrdersToken1, inverse(clearingPrice));
         emit BatchSettlement(
-            sellOrderToken0.sellToken,
-            sellOrderToken1.sellToken,
-            sellOrderToken0.sellAmount.sub(unmatchedAmountToken0),
-            sellOrderToken1.sellAmount
+            sellOrdersToken0[0].sellToken,
+            sellOrdersToken1[0].sellToken,
+            clearingPrice.denominator,
+            clearingPrice.numerator
         );
+    }
+
+    function inverse(Fraction memory f) public pure returns (Fraction memory) {
+        return Fraction(f.denominator, f.numerator);
     }
 
     function orderChecks(
-        Order memory sellOrderToken0,
-        Order memory sellOrderToken1
-    ) public pure returns (bool) {
-        return
-            sellOrderToken0.sellToken == sellOrderToken1.buyToken &&
-            sellOrderToken1.sellToken == sellOrderToken0.buyToken;
+        Order[] memory sellOrderToken0,
+        Order[] memory sellOrderToken1
+    ) public pure {
+        address buyToken = sellOrderToken0[0].buyToken;
+        address sellToken = sellOrderToken0[0].sellToken;
+        for (uint256 i = 0; i < sellOrderToken0.length; i++) {
+            require(
+                sellOrderToken0[i].sellToken == sellToken,
+                "sellOrderToken0 are not compatible in sellToken"
+            );
+            require(
+                sellOrderToken0[i].buyToken == buyToken,
+                "sellOrderToken0 are not compatible in buyToken"
+            );
+        }
+        for (uint256 i = 0; i < sellOrderToken1.length; i++) {
+            require(
+                sellOrderToken1[i].sellToken == buyToken,
+                "sellOrderToken1 are not compatible in sellToken"
+            );
+            require(
+                sellOrderToken1[i].buyToken == sellToken,
+                "sellOrderToken1 are not compatible in sellToken"
+            );
+        }
     }
 
-    function reduceOrder(Order memory order) public returns (Order memory) {
+    function reduceOrder(Order memory order)
+        public
+        view
+        returns (Order memory)
+    {
         IERC20 sellToken = IERC20(order.sellToken);
         uint256 newSellAmount = Math.min(
             sellToken.allowance(order.owner, address(this)),
@@ -104,78 +134,103 @@ contract PreAMMBatcher {
         return order;
     }
 
-    function parseOrderBytes(bytes memory orderBytes)
+    function parseOrderBytes(bytes calldata orderBytes)
         public
-        returns (Order memory order)
+        returns (Order[] memory orders)
     {
-        (
-            uint256 sellAmount,
-            uint256 buyAmount,
-            address sellToken,
-            address buyToken,
-            address owner,
-            uint8 nonce,
-            uint8 v,
-            bytes32 r,
-            bytes32 s
-        ) = abi.decode(
-            orderBytes,
+        orders = new Order[](orderBytes.length / 190);
+        uint256 count = 0;
+        while (orderBytes.length > 189) {
+            emit Log(orderBytes);
+            bytes calldata singleOrder = orderBytes[:288];
+            emit Log2(singleOrder);
+            orderBytes = orderBytes[288:];
             (
-                uint256,
-                uint256,
-                address,
-                address,
-                address,
-                uint8,
-                uint8,
-                bytes32,
-                bytes32
-            )
-        );
-        bytes32 digest = keccak256(
-            abi.encode(
-                DOMAIN_SEPARATOR,
-                sellAmount,
-                buyAmount,
-                sellToken,
-                buyToken,
-                owner,
-                nonce
-            )
-        );
-        address recoveredAddress = ecrecover(digest, v, r, s);
-        require(
-            recoveredAddress != address(0) && recoveredAddress == owner,
-            "invalid_signature"
-        );
-        require(nonces[owner] < nonce, "nonce already used");
-        nonces[owner] = nonce;
-        order = Order({
-            sellAmount: sellAmount,
-            buyAmount: buyAmount,
-            buyToken: buyToken,
-            sellToken: sellToken,
-            owner: owner
-        });
+                uint256 sellAmount,
+                uint256 buyAmount,
+                address sellToken,
+                address buyToken,
+                address owner,
+                uint8 nonce,
+                uint8 v,
+                bytes32 r,
+                bytes32 s
+            ) = abi.decode(
+                singleOrder,
+                (
+                    uint256,
+                    uint256,
+                    address,
+                    address,
+                    address,
+                    uint8,
+                    uint8,
+                    bytes32,
+                    bytes32
+                )
+            );
+            bytes32 digest = keccak256(
+                abi.encode(
+                    DOMAIN_SEPARATOR,
+                    sellAmount,
+                    buyAmount,
+                    sellToken,
+                    buyToken,
+                    owner,
+                    nonce
+                )
+            );
+            address recoveredAddress = ecrecover(digest, v, r, s);
+            require(
+                recoveredAddress != address(0) && recoveredAddress == owner,
+                "invalid_signature"
+            );
+            require(nonces[owner] < nonce, "nonce already used");
+            nonces[owner] = nonce;
+            orders[count] = Order({
+                sellAmount: sellAmount,
+                buyAmount: buyAmount,
+                buyToken: buyToken,
+                sellToken: sellToken,
+                owner: owner
+            });
+            count = count.add(1);
+        }
     }
 
     function calculateSettlementPrice(
-        Order memory sellOrderToken0,
-        Order memory sellOrderToken1,
+        Order[] memory sellOrderToken0,
+        Order[] memory sellOrderToken1,
         IUniswapV2Pair uniswapPool
-    ) public view returns (Fraction memory clearingPrice) {
+    )
+        public
+        view
+        returns (uint256 unmatchedAmountToken0, Fraction memory clearingPrice)
+    {
+        uint256 totalSellAmountToken0 = 0;
+        for (uint256 i = 0; i < sellOrderToken0.length; i++) {
+            totalSellAmountToken0 = totalSellAmountToken0.add(
+                sellOrderToken0[i].sellAmount
+            );
+        }
+        uint256 totalSellAmountToken1 = 0;
+        for (uint256 i = 0; i < sellOrderToken1.length; i++) {
+            totalSellAmountToken1 = totalSellAmountToken1.add(
+                sellOrderToken1[i].sellAmount
+            );
+        }
         (uint112 reserve0, uint112 reserve1, ) = uniswapPool.getReserves();
         uint256 uniswapK = uint256(reserve0).mul(reserve1);
         // if deltaUniswapToken0 will be > 0
         // if(sellOrderToken1.sellAmount * serve0 / reserve1 > sellToken2Order.sellAmount)
         uint256 p = uniswapK.div(
-            uint256(2).mul(uint256(reserve1).add(sellOrderToken1.sellAmount))
+            uint256(2).mul(uint256(reserve1).add(totalSellAmountToken1))
         );
         uint256 newReserve0 = p.add(
             Math.sqrt(
                 p.mul(p).add(
-                    uniswapK.mul(sellOrderToken0.sellAmount).div(
-                        uint256(reserve1).add(sellOrderToken1.sellAmount)
+                    uniswapK.mul(totalSellAmountToken0).div(
+                        uint256(reserve1).add(totalSellAmountToken1)
                     )
                 )
             )
@@ -185,15 +240,25 @@ contract PreAMMBatcher {
             numerator: newReserve0,
             denominator: newReserve1
         });
+        Order memory highestSellOrderToken0 = sellOrderToken0[sellOrderToken0
+            .length - 1];
+
+        Order memory highestSellOrderToken1 = sellOrderToken1[sellOrderToken1
+            .length - 1];
         require(
-            clearingPrice.numerator.mul(sellOrderToken0.sellAmount) >=
-                clearingPrice.denominator.mul(sellOrderToken0.buyAmount),
+            clearingPrice.numerator.mul(highestSellOrderToken0.sellAmount) >=
+                clearingPrice.denominator.mul(highestSellOrderToken0.buyAmount),
             "sellOrderToken0 price violations"
         );
         require(
-            clearingPrice.numerator.mul(sellOrderToken1.sellAmount) >
-                clearingPrice.denominator.mul(sellOrderToken1.buyAmount),
+            clearingPrice.numerator.mul(highestSellOrderToken1.sellAmount) >
+                clearingPrice.denominator.mul(highestSellOrderToken1.buyAmount),
             "sellOrderToken1 price violations"
+        );
+        unmatchedAmountToken0 = totalSellAmountToken0.sub(
+            totalSellAmountToken1.mul(clearingPrice.numerator).div(
+                clearingPrice.denominator
+            )
         );
     }
 
@@ -222,45 +287,36 @@ contract PreAMMBatcher {
         );
     }
 
-    function receiveTradeAmounts(
-        Order memory sellOrderToken0,
-        Order memory sellOrderToken1
-    ) internal {
-        require(
-            IERC20(sellOrderToken0.sellToken).transferFrom(
-                sellOrderToken0.owner,
-                address(this),
-                sellOrderToken0.sellAmount
-            ),
-            "unsuccessful transferFrom for token0"
-        );
-        require(
-            IERC20(sellOrderToken1.sellToken).transferFrom(
-                sellOrderToken1.owner,
-                address(this),
-                sellOrderToken1.sellAmount
-            ),
-            "unsuccessful transferFrom for token1"
-        );
+    function receiveTradeAmounts(Order[] memory orders) internal {
+        for (uint256 i = 0; i < orders.length; i++) {
+            require(
+                IERC20(orders[i].sellToken).transferFrom(
+                    orders[i].owner,
+                    address(this),
+                    orders[i].sellAmount
+                ),
+                "unsuccessful transferFrom for order"
+            );
+        }
     }
 
     function payOutTradeProceedings(
-        Order memory sellOrderToken0,
-        Order memory sellOrderToken1
+        Order[] memory orders,
+        Fraction memory price
     ) internal {
-        require(
-            IERC20(sellOrderToken0.sellToken).transfer(
-                sellOrderToken1.owner,
-                IERC20(sellOrderToken0.sellToken).balanceOf(address(this))
-            ),
-            "final token transfer failed"
-        );
-        require(
-            IERC20(sellOrderToken0.buyToken).transfer(
-                sellOrderToken0.owner,
-                IERC20(sellOrderToken0.buyToken).balanceOf(address(this))
-            ),
-            "final token1 transfer failed"
-        );
+        for (uint256 i = 0; i < orders.length; i++) {
+            require(
+                IERC20(orders[i].buyToken).transfer(
+                    orders[i].owner,
+                    orders[i]
+                        .sellAmount
+                        .mul(price.denominator)
+                        .div(price.numerator)
+                        .mul(feeFactor - 1)
+                        .div(feeFactor)
+                ),
+                "final token transfer failed"
+            );
+        }
     }
 }

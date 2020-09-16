@@ -5,7 +5,7 @@ import PreAMMBatcher from '../build/PreAMMBatcher.json';
 import UniswapV2Pair from '../node_modules/@uniswap/v2-core/build/UniswapV2Pair.json';
 import UniswapV2Factory from '../node_modules/@uniswap/v2-core/build/UniswapV2Factory.json';
 
-import ERC20 from '../node_modules/@openzeppelin/contracts/build/contracts/ERC20Mintable.json';
+import ERC20 from '../build/ERC20Mintable.json';
 import {Order} from '../src/js/orders.spec';
 import BN from 'bn.js';
 
@@ -21,8 +21,8 @@ describe('PreAMMBatcher-e2e', () => {
   let uniswapPairAddress: string;
 
   beforeEach(async () => {
-    token0 = await deployContract(walletDeployer, ERC20);
-    token1 = await deployContract(walletDeployer, ERC20);
+    token0 = await deployContract(walletDeployer, ERC20, ['token0', '18']);
+    token1 = await deployContract(walletDeployer, ERC20, ['token1', '18']);
     uniswapFactory = await deployContract(walletDeployer, UniswapV2Factory, [walletDeployer.address]);
     await uniswapFactory.createPair(token0.address, token1.address, {gasLimit: 6000000});
     uniswapPairAddress = await uniswapFactory.getPair(token0.address, token1.address);
@@ -52,14 +52,14 @@ describe('PreAMMBatcher-e2e', () => {
     await expect(await token0.allowance(walletTrader1.address, batcher.address))
       .to.equal(sellToken0Order.sellAmount.toString());
 
-    await expect(batcher.preBatchTrade(sellToken0Order.encode(), sellToken1Order.encode(), {gasLimit: 6000000}))
+    await expect(batcher.batchTrade(sellToken0Order.encode(), sellToken1Order.encode(), {gasLimit: 6000000}))
       .to.emit(batcher, 'BatchSettlement')
-      .withArgs(token0.address, token1.address, '915200301693484321', utils.parseEther('0.9').toString());
+      .withArgs(token0.address, token1.address, '9916608715780969175', '10084092542732199005');
 
     expect((await uniswapPair.getReserves())[0]).to.equal('10084799698306515679');
     expect((await uniswapPair.getReserves())[1]).to.equal('9916858889633626266');
     console.log('auction clearing price:',
-      (new BN('915200301693484321').mul(new BN(1000))).div(new BN(utils.parseEther('0.9').toString())).toString());
+      (new BN('10084092542732199005').mul(new BN('1000')).div(new BN('9916608715780969175'))));
     console.log('uniswap clearing price:',
       ((await uniswapPair.getReserves())[0]).mul(1000).div((await uniswapPair.getReserves())[1]).toString());
   });
