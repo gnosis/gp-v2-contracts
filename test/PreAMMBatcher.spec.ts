@@ -7,6 +7,7 @@ import UniswapV2Factory from '../node_modules/@uniswap/v2-core/build/UniswapV2Fa
 
 import ERC20 from '../build/ERC20Mintable.json';
 import {Order, DOMAIN_SEPARATOR} from '../src/js/orders.spec';
+import {baseTestInput} from './resources/index';
 
 use(solidity);
 
@@ -21,7 +22,7 @@ describe('PreAMMBatcher', () => {
   const initialUniswapFundingOfToken0 = utils.parseEther('10');
   const initialUniswapFundingOfToken1 = utils.parseEther('10');
 
-  const mockRelevantTokenDataForbatchTrade = async (sellOrder1: Order, sellOrder2: Order) => {
+  const mockRelevantTokenDataForBatchTrade = async (sellOrder1: Order, sellOrder2: Order) => {
     // todo: mock actual right information
     // mock un-relevant data to make batchTrade call pass
     await token0.mock.transferFrom.returns(true);
@@ -64,24 +65,19 @@ describe('PreAMMBatcher', () => {
   });
 
   it('orderChecks runs through smoothly', async () => {
-    const sellToken0Order = new Order(utils.parseEther('1'),
-      utils.parseEther('0.9'), token0, token1, walletTrader1, 1);
-    const sellToken1Order = new Order(utils.parseEther('0.9'),
-      utils.parseEther('0.90111'), token1, token0, walletTrader2, 1);
+    const testCaseInput = baseTestInput(token0, token1, [walletTrader1], [walletTrader2]);
 
-    await batcher.orderChecks([sellToken0Order.getSmartContractOrder()],
-      [sellToken1Order.getSmartContractOrder()], {gasLimit: 6000000});
+    await batcher.orderChecks([testCaseInput.sellOrdersToken0[0].getSmartContractOrder()],
+      [testCaseInput.sellOrdersToken1[0].getSmartContractOrder()], {gasLimit: 6000000});
   });
 
   it('orderChecks detects non matching orders', async () => {
-    const sellToken0Order = new Order(utils.parseEther('1'),
-      utils.parseEther('0.9'), token0, token1, walletTrader1, 1);
-    const sellToken1Order = new Order(utils.parseEther('0.9'),
-      utils.parseEther('0.90111'), token0, token1, walletTrader2, 1);
+    const testCaseInput = baseTestInput(token0, token1, [walletTrader1], [walletTrader2]);
+    testCaseInput.sellOrdersToken1[0].sellToken = token0;
 
-    await expect(batcher.orderChecks([sellToken0Order.getSmartContractOrder()],
-      [sellToken1Order.getSmartContractOrder()], {gasLimit: 6000000}))
-      .to.revertedWith('sellOrderToken1 are not compatible in sellToken');
+    await expect(batcher.orderChecks([testCaseInput.sellOrdersToken0[0].getSmartContractOrder()],
+      [testCaseInput.sellOrdersToken1[0].getSmartContractOrder()], {gasLimit: 6000000}))
+      .to.revertedWith('sellOrderToken1 are not compatible in sellToken'); ;
   });
 
   it('parseOrderBytes runs through smoothly for 1 order', async () => {
@@ -102,49 +98,42 @@ describe('PreAMMBatcher', () => {
   });
 
   it('receiveTradeAmounts reverts if transferFrom fails for token0', async () => {
-    const sellToken0Order = new Order(utils.parseEther('1'),
-      utils.parseEther('0.9'), token0, token1, walletTrader1, 1);
-    const sellToken1Order = new Order(utils.parseEther('0.9'),
-      utils.parseEther('0.90111'), token1, token0, walletTrader2, 1);
+    const testCaseInput = baseTestInput(token0, token1, [walletTrader1], [walletTrader2]);
 
-    await mockRelevantTokenDataForbatchTrade(sellToken0Order, sellToken1Order);
+    await mockRelevantTokenDataForBatchTrade(testCaseInput.sellOrdersToken0[0], testCaseInput.sellOrdersToken1[0]);
     await token0.mock.transferFrom.returns(false);
-    await expect(batcher.batchTrade(sellToken0Order.encode(), sellToken1Order.encode(), {gasLimit: 6000000}))
+    await expect(batcher.batchTrade(testCaseInput.sellOrdersToken0[0].encode(),
+      testCaseInput.sellOrdersToken1[0].encode(), {gasLimit: 6000000}))
       .to.be.revertedWith('unsuccessful transferFrom for order');
   });
+
   it('receiveTradeAmounts transferFrom the right amount of token0', async () => {
-    const sellToken0Order = new Order(utils.parseEther('1'),
-      utils.parseEther('0.9'), token0, token1, walletTrader1, 1);
-    const sellToken1Order = new Order(utils.parseEther('0.9'),
-      utils.parseEther('0.90111'), token1, token0, walletTrader2, 1);
+    const testCaseInput = baseTestInput(token0, token1, [walletTrader1], [walletTrader2]);
 
-    await mockRelevantTokenDataForbatchTrade(sellToken0Order, sellToken1Order);
+    await mockRelevantTokenDataForBatchTrade(testCaseInput.sellOrdersToken0[0], testCaseInput.sellOrdersToken1[0]);
 
-    await batcher.batchTrade(sellToken0Order.encode(), sellToken1Order.encode(), {gasLimit: 6000000});
+    await batcher.batchTrade(testCaseInput.sellOrdersToken0[0].encode(),
+      testCaseInput.sellOrdersToken1[0].encode(), {gasLimit: 6000000});
     expect('transferFrom').to.be.calledOnContractWith(token0,
-      [walletTrader1.address, batcher.address, sellToken0Order.sellAmount.toString()]);
+      [walletTrader1.address, batcher.address, testCaseInput.sellOrdersToken0[0].sellAmount.toString()]);
   });
   it('receiveTradeAmounts reverts if transferFrom fails for token1', async () => {
-    const sellToken0Order = new Order(utils.parseEther('1'),
-      utils.parseEther('0.9'), token0, token1, walletTrader1, 1);
-    const sellToken1Order = new Order(utils.parseEther('0.9'),
-      utils.parseEther('0.90111'), token1, token0, walletTrader2, 1);
-    await mockRelevantTokenDataForbatchTrade(sellToken0Order, sellToken1Order);
+    const testCaseInput = baseTestInput(token0, token1, [walletTrader1], [walletTrader2]);
+
+    await mockRelevantTokenDataForBatchTrade(testCaseInput.sellOrdersToken0[0], testCaseInput.sellOrdersToken1[0]);
 
     await token0.mock.transferFrom.returns(true);
     await token1.mock.transferFrom.returns(false);
-    await expect(batcher.batchTrade(sellToken0Order.encode(), sellToken1Order.encode(), {gasLimit: 6000000}))
+    await expect(batcher.batchTrade(testCaseInput.sellOrdersToken0[0].encode(),
+      testCaseInput.sellOrdersToken1[0].encode(), {gasLimit: 6000000}))
       .to.be.revertedWith('unsuccessful transferFrom for order');
   });
   it('receiveTradeAmounts transferFrom the right amount of token1', async () => {
-    const sellToken0Order = new Order(utils.parseEther('1'),
-      utils.parseEther('0.9'), token0, token1, walletTrader1, 1);
-    const sellToken1Order = new Order(utils.parseEther('0.9'),
-      utils.parseEther('0.90111'), token1, token0, walletTrader2, 1);
-
-    await mockRelevantTokenDataForbatchTrade(sellToken0Order, sellToken1Order);
-    await batcher.batchTrade(sellToken0Order.encode(), sellToken1Order.encode(), {gasLimit: 6000000});
+    const testCaseInput = baseTestInput(token0, token1, [walletTrader1], [walletTrader2]);
+    await mockRelevantTokenDataForBatchTrade(testCaseInput.sellOrdersToken0[0], testCaseInput.sellOrdersToken1[0]);
+    await batcher.batchTrade(testCaseInput.sellOrdersToken0[0].encode(), testCaseInput.sellOrdersToken1[0].encode(),
+      {gasLimit: 6000000});
     expect('transferFrom').to.be.calledOnContractWith(token1,
-      [walletTrader2.address, batcher.address, sellToken1Order.sellAmount.toString()]);
+      [walletTrader2.address, batcher.address, testCaseInput.sellOrdersToken1[0].sellAmount.toString()]);
   });
 });

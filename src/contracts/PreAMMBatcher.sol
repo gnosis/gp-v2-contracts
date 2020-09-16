@@ -13,9 +13,9 @@ contract PreAMMBatcher {
 
     bytes32 public constant DOMAIN_SEPARATOR = keccak256("preBatcher-V1");
     uint256 public constant feeFactor = 333; // Charged fee is (feeFactor-1)/feeFactor
-    mapping(address => uint8) public nonces; // probably a nonce per tokenpair would be better
+    mapping(address => uint8) public nonces; // Probably a nonce per tokenpair would be better
 
-    event Log(bytes b);
+    event Log(uint256 b);
     event Log2(bytes b);
 
     struct Order {
@@ -141,9 +141,7 @@ contract PreAMMBatcher {
         orders = new Order[](orderBytes.length / 190);
         uint256 count = 0;
         while (orderBytes.length > 189) {
-            emit Log(orderBytes);
             bytes calldata singleOrder = orderBytes[:288];
-            emit Log2(singleOrder);
             orderBytes = orderBytes[288:];
             (
                 uint256 sellAmount,
@@ -204,7 +202,6 @@ contract PreAMMBatcher {
         IUniswapV2Pair uniswapPool
     )
         public
-        view
         returns (uint256 unmatchedAmountToken0, Fraction memory clearingPrice)
     {
         uint256 totalSellAmountToken0 = 0;
