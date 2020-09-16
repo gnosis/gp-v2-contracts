@@ -11,6 +11,19 @@ import BN from 'bn.js';
 
 use(solidity);
 
+async function asyncForEach(array: Order[], callback: any) {
+  for (let index = 0; index < array.length; index++) {
+    await callback(array[index], index, array);
+  }
+}
+
+const setupOrder = async (orders: Order[], batcher: Contract) => {
+  await asyncForEach(orders, async (order: Order) => {
+    await order.sellToken.mint(order.wallet.address, order.sellAmount);
+    await order.sellToken.connect(order.wallet).approve(batcher.address, order.sellAmount);
+  });
+};
+
 describe('PreAMMBatcher-e2e', () => {
   const [walletDeployer, walletTrader1, walletTrader2] = new MockProvider().getWallets();
   let batcher: Contract;
@@ -39,18 +52,12 @@ describe('PreAMMBatcher-e2e', () => {
   });
 
   it('pre-batches two simple orders and settles left-overs to uniswap', async () => {
-    const sellToken0Order = new Order(new BN(utils.parseEther('1').toString()),
-      new BN(utils.parseEther('0.9').toString()), token0.address, token1.address, walletTrader1, new BN('1'));
-    const sellToken1Order = new Order(new BN(utils.parseEther('0.9').toString()),
-      new BN(utils.parseEther('0.90111').toString()), token1.address, token0.address, walletTrader2, new BN('1'));
+    const sellToken0Order = new Order(utils.parseEther('1'),
+      utils.parseEther('0.9'), token0, token1, walletTrader1, 1);
+    const sellToken1Order = new Order(utils.parseEther('0.9'),
+      utils.parseEther('0.90111'), token1, token0, walletTrader2, 1);
 
-    await token0.mint(sellToken0Order.wallet.address, sellToken0Order.sellAmount.toString());
-    await token1.mint(sellToken1Order.wallet.address, sellToken1Order.sellAmount.toString());
-    expect(await token0.balanceOf(sellToken0Order.wallet.address)).to.equal(sellToken0Order.sellAmount.toString());
-    await token0.connect(walletTrader1).approve(batcher.address, sellToken0Order.sellAmount.toString());
-    await token1.connect(walletTrader2).approve(batcher.address, sellToken1Order.sellAmount.toString());
-    await expect(await token0.allowance(walletTrader1.address, batcher.address))
-      .to.equal(sellToken0Order.sellAmount.toString());
+    await setupOrder([sellToken0Order, sellToken1Order], batcher);
 
     await expect(batcher.batchTrade(sellToken0Order.encode(), sellToken1Order.encode(), {gasLimit: 6000000}))
       .to.emit(batcher, 'BatchSettlement')
@@ -59,7 +66,7 @@ describe('PreAMMBatcher-e2e', () => {
     expect((await uniswapPair.getReserves())[0]).to.equal('10084799698306515679');
     expect((await uniswapPair.getReserves())[1]).to.equal('9916858889633626266');
     console.log('auction clearing price:',
-      (new BN('10084092542732199005').mul(new BN('1000')).div(new BN('9916608715780969175'))));
+      (new BN('10084092542732199005').mul(new BN('1000')).div(new BN('9916608715780969175'))).toString());
     console.log('uniswap clearing price:',
       ((await uniswapPair.getReserves())[0]).mul(1000).div((await uniswapPair.getReserves())[1]).toString());
   });

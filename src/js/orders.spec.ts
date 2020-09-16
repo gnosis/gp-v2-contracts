@@ -1,34 +1,33 @@
 
-import BN from 'bn.js';
 import abi from 'ethereumjs-abi';
-import {utils, Wallet} from 'ethers';
+import {utils, Wallet, Contract, BigNumber} from 'ethers';
 import {ecsign} from 'ethereumjs-util';
 
 export const DOMAIN_SEPARATOR = '0x24a654ed47680d6a76f087ec92b3a0f0fe4c9c82c26bff3bb22dffe0f120c7f0';
 
 export declare type SmartContractOrder ={
-  sellAmount: BN;
-  buyAmount: BN;
+  sellAmount: BigNumber;
+  buyAmount: BigNumber;
   sellToken: string;
   buyToken: string;
   owner: string;
 }
 export class Order {
-  sellAmount: BN;
-  buyAmount: BN;
-  sellToken: string;
-  buyToken: string;
+  sellAmount: BigNumber;
+  buyAmount: BigNumber;
+  sellToken: Contract;
+  buyToken: Contract;
   wallet: Wallet;
-  nonce: BN;
+  nonce: BigNumber;
 
-  constructor(sellAmount: BN | number, buyAmount: BN | number, sellToken: string,
-    buyToken: string, wallet: Wallet, nonce: BN | number) {
-    this.sellAmount = new BN(sellAmount);
-    this.buyAmount = new BN(buyAmount);
+  constructor(sellAmount: BigNumber | number, buyAmount: BigNumber | number, sellToken: Contract,
+    buyToken: Contract, wallet: Wallet, nonce: BigNumber | number) {
+    this.sellAmount = BigNumber.from(sellAmount);
+    this.buyAmount = BigNumber.from(buyAmount);
     this.sellToken = sellToken;
     this.buyToken = buyToken;
     this.wallet = wallet;
-    this.nonce = new BN(nonce);
+    this.nonce = BigNumber.from(nonce);
   }
 
   encode(): Buffer {
@@ -36,29 +35,29 @@ export class Order {
     const {v, r, s} = ecsign(Buffer.from(digest.slice(2), 'hex'), Buffer.from(this.wallet.privateKey.slice(2), 'hex'));
     return abi.rawEncode(['uint256', 'uint256', 'address', 'address',
       'address', 'uint8', 'uint8', 'bytes32', 'bytes32'],
-    [this.sellAmount.toString(), this.buyAmount.toString(), this.sellToken, this.buyToken,
+    [this.sellAmount.toString(), this.buyAmount.toString(), this.sellToken.address, this.buyToken.address,
       this.wallet.address, this.nonce.toString(), v, utils.hexlify(r), utils.hexlify(s)]);
   }
 
   getSmartContractOrder(): SmartContractOrder {
     return {sellAmount: this.sellAmount,
       buyAmount: this.buyAmount,
-      sellToken: this.sellToken,
-      buyToken: this.buyToken,
+      sellToken: this.sellToken.address,
+      buyToken: this.buyToken.address,
       owner: this.wallet.address};
   }
 
   asArray(): [string, string, string, string, string] {
     return [this.sellAmount.toString(), this.buyAmount.toString(),
-      this.sellToken, this.buyToken, this.wallet.address];
+      this.sellToken.address, this.buyToken.address, this.wallet.address];
   }
 
   getOrderDigest(): string {
     return utils.keccak256(
       utils.defaultAbiCoder.encode(
         ['bytes32', 'uint256', 'uint256', 'address', 'address', 'address', 'uint8'],
-        [DOMAIN_SEPARATOR, this.sellAmount.toString(), this.buyAmount.toString(), this.sellToken,
-          this.buyToken, this.wallet.address, this.nonce.toString()]
+        [DOMAIN_SEPARATOR, this.sellAmount.toString(), this.buyAmount.toString(), this.sellToken.address,
+          this.buyToken.address, this.wallet.address, this.nonce.toString()]
       ));
   }
 }

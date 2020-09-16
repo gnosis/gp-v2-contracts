@@ -7,7 +7,6 @@ import UniswapV2Factory from '../node_modules/@uniswap/v2-core/build/UniswapV2Fa
 
 import ERC20 from '../build/ERC20Mintable.json';
 import {Order, DOMAIN_SEPARATOR} from '../src/js/orders.spec';
-import BN from 'bn.js';
 
 use(solidity);
 
@@ -38,7 +37,7 @@ describe('PreAMMBatcher', () => {
     await token0.mock.balanceOf.withArgs(batcher.address).returns('1');
     await token1.mock.balanceOf.withArgs(batcher.address).returns('1');
     await token0.mock.balanceOf.withArgs(uniswapPair.address)
-      .returns(new BN(initialUniswapFundingOfToken0.toString()).add(sellOrder1.sellAmount).toString());
+      .returns(initialUniswapFundingOfToken0.add(sellOrder1.sellAmount).toString());
     await token1.mock.balanceOf.withArgs(uniswapPair.address).returns(initialUniswapFundingOfToken1);
   };
 
@@ -65,20 +64,20 @@ describe('PreAMMBatcher', () => {
   });
 
   it('orderChecks runs through smoothly', async () => {
-    const sellToken0Order = new Order(new BN(utils.parseEther('1').toString()),
-      new BN(utils.parseEther('0.9').toString()), token0.address, token1.address, walletTrader1, new BN('1'));
-    const sellToken1Order = new Order(new BN(utils.parseEther('0.9').toString()),
-      new BN(utils.parseEther('0.90111').toString()), token1.address, token0.address, walletTrader2, new BN('1'));
+    const sellToken0Order = new Order(utils.parseEther('1'),
+      utils.parseEther('0.9'), token0, token1, walletTrader1, 1);
+    const sellToken1Order = new Order(utils.parseEther('0.9'),
+      utils.parseEther('0.90111'), token1, token0, walletTrader2, 1);
 
     await batcher.orderChecks([sellToken0Order.getSmartContractOrder()],
       [sellToken1Order.getSmartContractOrder()], {gasLimit: 6000000});
   });
 
   it('orderChecks detects non matching orders', async () => {
-    const sellToken0Order = new Order(new BN(utils.parseEther('1').toString()),
-      new BN(utils.parseEther('0.9').toString()), token0.address, token1.address, walletTrader1, new BN('1'));
-    const sellToken1Order = new Order(new BN(utils.parseEther('0.9').toString()),
-      new BN(utils.parseEther('0.90111').toString()), token0.address, token1.address, walletTrader2, new BN('1'));
+    const sellToken0Order = new Order(utils.parseEther('1'),
+      utils.parseEther('0.9'), token0, token1, walletTrader1, 1);
+    const sellToken1Order = new Order(utils.parseEther('0.9'),
+      utils.parseEther('0.90111'), token0, token1, walletTrader2, 1);
 
     await expect(batcher.orderChecks([sellToken0Order.getSmartContractOrder()],
       [sellToken1Order.getSmartContractOrder()], {gasLimit: 6000000}))
@@ -86,27 +85,27 @@ describe('PreAMMBatcher', () => {
   });
 
   it('parseOrderBytes runs through smoothly for 1 order', async () => {
-    const sellToken0Order = new Order(new BN(utils.parseEther('1').toString()),
-      new BN(utils.parseEther('0.9').toString()), token0.address, token1.address, walletTrader1, new BN('1'));
+    const sellToken0Order = new Order(utils.parseEther('1'),
+      utils.parseEther('0.9'), token0, token1, walletTrader1, 1);
 
     await batcher.parseOrderBytes(sellToken0Order.encode(), {gasLimit: 6000000});
   });
 
   it('parseOrderBytes runs through smoothly for 2 orders', async () => {
-    const sellToken0Order = new Order(new BN(utils.parseEther('1').toString()),
-      new BN(utils.parseEther('0.9').toString()), token0.address, token1.address, walletTrader1, new BN('1'));
-    const sellToken0Order2 = new Order(new BN(utils.parseEther('1').toString()),
-      new BN(utils.parseEther('0.9').toString()), token0.address, token1.address, walletTrader1, new BN('2'));
+    const sellToken0Order = new Order(utils.parseEther('1'),
+      utils.parseEther('0.9'), token0, token1, walletTrader1, 1);
+    const sellToken0Order2 = new Order(utils.parseEther('1'),
+      utils.parseEther('0.9'), token0, token1, walletTrader1, 2);
 
     await batcher.parseOrderBytes(Buffer.concat([sellToken0Order.encode(), sellToken0Order2.encode()]),
       {gasLimit: 6000000});
   });
 
   it('receiveTradeAmounts reverts if transferFrom fails for token0', async () => {
-    const sellToken0Order = new Order(new BN(utils.parseEther('1').toString()),
-      new BN(utils.parseEther('0.9').toString()), token0.address, token1.address, walletTrader1, new BN('1'));
-    const sellToken1Order = new Order(new BN(utils.parseEther('0.9').toString()),
-      new BN(utils.parseEther('0.90111').toString()), token1.address, token0.address, walletTrader2, new BN('1'));
+    const sellToken0Order = new Order(utils.parseEther('1'),
+      utils.parseEther('0.9'), token0, token1, walletTrader1, 1);
+    const sellToken1Order = new Order(utils.parseEther('0.9'),
+      utils.parseEther('0.90111'), token1, token0, walletTrader2, 1);
 
     await mockRelevantTokenDataForbatchTrade(sellToken0Order, sellToken1Order);
     await token0.mock.transferFrom.returns(false);
@@ -114,10 +113,10 @@ describe('PreAMMBatcher', () => {
       .to.be.revertedWith('unsuccessful transferFrom for order');
   });
   it('receiveTradeAmounts transferFrom the right amount of token0', async () => {
-    const sellToken0Order = new Order(new BN(utils.parseEther('1').toString()),
-      new BN(utils.parseEther('0.9').toString()), token0.address, token1.address, walletTrader1, new BN('1'));
-    const sellToken1Order = new Order(new BN(utils.parseEther('0.9').toString()),
-      new BN(utils.parseEther('0.90111').toString()), token1.address, token0.address, walletTrader2, new BN('1'));
+    const sellToken0Order = new Order(utils.parseEther('1'),
+      utils.parseEther('0.9'), token0, token1, walletTrader1, 1);
+    const sellToken1Order = new Order(utils.parseEther('0.9'),
+      utils.parseEther('0.90111'), token1, token0, walletTrader2, 1);
 
     await mockRelevantTokenDataForbatchTrade(sellToken0Order, sellToken1Order);
 
@@ -126,10 +125,10 @@ describe('PreAMMBatcher', () => {
       [walletTrader1.address, batcher.address, sellToken0Order.sellAmount.toString()]);
   });
   it('receiveTradeAmounts reverts if transferFrom fails for token1', async () => {
-    const sellToken0Order = new Order(new BN(utils.parseEther('1').toString()),
-      new BN(utils.parseEther('0.9').toString()), token0.address, token1.address, walletTrader1, new BN('1'));
-    const sellToken1Order = new Order(new BN(utils.parseEther('0.9').toString()),
-      new BN(utils.parseEther('0.90111').toString()), token1.address, token0.address, walletTrader2, new BN('1'));
+    const sellToken0Order = new Order(utils.parseEther('1'),
+      utils.parseEther('0.9'), token0, token1, walletTrader1, 1);
+    const sellToken1Order = new Order(utils.parseEther('0.9'),
+      utils.parseEther('0.90111'), token1, token0, walletTrader2, 1);
     await mockRelevantTokenDataForbatchTrade(sellToken0Order, sellToken1Order);
 
     await token0.mock.transferFrom.returns(true);
@@ -138,10 +137,10 @@ describe('PreAMMBatcher', () => {
       .to.be.revertedWith('unsuccessful transferFrom for order');
   });
   it('receiveTradeAmounts transferFrom the right amount of token1', async () => {
-    const sellToken0Order = new Order(new BN(utils.parseEther('1').toString()),
-      new BN(utils.parseEther('0.9').toString()), token0.address, token1.address, walletTrader1, new BN('1'));
-    const sellToken1Order = new Order(new BN(utils.parseEther('0.9').toString()),
-      new BN(utils.parseEther('0.90111').toString()), token1.address, token0.address, walletTrader2, new BN('1'));
+    const sellToken0Order = new Order(utils.parseEther('1'),
+      utils.parseEther('0.9'), token0, token1, walletTrader1, 1);
+    const sellToken1Order = new Order(utils.parseEther('0.9'),
+      utils.parseEther('0.90111'), token1, token0, walletTrader2, 1);
 
     await mockRelevantTokenDataForbatchTrade(sellToken0Order, sellToken1Order);
     await batcher.batchTrade(sellToken0Order.encode(), sellToken1Order.encode(), {gasLimit: 6000000});
