@@ -24,6 +24,7 @@ contract PreAMMBatcher {
         address sellToken;
         address buyToken;
         address owner;
+        uint8 nonce;
     }
 
     struct Fraction {
@@ -75,6 +76,8 @@ contract PreAMMBatcher {
             sellOrdersToken0[0],
             uniswapPool
         );
+        markSettledOrders(sellOrdersToken0);
+        markSettledOrders(sellOrdersToken1);
         payOutTradeProceedings(sellOrdersToken0, clearingPrice);
         payOutTradeProceedings(sellOrdersToken1, inverse(clearingPrice));
         emit BatchSettlement(
@@ -183,16 +186,25 @@ contract PreAMMBatcher {
                 recoveredAddress != address(0) && recoveredAddress == owner,
                 "invalid_signature"
             );
-            require(nonces[owner] < nonce, "nonce already used");
-            nonces[owner] = nonce;
             orders[count] = Order({
                 sellAmount: sellAmount,
                 buyAmount: buyAmount,
                 buyToken: buyToken,
                 sellToken: sellToken,
-                owner: owner
+                owner: owner,
+                nonce: nonce
             });
             count = count.add(1);
+        }
+    }
+
+    function markSettledOrders(Order[] memory orders) public {
+        for (uint256 i = 0; i < orders.length; i++) {
+            require(
+                nonces[orders[i].owner] < orders[i].nonce,
+                "nonce already used"
+            );
+            nonces[orders[i].owner] = orders[i].nonce;
         }
     }
 

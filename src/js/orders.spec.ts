@@ -11,6 +11,7 @@ export declare type SmartContractOrder ={
   sellToken: string;
   buyToken: string;
   owner: string;
+  nonce: BigNumber;
 }
 export class Order {
   sellAmount: BigNumber;
@@ -44,7 +45,8 @@ export class Order {
       buyAmount: this.buyAmount,
       sellToken: this.sellToken.address,
       buyToken: this.buyToken.address,
-      owner: this.wallet.address};
+      owner: this.wallet.address,
+      nonce: this.nonce};
   }
 
   asArray(): [string, string, string, string, string] {
