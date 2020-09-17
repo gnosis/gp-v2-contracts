@@ -8,7 +8,10 @@ import UniswapV2Factory from '../node_modules/@uniswap/v2-core/build/UniswapV2Fa
 import ERC20 from '../build/ERC20Mintable.json';
 import {Order} from '../src/js/orders.spec';
 import BN from 'bn.js';
-import {baseTestInput, fourOrderTestInput, generateTestCase} from './resources/index';
+import {generateTestCase} from './resources/index';
+import {baseTestInput, fourOrderTestInput, oneOrderSellingToken0IsObmittedTestInput,
+  oneOrderSellingToken1IsObmittedTestInput, noSolutionTestInput, switchTokenTestInput} from './resources/testExamples';
+
 import {TestCase} from './resources/models';
 
 use(solidity);
@@ -111,5 +114,34 @@ describe('PreAMMBatcher-e2e', () => {
         .mul(basicTestCase.solution.clearingPrice.numerator).div(basicTestCase.solution.clearingPrice.denominator)
         .mul(332).div(333));
     });
+  });
+
+  it('example: oneOrderSellingToken0IsObmittedTestInput', async () => {
+    basicTestCase = generateTestCase(oneOrderSellingToken0IsObmittedTestInput(token0, token1,
+      [walletTrader1], [walletTrader3]), true);
+
+    expect(basicTestCase.solution.sellOrdersToken0.length).to.be.equal(1);
+    expect(basicTestCase.solution.sellOrdersToken1.length).to.be.equal(1);
+  });
+  it('example: oneOrderSellingToken1IsObmittedTestInput', async () => {
+    basicTestCase = generateTestCase(oneOrderSellingToken1IsObmittedTestInput(token0, token1,
+      [walletTrader1], [walletTrader3]), true);
+
+    expect(basicTestCase.solution.sellOrdersToken0.length).to.be.equal(3);
+    expect(basicTestCase.solution.sellOrdersToken1.length).to.be.equal(2);
+  });
+  it('example: noSolutionTestInput', async () => {
+    basicTestCase = generateTestCase(noSolutionTestInput(token0, token1,
+      [walletTrader1], [walletTrader3]), true);
+
+    expect(basicTestCase.solution.sellOrdersToken0.length).to.be.equal(0);
+    expect(basicTestCase.solution.sellOrdersToken1.length).to.be.equal(0);
+  });
+  it('example: switchTokenTestInput', async () => {
+    basicTestCase = generateTestCase(switchTokenTestInput(token0, token1,
+      [walletTrader1], [walletTrader3]), true);
+
+    expect(basicTestCase.solution.sellOrdersToken0.length).to.be.equal(3);
+    expect(basicTestCase.solution.sellOrdersToken1.length).to.be.equal(2);
   });
 });
