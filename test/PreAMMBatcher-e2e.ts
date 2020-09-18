@@ -39,7 +39,8 @@ const fundUniswap = async (testCase: TestCase, walletDeployer: Wallet, uniswapPa
   await uniswapPair.mint(walletDeployer.address, {gasLimit: 500000});
 };
 describe('PreAMMBatcher-e2e', () => {
-  const [walletDeployer, walletTrader1, walletTrader2, walletTrader3, walletTrader4] = new MockProvider().getWallets();
+  const [walletDeployer, walletTrader1, walletTrader2, walletTrader3, walletTrader4, walletTrader5, walletTrader6] =
+  new MockProvider().getWallets();
   let batcher: Contract;
   let token0: Contract;
   let token1: Contract;
@@ -47,6 +48,35 @@ describe('PreAMMBatcher-e2e', () => {
   let uniswapFactory: Contract;
   let uniswapPairAddress: string;
   let basicTestCase: TestCase;
+
+  const runScenarioOnchain = async (testCase: TestCase) => {
+    await fundUniswap(testCase, walletDeployer, uniswapPair);
+    await setupOrders(testCase.sellOrdersToken0.concat(testCase.sellOrdersToken1), batcher);
+
+    if (testCase.solution.sellOrdersToken0.length === 0) {
+      await expect(batcher.batchTrade(testCase.getSellOrdersToken0Encoded(),
+        testCase.getSellOrdersToken1Encoded(), {gasLimit: 6000000}))
+        .to.revertedWith('no solution found');
+    } else {
+      await expect(batcher.batchTrade(testCase.getSellOrdersToken0Encoded(),
+        testCase.getSellOrdersToken1Encoded(), {gasLimit: 6000000}))
+        .to.emit(batcher, 'BatchSettlement')
+        .withArgs(testCase.solution.sellOrdersToken0[0].sellToken.address,
+          testCase.solution.sellOrdersToken0[0].buyToken.address,
+          testCase.solution.clearingPrice.denominator, testCase.solution.clearingPrice.numerator);
+
+      await asyncForEach(testCase.solution.sellOrdersToken0, async (order: Order) => {
+        expect(await order.buyToken.balanceOf(order.wallet.address)).to.be.equal(order.sellAmount
+          .mul(testCase.solution.clearingPrice.denominator).div(testCase.solution.clearingPrice.numerator)
+          .mul(332).div(333));
+      });
+      await asyncForEach(testCase.solution.sellOrdersToken1, async (order: Order) => {
+        expect(await order.buyToken.balanceOf(order.wallet.address)).to.be.equal(order.sellAmount
+          .mul(testCase.solution.clearingPrice.numerator).div(testCase.solution.clearingPrice.denominator)
+          .mul(332).div(333));
+      });
+    }
+  };
 
   beforeEach(async () => {
     token0 = await deployContract(walletDeployer, ERC20, ['token0', '18']);
@@ -92,56 +122,42 @@ describe('PreAMMBatcher-e2e', () => {
   });
 
   it('pre-batches four orders and settles left-overs to uniswap', async () => {
-    basicTestCase = generateTestCase(fourOrderTestInput(token0, token1,
+    const testCase = generateTestCase(fourOrderTestInput(token0, token1,
       [walletTrader1, walletTrader2], [walletTrader3, walletTrader4]));
-    await fundUniswap(basicTestCase, walletDeployer, uniswapPair);
-
-    await setupOrders(basicTestCase.sellOrdersToken0.concat(basicTestCase.sellOrdersToken1), batcher);
-
-    await expect(batcher.batchTrade(basicTestCase.getSellOrdersToken0Encoded(),
-      basicTestCase.getSellOrdersToken1Encoded(), {gasLimit: 6000000}))
-      .to.emit(batcher, 'BatchSettlement')
-      .withArgs(token0.address, token1.address,
-        basicTestCase.solution.clearingPrice.denominator, basicTestCase.solution.clearingPrice.numerator);
-
-    await asyncForEach(basicTestCase.sellOrdersToken0, async (order: Order) => {
-      expect(await order.buyToken.balanceOf(order.wallet.address)).to.be.equal(order.sellAmount
-        .mul(basicTestCase.solution.clearingPrice.denominator).div(basicTestCase.solution.clearingPrice.numerator)
-        .mul(332).div(333));
-    });
-    await asyncForEach(basicTestCase.sellOrdersToken1, async (order: Order) => {
-      expect(await order.buyToken.balanceOf(order.wallet.address)).to.be.equal(order.sellAmount
-        .mul(basicTestCase.solution.clearingPrice.numerator).div(basicTestCase.solution.clearingPrice.denominator)
-        .mul(332).div(333));
-    });
+    await runScenarioOnchain(testCase);
   });
 
   it('example: oneOrderSellingToken0IsObmittedTestInput', async () => {
-    basicTestCase = generateTestCase(oneOrderSellingToken0IsObmittedTestInput(token0, token1,
-      [walletTrader1], [walletTrader3]), true);
-
-    expect(basicTestCase.solution.sellOrdersToken0.length).to.be.equal(1);
-    expect(basicTestCase.solution.sellOrdersToken1.length).to.be.equal(1);
+    const testCase = generateTestCase(oneOrderSellingToken0IsObmittedTestInput(token0, token1,
+      [walletTrader1, walletTrader2], [walletTrader3, walletTrader4]), true);
+    console.log(testCase.sellOrdersToken0.length);
+    console.log(testCase.sellOrdersToken0[0].sellToken.address);
+    expect(testCase.solution.sellOrdersToken0.length).to.be.equal(1);
+    expect(testCase.solution.sellOrdersToken1.length).to.be.equal(1);
+    await runScenarioOnchain(testCase);
   });
   it('example: oneOrderSellingToken1IsObmittedTestInput', async () => {
-    basicTestCase = generateTestCase(oneOrderSellingToken1IsObmittedTestInput(token0, token1,
-      [walletTrader1], [walletTrader3]), true);
+    const testCase = generateTestCase(oneOrderSellingToken1IsObmittedTestInput(token0, token1,
+      [walletTrader1, walletTrader2, walletTrader5, walletTrader6], [walletTrader3, walletTrader4]), true);
 
-    expect(basicTestCase.solution.sellOrdersToken0.length).to.be.equal(3);
-    expect(basicTestCase.solution.sellOrdersToken1.length).to.be.equal(2);
+    expect(testCase.solution.sellOrdersToken0.length).to.be.equal(3);
+    expect(testCase.solution.sellOrdersToken1.length).to.be.equal(2);
+    await runScenarioOnchain(testCase);
   });
   it('example: noSolutionTestInput', async () => {
-    basicTestCase = generateTestCase(noSolutionTestInput(token0, token1,
-      [walletTrader1], [walletTrader3]), true);
+    const testCase = generateTestCase(noSolutionTestInput(token0, token1,
+      [walletTrader1, walletTrader2, walletTrader5], [walletTrader3, walletTrader4, walletTrader6]), true);
 
-    expect(basicTestCase.solution.sellOrdersToken0.length).to.be.equal(0);
-    expect(basicTestCase.solution.sellOrdersToken1.length).to.be.equal(0);
+    expect(testCase.solution.sellOrdersToken0.length).to.be.equal(0);
+    expect(testCase.solution.sellOrdersToken1.length).to.be.equal(0);
+    await runScenarioOnchain(testCase);
   });
   it('example: switchTokenTestInput', async () => {
-    basicTestCase = generateTestCase(switchTokenTestInput(token0, token1,
-      [walletTrader1], [walletTrader3]), true);
+    const testCase = generateTestCase(switchTokenTestInput(token0, token1,
+      [walletTrader1, walletTrader2], [walletTrader3, walletTrader4, walletTrader5, walletTrader6]), true);
 
-    expect(basicTestCase.solution.sellOrdersToken0.length).to.be.equal(3);
-    expect(basicTestCase.solution.sellOrdersToken1.length).to.be.equal(2);
+    expect(testCase.solution.sellOrdersToken0.length).to.be.equal(3);
+    expect(testCase.solution.sellOrdersToken1.length).to.be.equal(2);
+    await runScenarioOnchain(testCase);
   });
 });
