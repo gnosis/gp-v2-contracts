@@ -9,8 +9,8 @@ export declare type Fraction = {
 
 export declare type Solution = {
   clearingPrice: Fraction;
-  settledAmountsSellOrderToken0: BigNumber[];
-  settledAmountsSellOrderToken1: BigNumber[];
+  sellOrdersToken0: Order[];
+  sellOrdersToken1: Order[];
 }
 
 export class TestCase {

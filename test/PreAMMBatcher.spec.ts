@@ -7,7 +7,7 @@ import UniswapV2Factory from '../node_modules/@uniswap/v2-core/build/UniswapV2Fa
 
 import ERC20 from '../build/ERC20Mintable.json';
 import {Order, DOMAIN_SEPARATOR} from '../src/js/orders.spec';
-import {baseTestInput} from './resources/index';
+import {baseTestInput} from './resources/testExamples';
 
 use(solidity);
 
