@@ -45,25 +45,9 @@ export const solveTestCase = function (testCaseInput: TestCaseInput, debug = fal
       sellOrdersToken0: testCaseInput.sellOrdersToken1,
       sellOrdersToken1: testCaseInput.sellOrdersToken0}, debug);
   }
-  const uniswapK = testCaseInput.fundingAMMToken0.mul(testCaseInput.fundingAMMToken1);
-  const p = uniswapK.div(
-    BigNumber.from(2).mul(testCaseInput.fundingAMMToken1.add(sumSellAmountToken1))
-  );
-
-  const newFundingAMMToken0 = p.add(
-    SoliditySqrt(
-      p.mul(p).add(
-        uniswapK.mul(sumSellDemandToken0).div(
-          testCaseInput.fundingAMMToken1.add(sumSellAmountToken1)
-        )
-      )
-    )
-  );
-
-  const newFundingAMMToken1 = uniswapK.div(newFundingAMMToken0);
   const clearingPrice: Fraction = {
-    numerator: newFundingAMMToken0,
-    denominator: newFundingAMMToken1
+    numerator: sumSellDemandToken0.add(testCaseInput.fundingAMMToken0),
+    denominator: sumSellAmountToken1.add(testCaseInput.fundingAMMToken1)
   };
   log('new clearing price', clearingPrice.denominator.toString(), '/', clearingPrice.numerator.toString(),
     '=', clearingPrice.denominator.mul(1000).div(clearingPrice.numerator).toNumber() / 1000);

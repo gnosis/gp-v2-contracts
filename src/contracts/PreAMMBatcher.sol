@@ -78,7 +78,6 @@ contract PreAMMBatcher {
             sellOrdersToken0[0],
             uniswapPool
         );
-
         markSettledOrders(sellOrdersToken0);
         markSettledOrders(sellOrdersToken1);
         payOutTradeProceedings(sellOrdersToken0, clearingPrice);
@@ -258,29 +257,13 @@ contract PreAMMBatcher {
                     uniswapPool
                 );
         }
-        uint256 newReserve0 = 0;
-        uint256 newReserve1 = 0;
-        {
-            (uint112 reserve0, uint112 reserve1, ) = uniswapPool.getReserves();
-            // needs to be switched, if tokens are switched.
-            uint256 uniswapK = uint256(reserve0).mul(reserve1);
-            uint256 p = uniswapK.div(
-                uint256(2).mul(uint256(reserve1).add(totalSellAmountToken1))
-            );
-            newReserve0 = p.add(
-                Math.sqrt(
-                    p.mul(p).add(
-                        uniswapK.mul(totalSellAmountToken0).div(
-                            uint256(reserve1).add(totalSellAmountToken1)
-                        )
-                    )
-                )
-            );
-            newReserve1 = uniswapK.div(newReserve0);
-        }
+
+        (uint112 reserve0, uint112 reserve1, ) = uniswapPool.getReserves();
+        // reserves actually need to be switched, if tokens are switched
+
         Fraction memory clearingPrice = Fraction({
-            numerator: newReserve0,
-            denominator: newReserve1
+            numerator: (totalSellAmountToken0.add(reserve0)),
+            denominator: (totalSellAmountToken1.add(reserve1))
         });
         {
 

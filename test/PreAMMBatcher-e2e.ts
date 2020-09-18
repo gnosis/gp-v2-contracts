@@ -1,5 +1,5 @@
 import {use, expect} from 'chai';
-import {Contract, Wallet} from 'ethers';
+import {BigNumber, Contract, Wallet} from 'ethers';
 import {deployContract, MockProvider, solidity} from 'ethereum-waffle';
 import PreAMMBatcher from '../build/PreAMMBatcher.json';
 import UniswapV2Pair from '../node_modules/@uniswap/v2-core/build/UniswapV2Pair.json';
@@ -7,7 +7,6 @@ import UniswapV2Factory from '../node_modules/@uniswap/v2-core/build/UniswapV2Fa
 
 import ERC20 from '../build/ERC20Mintable.json';
 import {Order} from '../src/js/orders.spec';
-import BN from 'bn.js';
 import {generateTestCase} from './resources/index';
 import {baseTestInput, fourOrderTestInput, oneOrderSellingToken0IsObmittedTestInput,
   oneOrderSellingToken1IsObmittedTestInput, noSolutionTestInput, switchTokenTestInput} from './resources/testExamples';
@@ -47,7 +46,6 @@ describe('PreAMMBatcher-e2e', () => {
   let uniswapPair: Contract;
   let uniswapFactory: Contract;
   let uniswapPairAddress: string;
-  let basicTestCase: TestCase;
 
   const runScenarioOnchain = async (testCase: TestCase) => {
     await fundUniswap(testCase, walletDeployer, uniswapPair);
@@ -89,36 +87,20 @@ describe('PreAMMBatcher-e2e', () => {
     batcher = await deployContract(walletDeployer, PreAMMBatcher, [uniswapFactory.address]);
   });
 
-  it('pre-batches two simple orders and settles left-overs to uniswap', async () => {
-    basicTestCase = generateTestCase(baseTestInput(token0, token1, [walletTrader1], [walletTrader2]));
-    await fundUniswap(basicTestCase, walletDeployer, uniswapPair);
+  it('example: baseTestInput', async () => {
+    const testCase = generateTestCase(baseTestInput(token0, token1,
+      [walletTrader1, walletTrader2], [walletTrader3, walletTrader4]), true);
+    console.log(testCase.sellOrdersToken0.length);
+    console.log(testCase.sellOrdersToken0[0].sellToken.address);
+    expect(testCase.solution.sellOrdersToken0.length).to.be.equal(1);
+    expect(testCase.solution.sellOrdersToken1.length).to.be.equal(1);
+    await runScenarioOnchain(testCase);
 
-    await setupOrders(basicTestCase.sellOrdersToken0.concat(basicTestCase.sellOrdersToken1), batcher);
-
-    await expect(batcher.batchTrade(basicTestCase.getSellOrdersToken0Encoded(),
-      basicTestCase.getSellOrdersToken1Encoded(), {gasLimit: 6000000}))
-      .to.emit(batcher, 'BatchSettlement')
-      .withArgs(token0.address, token1.address,
-        basicTestCase.solution.clearingPrice.denominator, basicTestCase.solution.clearingPrice.numerator);
-
-    // reserves do not agree exactly with clearing price, as calculations do not consider uniswap fees
-    expect((await uniswapPair.getReserves())[0]).to.equal('10084799698306515679');
-    expect((await uniswapPair.getReserves())[1]).to.equal('9916858889633626266');
     console.log('auction clearing price:',
-      (new BN('10084092542732199005').mul(new BN('1000')).div(new BN('9916608715780969175'))).toString());
+      (testCase.solution.clearingPrice.numerator.mul(BigNumber.from('100000'))
+        .div(testCase.solution.clearingPrice.denominator).toString()));
     console.log('uniswap clearing price:',
-      ((await uniswapPair.getReserves())[0]).mul(1000).div((await uniswapPair.getReserves())[1]).toString());
-
-    await asyncForEach(basicTestCase.sellOrdersToken0, async (order: Order) => {
-      expect(await order.buyToken.balanceOf(order.wallet.address)).to.be.equal(order.sellAmount
-        .mul(basicTestCase.solution.clearingPrice.denominator).div(basicTestCase.solution.clearingPrice.numerator)
-        .mul(332).div(333));
-    });
-    await asyncForEach(basicTestCase.sellOrdersToken1, async (order: Order) => {
-      expect(await order.buyToken.balanceOf(order.wallet.address)).to.be.equal(order.sellAmount
-        .mul(basicTestCase.solution.clearingPrice.numerator).div(basicTestCase.solution.clearingPrice.denominator)
-        .mul(332).div(333));
-    });
+      ((await uniswapPair.getReserves())[0]).mul(100000).div((await uniswapPair.getReserves())[1]).toString());
   });
 
   it('pre-batches four orders and settles left-overs to uniswap', async () => {
