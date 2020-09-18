@@ -15,9 +15,6 @@ contract PreAMMBatcher {
     uint256 public constant feeFactor = 333; // Charged fee is (feeFactor-1)/feeFactor
     mapping(address => uint8) public nonces; // Probably a nonce per tokenpair would be better
 
-    event Log(uint256 b);
-    event Log2(bytes b);
-
     struct Order {
         uint256 sellAmount;
         uint256 buyAmount;
@@ -64,18 +61,24 @@ contract PreAMMBatcher {
                 sellOrdersToken1[0].sellToken
             )
         );
-        uint256 unmatchedAmountToken0 = 0;
-        (unmatchedAmountToken0, clearingPrice) = calculateSettlementPrice(
+        uint256 unmatchedAmount = 0;
+        (
+            unmatchedAmount,
+            clearingPrice,
+            sellOrdersToken0,
+            sellOrdersToken1
+        ) = calculateSettlementPrice(
             sellOrdersToken0,
             sellOrdersToken1,
             uniswapPool
         );
         settleUnmatchedAmountsToUniswap(
-            unmatchedAmountToken0,
+            unmatchedAmount,
             clearingPrice,
             sellOrdersToken0[0],
             uniswapPool
         );
+
         markSettledOrders(sellOrdersToken0);
         markSettledOrders(sellOrdersToken1);
         payOutTradeProceedings(sellOrdersToken0, clearingPrice);
@@ -139,6 +142,7 @@ contract PreAMMBatcher {
 
     function parseOrderBytes(bytes calldata orderBytes)
         internal
+        pure
         returns (Order[] memory orders)
     {
         orders = new Order[](orderBytes.length / 288);
@@ -204,6 +208,8 @@ contract PreAMMBatcher {
                 nonces[orders[i].owner] < orders[i].nonce,
                 "nonce already used"
             );
+        }
+        for (uint256 i = 0; i < orders.length; i++) {
             nonces[orders[i].owner] = orders[i].nonce;
         }
     }
@@ -214,8 +220,12 @@ contract PreAMMBatcher {
         IUniswapV2Pair uniswapPool
     )
         public
-        view
-        returns (uint256 unmatchedAmountToken0, Fraction memory clearingPrice)
+        returns (
+            uint256,
+            Fraction memory,
+            Order[] memory,
+            Order[] memory
+        )
     {
         uint256 totalSellAmountToken0 = 0;
         for (uint256 i = 0; i < sellOrderToken0.length; i++) {
@@ -229,72 +239,135 @@ contract PreAMMBatcher {
                 sellOrderToken1[i].sellAmount
             );
         }
-        (uint112 reserve0, uint112 reserve1, ) = uniswapPool.getReserves();
-        uint256 uniswapK = uint256(reserve0).mul(reserve1);
-        // if deltaUniswapToken0 will be > 0
-        // if(sellOrderToken1.sellAmount * serve0 / reserve1 > sellToken2Order.sellAmount)
-        uint256 p = uniswapK.div(
-            uint256(2).mul(uint256(reserve1).add(totalSellAmountToken1))
-        );
-        uint256 newReserve0 = p.add(
-            Math.sqrt(
-                p.mul(p).add(
-                    uniswapK.mul(totalSellAmountToken0).div(
-                        uint256(reserve1).add(totalSellAmountToken1)
-                    )
-                )
-            )
-        );
-        uint256 newReserve1 = uniswapK.div(newReserve0);
-        clearingPrice = Fraction({
-            numerator: newReserve0,
-            denominator: newReserve1
-        });
-        Order memory highestSellOrderToken0 = sellOrderToken0[sellOrderToken0
-            .length - 1];
+
+        if (totalSellAmountToken0 == 0 || totalSellAmountToken1 == 0) {
+            revert("no solution found");
+        }
 
         Order memory highestSellOrderToken1 = sellOrderToken1[sellOrderToken1
             .length - 1];
-        require(
-            clearingPrice.numerator.mul(highestSellOrderToken0.sellAmount) >=
-                clearingPrice.denominator.mul(highestSellOrderToken0.buyAmount),
-            "sellOrderToken0 price violations"
-        );
-        require(
-            clearingPrice.numerator.mul(highestSellOrderToken1.sellAmount) >
-                clearingPrice.denominator.mul(highestSellOrderToken1.buyAmount),
-            "sellOrderToken1 price violations"
-        );
-        unmatchedAmountToken0 = totalSellAmountToken0.sub(
+        if (
+            totalSellAmountToken0.mul(highestSellOrderToken1.sellAmount) <
+            totalSellAmountToken1.mul(highestSellOrderToken1.buyAmount)
+        ) {
+            // switch order pairs
+            return
+                calculateSettlementPrice(
+                    sellOrderToken1,
+                    sellOrderToken0,
+                    uniswapPool
+                );
+        }
+        uint256 newReserve0 = 0;
+        uint256 newReserve1 = 0;
+        {
+            (uint112 reserve0, uint112 reserve1, ) = uniswapPool.getReserves();
+            // needs to be switched, if tokens are switched.
+            uint256 uniswapK = uint256(reserve0).mul(reserve1);
+            uint256 p = uniswapK.div(
+                uint256(2).mul(uint256(reserve1).add(totalSellAmountToken1))
+            );
+            newReserve0 = p.add(
+                Math.sqrt(
+                    p.mul(p).add(
+                        uniswapK.mul(totalSellAmountToken0).div(
+                            uint256(reserve1).add(totalSellAmountToken1)
+                        )
+                    )
+                )
+            );
+            newReserve1 = uniswapK.div(newReserve0);
+        }
+        Fraction memory clearingPrice = Fraction({
+            numerator: newReserve0,
+            denominator: newReserve1
+        });
+        {
+
+                Order memory highestSellOrderToken0
+             = sellOrderToken0[sellOrderToken0.length - 1];
+
+            if (
+                highestSellOrderToken0.sellAmount.mul(
+                    clearingPrice.denominator
+                ) <
+                (highestSellOrderToken0.buyAmount.mul(clearingPrice.numerator))
+            ) {
+                // take violated order with highest bid out
+                return
+                    calculateSettlementPrice(
+                        removeTopElement(sellOrderToken0),
+                        sellOrderToken1,
+                        uniswapPool
+                    );
+            } else if (
+                (clearingPrice.numerator.mul(
+                    highestSellOrderToken1.sellAmount
+                ) <
+                    clearingPrice.denominator.mul(
+                        highestSellOrderToken1.buyAmount
+                    ))
+            ) {
+                // take violated order with highest bid out
+                return
+                    calculateSettlementPrice(
+                        sellOrderToken0,
+                        removeTopElement(sellOrderToken1),
+                        uniswapPool
+                    );
+            }
+        }
+        uint256 unmatchedAmountToken0 = totalSellAmountToken0.sub(
             totalSellAmountToken1.mul(clearingPrice.numerator).div(
                 clearingPrice.denominator
             )
         );
+        return (
+            unmatchedAmountToken0,
+            clearingPrice,
+            sellOrderToken0,
+            sellOrderToken1
+        );
     }
 
     function settleUnmatchedAmountsToUniswap(
-        uint256 unsettledDirectAmountToken0,
+        uint256 unsettledDirectAmount,
         Fraction memory clearingPrice,
         Order memory sellOrderToken0,
         IUniswapV2Pair uniswapPool
     ) internal {
-        require(
-            IERC20(sellOrderToken0.sellToken).transfer(
-                address(uniswapPool),
-                unsettledDirectAmountToken0
-            ),
-            "transfer to uniswap failed"
-        );
-        uniswapPool.swap(
-            0,
-            unsettledDirectAmountToken0
-                .mul(clearingPrice.denominator)
-                .mul(997)
-                .div(clearingPrice.numerator)
-                .div(1000),
-            address(this),
-            ""
-        );
+        if (unsettledDirectAmount > 0) {
+            require(
+                IERC20(sellOrderToken0.sellToken).transfer(
+                    address(uniswapPool),
+                    unsettledDirectAmount
+                ),
+                "transfer to uniswap failed"
+            );
+            if (sellOrderToken0.sellToken == uniswapPool.token0()) {
+                uniswapPool.swap(
+                    0,
+                    unsettledDirectAmount
+                        .mul(clearingPrice.denominator)
+                        .mul(997)
+                        .div(clearingPrice.numerator)
+                        .div(1000),
+                    address(this),
+                    ""
+                );
+            } else {
+                uniswapPool.swap(
+                    unsettledDirectAmount
+                        .mul(clearingPrice.denominator)
+                        .mul(997)
+                        .div(clearingPrice.numerator)
+                        .div(1000),
+                    0,
+                    address(this),
+                    ""
+                );
+            }
+        }
     }
 
     function receiveTradeAmounts(Order[] memory orders) internal {
@@ -328,5 +401,24 @@ contract PreAMMBatcher {
                 "final token transfer failed"
             );
         }
+    }
+
+    function removeTopElement(Order[] memory orders)
+        public
+        pure
+        returns (Order[] memory)
+    {
+        // delete orders[orders.length - 1];
+        // return orders;
+        Order[] memory newOrders = new Order[](orders.length - 1);
+        for (uint256 i = 0; i < orders.length - 1; i++) {
+            newOrders[i].sellAmount = orders[i].sellAmount;
+            newOrders[i].buyAmount = orders[i].buyAmount;
+            newOrders[i].sellToken = orders[i].sellToken;
+            newOrders[i].buyToken = orders[i].buyToken;
+            newOrders[i].owner = orders[i].owner;
+            newOrders[i].nonce = orders[i].nonce;
+        }
+        return newOrders;
     }
 }

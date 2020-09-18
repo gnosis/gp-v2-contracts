@@ -1,9 +1,12 @@
 import {Fraction, TestCaseInput, Solution, TestCase} from './models';
 import {BigNumber} from 'ethers';
+import _ from 'lodash';
 
 export const generateTestCase = function (testCaseInput: TestCaseInput, debug = false): TestCase {
   return new TestCase(testCaseInput.fundingAMMToken0, testCaseInput.fundingAMMToken1,
-    testCaseInput.sellOrdersToken0, testCaseInput.sellOrdersToken1, solveTestCase(testCaseInput, debug));
+    _.cloneDeep(testCaseInput.sellOrdersToken0), // <-- deep copy needed as solveTestCase can modify the orders
+    _.cloneDeep(testCaseInput.sellOrdersToken1),
+    solveTestCase(testCaseInput, debug));
 };
 
 export const solveTestCase = function (testCaseInput: TestCaseInput, debug = false): Solution {
@@ -65,7 +68,7 @@ export const solveTestCase = function (testCaseInput: TestCaseInput, debug = fal
   log('new clearing price', clearingPrice.denominator.toString(), '/', clearingPrice.numerator.toString(),
     '=', clearingPrice.denominator.mul(1000).div(clearingPrice.numerator).toNumber() / 1000);
   if (highestSellOrderToken0.sellAmount.mul(clearingPrice.denominator)
-    .lte(highestSellOrderToken0.buyAmount.mul(clearingPrice.numerator))) {
+    .lt(highestSellOrderToken0.buyAmount.mul(clearingPrice.numerator))) {
     // In this case the clearing price of the order selling token0 with the highest price is violated.
     // We remove this bid and try to solve again
 
@@ -79,7 +82,7 @@ export const solveTestCase = function (testCaseInput: TestCaseInput, debug = fal
       sellOrdersToken0: testCaseInput.sellOrdersToken0,
       sellOrdersToken1: testCaseInput.sellOrdersToken1}, debug);
   } else if (clearingPrice.numerator.mul(highestSellOrderToken1.sellAmount)
-    .lte(clearingPrice.denominator.mul(highestSellOrderToken1.buyAmount))) {
+    .lt(clearingPrice.denominator.mul(highestSellOrderToken1.buyAmount))) {
     // In this case the clearing price of the order selling token1 with the highest price is violated.
     // We remove this bid and try to solve again
     console.log(`popping sellOrdersToken1, due to a its limit price of
@@ -90,6 +93,12 @@ export const solveTestCase = function (testCaseInput: TestCaseInput, debug = fal
       sellOrdersToken0: testCaseInput.sellOrdersToken0,
       sellOrdersToken1: testCaseInput.sellOrdersToken1}, debug);
   }
+  const unmatchedAmount = sumSellDemandToken0.sub(
+    sumSellAmountToken1.mul(clearingPrice.numerator).div(
+      clearingPrice.denominator
+    )
+  );
+  log('unmatchedAmount', unmatchedAmount.toString());
   // No price violation, we found a solution:
   return {clearingPrice: clearingPrice,
     sellOrdersToken0: testCaseInput.sellOrdersToken0,
