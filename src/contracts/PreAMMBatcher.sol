@@ -404,4 +404,30 @@ contract PreAMMBatcher {
         }
         return newOrders;
     }
+
+    function isSorted(Order[] memory orders, bool reverse)
+        public
+        pure
+        returns (bool)
+    {
+        // Values used to traverse the list forwards or backwards depending on reverse.
+        int256 start = 0;
+        int8 step = 1;
+        if (reverse) {
+            start = int256(orders.length) - 1;
+            step = -1;
+        }
+
+        for (int256 i = 0; i < int256(orders.length) - 1; i++) {
+            Order memory orderA = orders[uint256(start + i * step)];
+            Order memory orderB = orders[uint256(start + (i + 1) * step)];
+            if (
+                orderA.buyAmount * orderB.sellAmount >
+                orderB.buyAmount * orderA.sellAmount
+            ) {
+                return false;
+            }
+        }
+        return true;
+    }
 }
