@@ -4,8 +4,8 @@
     "build": "waffle",
     "test": "export NODE_ENV=test && mocha -r ts-node/register 'test/**/*.ts'",
     "btest": "yarn run build && yarn run test",
-    "lint": "eslint '{src,test}/**/*.ts'",
-    "lint:fix": "eslint --fix '{src,test}/**/*.ts'",
+    "lint": "eslint --max-warnings 0 .",
+    "lint:fix": "eslint --fix .",
     "ganache": "ganache-cli --host 0.0.0.0 --gasLimit 12e6 --deterministic"
   },
   "dependencies": {
