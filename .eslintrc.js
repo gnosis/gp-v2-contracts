@@ -15,11 +15,5 @@ module.exports = {
     "plugin:prettier/recommended",
     "prettier/@typescript-eslint",
   ],
-  ignorePatterns: [
-    "abis/",
-    "build/",
-    "generated/",
-    "node_modules/",
-    "!.prettierrc.js",
-  ],
-}
+  ignorePatterns: ["build/", "node_modules/", "!.prettierrc.js"],
+};
