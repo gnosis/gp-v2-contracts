@@ -330,13 +330,19 @@ describe("PreAMMBatcher-e2e", () => {
     expect(testCase.solution.sellOrdersToken1.length).to.be.equal(2);
     await runScenarioOnchain(testCase);
   });
-  it.only('isSorted', async () => {
+  it('isSorted', async () => {
     const testCase = generateTestCase(fourOrderTestInput(token0, token1,
       [walletTrader1, walletTrader2], [walletTrader3, walletTrader4]), false);
+
+    // const sortedOrders = [
+    //   new Order(100, 90, token0, token1, walletTrader1, 1),
+    //   new Order(50, 45, token0, token1, walletTrader1, 2)
+    // ];
+
     console.log(testCase.sellOrdersToken0.map(x => x.asArray()));
     console.log(testCase.sellOrdersToken1.map(x => x.asArray()));
-    const x = await batcher.isSorted(testCase.sellOrdersToken0, false);
-    const y = await batcher.isSorted(testCase.sellOrdersToken1, true);
+    const x = await batcher.isSorted(testCase.sellOrdersToken0.map(x => x.getSmartContractOrder()), false);
+    const y = await batcher.isSorted(testCase.sellOrdersToken1.map(x => x.getSmartContractOrder()), true);
     console.log(x);
     console.log(y);
   });
