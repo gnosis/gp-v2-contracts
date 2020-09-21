@@ -6,8 +6,8 @@ export const solveTestCase = function (
   testCaseInput: TestCaseInput,
   debug = false
 ): Solution {
-  // eslint-disable-next-line @typescript-eslint/no-empty-function, @typescript-eslint/explicit-function-return-type
-  const log = debug ? (...a: string) => console.log(...a) : (): void => {};
+  // eslint-disable-next-line @typescript-eslint/no-empty-function, @typescript-eslint/explicit-function-return-type, @typescript-eslint/no-explicit-any
+  const log = debug ? (...a: any) => console.log(...a) : (): void => {};
 
   let sumSellDemandToken0 = BigNumber.from(0);
   testCaseInput.sellOrdersToken0.forEach((order) => {
