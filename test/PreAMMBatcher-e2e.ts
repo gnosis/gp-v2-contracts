@@ -1,5 +1,5 @@
 import { use, expect } from "chai";
-import { BigNumber, Contract, Wallet } from "ethers";
+import { Contract, Wallet } from "ethers";
 import { deployContract, MockProvider, solidity } from "ethereum-waffle";
 import PreAMMBatcher from "../build/PreAMMBatcher.json";
 import UniswapV2Pair from "../node_modules/@uniswap/v2-core/build/UniswapV2Pair.json";
