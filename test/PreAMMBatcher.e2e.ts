@@ -1,3 +1,4 @@
+import { debug } from "debug";
 import { use, expect } from "chai";
 import { BigNumber, Contract, Wallet } from "ethers";
 import { deployContract, MockProvider, solidity } from "ethereum-waffle";
