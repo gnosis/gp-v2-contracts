@@ -257,7 +257,7 @@ describe("PreAMMBatcher-e2e", () => {
     expect(testCase.solution.sellOrdersToken1.length).to.be.equal(2);
     await runScenarioOnchain(testCase);
   });
-  it.only("isSorted", async () => {
+  it("isSorted", async () => {
     const sortedOrders = [
       new Order(1, 1, token0, token1, walletTrader1, 1),
       new Order(1, 2, token0, token1, walletTrader1, 2),
