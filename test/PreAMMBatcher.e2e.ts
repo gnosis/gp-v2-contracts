@@ -21,7 +21,7 @@ import {
 import { TestCase } from "./resources/models";
 
 use(solidity);
-const log = new debug();
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function asyncForEach(array: Order[], callback: any): Promise<void> {
   for (let index = 0; index < array.length; index++) {
