@@ -16,11 +16,11 @@ import { baseTestInput } from "./resources/testExamples";
 
 use(solidity);
 
-describe("PreAMMBatcher", () => {
+describe("PreAMMBatcher: Unit Tests", () => {
   const [
     walletDeployer,
-    walletTrader1,
-    walletTrader2,
+    traderWallet1,
+    traderWallet2,
   ] = new MockProvider().getWallets();
   let batcher: Contract;
   let token0: Contract;
@@ -106,8 +106,8 @@ describe("PreAMMBatcher", () => {
     const testCaseInput = baseTestInput(
       token0,
       token1,
-      [walletTrader1],
-      [walletTrader2],
+      [traderWallet1],
+      [traderWallet2],
     );
 
     await batcher.orderChecks(
@@ -121,8 +121,8 @@ describe("PreAMMBatcher", () => {
     const testCaseInput = baseTestInput(
       token0,
       token1,
-      [walletTrader1],
-      [walletTrader2],
+      [traderWallet1],
+      [traderWallet2],
     );
     testCaseInput.sellOrdersToken1[0].sellToken = token0;
 
@@ -139,8 +139,8 @@ describe("PreAMMBatcher", () => {
     const testCaseInput = baseTestInput(
       token0,
       token1,
-      [walletTrader1],
-      [walletTrader2],
+      [traderWallet1],
+      [traderWallet2],
     );
 
     await mockRelevantTokenDataForBatchTrade(
@@ -161,8 +161,8 @@ describe("PreAMMBatcher", () => {
     const testCaseInput = baseTestInput(
       token0,
       token1,
-      [walletTrader1],
-      [walletTrader2],
+      [traderWallet1],
+      [traderWallet2],
     );
 
     await mockRelevantTokenDataForBatchTrade(
@@ -176,7 +176,7 @@ describe("PreAMMBatcher", () => {
       { gasLimit: 6000000 },
     );
     expect("transferFrom").to.be.calledOnContractWith(token0, [
-      walletTrader1.address,
+      traderWallet1.address,
       batcher.address,
       testCaseInput.sellOrdersToken0[0].sellAmount.toString(),
     ]);
@@ -185,8 +185,8 @@ describe("PreAMMBatcher", () => {
     const testCaseInput = baseTestInput(
       token0,
       token1,
-      [walletTrader1],
-      [walletTrader2],
+      [traderWallet1],
+      [traderWallet2],
     );
 
     await mockRelevantTokenDataForBatchTrade(
@@ -208,8 +208,8 @@ describe("PreAMMBatcher", () => {
     const testCaseInput = baseTestInput(
       token0,
       token1,
-      [walletTrader1],
-      [walletTrader2],
+      [traderWallet1],
+      [traderWallet2],
     );
     await mockRelevantTokenDataForBatchTrade(
       testCaseInput.sellOrdersToken0[0],
@@ -221,9 +221,92 @@ describe("PreAMMBatcher", () => {
       { gasLimit: 6000000 },
     );
     expect("transferFrom").to.be.calledOnContractWith(token1, [
-      walletTrader2.address,
+      traderWallet2.address,
       batcher.address,
       testCaseInput.sellOrdersToken1[0].sellAmount.toString(),
     ]);
+  });
+  it("isSorted()", async () => {
+    const sortedOrders = [
+      new Order(1, 1, token0, token1, traderWallet1, 1),
+      new Order(1, 2, token0, token1, traderWallet1, 2),
+      new Order(1, 3, token0, token1, traderWallet1, 3),
+    ];
+
+    expect(
+      await batcher.isSorted(
+        sortedOrders.map((x) => x.getSmartContractOrder()),
+        false,
+      ),
+    ).to.be.equal(true);
+    expect(
+      await batcher.isSorted(
+        sortedOrders.map((x) => x.getSmartContractOrder()),
+        true,
+      ),
+    ).to.be.equal(false);
+
+    // Reverse the sorted list so it is descending and assert converse
+    sortedOrders.reverse();
+    expect(
+      await batcher.isSorted(
+        sortedOrders.map((x) => x.getSmartContractOrder()),
+        false,
+      ),
+    ).to.be.equal(false);
+    expect(
+      await batcher.isSorted(
+        sortedOrders.map((x) => x.getSmartContractOrder()),
+        true,
+      ),
+    ).to.be.equal(true);
+
+    const unsortedOrders = [
+      new Order(1, 2, token0, token1, traderWallet1, 1),
+      new Order(1, 1, token0, token1, traderWallet1, 2),
+      new Order(1, 3, token0, token1, traderWallet1, 3),
+    ];
+    expect(
+      await batcher.isSorted(
+        unsortedOrders.map((x) => x.getSmartContractOrder()),
+        false,
+      ),
+    ).to.be.equal(false);
+    expect(
+      await batcher.isSorted(
+        unsortedOrders.map((x) => x.getSmartContractOrder()),
+        true,
+      ),
+    ).to.be.equal(false);
+
+    // Empty orderset is sorted.
+    const emptyOrders: Order[] = [];
+    expect(
+      await batcher.isSorted(
+        emptyOrders.map((x) => x.getSmartContractOrder()),
+        false,
+      ),
+    ).to.be.equal(true);
+    expect(
+      await batcher.isSorted(
+        emptyOrders.map((x) => x.getSmartContractOrder()),
+        true,
+      ),
+    ).to.be.equal(true);
+
+    // Single Orderset is vacuously sorted
+    const singleOrder = [new Order(1, 1, token0, token1, traderWallet1, 1)];
+    expect(
+      await batcher.isSorted(
+        singleOrder.map((x) => x.getSmartContractOrder()),
+        false,
+      ),
+    ).to.be.equal(true);
+    expect(
+      await batcher.isSorted(
+        singleOrder.map((x) => x.getSmartContractOrder()),
+        true,
+      ),
+    ).to.be.equal(true);
   });
 });

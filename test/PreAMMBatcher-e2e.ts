@@ -11,8 +11,8 @@ import { generateTestCase } from "./resources/index";
 import {
   baseTestInput,
   fourOrderTestInput,
-  oneOrderSellingToken0IsObmittedTestInput,
-  oneOrderSellingToken1IsObmittedTestInput,
+  oneOrderSellingToken0IsOmittedTestInput,
+  oneOrderSellingToken1IsOmittedTestInput,
   noSolutionTestInput,
   switchTokenTestInput,
 } from "./resources/testExamples";
@@ -53,7 +53,7 @@ const fundUniswap = async (
   await token1.transfer(uniswapPair.address, testCase.fundingAMMToken0);
   await uniswapPair.mint(walletDeployer.address, { gasLimit: 500000 });
 };
-describe("PreAMMBatcher-e2e", () => {
+describe("PreAMMBatcher: End to End Tests", () => {
   const [
     walletDeployer,
     walletTrader1,
@@ -160,28 +160,28 @@ describe("PreAMMBatcher-e2e", () => {
         [walletTrader1, walletTrader2],
         [walletTrader3, walletTrader4],
       ),
-      true,
+      false,
     );
-    console.log(testCase.sellOrdersToken0.length);
-    console.log(testCase.sellOrdersToken0[0].sellToken.address);
+    // console.log(testCase.sellOrdersToken0.length);
+    // console.log(testCase.sellOrdersToken0[0].sellToken.address);
     expect(testCase.solution.sellOrdersToken0.length).to.be.equal(1);
     expect(testCase.solution.sellOrdersToken1.length).to.be.equal(1);
     await runScenarioOnchain(testCase);
 
-    console.log(
-      "auction clearing price:",
-      testCase.solution.clearingPrice.numerator
-        .mul(BigNumber.from("100000"))
-        .div(testCase.solution.clearingPrice.denominator)
-        .toString(),
-    );
-    console.log(
-      "uniswap clearing price:",
-      (await uniswapPair.getReserves())[0]
-        .mul(100000)
-        .div((await uniswapPair.getReserves())[1])
-        .toString(),
-    );
+    // console.log(
+    //   "auction clearing price:",
+    //   testCase.solution.clearingPrice.numerator
+    //     .mul(BigNumber.from("100000"))
+    //     .div(testCase.solution.clearingPrice.denominator)
+    //     .toString(),
+    // );
+    // console.log(
+    //   "uniswap clearing price:",
+    //   (await uniswapPair.getReserves())[0]
+    //     .mul(100000)
+    //     .div((await uniswapPair.getReserves())[1])
+    //     .toString(),
+    // );
   });
 
   it("pre-batches four orders and settles left-overs to uniswap", async () => {
@@ -196,31 +196,31 @@ describe("PreAMMBatcher-e2e", () => {
     await runScenarioOnchain(testCase);
   });
 
-  it("example: oneOrderSellingToken0IsObmittedTestInput", async () => {
+  it("example: oneOrderSellingToken0IsOmittedTestInput", async () => {
     const testCase = generateTestCase(
-      oneOrderSellingToken0IsObmittedTestInput(
+      oneOrderSellingToken0IsOmittedTestInput(
         token0,
         token1,
         [walletTrader1, walletTrader2],
         [walletTrader3, walletTrader4],
       ),
-      true,
+      false,
     );
-    console.log(testCase.sellOrdersToken0.length);
-    console.log(testCase.sellOrdersToken0[0].sellToken.address);
+    // console.log(testCase.sellOrdersToken0.length);
+    // console.log(testCase.sellOrdersToken0[0].sellToken.address);
     expect(testCase.solution.sellOrdersToken0.length).to.be.equal(1);
     expect(testCase.solution.sellOrdersToken1.length).to.be.equal(1);
     await runScenarioOnchain(testCase);
   });
-  it("example: oneOrderSellingToken1IsObmittedTestInput", async () => {
+  it("example: oneOrderSellingToken1IsOmittedTestInput", async () => {
     const testCase = generateTestCase(
-      oneOrderSellingToken1IsObmittedTestInput(
+      oneOrderSellingToken1IsOmittedTestInput(
         token0,
         token1,
         [walletTrader1, walletTrader2, walletTrader5, walletTrader6],
         [walletTrader3, walletTrader4],
       ),
-      true,
+      false,
     );
 
     expect(testCase.solution.sellOrdersToken0.length).to.be.equal(3);
@@ -235,7 +235,7 @@ describe("PreAMMBatcher-e2e", () => {
         [walletTrader1, walletTrader2, walletTrader5],
         [walletTrader3, walletTrader4, walletTrader6],
       ),
-      true,
+      false,
     );
 
     expect(testCase.solution.sellOrdersToken0.length).to.be.equal(0);
@@ -250,94 +250,11 @@ describe("PreAMMBatcher-e2e", () => {
         [walletTrader1, walletTrader2],
         [walletTrader3, walletTrader4, walletTrader5, walletTrader6],
       ),
-      true,
+      false,
     );
 
     expect(testCase.solution.sellOrdersToken0.length).to.be.equal(3);
     expect(testCase.solution.sellOrdersToken1.length).to.be.equal(2);
     await runScenarioOnchain(testCase);
-  });
-  it("isSorted", async () => {
-    const sortedOrders = [
-      new Order(1, 1, token0, token1, walletTrader1, 1),
-      new Order(1, 2, token0, token1, walletTrader1, 2),
-      new Order(1, 3, token0, token1, walletTrader1, 3),
-    ];
-
-    expect(
-      await batcher.isSorted(
-        sortedOrders.map((x) => x.getSmartContractOrder()),
-        false,
-      ),
-    ).to.be.equal(true);
-    expect(
-      await batcher.isSorted(
-        sortedOrders.map((x) => x.getSmartContractOrder()),
-        true,
-      ),
-    ).to.be.equal(false);
-
-    // Reverse the sorted list so it is descending and assert converse
-    sortedOrders.reverse();
-    expect(
-      await batcher.isSorted(
-        sortedOrders.map((x) => x.getSmartContractOrder()),
-        false,
-      ),
-    ).to.be.equal(false);
-    expect(
-      await batcher.isSorted(
-        sortedOrders.map((x) => x.getSmartContractOrder()),
-        true,
-      ),
-    ).to.be.equal(true);
-
-    const unsortedOrders = [
-      new Order(1, 2, token0, token1, walletTrader1, 1),
-      new Order(1, 1, token0, token1, walletTrader1, 2),
-      new Order(1, 3, token0, token1, walletTrader1, 3),
-    ];
-    expect(
-      await batcher.isSorted(
-        unsortedOrders.map((x) => x.getSmartContractOrder()),
-        false,
-      ),
-    ).to.be.equal(false);
-    expect(
-      await batcher.isSorted(
-        unsortedOrders.map((x) => x.getSmartContractOrder()),
-        true,
-      ),
-    ).to.be.equal(false);
-
-    // Empty orderset is sorted.
-    const emptyOrders: Order[] = [];
-    expect(
-      await batcher.isSorted(
-        emptyOrders.map((x) => x.getSmartContractOrder()),
-        false,
-      ),
-    ).to.be.equal(true);
-    expect(
-      await batcher.isSorted(
-        emptyOrders.map((x) => x.getSmartContractOrder()),
-        true,
-      ),
-    ).to.be.equal(true);
-
-    // Single Orderset is vacuously sorted
-    const singleOrder = [new Order(1, 1, token0, token1, walletTrader1, 1)];
-    expect(
-      await batcher.isSorted(
-        singleOrder.map((x) => x.getSmartContractOrder()),
-        false,
-      ),
-    ).to.be.equal(true);
-    expect(
-      await batcher.isSorted(
-        singleOrder.map((x) => x.getSmartContractOrder()),
-        true,
-      ),
-    ).to.be.equal(true);
   });
 });

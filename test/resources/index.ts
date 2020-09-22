@@ -86,7 +86,7 @@ export const solveTestCase = function (
 
     // Actually, the bid's sellAmount could also just be reduced, if uniswap prices(reserve0/reserve1)
     // is smaller than bid-price. We leave this optimzation for later and go with the principle fill or kill
-    console.log(`popping sellOrdersToken0, due to a its limit price of
+    log(`popping sellOrdersToken0, due to a its limit price of
      ${highestSellOrderToken0.sellAmount} / ${highestSellOrderToken0.buyAmount}`);
     testCaseInput.sellOrdersToken0.pop();
     return solveTestCase(
@@ -105,7 +105,7 @@ export const solveTestCase = function (
   ) {
     // In this case the clearing price of the order selling token1 with the highest price is violated.
     // We remove this bid and try to solve again
-    console.log(`popping sellOrdersToken1, due to a its limit price of
+    log(`popping sellOrdersToken1, due to a its limit price of
      ${highestSellOrderToken1.buyAmount} / ${highestSellOrderToken1.sellAmount}`);
     testCaseInput.sellOrdersToken1.pop();
     return solveTestCase(
