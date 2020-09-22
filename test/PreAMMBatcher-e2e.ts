@@ -257,33 +257,87 @@ describe("PreAMMBatcher-e2e", () => {
     expect(testCase.solution.sellOrdersToken1.length).to.be.equal(2);
     await runScenarioOnchain(testCase);
   });
-  it("isSorted", async () => {
-    const testCase = generateTestCase(
-      fourOrderTestInput(
-        token0,
-        token1,
-        [walletTrader1, walletTrader2],
-        [walletTrader3, walletTrader4],
+  it.only("isSorted", async () => {
+    const sortedOrders = [
+      new Order(1, 1, token0, token1, walletTrader1, 1),
+      new Order(1, 2, token0, token1, walletTrader1, 2),
+      new Order(1, 3, token0, token1, walletTrader1, 3),
+    ];
+
+    expect(
+      await batcher.isSorted(
+        sortedOrders.map((x) => x.getSmartContractOrder()),
+        false,
       ),
-      false,
-    );
+    ).to.be.equal(true);
+    expect(
+      await batcher.isSorted(
+        sortedOrders.map((x) => x.getSmartContractOrder()),
+        true,
+      ),
+    ).to.be.equal(false);
 
-    // const sortedOrders = [
-    //   new Order(100, 90, token0, token1, walletTrader1, 1),
-    //   new Order(50, 45, token0, token1, walletTrader1, 2)
-    // ];
+    // Reverse the sorted list so it is descending and assert converse
+    sortedOrders.reverse();
+    expect(
+      await batcher.isSorted(
+        sortedOrders.map((x) => x.getSmartContractOrder()),
+        false,
+      ),
+    ).to.be.equal(false);
+    expect(
+      await batcher.isSorted(
+        sortedOrders.map((x) => x.getSmartContractOrder()),
+        true,
+      ),
+    ).to.be.equal(true);
 
-    console.log(testCase.sellOrdersToken0.map((x) => x.asArray()));
-    console.log(testCase.sellOrdersToken1.map((x) => x.asArray()));
-    const x = await batcher.isSorted(
-      testCase.sellOrdersToken0.map((x) => x.getSmartContractOrder()),
-      false,
-    );
-    const y = await batcher.isSorted(
-      testCase.sellOrdersToken1.map((x) => x.getSmartContractOrder()),
-      true,
-    );
-    console.log(x);
-    console.log(y);
+    const unsortedOrders = [
+      new Order(1, 2, token0, token1, walletTrader1, 1),
+      new Order(1, 1, token0, token1, walletTrader1, 2),
+      new Order(1, 3, token0, token1, walletTrader1, 3),
+    ];
+    expect(
+      await batcher.isSorted(
+        unsortedOrders.map((x) => x.getSmartContractOrder()),
+        false,
+      ),
+    ).to.be.equal(false);
+    expect(
+      await batcher.isSorted(
+        unsortedOrders.map((x) => x.getSmartContractOrder()),
+        true,
+      ),
+    ).to.be.equal(false);
+
+    // Empty orderset is sorted.
+    const emptyOrders: Order[] = [];
+    expect(
+      await batcher.isSorted(
+        emptyOrders.map((x) => x.getSmartContractOrder()),
+        false,
+      ),
+    ).to.be.equal(true);
+    expect(
+      await batcher.isSorted(
+        emptyOrders.map((x) => x.getSmartContractOrder()),
+        true,
+      ),
+    ).to.be.equal(true);
+
+    // Single Orderset is vacuously sorted
+    const singleOrder = [new Order(1, 1, token0, token1, walletTrader1, 1)];
+    expect(
+      await batcher.isSorted(
+        singleOrder.map((x) => x.getSmartContractOrder()),
+        false,
+      ),
+    ).to.be.equal(true);
+    expect(
+      await batcher.isSorted(
+        singleOrder.map((x) => x.getSmartContractOrder()),
+        true,
+      ),
+    ).to.be.equal(true);
   });
 });

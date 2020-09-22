@@ -411,6 +411,7 @@ contract PreAMMBatcher {
         returns (bool)
     {
         // Values used to traverse the list forwards or backwards depending on reverse.
+        // That is, reverse determines whether we want the orders to be ascendeing or descending
         int256 start = 0;
         int8 step = 1;
         if (reverse) {
