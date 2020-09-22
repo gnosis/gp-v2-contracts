@@ -7,8 +7,8 @@ import {
   solidity,
 } from "ethereum-waffle";
 import PreAMMBatcher from "../build/PreAMMBatcher.json";
-import UniswapV2Pair from "@uniswap/v2-core/build/UniswapV2Pair";
-import UniswapV2Factory from "@uniswap/v2-core/build/UniswapV2Factory";
+import UniswapV2Pair from "@uniswap/v2-core/build/UniswapV2Pair.json";
+import UniswapV2Factory from "@uniswap/v2-core/build/UniswapV2Factory.json";
 
 import ERC20 from "../build/ERC20Mintable.json";
 import { Order, DOMAIN_SEPARATOR } from "../src/js/orders.spec";

@@ -1,9 +1,9 @@
 import { use, expect } from "chai";
-import { Contract, Wallet } from "ethers";
+import { BigNumber, Contract, Wallet } from "ethers";
 import { deployContract, MockProvider, solidity } from "ethereum-waffle";
 import PreAMMBatcher from "../build/PreAMMBatcher.json";
-import UniswapV2Pair from "@uniswap/v2-core/build/UniswapV2Pair";
-import UniswapV2Factory from "@uniswap/v2-core/build/UniswapV2Factory";
+import UniswapV2Pair from "@uniswap/v2-core/build/UniswapV2Pair.json";
+import UniswapV2Factory from "@uniswap/v2-core/build/UniswapV2Factory.json";
 
 import ERC20 from "../build/ERC20Mintable.json";
 import { Order } from "../src/js/orders.spec";
@@ -20,7 +20,7 @@ import {
 import { TestCase } from "./resources/models";
 
 use(solidity);
-
+const log = new debug();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function asyncForEach(array: Order[], callback: any): Promise<void> {
   for (let index = 0; index < array.length; index++) {
@@ -162,26 +162,28 @@ describe("PreAMMBatcher: End to End Tests", () => {
       ),
       false,
     );
-    // console.log(testCase.sellOrdersToken0.length);
-    // console.log(testCase.sellOrdersToken0[0].sellToken.address);
     expect(testCase.solution.sellOrdersToken0.length).to.be.equal(1);
     expect(testCase.solution.sellOrdersToken1.length).to.be.equal(1);
     await runScenarioOnchain(testCase);
-
-    // console.log(
-    //   "auction clearing price:",
-    //   testCase.solution.clearingPrice.numerator
-    //     .mul(BigNumber.from("100000"))
-    //     .div(testCase.solution.clearingPrice.denominator)
-    //     .toString(),
-    // );
-    // console.log(
-    //   "uniswap clearing price:",
-    //   (await uniswapPair.getReserves())[0]
-    //     .mul(100000)
-    //     .div((await uniswapPair.getReserves())[1])
-    //     .toString(),
-    // );
+    debug("HELLO!");
+    debug("HELLO!");
+    debug("HELLO!");
+    debug("HELLO!");
+    debug("HELLO!");
+    debug(
+      "auction clearing price: " +
+        testCase.solution.clearingPrice.numerator
+          .mul(BigNumber.from("100000"))
+          .div(testCase.solution.clearingPrice.denominator)
+          .toString(),
+    );
+    debug(
+      "uniswap clearing price: " +
+        (await uniswapPair.getReserves())[0]
+          .mul(100000)
+          .div((await uniswapPair.getReserves())[1])
+          .toString(),
+    );
   });
 
   it("pre-batches four orders and settles left-overs to uniswap", async () => {
