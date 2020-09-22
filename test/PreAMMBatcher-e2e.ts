@@ -30,7 +30,7 @@ async function asyncForEach(array: Order[], callback: any): Promise<void> {
 
 const setupOrders = async (
   orders: Order[],
-  batcher: Contract
+  batcher: Contract,
 ): Promise<void> => {
   await asyncForEach(orders, async (order: Order) => {
     await order.sellToken.mint(order.wallet.address, order.sellAmount);
@@ -43,7 +43,7 @@ const setupOrders = async (
 const fundUniswap = async (
   testCase: TestCase,
   walletDeployer: Wallet,
-  uniswapPair: Contract
+  uniswapPair: Contract,
 ): Promise<void> => {
   const token0 = testCase.sellOrdersToken0[0].sellToken;
   const token1 = testCase.sellOrdersToken0[0].buyToken;
@@ -74,7 +74,7 @@ describe("PreAMMBatcher-e2e", () => {
     await fundUniswap(testCase, walletDeployer, uniswapPair);
     await setupOrders(
       testCase.sellOrdersToken0.concat(testCase.sellOrdersToken1),
-      batcher
+      batcher,
     );
 
     if (testCase.solution.sellOrdersToken0.length === 0) {
@@ -82,52 +82,52 @@ describe("PreAMMBatcher-e2e", () => {
         batcher.batchTrade(
           testCase.getSellOrdersToken0Encoded(),
           testCase.getSellOrdersToken1Encoded(),
-          { gasLimit: 6000000 }
-        )
+          { gasLimit: 6000000 },
+        ),
       ).to.revertedWith("no solution found");
     } else {
       await expect(
         batcher.batchTrade(
           testCase.getSellOrdersToken0Encoded(),
           testCase.getSellOrdersToken1Encoded(),
-          { gasLimit: 6000000 }
-        )
+          { gasLimit: 6000000 },
+        ),
       )
         .to.emit(batcher, "BatchSettlement")
         .withArgs(
           testCase.solution.sellOrdersToken0[0].sellToken.address,
           testCase.solution.sellOrdersToken0[0].buyToken.address,
           testCase.solution.clearingPrice.denominator,
-          testCase.solution.clearingPrice.numerator
+          testCase.solution.clearingPrice.numerator,
         );
 
       await asyncForEach(
         testCase.solution.sellOrdersToken0,
         async (order: Order) => {
           expect(
-            await order.buyToken.balanceOf(order.wallet.address)
+            await order.buyToken.balanceOf(order.wallet.address),
           ).to.be.equal(
             order.sellAmount
               .mul(testCase.solution.clearingPrice.denominator)
               .div(testCase.solution.clearingPrice.numerator)
               .mul(332)
-              .div(333)
+              .div(333),
           );
-        }
+        },
       );
       await asyncForEach(
         testCase.solution.sellOrdersToken1,
         async (order: Order) => {
           expect(
-            await order.buyToken.balanceOf(order.wallet.address)
+            await order.buyToken.balanceOf(order.wallet.address),
           ).to.be.equal(
             order.sellAmount
               .mul(testCase.solution.clearingPrice.numerator)
               .div(testCase.solution.clearingPrice.denominator)
               .mul(332)
-              .div(333)
+              .div(333),
           );
-        }
+        },
       );
     }
   };
@@ -143,7 +143,7 @@ describe("PreAMMBatcher-e2e", () => {
     });
     uniswapPairAddress = await uniswapFactory.getPair(
       token0.address,
-      token1.address
+      token1.address,
     );
     uniswapPair = await deployContract(walletDeployer, UniswapV2Pair);
     uniswapPair = await uniswapPair.attach(uniswapPairAddress);
@@ -158,9 +158,9 @@ describe("PreAMMBatcher-e2e", () => {
         token0,
         token1,
         [walletTrader1, walletTrader2],
-        [walletTrader3, walletTrader4]
+        [walletTrader3, walletTrader4],
       ),
-      true
+      true,
     );
     console.log(testCase.sellOrdersToken0.length);
     console.log(testCase.sellOrdersToken0[0].sellToken.address);
@@ -173,14 +173,14 @@ describe("PreAMMBatcher-e2e", () => {
       testCase.solution.clearingPrice.numerator
         .mul(BigNumber.from("100000"))
         .div(testCase.solution.clearingPrice.denominator)
-        .toString()
+        .toString(),
     );
     console.log(
       "uniswap clearing price:",
       (await uniswapPair.getReserves())[0]
         .mul(100000)
         .div((await uniswapPair.getReserves())[1])
-        .toString()
+        .toString(),
     );
   });
 
@@ -190,8 +190,8 @@ describe("PreAMMBatcher-e2e", () => {
         token0,
         token1,
         [walletTrader1, walletTrader2],
-        [walletTrader3, walletTrader4]
-      )
+        [walletTrader3, walletTrader4],
+      ),
     );
     await runScenarioOnchain(testCase);
   });
@@ -202,9 +202,9 @@ describe("PreAMMBatcher-e2e", () => {
         token0,
         token1,
         [walletTrader1, walletTrader2],
-        [walletTrader3, walletTrader4]
+        [walletTrader3, walletTrader4],
       ),
-      true
+      true,
     );
     console.log(testCase.sellOrdersToken0.length);
     console.log(testCase.sellOrdersToken0[0].sellToken.address);
@@ -218,9 +218,9 @@ describe("PreAMMBatcher-e2e", () => {
         token0,
         token1,
         [walletTrader1, walletTrader2, walletTrader5, walletTrader6],
-        [walletTrader3, walletTrader4]
+        [walletTrader3, walletTrader4],
       ),
-      true
+      true,
     );
 
     expect(testCase.solution.sellOrdersToken0.length).to.be.equal(3);
@@ -233,9 +233,9 @@ describe("PreAMMBatcher-e2e", () => {
         token0,
         token1,
         [walletTrader1, walletTrader2, walletTrader5],
-        [walletTrader3, walletTrader4, walletTrader6]
+        [walletTrader3, walletTrader4, walletTrader6],
       ),
-      true
+      true,
     );
 
     expect(testCase.solution.sellOrdersToken0.length).to.be.equal(0);
@@ -248,9 +248,9 @@ describe("PreAMMBatcher-e2e", () => {
         token0,
         token1,
         [walletTrader1, walletTrader2],
-        [walletTrader3, walletTrader4, walletTrader5, walletTrader6]
+        [walletTrader3, walletTrader4, walletTrader5, walletTrader6],
       ),
-      true
+      true,
     );
 
     expect(testCase.solution.sellOrdersToken0.length).to.be.equal(3);

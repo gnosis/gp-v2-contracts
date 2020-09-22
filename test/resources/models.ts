@@ -25,7 +25,7 @@ export class TestCase {
     fundingAMMToken1: BigNumber | number,
     sellOrdersToken0: Order[],
     sellOrdersToken1: Order[],
-    solution: Solution
+    solution: Solution,
   ) {
     this.fundingAMMToken0 = BigNumber.from(fundingAMMToken0);
     this.fundingAMMToken1 = BigNumber.from(fundingAMMToken1);

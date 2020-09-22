@@ -6,4 +6,4 @@ module.exports = {
   rules: {
     "no-only-tests/no-only-tests": "error",
   },
-}
+};

@@ -27,7 +27,7 @@ export class Order {
     sellToken: Contract,
     buyToken: Contract,
     wallet: Wallet,
-    nonce: BigNumber | number
+    nonce: BigNumber | number,
   ) {
     this.sellAmount = BigNumber.from(sellAmount);
     this.buyAmount = BigNumber.from(buyAmount);
@@ -41,7 +41,7 @@ export class Order {
     const digest = this.getOrderDigest();
     const { v, r, s } = ecsign(
       Buffer.from(digest.slice(2), "hex"),
-      Buffer.from(this.wallet.privateKey.slice(2), "hex")
+      Buffer.from(this.wallet.privateKey.slice(2), "hex"),
     );
     return abi.rawEncode(
       [
@@ -65,7 +65,7 @@ export class Order {
         v,
         utils.hexlify(r),
         utils.hexlify(s),
-      ]
+      ],
     );
   }
 
@@ -110,8 +110,8 @@ export class Order {
           this.buyToken.address,
           this.wallet.address,
           this.nonce.toString(),
-        ]
-      )
+        ],
+      ),
     );
   }
 }

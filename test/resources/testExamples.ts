@@ -6,7 +6,7 @@ export const baseTestInput = function (
   token0: Contract,
   token1: Contract,
   tradersToken0: Wallet[],
-  tradersToken1: Wallet[]
+  tradersToken1: Wallet[],
 ): TestCaseInput {
   return {
     fundingAMMToken0: utils.parseEther("10"),
@@ -18,7 +18,7 @@ export const baseTestInput = function (
         token0,
         token1,
         tradersToken0[0],
-        1
+        1,
       ),
     ],
     sellOrdersToken1: [
@@ -28,7 +28,7 @@ export const baseTestInput = function (
         token1,
         token0,
         tradersToken1[0],
-        1
+        1,
       ),
     ],
   };
@@ -38,7 +38,7 @@ export const fourOrderTestInput = function (
   token0: Contract,
   token1: Contract,
   tradersToken0: Wallet[],
-  tradersToken1: Wallet[]
+  tradersToken1: Wallet[],
 ): TestCaseInput {
   return {
     fundingAMMToken0: utils.parseEther("10"),
@@ -50,7 +50,7 @@ export const fourOrderTestInput = function (
         token0,
         token1,
         tradersToken0[0],
-        1
+        1,
       ),
       new Order(
         utils.parseEther("0.5"),
@@ -58,7 +58,7 @@ export const fourOrderTestInput = function (
         token0,
         token1,
         tradersToken0[1],
-        2
+        2,
       ),
     ],
     sellOrdersToken1: [
@@ -68,7 +68,7 @@ export const fourOrderTestInput = function (
         token1,
         token0,
         tradersToken1[0],
-        1
+        1,
       ),
       new Order(
         utils.parseEther("0.45"),
@@ -76,7 +76,7 @@ export const fourOrderTestInput = function (
         token1,
         token0,
         tradersToken1[1],
-        1
+        1,
       ),
     ],
   };
@@ -86,7 +86,7 @@ export const oneOrderSellingToken0IsObmittedTestInput = function (
   token0: Contract,
   token1: Contract,
   tradersToken0: Wallet[],
-  tradersToken1: Wallet[]
+  tradersToken1: Wallet[],
 ): TestCaseInput {
   return {
     fundingAMMToken0: utils.parseEther("10"),
@@ -98,7 +98,7 @@ export const oneOrderSellingToken0IsObmittedTestInput = function (
         token0,
         token1,
         tradersToken0[0],
-        1
+        1,
       ),
       new Order(
         utils.parseEther("5"), // <--- this order would can not be traded fully against uniswap
@@ -106,7 +106,7 @@ export const oneOrderSellingToken0IsObmittedTestInput = function (
         token0,
         token1,
         tradersToken0[1],
-        2
+        2,
       ),
     ],
     sellOrdersToken1: [
@@ -116,7 +116,7 @@ export const oneOrderSellingToken0IsObmittedTestInput = function (
         token1,
         token0,
         tradersToken1[0],
-        1
+        1,
       ),
     ],
   };
@@ -126,7 +126,7 @@ export const noSolutionTestInput = function (
   token0: Contract,
   token1: Contract,
   tradersToken0: Wallet[],
-  tradersToken1: Wallet[]
+  tradersToken1: Wallet[],
 ): TestCaseInput {
   return {
     fundingAMMToken0: utils.parseEther("10"),
@@ -138,7 +138,7 @@ export const noSolutionTestInput = function (
         token0,
         token1,
         tradersToken0[0],
-        1
+        1,
       ),
       new Order(
         utils.parseEther("5"),
@@ -146,7 +146,7 @@ export const noSolutionTestInput = function (
         token0,
         token1,
         tradersToken0[1],
-        2
+        2,
       ),
     ],
     sellOrdersToken1: [
@@ -156,7 +156,7 @@ export const noSolutionTestInput = function (
         token1,
         token0,
         tradersToken1[0],
-        1
+        1,
       ),
       new Order(
         utils.parseEther("3"),
@@ -164,7 +164,7 @@ export const noSolutionTestInput = function (
         token1,
         token0,
         tradersToken1[1],
-        2
+        2,
       ),
       new Order(
         utils.parseEther("3"),
@@ -172,7 +172,7 @@ export const noSolutionTestInput = function (
         token1,
         token0,
         tradersToken1[2],
-        3
+        3,
       ),
     ],
   };
@@ -182,7 +182,7 @@ export const oneOrderSellingToken1IsObmittedTestInput = function (
   token0: Contract,
   token1: Contract,
   tradersToken0: Wallet[],
-  tradersToken1: Wallet[]
+  tradersToken1: Wallet[],
 ): TestCaseInput {
   return {
     fundingAMMToken0: utils.parseEther("10"),
@@ -195,7 +195,7 @@ export const oneOrderSellingToken1IsObmittedTestInput = function (
         token1,
         token0,
         tradersToken0[0],
-        1
+        1,
       ),
       new Order(
         utils.parseEther("3"),
@@ -203,7 +203,7 @@ export const oneOrderSellingToken1IsObmittedTestInput = function (
         token1,
         token0,
         tradersToken0[1],
-        2
+        2,
       ),
       new Order(
         utils.parseEther("3"),
@@ -211,7 +211,7 @@ export const oneOrderSellingToken1IsObmittedTestInput = function (
         token1,
         token0,
         tradersToken0[2],
-        3
+        3,
       ),
       new Order(
         utils.parseEther("3"), // <--- this order would can not be traded fully against uniswap
@@ -219,7 +219,7 @@ export const oneOrderSellingToken1IsObmittedTestInput = function (
         token1,
         token0,
         tradersToken0[3],
-        4
+        4,
       ),
     ],
     sellOrdersToken1: [
@@ -229,7 +229,7 @@ export const oneOrderSellingToken1IsObmittedTestInput = function (
         token0,
         token1,
         tradersToken1[0],
-        1
+        1,
       ),
       new Order(
         utils.parseEther("5"),
@@ -237,7 +237,7 @@ export const oneOrderSellingToken1IsObmittedTestInput = function (
         token0,
         token1,
         tradersToken1[1],
-        2
+        2,
       ),
     ],
   };
@@ -247,7 +247,7 @@ export const switchTokenTestInput = function (
   token0: Contract,
   token1: Contract,
   tradersToken0: Wallet[],
-  tradersToken1: Wallet[]
+  tradersToken1: Wallet[],
 ): TestCaseInput {
   return {
     fundingAMMToken0: utils.parseEther("10"),
@@ -259,7 +259,7 @@ export const switchTokenTestInput = function (
         token0,
         token1,
         tradersToken0[0],
-        1
+        1,
       ),
       new Order(
         utils.parseEther("5"),
@@ -267,7 +267,7 @@ export const switchTokenTestInput = function (
         token0,
         token1,
         tradersToken0[1],
-        2
+        2,
       ),
     ],
     sellOrdersToken1: [
@@ -277,7 +277,7 @@ export const switchTokenTestInput = function (
         token1,
         token0,
         tradersToken1[0],
-        1
+        1,
       ),
       new Order(
         utils.parseEther("3"),
@@ -285,7 +285,7 @@ export const switchTokenTestInput = function (
         token1,
         token0,
         tradersToken1[1],
-        2
+        2,
       ),
       new Order(
         utils.parseEther("3"),
@@ -293,7 +293,7 @@ export const switchTokenTestInput = function (
         token1,
         token0,
         tradersToken1[2],
-        3
+        3,
       ),
       new Order(
         utils.parseEther("3"),
@@ -301,7 +301,7 @@ export const switchTokenTestInput = function (
         token1,
         token0,
         tradersToken1[3],
-        4
+        4,
       ),
     ],
   };

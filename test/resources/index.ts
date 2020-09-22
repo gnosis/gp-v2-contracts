@@ -4,7 +4,7 @@ import _ from "lodash";
 
 export const solveTestCase = function (
   testCaseInput: TestCaseInput,
-  debug = false
+  debug = false,
 ): Solution {
   // eslint-disable-next-line @typescript-eslint/no-empty-function, @typescript-eslint/explicit-function-return-type, @typescript-eslint/no-explicit-any
   const log = debug ? (...a: any) => console.log(...a) : (): void => {};
@@ -38,11 +38,11 @@ export const solveTestCase = function (
   log("Total selling demand token1", sumSellAmountToken1.toString());
   log(
     "Highest bid selling OrderToken0",
-    highestSellOrderToken0.sellAmount.toString()
+    highestSellOrderToken0.sellAmount.toString(),
   );
   log(
     "Highest bid selling OrderToken1",
-    highestSellOrderToken0.buyAmount.toString()
+    highestSellOrderToken0.buyAmount.toString(),
   );
   if (
     sumSellDemandToken0
@@ -58,7 +58,7 @@ export const solveTestCase = function (
         sellOrdersToken0: testCaseInput.sellOrdersToken1,
         sellOrdersToken1: testCaseInput.sellOrdersToken0,
       },
-      debug
+      debug,
     );
   }
   const clearingPrice: Fraction = {
@@ -74,7 +74,7 @@ export const solveTestCase = function (
     clearingPrice.denominator
       .mul(1000)
       .div(clearingPrice.numerator)
-      .toNumber() / 1000
+      .toNumber() / 1000,
   );
   if (
     highestSellOrderToken0.sellAmount
@@ -96,7 +96,7 @@ export const solveTestCase = function (
         sellOrdersToken0: testCaseInput.sellOrdersToken0,
         sellOrdersToken1: testCaseInput.sellOrdersToken1,
       },
-      debug
+      debug,
     );
   } else if (
     clearingPrice.numerator
@@ -115,13 +115,13 @@ export const solveTestCase = function (
         sellOrdersToken0: testCaseInput.sellOrdersToken0,
         sellOrdersToken1: testCaseInput.sellOrdersToken1,
       },
-      debug
+      debug,
     );
   }
   const unmatchedAmount = sumSellDemandToken0.sub(
     sumSellAmountToken1
       .mul(clearingPrice.numerator)
-      .div(clearingPrice.denominator)
+      .div(clearingPrice.denominator),
   );
   log("unmatchedAmount", unmatchedAmount.toString());
   // No price violation, we found a solution:
@@ -134,14 +134,14 @@ export const solveTestCase = function (
 
 export const generateTestCase = function (
   testCaseInput: TestCaseInput,
-  debug = false
+  debug = false,
 ): TestCase {
   return new TestCase(
     testCaseInput.fundingAMMToken0,
     testCaseInput.fundingAMMToken1,
     _.cloneDeep(testCaseInput.sellOrdersToken0), // <-- deep copy needed as solveTestCase can modify the orders
     _.cloneDeep(testCaseInput.sellOrdersToken1),
-    solveTestCase(testCaseInput, debug)
+    solveTestCase(testCaseInput, debug),
   );
 };
 

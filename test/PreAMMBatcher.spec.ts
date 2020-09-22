@@ -33,7 +33,7 @@ describe("PreAMMBatcher", () => {
 
   const mockRelevantTokenDataForBatchTrade = async (
     sellOrder1: Order,
-    sellOrder2: Order
+    sellOrder2: Order,
   ): Promise<void> => {
     // todo: mock actual right information
     // mock un-relevant data to make batchTrade call pass
@@ -58,7 +58,7 @@ describe("PreAMMBatcher", () => {
     await token0.mock.balanceOf
       .withArgs(uniswapPair.address)
       .returns(
-        initialUniswapFundingOfToken0.add(sellOrder1.sellAmount).toString()
+        initialUniswapFundingOfToken0.add(sellOrder1.sellAmount).toString(),
       );
     await token1.mock.balanceOf
       .withArgs(uniswapPair.address)
@@ -77,7 +77,7 @@ describe("PreAMMBatcher", () => {
     });
     uniswapPairAddress = await uniswapFactory.getPair(
       token0.address,
-      token1.address
+      token1.address,
     );
     uniswapPair = await deployContract(walletDeployer, UniswapV2Pair);
     uniswapPair = await uniswapPair.attach(uniswapPairAddress);
@@ -94,7 +94,7 @@ describe("PreAMMBatcher", () => {
 
     await uniswapPair.mint(walletDeployer.address, { gasLimit: 500000 });
     expect((await uniswapPair.getReserves())[0]).to.equal(
-      initialUniswapFundingOfToken0
+      initialUniswapFundingOfToken0,
     );
   });
 
@@ -107,13 +107,13 @@ describe("PreAMMBatcher", () => {
       token0,
       token1,
       [walletTrader1],
-      [walletTrader2]
+      [walletTrader2],
     );
 
     await batcher.orderChecks(
       [testCaseInput.sellOrdersToken0[0].getSmartContractOrder()],
       [testCaseInput.sellOrdersToken1[0].getSmartContractOrder()],
-      { gasLimit: 6000000 }
+      { gasLimit: 6000000 },
     );
   });
 
@@ -122,7 +122,7 @@ describe("PreAMMBatcher", () => {
       token0,
       token1,
       [walletTrader1],
-      [walletTrader2]
+      [walletTrader2],
     );
     testCaseInput.sellOrdersToken1[0].sellToken = token0;
 
@@ -130,8 +130,8 @@ describe("PreAMMBatcher", () => {
       batcher.orderChecks(
         [testCaseInput.sellOrdersToken0[0].getSmartContractOrder()],
         [testCaseInput.sellOrdersToken1[0].getSmartContractOrder()],
-        { gasLimit: 6000000 }
-      )
+        { gasLimit: 6000000 },
+      ),
     ).to.revertedWith("sellOrderToken1 are not compatible in sellToken");
   });
 
@@ -140,20 +140,20 @@ describe("PreAMMBatcher", () => {
       token0,
       token1,
       [walletTrader1],
-      [walletTrader2]
+      [walletTrader2],
     );
 
     await mockRelevantTokenDataForBatchTrade(
       testCaseInput.sellOrdersToken0[0],
-      testCaseInput.sellOrdersToken1[0]
+      testCaseInput.sellOrdersToken1[0],
     );
     await token0.mock.transferFrom.returns(false);
     await expect(
       batcher.batchTrade(
         testCaseInput.sellOrdersToken0[0].encode(),
         testCaseInput.sellOrdersToken1[0].encode(),
-        { gasLimit: 6000000 }
-      )
+        { gasLimit: 6000000 },
+      ),
     ).to.be.revertedWith("unsuccessful transferFrom for order");
   });
 
@@ -162,18 +162,18 @@ describe("PreAMMBatcher", () => {
       token0,
       token1,
       [walletTrader1],
-      [walletTrader2]
+      [walletTrader2],
     );
 
     await mockRelevantTokenDataForBatchTrade(
       testCaseInput.sellOrdersToken0[0],
-      testCaseInput.sellOrdersToken1[0]
+      testCaseInput.sellOrdersToken1[0],
     );
 
     await batcher.batchTrade(
       testCaseInput.sellOrdersToken0[0].encode(),
       testCaseInput.sellOrdersToken1[0].encode(),
-      { gasLimit: 6000000 }
+      { gasLimit: 6000000 },
     );
     expect("transferFrom").to.be.calledOnContractWith(token0, [
       walletTrader1.address,
@@ -186,12 +186,12 @@ describe("PreAMMBatcher", () => {
       token0,
       token1,
       [walletTrader1],
-      [walletTrader2]
+      [walletTrader2],
     );
 
     await mockRelevantTokenDataForBatchTrade(
       testCaseInput.sellOrdersToken0[0],
-      testCaseInput.sellOrdersToken1[0]
+      testCaseInput.sellOrdersToken1[0],
     );
 
     await token0.mock.transferFrom.returns(true);
@@ -200,8 +200,8 @@ describe("PreAMMBatcher", () => {
       batcher.batchTrade(
         testCaseInput.sellOrdersToken0[0].encode(),
         testCaseInput.sellOrdersToken1[0].encode(),
-        { gasLimit: 6000000 }
-      )
+        { gasLimit: 6000000 },
+      ),
     ).to.be.revertedWith("unsuccessful transferFrom for order");
   });
   it("receiveTradeAmounts transferFrom the right amount of token1", async () => {
@@ -209,16 +209,16 @@ describe("PreAMMBatcher", () => {
       token0,
       token1,
       [walletTrader1],
-      [walletTrader2]
+      [walletTrader2],
     );
     await mockRelevantTokenDataForBatchTrade(
       testCaseInput.sellOrdersToken0[0],
-      testCaseInput.sellOrdersToken1[0]
+      testCaseInput.sellOrdersToken1[0],
     );
     await batcher.batchTrade(
       testCaseInput.sellOrdersToken0[0].encode(),
       testCaseInput.sellOrdersToken1[0].encode(),
-      { gasLimit: 6000000 }
+      { gasLimit: 6000000 },
     );
     expect("transferFrom").to.be.calledOnContractWith(token1, [
       walletTrader2.address,
