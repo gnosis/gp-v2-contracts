@@ -6,9 +6,11 @@ import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./libraries/Math.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/math/SignedSafeMath.sol";
 
 contract PreAMMBatcher {
     using SafeMath for uint256;
+    using SignedSafeMath for int256;
     IUniswapV2Factory uniswapFactory;
 
     bytes32 public constant DOMAIN_SEPARATOR = keccak256("preBatcher-V1");
@@ -407,7 +409,7 @@ contract PreAMMBatcher {
 
     enum Direction {Ascending, Descending}
 
-    function isSorted(Order[] memory orders, Direction direction)
+    function isSortedByLimitPrice(Order[] memory orders, Direction direction)
         public
         pure
         returns (bool)
@@ -425,14 +427,9 @@ contract PreAMMBatcher {
             Order memory orderA = orders[i];
             Order memory orderB = orders[i + 1];
             if (
-                int256(
-                    orderA.buyAmount *
-                        orderB.sellAmount -
-                        orderB.buyAmount *
-                        orderA.sellAmount
-                ) *
-                    step >
-                0
+                int256(orderA.buyAmount.mul(orderB.sellAmount))
+                    .sub(int256(orderB.buyAmount.mul(orderA.sellAmount)))
+                    .mul(step) > 0
             ) {
                 return false;
             }

@@ -257,20 +257,20 @@ describe("PreAMMBatcher-e2e", () => {
     expect(testCase.solution.sellOrdersToken1.length).to.be.equal(2);
     await runScenarioOnchain(testCase);
   });
-  it("isSorted", async () => {
+  it("isSortedByLimitPrice()", async () => {
     const sortedOrders = [
       new Order(1, 1, token0, token1, walletTrader1, 1),
       new Order(1, 2, token0, token1, walletTrader1, 2),
       new Order(1, 3, token0, token1, walletTrader1, 3),
     ];
     expect(
-      await batcher.isSorted(
+      await batcher.isSortedByLimitPrice(
         sortedOrders.map((x) => x.getSmartContractOrder()),
         0,
       ),
     ).to.be.equal(true);
     expect(
-      await batcher.isSorted(
+      await batcher.isSortedByLimitPrice(
         sortedOrders.map((x) => x.getSmartContractOrder()),
         1,
       ),
@@ -279,13 +279,13 @@ describe("PreAMMBatcher-e2e", () => {
     // Reverse the sorted list so it is descending and assert converse
     sortedOrders.reverse();
     expect(
-      await batcher.isSorted(
+      await batcher.isSortedByLimitPrice(
         sortedOrders.map((x) => x.getSmartContractOrder()),
         0,
       ),
     ).to.be.equal(false);
     expect(
-      await batcher.isSorted(
+      await batcher.isSortedByLimitPrice(
         sortedOrders.map((x) => x.getSmartContractOrder()),
         1,
       ),
@@ -297,13 +297,13 @@ describe("PreAMMBatcher-e2e", () => {
       new Order(1, 3, token0, token1, walletTrader1, 3),
     ];
     expect(
-      await batcher.isSorted(
+      await batcher.isSortedByLimitPrice(
         unsortedOrders.map((x) => x.getSmartContractOrder()),
         0,
       ),
     ).to.be.equal(false);
     expect(
-      await batcher.isSorted(
+      await batcher.isSortedByLimitPrice(
         unsortedOrders.map((x) => x.getSmartContractOrder()),
         1,
       ),
@@ -312,13 +312,13 @@ describe("PreAMMBatcher-e2e", () => {
     // Empty orderset is sorted.
     const emptyOrders: Order[] = [];
     expect(
-      await batcher.isSorted(
+      await batcher.isSortedByLimitPrice(
         emptyOrders.map((x) => x.getSmartContractOrder()),
         0,
       ),
     ).to.be.equal(true);
     expect(
-      await batcher.isSorted(
+      await batcher.isSortedByLimitPrice(
         emptyOrders.map((x) => x.getSmartContractOrder()),
         1,
       ),
@@ -327,13 +327,13 @@ describe("PreAMMBatcher-e2e", () => {
     // Single Orderset is vacuously sorted
     const singleOrder = [new Order(1, 1, token0, token1, walletTrader1, 1)];
     expect(
-      await batcher.isSorted(
+      await batcher.isSortedByLimitPrice(
         singleOrder.map((x) => x.getSmartContractOrder()),
         0,
       ),
     ).to.be.equal(true);
     expect(
-      await batcher.isSorted(
+      await batcher.isSortedByLimitPrice(
         singleOrder.map((x) => x.getSmartContractOrder()),
         1,
       ),
