@@ -226,4 +226,91 @@ describe("PreAMMBatcher", () => {
       testCaseInput.sellOrdersToken1[0].sellAmount.toString(),
     ]);
   });
+  describe("isSortedByLimitPrice()", async () => {
+    it("returns expected values for generic sorted order set", async () => {
+      const sortedOrders = [
+        new Order(1, 1, token0, token1, walletTrader1, 1),
+        new Order(1, 2, token0, token1, walletTrader1, 2),
+        new Order(1, 3, token0, token1, walletTrader1, 3),
+      ];
+
+      expect(
+        await batcher.isSortedByLimitPrice(
+          sortedOrders.map((x) => x.getSmartContractOrder()),
+          0,
+        ),
+      ).to.be.equal(true);
+      expect(
+        await batcher.isSortedByLimitPrice(
+          sortedOrders.map((x) => x.getSmartContractOrder()),
+          1,
+        ),
+      ).to.be.equal(false);
+
+      // Reverse the sorted list so it is descending and assert converse
+      sortedOrders.reverse();
+      expect(
+        await batcher.isSortedByLimitPrice(
+          sortedOrders.map((x) => x.getSmartContractOrder()),
+          0,
+        ),
+      ).to.be.equal(false);
+      expect(
+        await batcher.isSortedByLimitPrice(
+          sortedOrders.map((x) => x.getSmartContractOrder()),
+          1,
+        ),
+      ).to.be.equal(true);
+    });
+
+    it("returns expected values for generic unsorted set of orders", async () => {
+      const unsortedOrders = [
+        new Order(1, 2, token0, token1, walletTrader1, 1),
+        new Order(1, 1, token0, token1, walletTrader1, 2),
+        new Order(1, 3, token0, token1, walletTrader1, 3),
+      ];
+      expect(
+        await batcher.isSortedByLimitPrice(
+          unsortedOrders.map((x) => x.getSmartContractOrder()),
+          0,
+        ),
+      ).to.be.equal(false);
+      expect(
+        await batcher.isSortedByLimitPrice(
+          unsortedOrders.map((x) => x.getSmartContractOrder()),
+          1,
+        ),
+      ).to.be.equal(false);
+    });
+    it("returns expected values for empty set of orders", async () => {
+      const emptyOrders: Order[] = [];
+      expect(
+        await batcher.isSortedByLimitPrice(
+          emptyOrders.map((x) => x.getSmartContractOrder()),
+          0,
+        ),
+      ).to.be.equal(true);
+      expect(
+        await batcher.isSortedByLimitPrice(
+          emptyOrders.map((x) => x.getSmartContractOrder()),
+          1,
+        ),
+      ).to.be.equal(true);
+    });
+    it("returns expected values for singleton order set", async () => {
+      const singleOrder = [new Order(1, 1, token0, token1, walletTrader1, 1)];
+      expect(
+        await batcher.isSortedByLimitPrice(
+          singleOrder.map((x) => x.getSmartContractOrder()),
+          0,
+        ),
+      ).to.be.equal(true);
+      expect(
+        await batcher.isSortedByLimitPrice(
+          singleOrder.map((x) => x.getSmartContractOrder()),
+          1,
+        ),
+      ).to.be.equal(true);
+    });
+  });
 });
