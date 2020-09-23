@@ -1,5 +1,5 @@
 import { use, expect } from "chai";
-import { Contract, utils } from "ethers";
+import { Contract, ethers, utils } from "ethers";
 import {
   deployContract,
   deployMockContract,
@@ -15,6 +15,8 @@ import { Order, DOMAIN_SEPARATOR } from "../src/js/orders.spec";
 import { baseTestInput } from "./resources/testExamples";
 
 use(solidity);
+const ASCENDING = 0;
+const DESCENDING = 1;
 
 describe("PreAMMBatcher", () => {
   const [
@@ -226,7 +228,7 @@ describe("PreAMMBatcher", () => {
       testCaseInput.sellOrdersToken1[0].sellAmount.toString(),
     ]);
   });
-  describe("isSortedByLimitPrice()", async () => {
+  describe.only("isSortedByLimitPrice()", async () => {
     it("returns expected values for generic sorted order set", async () => {
       const sortedOrders = [
         new Order(1, 1, token0, token1, walletTrader1, 1),
@@ -263,6 +265,24 @@ describe("PreAMMBatcher", () => {
       ).to.be.equal(true);
     });
 
+    it("returns expected values for same two orders", async () => {
+      const sortedOrders = [
+        new Order(1, 1, token0, token1, walletTrader1, 1),
+        new Order(1, 1, token0, token1, walletTrader1, 2),
+      ];
+      expect(
+        await batcher.isSortedByLimitPrice(
+          sortedOrders.map((x) => x.getSmartContractOrder()),
+          ASCENDING,
+        ),
+      ).to.be.equal(true, "Failed ascending");
+      expect(
+        await batcher.isSortedByLimitPrice(
+          sortedOrders.map((x) => x.getSmartContractOrder()),
+          DESCENDING,
+        ),
+      ).to.be.equal(true, "Failed Descending");
+    });
     it("returns expected values for generic unsorted set of orders", async () => {
       const unsortedOrders = [
         new Order(1, 2, token0, token1, walletTrader1, 1),

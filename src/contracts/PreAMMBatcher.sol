@@ -7,10 +7,12 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./libraries/Math.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/math/SignedSafeMath.sol";
+import "@openzeppelin/contracts/utils/SafeCast.sol";
 
 contract PreAMMBatcher {
     using SafeMath for uint256;
     using SignedSafeMath for int256;
+    using SafeCast for uint256;
     IUniswapV2Factory uniswapFactory;
 
     bytes32 public constant DOMAIN_SEPARATOR = keccak256("preBatcher-V1");
@@ -414,24 +416,27 @@ contract PreAMMBatcher {
         pure
         returns (bool)
     {
-        if (orders.length <= 1) {
+        if (orders.length < 2) {
             // All order sets with less than 2 elements are tautologically sorted.
             return true;
         }
-        int8 step = 1;
-        if (direction == Direction.Descending) {
-            step = -1;
-        }
-
         for (uint256 i = 0; i < orders.length - 1; i++) {
             Order memory orderA = orders[i];
             Order memory orderB = orders[i + 1];
-            if (
-                int256(orderA.buyAmount.mul(orderB.sellAmount))
-                    .sub(int256(orderB.buyAmount.mul(orderA.sellAmount)))
-                    .mul(step) > 0
-            ) {
-                return false;
+            if (direction == Direction.Ascending) {
+                if (
+                    orderA.buyAmount.mul(orderB.sellAmount) >=
+                    orderB.buyAmount.mul(orderA.sellAmount)
+                ) {
+                    return false;
+                }
+            } else {
+                if (
+                    orderA.buyAmount.mul(orderB.sellAmount) <=
+                    orderB.buyAmount.mul(orderA.sellAmount)
+                ) {
+                    return false;
+                }
             }
         }
         return true;
