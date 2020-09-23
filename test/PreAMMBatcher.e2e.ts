@@ -1,11 +1,12 @@
 import ERC20 from "@openzeppelin/contracts/build/contracts/ERC20PresetMinterPauser.json";
+import { debug } from "debug";
 import { use, expect } from "chai";
 import { deployContract, MockProvider, solidity } from "ethereum-waffle";
 import { BigNumber, Contract, Wallet } from "ethers";
+import PreAMMBatcher from "../build/PreAMMBatcher.json";
+import UniswapV2Pair from "@uniswap/v2-core/build/UniswapV2Pair.json";
+import UniswapV2Factory from "@uniswap/v2-core/build/UniswapV2Factory.json";
 
-import PreAMMBatcher from "../build/artifacts/PreAMMBatcher.json";
-import UniswapV2Factory from "../node_modules/@uniswap/v2-core/build/UniswapV2Factory.json";
-import UniswapV2Pair from "../node_modules/@uniswap/v2-core/build/UniswapV2Pair.json";
 import { Order } from "../src/js/orders.spec";
 
 import { generateTestCase } from "./resources";
@@ -13,12 +14,13 @@ import { TestCase } from "./resources/models";
 import {
   baseTestInput,
   fourOrderTestInput,
-  oneOrderSellingToken0IsObmittedTestInput,
-  oneOrderSellingToken1IsObmittedTestInput,
+  oneOrderSellingToken0IsOmittedTestInput,
+  oneOrderSellingToken1IsOmittedTestInput,
   noSolutionTestInput,
   switchTokenTestInput,
 } from "./resources/testExamples";
 
+const log = debug("PreAMMBatcher.e2e");
 use(solidity);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -53,7 +55,7 @@ const fundUniswap = async (
   await token1.transfer(uniswapPair.address, testCase.fundingAMMToken0);
   await uniswapPair.mint(walletDeployer.address, { gasLimit: 500000 });
 };
-describe("PreAMMBatcher-e2e", () => {
+describe("PreAMMBatcher: End to End Tests", () => {
   const [
     walletDeployer,
     walletTrader1,
@@ -160,27 +162,23 @@ describe("PreAMMBatcher-e2e", () => {
         [walletTrader1, walletTrader2],
         [walletTrader3, walletTrader4],
       ),
-      true,
     );
-    console.log(testCase.sellOrdersToken0.length);
-    console.log(testCase.sellOrdersToken0[0].sellToken.address);
     expect(testCase.solution.sellOrdersToken0.length).to.be.equal(1);
     expect(testCase.solution.sellOrdersToken1.length).to.be.equal(1);
     await runScenarioOnchain(testCase);
-
-    console.log(
-      "auction clearing price:",
-      testCase.solution.clearingPrice.numerator
-        .mul(BigNumber.from("100000"))
-        .div(testCase.solution.clearingPrice.denominator)
-        .toString(),
+    log(
+      "auction clearing price: " +
+        testCase.solution.clearingPrice.numerator
+          .mul(BigNumber.from("100000"))
+          .div(testCase.solution.clearingPrice.denominator)
+          .toString(),
     );
-    console.log(
-      "uniswap clearing price:",
-      (await uniswapPair.getReserves())[0]
-        .mul(100000)
-        .div((await uniswapPair.getReserves())[1])
-        .toString(),
+    log(
+      "uniswap clearing price: " +
+        (await uniswapPair.getReserves())[0]
+          .mul(100000)
+          .div((await uniswapPair.getReserves())[1])
+          .toString(),
     );
   });
 
@@ -193,7 +191,6 @@ describe("PreAMMBatcher-e2e", () => {
           [walletTrader1, walletTrader2],
           [walletTrader3, walletTrader4],
         ),
-        true,
       );
 
       await fundUniswap(testCase, walletDeployer, uniswapPair);
@@ -232,7 +229,6 @@ describe("PreAMMBatcher-e2e", () => {
           [walletTrader1, walletTrader2],
           [walletTrader3, walletTrader4],
         ),
-        true,
       );
 
       await fundUniswap(testCase, walletDeployer, uniswapPair);
@@ -269,31 +265,29 @@ describe("PreAMMBatcher-e2e", () => {
     await runScenarioOnchain(testCase);
   });
 
-  it("example: oneOrderSellingToken0IsObmittedTestInput", async () => {
+  it("example: oneOrderSellingToken0IsOmittedTestInput", async () => {
     const testCase = generateTestCase(
-      oneOrderSellingToken0IsObmittedTestInput(
+      oneOrderSellingToken0IsOmittedTestInput(
         token0,
         token1,
         [walletTrader1, walletTrader2],
         [walletTrader3, walletTrader4],
       ),
-      true,
     );
-    console.log(testCase.sellOrdersToken0.length);
-    console.log(testCase.sellOrdersToken0[0].sellToken.address);
+    // console.log(testCase.sellOrdersToken0.length);
+    // console.log(testCase.sellOrdersToken0[0].sellToken.address);
     expect(testCase.solution.sellOrdersToken0.length).to.be.equal(1);
     expect(testCase.solution.sellOrdersToken1.length).to.be.equal(1);
     await runScenarioOnchain(testCase);
   });
-  it("example: oneOrderSellingToken1IsObmittedTestInput", async () => {
+  it("example: oneOrderSellingToken1IsOmittedTestInput", async () => {
     const testCase = generateTestCase(
-      oneOrderSellingToken1IsObmittedTestInput(
+      oneOrderSellingToken1IsOmittedTestInput(
         token0,
         token1,
         [walletTrader1, walletTrader2, walletTrader5, walletTrader6],
         [walletTrader3, walletTrader4],
       ),
-      true,
     );
 
     expect(testCase.solution.sellOrdersToken0.length).to.be.equal(3);
@@ -308,7 +302,6 @@ describe("PreAMMBatcher-e2e", () => {
         [walletTrader1, walletTrader2, walletTrader5],
         [walletTrader3, walletTrader4, walletTrader6],
       ),
-      true,
     );
 
     expect(testCase.solution.sellOrdersToken0.length).to.be.equal(0);
@@ -323,7 +316,6 @@ describe("PreAMMBatcher-e2e", () => {
         [walletTrader1, walletTrader2],
         [walletTrader3, walletTrader4, walletTrader5, walletTrader6],
       ),
-      true,
     );
 
     expect(testCase.solution.sellOrdersToken0.length).to.be.equal(3);
