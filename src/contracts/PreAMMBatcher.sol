@@ -6,9 +6,11 @@ import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./libraries/Math.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/math/SignedSafeMath.sol";
 
 contract PreAMMBatcher {
     using SafeMath for uint256;
+    using SignedSafeMath for int256;
     IUniswapV2Factory uniswapFactory;
 
     bytes32 public constant DOMAIN_SEPARATOR = keccak256("preBatcher-V1");
@@ -405,26 +407,29 @@ contract PreAMMBatcher {
         return newOrders;
     }
 
-    function isSorted(Order[] memory orders, bool reverse)
+    enum Direction {Ascending, Descending}
+
+    function isSortedByLimitPrice(Order[] memory orders, Direction direction)
         public
         pure
         returns (bool)
     {
-        // Values used to traverse the list forwards or backwards depending on reverse.
-        // That is, reverse determines whether we want the orders to be ascendeing or descending
-        int256 start = 0;
+        if (orders.length <= 1) {
+            // All order sets with less than 2 elements are tautologically sorted.
+            return true;
+        }
         int8 step = 1;
-        if (reverse) {
-            start = int256(orders.length) - 1;
+        if (direction == Direction.Descending) {
             step = -1;
         }
 
-        for (int256 i = 0; i < int256(orders.length) - 1; i++) {
-            Order memory orderA = orders[uint256(start + i * step)];
-            Order memory orderB = orders[uint256(start + (i + 1) * step)];
+        for (uint256 i = 0; i < orders.length - 1; i++) {
+            Order memory orderA = orders[i];
+            Order memory orderB = orders[i + 1];
             if (
-                orderA.buyAmount * orderB.sellAmount >
-                orderB.buyAmount * orderA.sellAmount
+                int256(orderA.buyAmount.mul(orderB.sellAmount))
+                    .sub(int256(orderB.buyAmount.mul(orderA.sellAmount)))
+                    .mul(step) > 0
             ) {
                 return false;
             }
