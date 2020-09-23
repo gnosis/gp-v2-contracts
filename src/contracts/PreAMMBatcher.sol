@@ -6,12 +6,14 @@ import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/math/SignedSafeMath.sol";
+import "@openzeppelin/contracts/utils/SafeCast.sol";
 
 import "./libraries/Math.sol";
 
 contract PreAMMBatcher {
     using SafeMath for uint256;
     using SignedSafeMath for int256;
+    using SafeCast for uint256;
     IUniswapV2Factory uniswapFactory;
 
     bytes32 public constant DOMAIN_SEPARATOR = keccak256("preBatcher-V1");

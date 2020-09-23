@@ -17,6 +17,8 @@ import { Order, DOMAIN_SEPARATOR } from "../src/js/orders.spec";
 import { baseTestInput } from "./resources/testExamples";
 
 use(solidity);
+const ASCENDING = 0;
+const DESCENDING = 1;
 
 describe("PreAMMBatcher", () => {
   const [
