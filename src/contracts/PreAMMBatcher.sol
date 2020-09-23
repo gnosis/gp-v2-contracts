@@ -412,6 +412,10 @@ contract PreAMMBatcher {
         pure
         returns (bool)
     {
+        if (orders.length <= 1) {
+            // All order sets with less than 2 elements are tautologically sorted.
+            return true;
+        }
         int8 step = 1;
         if (direction == Direction.Descending) {
             step = -1;

@@ -263,17 +263,16 @@ describe("PreAMMBatcher-e2e", () => {
       new Order(1, 2, token0, token1, walletTrader1, 2),
       new Order(1, 3, token0, token1, walletTrader1, 3),
     ];
-
     expect(
       await batcher.isSorted(
         sortedOrders.map((x) => x.getSmartContractOrder()),
-        false,
+        0,
       ),
     ).to.be.equal(true);
     expect(
       await batcher.isSorted(
         sortedOrders.map((x) => x.getSmartContractOrder()),
-        true,
+        1,
       ),
     ).to.be.equal(false);
 
@@ -282,13 +281,13 @@ describe("PreAMMBatcher-e2e", () => {
     expect(
       await batcher.isSorted(
         sortedOrders.map((x) => x.getSmartContractOrder()),
-        false,
+        0,
       ),
     ).to.be.equal(false);
     expect(
       await batcher.isSorted(
         sortedOrders.map((x) => x.getSmartContractOrder()),
-        true,
+        1,
       ),
     ).to.be.equal(true);
 
@@ -300,13 +299,13 @@ describe("PreAMMBatcher-e2e", () => {
     expect(
       await batcher.isSorted(
         unsortedOrders.map((x) => x.getSmartContractOrder()),
-        false,
+        0,
       ),
     ).to.be.equal(false);
     expect(
       await batcher.isSorted(
         unsortedOrders.map((x) => x.getSmartContractOrder()),
-        true,
+        1,
       ),
     ).to.be.equal(false);
 
@@ -315,13 +314,13 @@ describe("PreAMMBatcher-e2e", () => {
     expect(
       await batcher.isSorted(
         emptyOrders.map((x) => x.getSmartContractOrder()),
-        false,
+        0,
       ),
     ).to.be.equal(true);
     expect(
       await batcher.isSorted(
         emptyOrders.map((x) => x.getSmartContractOrder()),
-        true,
+        1,
       ),
     ).to.be.equal(true);
 
@@ -330,13 +329,13 @@ describe("PreAMMBatcher-e2e", () => {
     expect(
       await batcher.isSorted(
         singleOrder.map((x) => x.getSmartContractOrder()),
-        false,
+        0,
       ),
     ).to.be.equal(true);
     expect(
       await batcher.isSorted(
         singleOrder.map((x) => x.getSmartContractOrder()),
-        true,
+        1,
       ),
     ).to.be.equal(true);
   });
