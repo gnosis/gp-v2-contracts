@@ -405,26 +405,30 @@ contract PreAMMBatcher {
         return newOrders;
     }
 
-    function isSorted(Order[] memory orders, bool reverse)
+    enum Direction {Ascending, Descending}
+
+    function isSorted(Order[] memory orders, Direction direction)
         public
         pure
         returns (bool)
     {
-        // Values used to traverse the list forwards or backwards depending on reverse.
-        // That is, reverse determines whether we want the orders to be ascendeing or descending
-        int256 start = 0;
         int8 step = 1;
-        if (reverse) {
-            start = int256(orders.length) - 1;
+        if (direction == Direction.Descending) {
             step = -1;
         }
 
-        for (int256 i = 0; i < int256(orders.length) - 1; i++) {
-            Order memory orderA = orders[uint256(start + i * step)];
-            Order memory orderB = orders[uint256(start + (i + 1) * step)];
+        for (uint256 i = 0; i < orders.length - 1; i++) {
+            Order memory orderA = orders[i];
+            Order memory orderB = orders[i + 1];
             if (
-                orderA.buyAmount * orderB.sellAmount >
-                orderB.buyAmount * orderA.sellAmount
+                int256(
+                    orderA.buyAmount *
+                        orderB.sellAmount -
+                        orderB.buyAmount *
+                        orderA.sellAmount
+                ) *
+                    step >
+                0
             ) {
                 return false;
             }
