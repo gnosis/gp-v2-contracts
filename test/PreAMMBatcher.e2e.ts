@@ -20,6 +20,7 @@ import {
 
 import { TestCase } from "./resources/models";
 
+const log = debug("PreAMMBatcher.e2e");
 use(solidity);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -161,24 +162,18 @@ describe("PreAMMBatcher: End to End Tests", () => {
         [walletTrader1, walletTrader2],
         [walletTrader3, walletTrader4],
       ),
-      false,
     );
     expect(testCase.solution.sellOrdersToken0.length).to.be.equal(1);
     expect(testCase.solution.sellOrdersToken1.length).to.be.equal(1);
     await runScenarioOnchain(testCase);
-    debug("HELLO!");
-    debug("HELLO!");
-    debug("HELLO!");
-    debug("HELLO!");
-    debug("HELLO!");
-    debug(
+    log(
       "auction clearing price: " +
         testCase.solution.clearingPrice.numerator
           .mul(BigNumber.from("100000"))
           .div(testCase.solution.clearingPrice.denominator)
           .toString(),
     );
-    debug(
+    log(
       "uniswap clearing price: " +
         (await uniswapPair.getReserves())[0]
           .mul(100000)
@@ -207,7 +202,6 @@ describe("PreAMMBatcher: End to End Tests", () => {
         [walletTrader1, walletTrader2],
         [walletTrader3, walletTrader4],
       ),
-      false,
     );
     // console.log(testCase.sellOrdersToken0.length);
     // console.log(testCase.sellOrdersToken0[0].sellToken.address);
@@ -223,7 +217,6 @@ describe("PreAMMBatcher: End to End Tests", () => {
         [walletTrader1, walletTrader2, walletTrader5, walletTrader6],
         [walletTrader3, walletTrader4],
       ),
-      false,
     );
 
     expect(testCase.solution.sellOrdersToken0.length).to.be.equal(3);
@@ -238,7 +231,6 @@ describe("PreAMMBatcher: End to End Tests", () => {
         [walletTrader1, walletTrader2, walletTrader5],
         [walletTrader3, walletTrader4, walletTrader6],
       ),
-      false,
     );
 
     expect(testCase.solution.sellOrdersToken0.length).to.be.equal(0);
@@ -253,7 +245,6 @@ describe("PreAMMBatcher: End to End Tests", () => {
         [walletTrader1, walletTrader2],
         [walletTrader3, walletTrader4, walletTrader5, walletTrader6],
       ),
-      false,
     );
 
     expect(testCase.solution.sellOrdersToken0.length).to.be.equal(3);

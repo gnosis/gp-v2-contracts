@@ -1,14 +1,10 @@
+import { debug } from "debug";
 import { Fraction, TestCaseInput, Solution, TestCase } from "./models";
 import { BigNumber } from "ethers";
 import _ from "lodash";
 
-export const solveTestCase = function (
-  testCaseInput: TestCaseInput,
-  debug = false,
-): Solution {
-  // eslint-disable-next-line @typescript-eslint/no-empty-function, @typescript-eslint/explicit-function-return-type, @typescript-eslint/no-explicit-any
-  const log = debug ? (...a: any) => console.log(...a) : (): void => {};
-
+const log = debug("index.ts");
+export const solveTestCase = function (testCaseInput: TestCaseInput): Solution {
   let sumSellDemandToken0 = BigNumber.from(0);
   testCaseInput.sellOrdersToken0.forEach((order) => {
     sumSellDemandToken0 = sumSellDemandToken0.add(order.sellAmount);
@@ -51,15 +47,12 @@ export const solveTestCase = function (
   ) {
     log("switching token0 and token1");
 
-    return solveTestCase(
-      {
-        fundingAMMToken0: testCaseInput.fundingAMMToken1,
-        fundingAMMToken1: testCaseInput.fundingAMMToken0,
-        sellOrdersToken0: testCaseInput.sellOrdersToken1,
-        sellOrdersToken1: testCaseInput.sellOrdersToken0,
-      },
-      debug,
-    );
+    return solveTestCase({
+      fundingAMMToken0: testCaseInput.fundingAMMToken1,
+      fundingAMMToken1: testCaseInput.fundingAMMToken0,
+      sellOrdersToken0: testCaseInput.sellOrdersToken1,
+      sellOrdersToken1: testCaseInput.sellOrdersToken0,
+    });
   }
   const clearingPrice: Fraction = {
     numerator: sumSellDemandToken0.add(testCaseInput.fundingAMMToken0),
@@ -89,15 +82,12 @@ export const solveTestCase = function (
     log(`popping sellOrdersToken0, due to a its limit price of
      ${highestSellOrderToken0.sellAmount} / ${highestSellOrderToken0.buyAmount}`);
     testCaseInput.sellOrdersToken0.pop();
-    return solveTestCase(
-      {
-        fundingAMMToken0: testCaseInput.fundingAMMToken0,
-        fundingAMMToken1: testCaseInput.fundingAMMToken1,
-        sellOrdersToken0: testCaseInput.sellOrdersToken0,
-        sellOrdersToken1: testCaseInput.sellOrdersToken1,
-      },
-      debug,
-    );
+    return solveTestCase({
+      fundingAMMToken0: testCaseInput.fundingAMMToken0,
+      fundingAMMToken1: testCaseInput.fundingAMMToken1,
+      sellOrdersToken0: testCaseInput.sellOrdersToken0,
+      sellOrdersToken1: testCaseInput.sellOrdersToken1,
+    });
   } else if (
     clearingPrice.numerator
       .mul(highestSellOrderToken1.sellAmount)
@@ -108,15 +98,12 @@ export const solveTestCase = function (
     log(`popping sellOrdersToken1, due to a its limit price of
      ${highestSellOrderToken1.buyAmount} / ${highestSellOrderToken1.sellAmount}`);
     testCaseInput.sellOrdersToken1.pop();
-    return solveTestCase(
-      {
-        fundingAMMToken0: testCaseInput.fundingAMMToken0,
-        fundingAMMToken1: testCaseInput.fundingAMMToken1,
-        sellOrdersToken0: testCaseInput.sellOrdersToken0,
-        sellOrdersToken1: testCaseInput.sellOrdersToken1,
-      },
-      debug,
-    );
+    return solveTestCase({
+      fundingAMMToken0: testCaseInput.fundingAMMToken0,
+      fundingAMMToken1: testCaseInput.fundingAMMToken1,
+      sellOrdersToken0: testCaseInput.sellOrdersToken0,
+      sellOrdersToken1: testCaseInput.sellOrdersToken1,
+    });
   }
   const unmatchedAmount = sumSellDemandToken0.sub(
     sumSellAmountToken1
@@ -134,14 +121,13 @@ export const solveTestCase = function (
 
 export const generateTestCase = function (
   testCaseInput: TestCaseInput,
-  debug = false,
 ): TestCase {
   return new TestCase(
     testCaseInput.fundingAMMToken0,
     testCaseInput.fundingAMMToken1,
     _.cloneDeep(testCaseInput.sellOrdersToken0), // <-- deep copy needed as solveTestCase can modify the orders
     _.cloneDeep(testCaseInput.sellOrdersToken1),
-    solveTestCase(testCaseInput, debug),
+    solveTestCase(testCaseInput),
   );
 };
 
