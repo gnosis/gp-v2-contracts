@@ -84,7 +84,7 @@ describe("PreAMMBatcher-e2e", () => {
           testCase.getSellOrdersToken1Encoded(),
           { gasLimit: 6000000 },
         ),
-      ).to.revertedWith("no solution found");
+      ).to.be.revertedWith("no solution found");
     } else {
       await expect(
         batcher.batchTrade(
@@ -182,6 +182,81 @@ describe("PreAMMBatcher-e2e", () => {
         .div((await uniswapPair.getReserves())[1])
         .toString(),
     );
+  });
+
+  describe("Bad encoded order", async () => {
+    it("invalid signature", async () => {
+      const testCase = generateTestCase(
+        baseTestInput(
+          token0,
+          token1,
+          [walletTrader1, walletTrader2],
+          [walletTrader3, walletTrader4],
+        ),
+        true,
+      );
+
+      await fundUniswap(testCase, walletDeployer, uniswapPair);
+      await setupOrders(
+        testCase.sellOrdersToken0.concat(testCase.sellOrdersToken1),
+        batcher,
+      );
+
+      const encodedOrdersToken0 = testCase.getSellOrdersToken0Encoded();
+      const encodedOrdersToken1 = testCase.getSellOrdersToken1Encoded();
+
+      const lastByte = encodedOrdersToken0.readInt8(
+        encodedOrdersToken0.length - 1,
+      );
+      const encodedOrdersLength = encodedOrdersToken0.length;
+      expect(encodedOrdersLength).to.be.greaterThan(0);
+      const replacementByte = lastByte + 1; // no need to wrap, it's done by fill
+      encodedOrdersToken0.fill(
+        replacementByte,
+        encodedOrdersToken0.length - 1,
+        encodedOrdersToken0.length,
+      );
+
+      await expect(
+        batcher.batchTrade(encodedOrdersToken0, encodedOrdersToken1, {
+          gasLimit: 6000000,
+        }),
+      ).to.be.revertedWith("invalid_signature");
+    });
+
+    it("not enough bytes", async () => {
+      const testCase = generateTestCase(
+        baseTestInput(
+          token0,
+          token1,
+          [walletTrader1, walletTrader2],
+          [walletTrader3, walletTrader4],
+        ),
+        true,
+      );
+
+      await fundUniswap(testCase, walletDeployer, uniswapPair);
+      await setupOrders(
+        testCase.sellOrdersToken0.concat(testCase.sellOrdersToken1),
+        batcher,
+      );
+
+      let encodedOrdersToken0 = testCase.getSellOrdersToken0Encoded();
+      const encodedOrdersToken1 = testCase.getSellOrdersToken1Encoded();
+
+      encodedOrdersToken0 = encodedOrdersToken0.slice(
+        0,
+        encodedOrdersToken0.length - 1,
+      );
+
+      // ideally we'd check that the revert message matches exactly an empty string,
+      // since it reverts with an empty message, however revertedWith matches substrings
+      await expect(
+        batcher.batchTrade(encodedOrdersToken0, encodedOrdersToken1, {
+          gasLimit: 6000000,
+        }),
+      ).to.be.reverted;
+    });
   });
 
   it("pre-batches four orders and settles left-overs to uniswap", async () => {
