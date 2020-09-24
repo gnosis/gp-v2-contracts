@@ -1,6 +1,8 @@
-import { TestCaseInput } from "./models";
 import { Contract, Wallet, utils } from "ethers";
+
 import { Order } from "../../src/js/orders.spec";
+
+import { TestCaseInput } from "./models";
 
 export const baseTestInput = function (
   token0: Contract,
