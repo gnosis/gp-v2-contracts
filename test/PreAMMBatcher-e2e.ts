@@ -1,13 +1,15 @@
 import { use, expect } from "chai";
-import { BigNumber, Contract, Wallet } from "ethers";
 import { deployContract, MockProvider, solidity } from "ethereum-waffle";
-import PreAMMBatcher from "../build/PreAMMBatcher.json";
-import UniswapV2Pair from "../node_modules/@uniswap/v2-core/build/UniswapV2Pair.json";
-import UniswapV2Factory from "../node_modules/@uniswap/v2-core/build/UniswapV2Factory.json";
+import { BigNumber, Contract, Wallet } from "ethers";
 
 import ERC20 from "../build/ERC20Mintable.json";
+import PreAMMBatcher from "../build/PreAMMBatcher.json";
+import UniswapV2Factory from "../node_modules/@uniswap/v2-core/build/UniswapV2Factory.json";
+import UniswapV2Pair from "../node_modules/@uniswap/v2-core/build/UniswapV2Pair.json";
 import { Order } from "../src/js/orders.spec";
+
 import { generateTestCase } from "./resources/index";
+import { TestCase } from "./resources/models";
 import {
   baseTestInput,
   fourOrderTestInput,
@@ -16,8 +18,6 @@ import {
   noSolutionTestInput,
   switchTokenTestInput,
 } from "./resources/testExamples";
-
-import { TestCase } from "./resources/models";
 
 use(solidity);
 
