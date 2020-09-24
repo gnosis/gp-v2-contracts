@@ -1,15 +1,14 @@
+# One Block Auctions (OBA):
 
-## One Block Auctions (OBA):
-
-To run the project execute:
+## Building the Project
 
 ```
 yarn
 yarn build
 ```
 
-To run test
+## Running Tests
+
 ```
-yarn ganache
 yarn test
 ```
