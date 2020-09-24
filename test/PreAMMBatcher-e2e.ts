@@ -2,13 +2,13 @@ import { use, expect } from "chai";
 import { deployContract, MockProvider, solidity } from "ethereum-waffle";
 import { BigNumber, Contract, Wallet } from "ethers";
 
-import ERC20 from "../build/ERC20Mintable.json";
-import PreAMMBatcher from "../build/PreAMMBatcher.json";
+import ERC20 from "../build/artifacts/ERC20Mintable.json";
+import PreAMMBatcher from "../build/artifacts/PreAMMBatcher.json";
 import UniswapV2Factory from "../node_modules/@uniswap/v2-core/build/UniswapV2Factory.json";
 import UniswapV2Pair from "../node_modules/@uniswap/v2-core/build/UniswapV2Pair.json";
 import { Order } from "../src/js/orders.spec";
 
-import { generateTestCase } from "./resources/index";
+import { generateTestCase } from "./resources";
 import { TestCase } from "./resources/models";
 import {
   baseTestInput,
