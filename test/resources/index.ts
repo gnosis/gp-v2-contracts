@@ -1,6 +1,5 @@
 import { debug } from "debug";
 import { BigNumber } from "ethers";
-import _ from "lodash";
 
 import { Fraction, TestCaseInput, Solution, TestCase } from "./models";
 
@@ -126,8 +125,9 @@ export const generateTestCase = function (
   return new TestCase(
     testCaseInput.fundingAMMToken0,
     testCaseInput.fundingAMMToken1,
-    _.cloneDeep(testCaseInput.sellOrdersToken0), // <-- deep copy needed as solveTestCase can modify the orders
-    _.cloneDeep(testCaseInput.sellOrdersToken1),
+    // cloning orders is needed as solveTestCase can modify the orders
+    testCaseInput.sellOrdersToken0.map((order) => order.clone()),
+    testCaseInput.sellOrdersToken1.map((order) => order.clone()),
     solveTestCase(testCaseInput),
   );
 };

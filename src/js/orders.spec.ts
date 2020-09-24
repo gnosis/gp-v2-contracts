@@ -114,4 +114,15 @@ export class Order {
       ),
     );
   }
+
+  clone(): Order {
+    return new Order(
+      this.sellAmount,
+      this.buyAmount,
+      this.sellToken,
+      this.buyToken,
+      this.wallet,
+      this.nonce,
+    );
+  }
 }
