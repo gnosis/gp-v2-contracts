@@ -1,8 +1,11 @@
 import { use, expect } from "chai";
-import { ethers } from "@nomiclabs/buidler";
-import { BigNumber, Contract, Signer, Wallet } from "ethers";
-import { solidity } from "ethereum-waffle";
+import { BigNumber, Contract, Wallet } from "ethers";
+import { deployContract, MockProvider, solidity } from "ethereum-waffle";
+import PreAMMBatcher from "../artifacts/PreAMMBatcher.json";
+import UniswapV2Pair from "../node_modules/@uniswap/v2-core/build/UniswapV2Pair.json";
+import UniswapV2Factory from "../node_modules/@uniswap/v2-core/build/UniswapV2Factory.json";
 
+import ERC20 from "../artifacts/ERC20Mintable.json";
 import { Order } from "../src/js/orders.spec";
 import { generateTestCase } from "./resources/index";
 import {
@@ -18,33 +21,39 @@ import { TestCase } from "./resources/models";
 
 use(solidity);
 
-async function setupOrders(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function asyncForEach(array: Order[], callback: any): Promise<void> {
+  for (let index = 0; index < array.length; index++) {
+    await callback(array[index], index, array);
+  }
+}
+
+const setupOrders = async (
   orders: Order[],
   batcher: Contract,
-): Promise<void> {
-  for (const order of orders) {
+): Promise<void> => {
+  await asyncForEach(orders, async (order: Order) => {
     await order.sellToken.mint(order.wallet.address, order.sellAmount);
     await order.sellToken
       .connect(order.wallet)
       .approve(batcher.address, order.sellAmount);
-  }
+  });
 };
 
 const fundUniswap = async (
   testCase: TestCase,
-  walletDeployer: Signer,
+  walletDeployer: Wallet,
   uniswapPair: Contract,
 ): Promise<void> => {
   const token0 = testCase.sellOrdersToken0[0].sellToken;
   const token1 = testCase.sellOrdersToken0[0].buyToken;
-  await token0.mint(walletDeployer.getAddress(), testCase.fundingAMMToken0);
-  await token1.mint(walletDeployer.getAddress(), testCase.fundingAMMToken1);
+  await token0.mint(walletDeployer.address, testCase.fundingAMMToken0);
+  await token1.mint(walletDeployer.address, testCase.fundingAMMToken1);
   await token0.transfer(uniswapPair.address, testCase.fundingAMMToken0);
   await token1.transfer(uniswapPair.address, testCase.fundingAMMToken0);
-  await uniswapPair.mint(walletDeployer.getAddress(), { gasLimit: 500000 });
+  await uniswapPair.mint(walletDeployer.address, { gasLimit: 500000 });
 };
-
-describe("PreAMMBatcher-e2e", async () => {
+describe("PreAMMBatcher-e2e", () => {
   const [
     walletDeployer,
     walletTrader1,
@@ -53,13 +62,7 @@ describe("PreAMMBatcher-e2e", async () => {
     walletTrader4,
     walletTrader5,
     walletTrader6,
-  ] = await ethers.getSigners();
-
-  const ERC20 = await ethers.getContractFactory("ERC20Mintable", walletDeployer);
-  const PreAMMBatcher = await ethers.getContractFactory("PreAMMBatcher", walletDeployer);
-  const UniswapV2Factory = await ethers.getContractFactory("UniswapV2Factory", walletDeployer);
-  const UniswapV2Pair = await ethers.getContractFactory("UniswapV2Pair", walletDeployer);
-
+  ] = new MockProvider().getWallets();
   let batcher: Contract;
   let token0: Contract;
   let token1: Contract;
@@ -130,22 +133,23 @@ describe("PreAMMBatcher-e2e", async () => {
   };
 
   beforeEach(async () => {
-    token0 = await ERC20.deploy();
-    token1 = await ERC20.deploy();
-
-    uniswapFactory = await UniswapV2Factory.deploy();
+    token0 = await deployContract(walletDeployer, ERC20, ["token0", "18"]);
+    token1 = await deployContract(walletDeployer, ERC20, ["token1", "18"]);
+    uniswapFactory = await deployContract(walletDeployer, UniswapV2Factory, [
+      walletDeployer.address,
+    ]);
     await uniswapFactory.createPair(token0.address, token1.address, {
       gasLimit: 6000000,
     });
-    
     uniswapPairAddress = await uniswapFactory.getPair(
       token0.address,
       token1.address,
     );
-    uniswapPair = await UniswapV2Pair.deploy();
+    uniswapPair = await deployContract(walletDeployer, UniswapV2Pair);
     uniswapPair = await uniswapPair.attach(uniswapPairAddress);
-
-    batcher = await PreAMMBatcher.deploy(uniswapFactory.address);
+    batcher = await deployContract(walletDeployer, PreAMMBatcher, [
+      uniswapFactory.address,
+    ]);
   });
 
   it("example: baseTestInput", async () => {

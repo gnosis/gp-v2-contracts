@@ -6,11 +6,11 @@ import {
   MockProvider,
   solidity,
 } from "ethereum-waffle";
-import PreAMMBatcher from "../build/PreAMMBatcher.json";
+import PreAMMBatcher from "../artifacts/PreAMMBatcher.json";
 import UniswapV2Pair from "../node_modules/@uniswap/v2-core/build/UniswapV2Pair.json";
 import UniswapV2Factory from "../node_modules/@uniswap/v2-core/build/UniswapV2Factory.json";
 
-import ERC20 from "../build/ERC20Mintable.json";
+import ERC20 from "../artifacts/ERC20Mintable.json";
 import { Order, DOMAIN_SEPARATOR } from "../src/js/orders.spec";
 import { baseTestInput } from "./resources/testExamples";
 
