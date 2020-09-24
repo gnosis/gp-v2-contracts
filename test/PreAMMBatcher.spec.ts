@@ -1,17 +1,18 @@
 import { use, expect } from "chai";
-import { Contract, utils } from "ethers";
 import {
   deployContract,
   deployMockContract,
   MockProvider,
   solidity,
 } from "ethereum-waffle";
-import PreAMMBatcher from "../build/PreAMMBatcher.json";
-import UniswapV2Pair from "../node_modules/@uniswap/v2-core/build/UniswapV2Pair.json";
-import UniswapV2Factory from "../node_modules/@uniswap/v2-core/build/UniswapV2Factory.json";
+import { Contract, utils } from "ethers";
 
 import ERC20 from "../build/ERC20Mintable.json";
+import PreAMMBatcher from "../build/PreAMMBatcher.json";
+import UniswapV2Factory from "../node_modules/@uniswap/v2-core/build/UniswapV2Factory.json";
+import UniswapV2Pair from "../node_modules/@uniswap/v2-core/build/UniswapV2Pair.json";
 import { Order, DOMAIN_SEPARATOR } from "../src/js/orders.spec";
+
 import { baseTestInput } from "./resources/testExamples";
 
 use(solidity);
