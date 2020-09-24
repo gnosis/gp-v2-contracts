@@ -1,5 +1,5 @@
 import abi from "ethereumjs-abi";
-import { utils, Wallet, Contract, BigNumber } from "ethers";
+import { utils, Wallet, Contract, BigNumber, Signer } from "ethers";
 import { ecsign } from "ethereumjs-util";
 
 export const DOMAIN_SEPARATOR =
@@ -18,7 +18,7 @@ export class Order {
   buyAmount: BigNumber;
   sellToken: Contract;
   buyToken: Contract;
-  wallet: Wallet;
+  signer: Signer;
   nonce: BigNumber;
 
   constructor(
@@ -26,14 +26,14 @@ export class Order {
     buyAmount: BigNumber | number,
     sellToken: Contract,
     buyToken: Contract,
-    wallet: Wallet,
+    signer: Signer,
     nonce: BigNumber | number,
   ) {
     this.sellAmount = BigNumber.from(sellAmount);
     this.buyAmount = BigNumber.from(buyAmount);
     this.sellToken = sellToken;
     this.buyToken = buyToken;
-    this.wallet = wallet;
+    this.signer = signer;
     this.nonce = BigNumber.from(nonce);
   }
 
