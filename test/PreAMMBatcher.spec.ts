@@ -1,5 +1,5 @@
 import { use, expect } from "chai";
-import { Contract, utils } from "ethers";
+import { BigNumber, Contract, utils } from "ethers";
 import {
   deployContract,
   deployMockContract,
@@ -332,6 +332,42 @@ describe("PreAMMBatcher", () => {
           DESCENDING,
         ),
       ).to.be.equal(true);
+    });
+    it("reverts with overflowing artithmetic", async () => {
+      const maxUint = BigNumber.from(2)
+        .pow(BigNumber.from(256))
+        .sub(BigNumber.from(1));
+
+      const overflowingPair = [
+        new Order(2, maxUint, token0, token1, walletTrader1, 1),
+        new Order(1, maxUint, token0, token1, walletTrader1, 1),
+      ];
+      await expect(
+        batcher.isSortedByLimitPrice(
+          overflowingPair.map((x) => x.getSmartContractOrder()),
+          ASCENDING,
+        ),
+      ).to.be.revertedWith("SafeMath: multiplication overflow");
+      await expect(
+        batcher.isSortedByLimitPrice(
+          overflowingPair.map((x) => x.getSmartContractOrder()),
+          DESCENDING,
+        ),
+      ).to.be.revertedWith("SafeMath: multiplication overflow");
+
+      overflowingPair.reverse();
+      await expect(
+        batcher.isSortedByLimitPrice(
+          overflowingPair.map((x) => x.getSmartContractOrder()),
+          ASCENDING,
+        ),
+      ).to.be.revertedWith("SafeMath: multiplication overflow");
+      await expect(
+        batcher.isSortedByLimitPrice(
+          overflowingPair.map((x) => x.getSmartContractOrder()),
+          DESCENDING,
+        ),
+      ).to.be.revertedWith("SafeMath: multiplication overflow");
     });
   });
 });
