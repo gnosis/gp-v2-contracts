@@ -1,11 +1,12 @@
 pragma experimental ABIEncoderV2;
-pragma solidity ^0.6.2;
+pragma solidity ^0.6.12;
+
 import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
-
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./libraries/Math.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
+
+import "./libraries/Math.sol";
 
 contract PreAMMBatcher {
     using SafeMath for uint256;

@@ -1,6 +1,7 @@
-import { Fraction, TestCaseInput, Solution, TestCase } from "./models";
 import { BigNumber } from "ethers";
 import _ from "lodash";
+
+import { Fraction, TestCaseInput, Solution, TestCase } from "./models";
 
 export const solveTestCase = function (
   testCaseInput: TestCaseInput,

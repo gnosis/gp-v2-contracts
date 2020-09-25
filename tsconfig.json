@@ -2,13 +2,13 @@
   "compilerOptions": {
     "declaration": true,
     "esModuleInterop": true,
-    "lib": ["ES2018"],
-    "module": "CommonJS",
+    "module": "commonjs",
     "moduleResolution": "node",
-    "outDir": "dist",
+    "noEmit": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": true,
-    "target": "ES2018"
+    "target": "es2020",
+    "typeRoots": ["node_modules/@types", "typings"]
   }
 }

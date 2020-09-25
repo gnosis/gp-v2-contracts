@@ -8,12 +8,25 @@ module.exports = {
   parserOptions: {
     ecmaVersion: 2020,
   },
-  plugins: ["@typescript-eslint", "prettier"],
+  plugins: ["@typescript-eslint", "import", "prettier"],
   extends: [
     "eslint:recommended",
+    "plugin:import/recommended",
+    "plugin:import/typescript",
     "plugin:@typescript-eslint/recommended",
     "plugin:prettier/recommended",
     "prettier/@typescript-eslint",
   ],
   ignorePatterns: ["build/", "node_modules/", "!.prettierrc.js"],
+  rules: {
+    "import/order": [
+      "error",
+      {
+        "newlines-between": "always",
+        alphabetize: {
+          order: "asc",
+        },
+      },
+    ],
+  },
 };
