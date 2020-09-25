@@ -185,7 +185,7 @@ describe("PreAMMBatcher-e2e", () => {
   });
 
   describe("Bad encoded order", async () => {
-    it("invalid signature", async () => {
+    it("rejects invalid signatures", async () => {
       const testCase = generateTestCase(
         baseTestInput(
           token0,
@@ -224,7 +224,7 @@ describe("PreAMMBatcher-e2e", () => {
       ).to.be.revertedWith("invalid_signature");
     });
 
-    it("not enough bytes", async () => {
+    it("rejects encoded order with not enough bytes", async () => {
       const testCase = generateTestCase(
         baseTestInput(
           token0,

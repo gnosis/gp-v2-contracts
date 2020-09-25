@@ -17,7 +17,7 @@ contract PreAMMBatcher {
 
     uint256 constant ENTRIES_IN_ORDER = 6;
     uint256 constant ENTRIES_IN_SIGNATURE = 3;
-    uint256 constant OFFCHAIN_ORDER_BYTE_SIZE = 32 * (ENTRIES_IN_ORDER + ENTRIES_IN_SIGNATURE);
+    uint256 constant OFFCHAIN_ORDER_STRIDE = 32 * (ENTRIES_IN_ORDER + ENTRIES_IN_SIGNATURE);
 
     struct Order {
         uint256 sellAmount;
