@@ -1,5 +1,5 @@
 import { use, expect } from "chai";
-import { Contract, ethers, utils } from "ethers";
+import { Contract, utils } from "ethers";
 import {
   deployContract,
   deployMockContract,
@@ -15,8 +15,6 @@ import { Order, DOMAIN_SEPARATOR } from "../src/js/orders.spec";
 import { baseTestInput } from "./resources/testExamples";
 
 use(solidity);
-const ASCENDING = 0;
-const DESCENDING = 1;
 
 describe("PreAMMBatcher", () => {
   const [
@@ -228,7 +226,10 @@ describe("PreAMMBatcher", () => {
       testCaseInput.sellOrdersToken1[0].sellAmount.toString(),
     ]);
   });
-  describe.only("isSortedByLimitPrice()", async () => {
+  describe("isSortedByLimitPrice()", async () => {
+    const ASCENDING = 0;
+    const DESCENDING = 1;
+
     it("returns expected values for generic sorted order set", async () => {
       const sortedOrders = [
         new Order(1, 1, token0, token1, walletTrader1, 1),
@@ -239,30 +240,30 @@ describe("PreAMMBatcher", () => {
       expect(
         await batcher.isSortedByLimitPrice(
           sortedOrders.map((x) => x.getSmartContractOrder()),
-          0,
+          ASCENDING,
         ),
-      ).to.be.equal(true);
+      ).to.be.equal(true, "sorted orders should be ascending.");
       expect(
         await batcher.isSortedByLimitPrice(
           sortedOrders.map((x) => x.getSmartContractOrder()),
-          1,
+          DESCENDING,
         ),
-      ).to.be.equal(false);
+      ).to.be.equal(false, "Sorted orders should not be descending");
 
       // Reverse the sorted list so it is descending and assert converse
       sortedOrders.reverse();
       expect(
         await batcher.isSortedByLimitPrice(
           sortedOrders.map((x) => x.getSmartContractOrder()),
-          0,
+          ASCENDING,
         ),
-      ).to.be.equal(false);
+      ).to.be.equal(false, "Reversed sorted orders should not be ascending.");
       expect(
         await batcher.isSortedByLimitPrice(
           sortedOrders.map((x) => x.getSmartContractOrder()),
-          1,
+          DESCENDING,
         ),
-      ).to.be.equal(true);
+      ).to.be.equal(true, "Reversed sorted orders should be descending.");
     });
 
     it("returns expected values for same two orders", async () => {
@@ -292,13 +293,13 @@ describe("PreAMMBatcher", () => {
       expect(
         await batcher.isSortedByLimitPrice(
           unsortedOrders.map((x) => x.getSmartContractOrder()),
-          0,
+          ASCENDING,
         ),
       ).to.be.equal(false);
       expect(
         await batcher.isSortedByLimitPrice(
           unsortedOrders.map((x) => x.getSmartContractOrder()),
-          1,
+          DESCENDING,
         ),
       ).to.be.equal(false);
     });
@@ -307,13 +308,13 @@ describe("PreAMMBatcher", () => {
       expect(
         await batcher.isSortedByLimitPrice(
           emptyOrders.map((x) => x.getSmartContractOrder()),
-          0,
+          ASCENDING,
         ),
       ).to.be.equal(true);
       expect(
         await batcher.isSortedByLimitPrice(
           emptyOrders.map((x) => x.getSmartContractOrder()),
-          1,
+          DESCENDING,
         ),
       ).to.be.equal(true);
     });
@@ -322,13 +323,13 @@ describe("PreAMMBatcher", () => {
       expect(
         await batcher.isSortedByLimitPrice(
           singleOrder.map((x) => x.getSmartContractOrder()),
-          0,
+          ASCENDING,
         ),
       ).to.be.equal(true);
       expect(
         await batcher.isSortedByLimitPrice(
           singleOrder.map((x) => x.getSmartContractOrder()),
-          1,
+          DESCENDING,
         ),
       ).to.be.equal(true);
     });

@@ -6,13 +6,9 @@ import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./libraries/Math.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/math/SignedSafeMath.sol";
-import "@openzeppelin/contracts/utils/SafeCast.sol";
 
 contract PreAMMBatcher {
     using SafeMath for uint256;
-    using SignedSafeMath for int256;
-    using SafeCast for uint256;
     IUniswapV2Factory uniswapFactory;
 
     bytes32 public constant DOMAIN_SEPARATOR = keccak256("preBatcher-V1");
@@ -423,16 +419,15 @@ contract PreAMMBatcher {
         for (uint256 i = 0; i < orders.length - 1; i++) {
             Order memory orderA = orders[i];
             Order memory orderB = orders[i + 1];
-            if (direction == Direction.Ascending) {
-                if (
-                    orderA.buyAmount.mul(orderB.sellAmount) >=
-                    orderB.buyAmount.mul(orderA.sellAmount)
-                ) {
-                    return false;
-                }
+            if (
+                direction == Direction.Ascending &&
+                orderA.buyAmount.mul(orderB.sellAmount) >
+                orderB.buyAmount.mul(orderA.sellAmount)
+            ) {
+                return false;
             } else {
                 if (
-                    orderA.buyAmount.mul(orderB.sellAmount) <=
+                    orderA.buyAmount.mul(orderB.sellAmount) <
                     orderB.buyAmount.mul(orderA.sellAmount)
                 ) {
                     return false;
