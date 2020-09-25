@@ -203,11 +203,11 @@ contract PreAMMBatcher {
         pure
         returns (Order[] memory orders)
     {
-        orders = new Order[](orderBytes.length / OFFCHAIN_ORDER_BYTE_SIZE);
+        orders = new Order[](orderBytes.length / OFFCHAIN_ORDER_STRIDE);
         uint256 count = 0;
         while (orderBytes.length > 0) {
-            bytes calldata singleOrder = orderBytes[:OFFCHAIN_ORDER_BYTE_SIZE];
-            orderBytes = orderBytes[OFFCHAIN_ORDER_BYTE_SIZE:];
+            bytes calldata singleOrder = orderBytes[:OFFCHAIN_ORDER_STRIDE];
+            orderBytes = orderBytes[OFFCHAIN_ORDER_STRIDE:];
             orders[count] = decodeSingleOrder(singleOrder);
             count = count + 1;
         }
