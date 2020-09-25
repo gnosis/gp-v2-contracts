@@ -249,13 +249,11 @@ describe("PreAMMBatcher-e2e", () => {
         encodedOrdersToken0.length - 1,
       );
 
-      // ideally we'd check that the revert message matches exactly an empty string,
-      // since it reverts with an empty message, however revertedWith matches substrings
       await expect(
         batcher.batchTrade(encodedOrdersToken0, encodedOrdersToken1, {
           gasLimit: 6000000,
         }),
-      ).to.be.reverted;
+      ).to.be.revertedWith("malformed encoded orders");
     });
   });
 

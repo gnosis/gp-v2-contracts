@@ -204,6 +204,7 @@ contract PreAMMBatcher {
         pure
         returns (Order[] memory orders)
     {
+        require(orderBytes.length % OFFCHAIN_ORDER_STRIDE == 0, "malformed encoded orders");
         orders = new Order[](orderBytes.length / OFFCHAIN_ORDER_STRIDE);
         uint256 count = 0;
         while (orderBytes.length > 0) {
