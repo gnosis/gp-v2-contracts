@@ -419,12 +419,13 @@ contract PreAMMBatcher {
         for (uint256 i = 0; i < orders.length - 1; i++) {
             Order memory orderA = orders[i];
             Order memory orderB = orders[i + 1];
-            if (
-                direction == Direction.Ascending &&
-                orderA.buyAmount.mul(orderB.sellAmount) >
-                orderB.buyAmount.mul(orderA.sellAmount)
-            ) {
-                return false;
+            if (direction == Direction.Ascending) {
+                if (
+                    orderA.buyAmount.mul(orderB.sellAmount) >
+                    orderB.buyAmount.mul(orderA.sellAmount)
+                ) {
+                    return false;
+                }
             } else {
                 if (
                     orderA.buyAmount.mul(orderB.sellAmount) <
