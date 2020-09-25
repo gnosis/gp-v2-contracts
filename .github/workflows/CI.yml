@@ -25,7 +25,7 @@ jobs:
           key: ${{ matrix.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ matrix.os }}-yarn-
-      - run: yarn
+      - run: yarn --frozen-lockfile
       - run: yarn build
       - run: yarn lint
       - run: yarn test
