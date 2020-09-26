@@ -9,6 +9,7 @@ import { BigNumber, utils, Contract } from "ethers";
 
 import ERC20 from "../build/artifacts/ERC20Mintable.json";
 import PreAMMBatcher from "../build/artifacts/PreAMMBatcher.json";
+import PreAMMBatcherTestInterface from "../build/artifacts/PreAMMBatcherTestInterface.json";
 import UniswapV2Factory from "../node_modules/@uniswap/v2-core/build/UniswapV2Factory.json";
 import UniswapV2Pair from "../node_modules/@uniswap/v2-core/build/UniswapV2Pair.json";
 import { Order, DOMAIN_SEPARATOR } from "../src/js/orders.spec";
@@ -233,7 +234,7 @@ describe("PreAMMBatcher", () => {
       testCaseInput.sellOrdersToken1[0].sellAmount.toString(),
     ]);
   });
-  describe.only("isSortedByLimitPrice()", async () => {
+  describe("isSortedByLimitPrice()", async () => {
     const ASCENDING = 0;
     const DESCENDING = 1;
 
