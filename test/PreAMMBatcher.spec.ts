@@ -1,3 +1,4 @@
+import ERC20 from "@openzeppelin/contracts/build/contracts/IERC20.json";
 import { use, expect } from "chai";
 import {
   deployContract,
@@ -7,7 +8,6 @@ import {
 } from "ethereum-waffle";
 import { utils, Contract } from "ethers";
 
-import ERC20 from "../build/artifacts/ERC20Mintable.json";
 import PreAMMBatcher from "../build/artifacts/PreAMMBatcher.json";
 import UniswapV2Factory from "../node_modules/@uniswap/v2-core/build/UniswapV2Factory.json";
 import UniswapV2Pair from "../node_modules/@uniswap/v2-core/build/UniswapV2Pair.json";
