@@ -7,6 +7,7 @@ import {
   solidity,
 } from "ethereum-waffle";
 import PreAMMBatcher from "../build/PreAMMBatcher.json";
+import PreAMMBatcherTestInterface from "../build/PreAMMBatcherTestInterface.json";
 import UniswapV2Pair from "../node_modules/@uniswap/v2-core/build/UniswapV2Pair.json";
 import UniswapV2Factory from "../node_modules/@uniswap/v2-core/build/UniswapV2Factory.json";
 
@@ -23,6 +24,7 @@ describe("PreAMMBatcher", () => {
     walletTrader2,
   ] = new MockProvider().getWallets();
   let batcher: Contract;
+  let batchTester: Contract;
   let token0: Contract;
   let token1: Contract;
   let uniswapPair: Contract;
@@ -84,6 +86,11 @@ describe("PreAMMBatcher", () => {
     batcher = await deployContract(walletDeployer, PreAMMBatcher, [
       uniswapFactory.address,
     ]);
+    batchTester = await deployContract(
+      walletDeployer,
+      PreAMMBatcherTestInterface,
+      [uniswapFactory.address],
+    );
 
     await token0.mock.balanceOf
       .withArgs(uniswapPair.address)
@@ -226,7 +233,7 @@ describe("PreAMMBatcher", () => {
       testCaseInput.sellOrdersToken1[0].sellAmount.toString(),
     ]);
   });
-  describe("isSortedByLimitPrice()", async () => {
+  describe.only("isSortedByLimitPrice()", async () => {
     const ASCENDING = 0;
     const DESCENDING = 1;
 
@@ -238,13 +245,13 @@ describe("PreAMMBatcher", () => {
       ];
 
       expect(
-        await batcher.isSortedByLimitPrice(
+        await batchTester.isSortedByLimitPriceTest(
           sortedOrders.map((x) => x.getSmartContractOrder()),
           ASCENDING,
         ),
       ).to.be.equal(true, "sorted orders should be ascending.");
       expect(
-        await batcher.isSortedByLimitPrice(
+        await batchTester.isSortedByLimitPriceTest(
           sortedOrders.map((x) => x.getSmartContractOrder()),
           DESCENDING,
         ),
@@ -253,13 +260,13 @@ describe("PreAMMBatcher", () => {
       // Reverse the sorted list so it is descending and assert converse
       sortedOrders.reverse();
       expect(
-        await batcher.isSortedByLimitPrice(
+        await batchTester.isSortedByLimitPriceTest(
           sortedOrders.map((x) => x.getSmartContractOrder()),
           ASCENDING,
         ),
       ).to.be.equal(false, "Reversed sorted orders should not be ascending.");
       expect(
-        await batcher.isSortedByLimitPrice(
+        await batchTester.isSortedByLimitPriceTest(
           sortedOrders.map((x) => x.getSmartContractOrder()),
           DESCENDING,
         ),
@@ -272,13 +279,13 @@ describe("PreAMMBatcher", () => {
         new Order(1, 1, token0, token1, walletTrader1, 2),
       ];
       expect(
-        await batcher.isSortedByLimitPrice(
+        await batchTester.isSortedByLimitPriceTest(
           sortedOrders.map((x) => x.getSmartContractOrder()),
           ASCENDING,
         ),
       ).to.be.equal(true, "Failed ascending");
       expect(
-        await batcher.isSortedByLimitPrice(
+        await batchTester.isSortedByLimitPriceTest(
           sortedOrders.map((x) => x.getSmartContractOrder()),
           DESCENDING,
         ),
@@ -291,13 +298,13 @@ describe("PreAMMBatcher", () => {
         new Order(1, 3, token0, token1, walletTrader1, 3),
       ];
       expect(
-        await batcher.isSortedByLimitPrice(
+        await batchTester.isSortedByLimitPriceTest(
           unsortedOrders.map((x) => x.getSmartContractOrder()),
           ASCENDING,
         ),
       ).to.be.equal(false);
       expect(
-        await batcher.isSortedByLimitPrice(
+        await batchTester.isSortedByLimitPriceTest(
           unsortedOrders.map((x) => x.getSmartContractOrder()),
           DESCENDING,
         ),
@@ -306,13 +313,13 @@ describe("PreAMMBatcher", () => {
     it("returns expected values for empty set of orders", async () => {
       const emptyOrders: Order[] = [];
       expect(
-        await batcher.isSortedByLimitPrice(
+        await batchTester.isSortedByLimitPriceTest(
           emptyOrders.map((x) => x.getSmartContractOrder()),
           ASCENDING,
         ),
       ).to.be.equal(true);
       expect(
-        await batcher.isSortedByLimitPrice(
+        await batchTester.isSortedByLimitPriceTest(
           emptyOrders.map((x) => x.getSmartContractOrder()),
           DESCENDING,
         ),
@@ -321,13 +328,13 @@ describe("PreAMMBatcher", () => {
     it("returns expected values for singleton order set", async () => {
       const singleOrder = [new Order(1, 1, token0, token1, walletTrader1, 1)];
       expect(
-        await batcher.isSortedByLimitPrice(
+        await batchTester.isSortedByLimitPriceTest(
           singleOrder.map((x) => x.getSmartContractOrder()),
           ASCENDING,
         ),
       ).to.be.equal(true);
       expect(
-        await batcher.isSortedByLimitPrice(
+        await batchTester.isSortedByLimitPriceTest(
           singleOrder.map((x) => x.getSmartContractOrder()),
           DESCENDING,
         ),
@@ -343,13 +350,13 @@ describe("PreAMMBatcher", () => {
         new Order(1, maxUint, token0, token1, walletTrader1, 1),
       ];
       await expect(
-        batcher.isSortedByLimitPrice(
+        batchTester.isSortedByLimitPriceTest(
           overflowingPair.map((x) => x.getSmartContractOrder()),
           ASCENDING,
         ),
       ).to.be.revertedWith("SafeMath: multiplication overflow");
       await expect(
-        batcher.isSortedByLimitPrice(
+        batchTester.isSortedByLimitPriceTest(
           overflowingPair.map((x) => x.getSmartContractOrder()),
           DESCENDING,
         ),
@@ -357,13 +364,13 @@ describe("PreAMMBatcher", () => {
 
       overflowingPair.reverse();
       await expect(
-        batcher.isSortedByLimitPrice(
+        batchTester.isSortedByLimitPriceTest(
           overflowingPair.map((x) => x.getSmartContractOrder()),
           ASCENDING,
         ),
       ).to.be.revertedWith("SafeMath: multiplication overflow");
       await expect(
-        batcher.isSortedByLimitPrice(
+        batchTester.isSortedByLimitPriceTest(
           overflowingPair.map((x) => x.getSmartContractOrder()),
           DESCENDING,
         ),

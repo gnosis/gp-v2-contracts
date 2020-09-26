@@ -408,7 +408,7 @@ contract PreAMMBatcher {
     enum Direction {Ascending, Descending}
 
     function isSortedByLimitPrice(Order[] memory orders, Direction direction)
-        public
+        internal
         pure
         returns (bool)
     {
