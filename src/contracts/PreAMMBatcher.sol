@@ -16,6 +16,10 @@ contract PreAMMBatcher {
     uint256 public constant feeFactor = 333; // Charged fee is (feeFactor-1)/feeFactor
     mapping(address => uint8) public nonces; // Probably a nonce per tokenpair would be better
 
+    uint256 constant ENTRIES_IN_ORDER = 6;
+    uint256 constant ENTRIES_IN_SIGNATURE = 3;
+    uint256 constant OFFCHAIN_ORDER_STRIDE = 32 * (ENTRIES_IN_ORDER + ENTRIES_IN_SIGNATURE);
+
     struct Order {
         uint256 sellAmount;
         uint256 buyAmount;
@@ -45,8 +49,8 @@ contract PreAMMBatcher {
         public
         returns (Fraction memory clearingPrice)
     {
-        Order[] memory sellOrdersToken0 = parseOrderBytes(order0bytes);
-        Order[] memory sellOrdersToken1 = parseOrderBytes(order1bytes);
+        Order[] memory sellOrdersToken0 = decodeOrders(order0bytes);
+        Order[] memory sellOrdersToken1 = decodeOrders(order1bytes);
         for (uint256 i = 0; i < sellOrdersToken0.length; i++) {
             sellOrdersToken0[i] = reduceOrder(sellOrdersToken0[i]);
         }
@@ -140,65 +144,74 @@ contract PreAMMBatcher {
         return order;
     }
 
-    function parseOrderBytes(bytes calldata orderBytes)
+    function decodeSingleOrder(bytes calldata orderBytes)
+        internal
+        pure
+        returns (Order memory orders)
+    {
+        (
+            uint256 sellAmount,
+            uint256 buyAmount,
+            address sellToken,
+            address buyToken,
+            address owner,
+            uint8 nonce,
+            uint8 v,
+            bytes32 r,
+            bytes32 s
+        ) = abi.decode(
+            orderBytes,
+            (
+                uint256,
+                uint256,
+                address,
+                address,
+                address,
+                uint8,
+                uint8,
+                bytes32,
+                bytes32
+            )
+        );
+        bytes32 digest = keccak256(
+            abi.encode(
+                DOMAIN_SEPARATOR,
+                sellAmount,
+                buyAmount,
+                sellToken,
+                buyToken,
+                owner,
+                nonce
+            )
+        );
+        address recoveredAddress = ecrecover(digest, v, r, s);
+        require(
+            recoveredAddress != address(0) && recoveredAddress == owner,
+            "invalid_signature"
+        );
+        return Order({
+            sellAmount: sellAmount,
+            buyAmount: buyAmount,
+            buyToken: buyToken,
+            sellToken: sellToken,
+            owner: owner,
+            nonce: nonce
+        });
+    }
+
+    function decodeOrders(bytes calldata orderBytes)
         internal
         pure
         returns (Order[] memory orders)
     {
-        orders = new Order[](orderBytes.length / 288);
+        require(orderBytes.length % OFFCHAIN_ORDER_STRIDE == 0, "malformed encoded orders");
+        orders = new Order[](orderBytes.length / OFFCHAIN_ORDER_STRIDE);
         uint256 count = 0;
-        while (orderBytes.length > 189) {
-            bytes calldata singleOrder = orderBytes[:288];
-            orderBytes = orderBytes[288:];
-            (
-                uint256 sellAmount,
-                uint256 buyAmount,
-                address sellToken,
-                address buyToken,
-                address owner,
-                uint8 nonce,
-                uint8 v,
-                bytes32 r,
-                bytes32 s
-            ) = abi.decode(
-                singleOrder,
-                (
-                    uint256,
-                    uint256,
-                    address,
-                    address,
-                    address,
-                    uint8,
-                    uint8,
-                    bytes32,
-                    bytes32
-                )
-            );
-            bytes32 digest = keccak256(
-                abi.encode(
-                    DOMAIN_SEPARATOR,
-                    sellAmount,
-                    buyAmount,
-                    sellToken,
-                    buyToken,
-                    owner,
-                    nonce
-                )
-            );
-            address recoveredAddress = ecrecover(digest, v, r, s);
-            require(
-                recoveredAddress != address(0) && recoveredAddress == owner,
-                "invalid_signature"
-            );
-            orders[count] = Order({
-                sellAmount: sellAmount,
-                buyAmount: buyAmount,
-                buyToken: buyToken,
-                sellToken: sellToken,
-                owner: owner,
-                nonce: nonce
-            });
-            count = count.add(1);
+        while (orderBytes.length > 0) {
+            bytes calldata singleOrder = orderBytes[:OFFCHAIN_ORDER_STRIDE];
+            orderBytes = orderBytes[OFFCHAIN_ORDER_STRIDE:];
+            orders[count] = decodeSingleOrder(singleOrder);
+            count = count + 1;
         }
     }
 

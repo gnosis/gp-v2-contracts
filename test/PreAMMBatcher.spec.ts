@@ -133,7 +133,7 @@ describe("PreAMMBatcher", () => {
         [testCaseInput.sellOrdersToken1[0].getSmartContractOrder()],
         { gasLimit: 6000000 },
       ),
-    ).to.revertedWith("sellOrderToken1 are not compatible in sellToken");
+    ).to.be.revertedWith("sellOrderToken1 are not compatible in sellToken");
   });
 
   it("receiveTradeAmounts reverts if transferFrom fails for token0", async () => {
