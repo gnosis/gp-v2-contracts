@@ -6,9 +6,10 @@ import {
   MockProvider,
   solidity,
 } from "ethereum-waffle";
-import { utils, Contract } from "ethers";
+import { BigNumber, utils, Contract } from "ethers";
 
 import PreAMMBatcher from "../build/artifacts/PreAMMBatcher.json";
+import PreAMMBatcherTestInterface from "../build/artifacts/PreAMMBatcherTestInterface.json";
 import UniswapV2Factory from "../node_modules/@uniswap/v2-core/build/UniswapV2Factory.json";
 import UniswapV2Pair from "../node_modules/@uniswap/v2-core/build/UniswapV2Pair.json";
 import { Order, DOMAIN_SEPARATOR } from "../src/js/orders.spec";
@@ -24,6 +25,7 @@ describe("PreAMMBatcher", () => {
     walletTrader2,
   ] = new MockProvider().getWallets();
   let batcher: Contract;
+  let batchTester: Contract;
   let token0: Contract;
   let token1: Contract;
   let uniswapPair: Contract;
@@ -85,6 +87,11 @@ describe("PreAMMBatcher", () => {
     batcher = await deployContract(walletDeployer, PreAMMBatcher, [
       uniswapFactory.address,
     ]);
+    batchTester = await deployContract(
+      walletDeployer,
+      PreAMMBatcherTestInterface,
+      [uniswapFactory.address],
+    );
 
     await token0.mock.balanceOf
       .withArgs(uniswapPair.address)
@@ -226,5 +233,149 @@ describe("PreAMMBatcher", () => {
       batcher.address,
       testCaseInput.sellOrdersToken1[0].sellAmount.toString(),
     ]);
+  });
+  describe("isSortedByLimitPrice()", async () => {
+    const ASCENDING = 0;
+    const DESCENDING = 1;
+
+    it("returns expected values for generic sorted order set", async () => {
+      const sortedOrders = [
+        new Order(1, 1, token0, token1, walletTrader1, 1),
+        new Order(1, 2, token0, token1, walletTrader1, 2),
+        new Order(1, 3, token0, token1, walletTrader1, 3),
+      ];
+
+      expect(
+        await batchTester.isSortedByLimitPriceTest(
+          sortedOrders.map((x) => x.getSmartContractOrder()),
+          ASCENDING,
+        ),
+      ).to.be.equal(true, "sorted orders should be ascending.");
+      expect(
+        await batchTester.isSortedByLimitPriceTest(
+          sortedOrders.map((x) => x.getSmartContractOrder()),
+          DESCENDING,
+        ),
+      ).to.be.equal(false, "Sorted orders should not be descending");
+
+      // Reverse the sorted list so it is descending and assert converse
+      sortedOrders.reverse();
+      expect(
+        await batchTester.isSortedByLimitPriceTest(
+          sortedOrders.map((x) => x.getSmartContractOrder()),
+          ASCENDING,
+        ),
+      ).to.be.equal(false, "Reversed sorted orders should not be ascending.");
+      expect(
+        await batchTester.isSortedByLimitPriceTest(
+          sortedOrders.map((x) => x.getSmartContractOrder()),
+          DESCENDING,
+        ),
+      ).to.be.equal(true, "Reversed sorted orders should be descending.");
+    });
+
+    it("returns expected values for same two orders", async () => {
+      const sortedOrders = [
+        new Order(1, 1, token0, token1, walletTrader1, 1),
+        new Order(1, 1, token0, token1, walletTrader1, 2),
+      ];
+      expect(
+        await batchTester.isSortedByLimitPriceTest(
+          sortedOrders.map((x) => x.getSmartContractOrder()),
+          ASCENDING,
+        ),
+      ).to.be.equal(true, "Failed ascending");
+      expect(
+        await batchTester.isSortedByLimitPriceTest(
+          sortedOrders.map((x) => x.getSmartContractOrder()),
+          DESCENDING,
+        ),
+      ).to.be.equal(true, "Failed Descending");
+    });
+    it("returns expected values for generic unsorted set of orders", async () => {
+      const unsortedOrders = [
+        new Order(1, 2, token0, token1, walletTrader1, 1),
+        new Order(1, 1, token0, token1, walletTrader1, 2),
+        new Order(1, 3, token0, token1, walletTrader1, 3),
+      ];
+      expect(
+        await batchTester.isSortedByLimitPriceTest(
+          unsortedOrders.map((x) => x.getSmartContractOrder()),
+          ASCENDING,
+        ),
+      ).to.be.equal(false);
+      expect(
+        await batchTester.isSortedByLimitPriceTest(
+          unsortedOrders.map((x) => x.getSmartContractOrder()),
+          DESCENDING,
+        ),
+      ).to.be.equal(false);
+    });
+    it("returns expected values for empty set of orders", async () => {
+      const emptyOrders: Order[] = [];
+      expect(
+        await batchTester.isSortedByLimitPriceTest(
+          emptyOrders.map((x) => x.getSmartContractOrder()),
+          ASCENDING,
+        ),
+      ).to.be.equal(true);
+      expect(
+        await batchTester.isSortedByLimitPriceTest(
+          emptyOrders.map((x) => x.getSmartContractOrder()),
+          DESCENDING,
+        ),
+      ).to.be.equal(true);
+    });
+    it("returns expected values for singleton order set", async () => {
+      const singleOrder = [new Order(1, 1, token0, token1, walletTrader1, 1)];
+      expect(
+        await batchTester.isSortedByLimitPriceTest(
+          singleOrder.map((x) => x.getSmartContractOrder()),
+          ASCENDING,
+        ),
+      ).to.be.equal(true);
+      expect(
+        await batchTester.isSortedByLimitPriceTest(
+          singleOrder.map((x) => x.getSmartContractOrder()),
+          DESCENDING,
+        ),
+      ).to.be.equal(true);
+    });
+    it("reverts with overflowing artithmetic", async () => {
+      const maxUint = BigNumber.from(2)
+        .pow(BigNumber.from(256))
+        .sub(BigNumber.from(1));
+
+      const overflowingPair = [
+        new Order(2, maxUint, token0, token1, walletTrader1, 1),
+        new Order(1, maxUint, token0, token1, walletTrader1, 1),
+      ];
+      await expect(
+        batchTester.isSortedByLimitPriceTest(
+          overflowingPair.map((x) => x.getSmartContractOrder()),
+          ASCENDING,
+        ),
+      ).to.be.revertedWith("SafeMath: multiplication overflow");
+      await expect(
+        batchTester.isSortedByLimitPriceTest(
+          overflowingPair.map((x) => x.getSmartContractOrder()),
+          DESCENDING,
+        ),
+      ).to.be.revertedWith("SafeMath: multiplication overflow");
+
+      overflowingPair.reverse();
+      await expect(
+        batchTester.isSortedByLimitPriceTest(
+          overflowingPair.map((x) => x.getSmartContractOrder()),
+          ASCENDING,
+        ),
+      ).to.be.revertedWith("SafeMath: multiplication overflow");
+      await expect(
+        batchTester.isSortedByLimitPriceTest(
+          overflowingPair.map((x) => x.getSmartContractOrder()),
+          DESCENDING,
+        ),
+      ).to.be.revertedWith("SafeMath: multiplication overflow");
+    });
   });
 });

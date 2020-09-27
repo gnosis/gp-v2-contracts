@@ -418,4 +418,37 @@ contract PreAMMBatcher {
         }
         return newOrders;
     }
+
+    enum Direction {Ascending, Descending}
+
+    function isSortedByLimitPrice(Order[] memory orders, Direction direction)
+        internal
+        pure
+        returns (bool)
+    {
+        if (orders.length < 2) {
+            // All order sets with less than 2 elements are tautologically sorted.
+            return true;
+        }
+        for (uint256 i = 0; i < orders.length - 1; i++) {
+            Order memory orderA = orders[i];
+            Order memory orderB = orders[i + 1];
+            if (direction == Direction.Ascending) {
+                if (
+                    orderA.buyAmount.mul(orderB.sellAmount) >
+                    orderB.buyAmount.mul(orderA.sellAmount)
+                ) {
+                    return false;
+                }
+            } else {
+                if (
+                    orderA.buyAmount.mul(orderB.sellAmount) <
+                    orderB.buyAmount.mul(orderA.sellAmount)
+                ) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
 }
