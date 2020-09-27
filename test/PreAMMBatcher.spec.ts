@@ -1,3 +1,4 @@
+import ERC20 from "@openzeppelin/contracts/build/contracts/IERC20.json";
 import { use, expect } from "chai";
 import {
   deployContract,
@@ -7,7 +8,6 @@ import {
 } from "ethereum-waffle";
 import { BigNumber, utils, Contract } from "ethers";
 
-import ERC20 from "../build/artifacts/ERC20Mintable.json";
 import PreAMMBatcher from "../build/artifacts/PreAMMBatcher.json";
 import PreAMMBatcherTestInterface from "../build/artifacts/PreAMMBatcherTestInterface.json";
 import UniswapV2Factory from "../node_modules/@uniswap/v2-core/build/UniswapV2Factory.json";
@@ -140,7 +140,7 @@ describe("PreAMMBatcher", () => {
         [testCaseInput.sellOrdersToken1[0].getSmartContractOrder()],
         { gasLimit: 6000000 },
       ),
-    ).to.revertedWith("sellOrderToken1 are not compatible in sellToken");
+    ).to.be.revertedWith("sellOrderToken1 are not compatible in sellToken");
   });
 
   it("receiveTradeAmounts reverts if transferFrom fails for token0", async () => {
