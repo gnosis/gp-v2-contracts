@@ -17,8 +17,6 @@ import { Order, DOMAIN_SEPARATOR } from "../src/js/orders.spec";
 import { baseTestInput } from "./resources/testExamples";
 
 use(solidity);
-const ASCENDING = 0;
-const DESCENDING = 1;
 
 describe("PreAMMBatcher: Unit Tests", () => {
   const [
@@ -120,11 +118,12 @@ describe("PreAMMBatcher: Unit Tests", () => {
         [traderWallet2],
       );
 
-      await expect(batcher.orderChecks(
-        [testCaseInput.sellOrdersToken0[0].getSmartContractOrder()],
-        [testCaseInput.sellOrdersToken1[0].getSmartContractOrder()],
-        { gasLimit: 6000000 },
-      ),
+      await expect(
+        batcher.orderChecks(
+          [testCaseInput.sellOrdersToken0[0].getSmartContractOrder()],
+          [testCaseInput.sellOrdersToken1[0].getSmartContractOrder()],
+          { gasLimit: 6000000 },
+        ),
       ).to.be.revertedWith("sellOrderToken1 are not compatible in sellToken");
     });
 

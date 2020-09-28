@@ -1,12 +1,12 @@
 import ERC20 from "@openzeppelin/contracts/build/contracts/ERC20PresetMinterPauser.json";
-import { debug } from "debug";
+import UniswapV2Factory from "@uniswap/v2-core/build/UniswapV2Factory.json";
+import UniswapV2Pair from "@uniswap/v2-core/build/UniswapV2Pair.json";
 import { use, expect } from "chai";
+import { debug } from "debug";
 import { deployContract, MockProvider, solidity } from "ethereum-waffle";
 import { BigNumber, Contract, Wallet } from "ethers";
-import PreAMMBatcher from "../build/PreAMMBatcher.json";
-import UniswapV2Pair from "@uniswap/v2-core/build/UniswapV2Pair.json";
-import UniswapV2Factory from "@uniswap/v2-core/build/UniswapV2Factory.json";
 
+import PreAMMBatcher from "../build/PreAMMBatcher.json";
 import { Order } from "../src/js/orders.spec";
 
 import { generateTestCase } from "./resources";
