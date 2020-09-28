@@ -274,8 +274,6 @@ describe("PreAMMBatcher: End to End Tests", () => {
         [walletTrader3, walletTrader4],
       ),
     );
-    // console.log(testCase.sellOrdersToken0.length);
-    // console.log(testCase.sellOrdersToken0[0].sellToken.address);
     expect(testCase.solution.sellOrdersToken0.length).to.be.equal(1);
     expect(testCase.solution.sellOrdersToken1.length).to.be.equal(1);
     await runScenarioOnchain(testCase);
