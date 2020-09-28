@@ -13,11 +13,8 @@
     "@nomiclabs/buidler-waffle": "^2.1.0",
     "@openzeppelin/contracts": "^3.2.0",
     "@types/chai": "^4.2.3",
-<<<<<<< HEAD
     "@types/ethereumjs-abi": "^0.6.3",
-=======
     "@types/debug": "^4.1.5",
->>>>>>> 87d9ddc... rearrange the unit tests into something reasonable, introduce debugger and remove ugly console logs
     "@types/lodash": "^4.14.161",
     "@types/mocha": "^8.0.3",
     "@typescript-eslint/eslint-plugin": "^4.1.1",
