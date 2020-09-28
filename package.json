@@ -7,7 +7,7 @@
     "lint:fix": "eslint --fix ."
   },
   "devDependencies": {
-    "@ethereum-waffle/mock-contract": "^3.1.0",
+    "@ethereum-waffle/mock-contract": "^3.1.1",
     "@nomiclabs/buidler": "^1.4.7",
     "@nomiclabs/buidler-ethers": "^2.0.0",
     "@nomiclabs/buidler-waffle": "^2.1.0",
