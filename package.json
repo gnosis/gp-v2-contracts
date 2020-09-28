@@ -23,7 +23,7 @@
     "chai": "^4.2.0",
     "eslint": "^7.9.0",
     "eslint-config-prettier": "^6.12.0",
-    "eslint-plugin-import": "^2.20.2",
+    "eslint-plugin-import": "^2.22.1",
     "eslint-plugin-no-only-tests": "^2.4.0",
     "eslint-plugin-prettier": "^3.1.4",
     "ethereum-waffle": "^3.1.1",
