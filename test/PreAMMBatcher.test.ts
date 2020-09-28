@@ -118,11 +118,13 @@ describe("PreAMMBatcher: Unit Tests", () => {
         [traderWallet2],
       );
 
-      await batcher.orderChecks(
-        [testCaseInput.sellOrdersToken0[0].getSmartContractOrder()],
-        [testCaseInput.sellOrdersToken1[0].getSmartContractOrder()],
-        { gasLimit: 6000000 },
-      );
+      await expect(
+        batchTester.orderChecksTest(
+          [testCaseInput.sellOrdersToken0[0].getSmartContractOrder()],
+          [testCaseInput.sellOrdersToken1[0].getSmartContractOrder()],
+          { gasLimit: 6000000 },
+        ),
+      ).to.not.be.reverted;
     });
 
     it("detects non matching orders", async () => {
@@ -135,7 +137,7 @@ describe("PreAMMBatcher: Unit Tests", () => {
       testCaseInput.sellOrdersToken1[0].sellToken = token0;
 
       await expect(
-        batcher.orderChecks(
+        batchTester.orderChecksTest(
           [testCaseInput.sellOrdersToken0[0].getSmartContractOrder()],
           [testCaseInput.sellOrdersToken1[0].getSmartContractOrder()],
           { gasLimit: 6000000 },

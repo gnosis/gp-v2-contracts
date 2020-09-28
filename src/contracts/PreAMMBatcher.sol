@@ -104,7 +104,7 @@ contract PreAMMBatcher {
     function orderChecks(
         Order[] memory sellOrderToken0,
         Order[] memory sellOrderToken1
-    ) public pure {
+    ) internal pure {
         address buyToken = sellOrderToken0[0].buyToken;
         address sellToken = sellOrderToken0[0].sellToken;
         for (uint256 i = 0; i < sellOrderToken0.length; i++) {
