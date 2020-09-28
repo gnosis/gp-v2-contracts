@@ -13,4 +13,11 @@ contract PreAMMBatcherTestInterface is PreAMMBatcher {
     ) public pure returns (bool) {
         return super.isSortedByLimitPrice(orders, direction);
     }
+
+    function orderChecksTest(
+        Order[] memory sellOrderToken0,
+        Order[] memory sellOrderToken1
+    ) public pure {
+        super.orderChecks(sellOrderToken0, sellOrderToken1);
+    }
 }

@@ -18,11 +18,11 @@ import { baseTestInput } from "./resources/testExamples";
 
 use(solidity);
 
-describe("PreAMMBatcher", () => {
+describe("PreAMMBatcher: Unit Tests", () => {
   const [
     walletDeployer,
-    walletTrader1,
-    walletTrader2,
+    traderWallet1,
+    traderWallet2,
   ] = new MockProvider().getWallets();
   let batcher: Contract;
   let batchTester: Contract;
@@ -109,130 +109,134 @@ describe("PreAMMBatcher", () => {
   it("DOMAIN_SEPARATOR is correct", async () => {
     expect(await batcher.DOMAIN_SEPARATOR()).to.equal(DOMAIN_SEPARATOR);
   });
+  describe("orderChecks()", () => {
+    it("runs as expected in generic setting", async () => {
+      const testCaseInput = baseTestInput(
+        token0,
+        token1,
+        [traderWallet1],
+        [traderWallet2],
+      );
 
-  it("orderChecks runs through smoothly", async () => {
-    const testCaseInput = baseTestInput(
-      token0,
-      token1,
-      [walletTrader1],
-      [walletTrader2],
-    );
+      await expect(
+        batchTester.orderChecksTest(
+          [testCaseInput.sellOrdersToken0[0].getSmartContractOrder()],
+          [testCaseInput.sellOrdersToken1[0].getSmartContractOrder()],
+          { gasLimit: 6000000 },
+        ),
+      ).to.not.be.reverted;
+    });
 
-    await batcher.orderChecks(
-      [testCaseInput.sellOrdersToken0[0].getSmartContractOrder()],
-      [testCaseInput.sellOrdersToken1[0].getSmartContractOrder()],
-      { gasLimit: 6000000 },
-    );
+    it("detects non matching orders", async () => {
+      const testCaseInput = baseTestInput(
+        token0,
+        token1,
+        [traderWallet1],
+        [traderWallet2],
+      );
+      testCaseInput.sellOrdersToken1[0].sellToken = token0;
+
+      await expect(
+        batchTester.orderChecksTest(
+          [testCaseInput.sellOrdersToken0[0].getSmartContractOrder()],
+          [testCaseInput.sellOrdersToken1[0].getSmartContractOrder()],
+          { gasLimit: 6000000 },
+        ),
+      ).to.revertedWith("sellOrderToken1 are not compatible in sellToken");
+    });
   });
+  describe("receiveTradeAmounts()", () => {
+    it("reverts if transferFrom fails for token0", async () => {
+      const testCaseInput = baseTestInput(
+        token0,
+        token1,
+        [traderWallet1],
+        [traderWallet2],
+      );
 
-  it("orderChecks detects non matching orders", async () => {
-    const testCaseInput = baseTestInput(
-      token0,
-      token1,
-      [walletTrader1],
-      [walletTrader2],
-    );
-    testCaseInput.sellOrdersToken1[0].sellToken = token0;
+      await mockRelevantTokenDataForBatchTrade(
+        testCaseInput.sellOrdersToken0[0],
+        testCaseInput.sellOrdersToken1[0],
+      );
+      await token0.mock.transferFrom.returns(false);
+      await expect(
+        batcher.batchTrade(
+          testCaseInput.sellOrdersToken0[0].encode(),
+          testCaseInput.sellOrdersToken1[0].encode(),
+          { gasLimit: 6000000 },
+        ),
+      ).to.be.revertedWith("unsuccessful transferFrom for order");
+    });
 
-    await expect(
-      batcher.orderChecks(
-        [testCaseInput.sellOrdersToken0[0].getSmartContractOrder()],
-        [testCaseInput.sellOrdersToken1[0].getSmartContractOrder()],
-        { gasLimit: 6000000 },
-      ),
-    ).to.be.revertedWith("sellOrderToken1 are not compatible in sellToken");
-  });
+    it("transfers correct amount of token0", async () => {
+      const testCaseInput = baseTestInput(
+        token0,
+        token1,
+        [traderWallet1],
+        [traderWallet2],
+      );
 
-  it("receiveTradeAmounts reverts if transferFrom fails for token0", async () => {
-    const testCaseInput = baseTestInput(
-      token0,
-      token1,
-      [walletTrader1],
-      [walletTrader2],
-    );
+      await mockRelevantTokenDataForBatchTrade(
+        testCaseInput.sellOrdersToken0[0],
+        testCaseInput.sellOrdersToken1[0],
+      );
 
-    await mockRelevantTokenDataForBatchTrade(
-      testCaseInput.sellOrdersToken0[0],
-      testCaseInput.sellOrdersToken1[0],
-    );
-    await token0.mock.transferFrom.returns(false);
-    await expect(
-      batcher.batchTrade(
+      await batcher.batchTrade(
         testCaseInput.sellOrdersToken0[0].encode(),
         testCaseInput.sellOrdersToken1[0].encode(),
         { gasLimit: 6000000 },
-      ),
-    ).to.be.revertedWith("unsuccessful transferFrom for order");
-  });
+      );
+      expect("transferFrom").to.be.calledOnContractWith(token0, [
+        traderWallet1.address,
+        batcher.address,
+        testCaseInput.sellOrdersToken0[0].sellAmount.toString(),
+      ]);
+    });
+    it("reverts if transferFrom fails for token1", async () => {
+      const testCaseInput = baseTestInput(
+        token0,
+        token1,
+        [traderWallet1],
+        [traderWallet2],
+      );
 
-  it("receiveTradeAmounts transferFrom the right amount of token0", async () => {
-    const testCaseInput = baseTestInput(
-      token0,
-      token1,
-      [walletTrader1],
-      [walletTrader2],
-    );
+      await mockRelevantTokenDataForBatchTrade(
+        testCaseInput.sellOrdersToken0[0],
+        testCaseInput.sellOrdersToken1[0],
+      );
 
-    await mockRelevantTokenDataForBatchTrade(
-      testCaseInput.sellOrdersToken0[0],
-      testCaseInput.sellOrdersToken1[0],
-    );
-
-    await batcher.batchTrade(
-      testCaseInput.sellOrdersToken0[0].encode(),
-      testCaseInput.sellOrdersToken1[0].encode(),
-      { gasLimit: 6000000 },
-    );
-    expect("transferFrom").to.be.calledOnContractWith(token0, [
-      walletTrader1.address,
-      batcher.address,
-      testCaseInput.sellOrdersToken0[0].sellAmount.toString(),
-    ]);
-  });
-  it("receiveTradeAmounts reverts if transferFrom fails for token1", async () => {
-    const testCaseInput = baseTestInput(
-      token0,
-      token1,
-      [walletTrader1],
-      [walletTrader2],
-    );
-
-    await mockRelevantTokenDataForBatchTrade(
-      testCaseInput.sellOrdersToken0[0],
-      testCaseInput.sellOrdersToken1[0],
-    );
-
-    await token0.mock.transferFrom.returns(true);
-    await token1.mock.transferFrom.returns(false);
-    await expect(
-      batcher.batchTrade(
+      await token0.mock.transferFrom.returns(true);
+      await token1.mock.transferFrom.returns(false);
+      await expect(
+        batcher.batchTrade(
+          testCaseInput.sellOrdersToken0[0].encode(),
+          testCaseInput.sellOrdersToken1[0].encode(),
+          { gasLimit: 6000000 },
+        ),
+      ).to.be.revertedWith("unsuccessful transferFrom for order");
+    });
+    it("transfers correct amount of token1", async () => {
+      const testCaseInput = baseTestInput(
+        token0,
+        token1,
+        [traderWallet1],
+        [traderWallet2],
+      );
+      await mockRelevantTokenDataForBatchTrade(
+        testCaseInput.sellOrdersToken0[0],
+        testCaseInput.sellOrdersToken1[0],
+      );
+      await batcher.batchTrade(
         testCaseInput.sellOrdersToken0[0].encode(),
         testCaseInput.sellOrdersToken1[0].encode(),
         { gasLimit: 6000000 },
-      ),
-    ).to.be.revertedWith("unsuccessful transferFrom for order");
-  });
-  it("receiveTradeAmounts transferFrom the right amount of token1", async () => {
-    const testCaseInput = baseTestInput(
-      token0,
-      token1,
-      [walletTrader1],
-      [walletTrader2],
-    );
-    await mockRelevantTokenDataForBatchTrade(
-      testCaseInput.sellOrdersToken0[0],
-      testCaseInput.sellOrdersToken1[0],
-    );
-    await batcher.batchTrade(
-      testCaseInput.sellOrdersToken0[0].encode(),
-      testCaseInput.sellOrdersToken1[0].encode(),
-      { gasLimit: 6000000 },
-    );
-    expect("transferFrom").to.be.calledOnContractWith(token1, [
-      walletTrader2.address,
-      batcher.address,
-      testCaseInput.sellOrdersToken1[0].sellAmount.toString(),
-    ]);
+      );
+      expect("transferFrom").to.be.calledOnContractWith(token1, [
+        traderWallet2.address,
+        batcher.address,
+        testCaseInput.sellOrdersToken1[0].sellAmount.toString(),
+      ]);
+    });
   });
   describe("isSortedByLimitPrice()", async () => {
     const ASCENDING = 0;
@@ -240,9 +244,9 @@ describe("PreAMMBatcher", () => {
 
     it("returns expected values for generic sorted order set", async () => {
       const sortedOrders = [
-        new Order(1, 1, token0, token1, walletTrader1, 1),
-        new Order(1, 2, token0, token1, walletTrader1, 2),
-        new Order(1, 3, token0, token1, walletTrader1, 3),
+        new Order(1, 1, token0, token1, traderWallet1, 1),
+        new Order(1, 2, token0, token1, traderWallet1, 2),
+        new Order(1, 3, token0, token1, traderWallet1, 3),
       ];
 
       expect(
@@ -276,8 +280,8 @@ describe("PreAMMBatcher", () => {
 
     it("returns expected values for same two orders", async () => {
       const sortedOrders = [
-        new Order(1, 1, token0, token1, walletTrader1, 1),
-        new Order(1, 1, token0, token1, walletTrader1, 2),
+        new Order(1, 1, token0, token1, traderWallet1, 1),
+        new Order(1, 1, token0, token1, traderWallet1, 2),
       ];
       expect(
         await batchTester.isSortedByLimitPriceTest(
@@ -294,9 +298,9 @@ describe("PreAMMBatcher", () => {
     });
     it("returns expected values for generic unsorted set of orders", async () => {
       const unsortedOrders = [
-        new Order(1, 2, token0, token1, walletTrader1, 1),
-        new Order(1, 1, token0, token1, walletTrader1, 2),
-        new Order(1, 3, token0, token1, walletTrader1, 3),
+        new Order(1, 2, token0, token1, traderWallet1, 1),
+        new Order(1, 1, token0, token1, traderWallet1, 2),
+        new Order(1, 3, token0, token1, traderWallet1, 3),
       ];
       expect(
         await batchTester.isSortedByLimitPriceTest(
@@ -312,6 +316,7 @@ describe("PreAMMBatcher", () => {
       ).to.be.equal(false);
     });
     it("returns expected values for empty set of orders", async () => {
+      // Empty orderset is sorted.
       const emptyOrders: Order[] = [];
       expect(
         await batchTester.isSortedByLimitPriceTest(
@@ -327,7 +332,8 @@ describe("PreAMMBatcher", () => {
       ).to.be.equal(true);
     });
     it("returns expected values for singleton order set", async () => {
-      const singleOrder = [new Order(1, 1, token0, token1, walletTrader1, 1)];
+      // Single Orderset is vacuously sorted
+      const singleOrder = [new Order(1, 1, token0, token1, traderWallet1, 1)];
       expect(
         await batchTester.isSortedByLimitPriceTest(
           singleOrder.map((x) => x.getSmartContractOrder()),
@@ -347,8 +353,8 @@ describe("PreAMMBatcher", () => {
         .sub(BigNumber.from(1));
 
       const overflowingPair = [
-        new Order(2, maxUint, token0, token1, walletTrader1, 1),
-        new Order(1, maxUint, token0, token1, walletTrader1, 1),
+        new Order(2, maxUint, token0, token1, traderWallet1, 1),
+        new Order(1, maxUint, token0, token1, traderWallet1, 1),
       ];
       await expect(
         batchTester.isSortedByLimitPriceTest(

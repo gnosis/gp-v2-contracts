@@ -10,6 +10,7 @@ import "./libraries/Math.sol";
 
 contract PreAMMBatcher {
     using SafeMath for uint256;
+
     IUniswapV2Factory uniswapFactory;
 
     bytes32 public constant DOMAIN_SEPARATOR = keccak256("preBatcher-V1");
@@ -18,7 +19,8 @@ contract PreAMMBatcher {
 
     uint256 constant ENTRIES_IN_ORDER = 6;
     uint256 constant ENTRIES_IN_SIGNATURE = 3;
-    uint256 constant OFFCHAIN_ORDER_STRIDE = 32 * (ENTRIES_IN_ORDER + ENTRIES_IN_SIGNATURE);
+    uint256 constant OFFCHAIN_ORDER_STRIDE = 32 *
+        (ENTRIES_IN_ORDER + ENTRIES_IN_SIGNATURE);
 
     struct Order {
         uint256 sellAmount;
@@ -102,7 +104,7 @@ contract PreAMMBatcher {
     function orderChecks(
         Order[] memory sellOrderToken0,
         Order[] memory sellOrderToken1
-    ) public pure {
+    ) internal pure {
         address buyToken = sellOrderToken0[0].buyToken;
         address sellToken = sellOrderToken0[0].sellToken;
         for (uint256 i = 0; i < sellOrderToken0.length; i++) {
@@ -189,14 +191,15 @@ contract PreAMMBatcher {
             recoveredAddress != address(0) && recoveredAddress == owner,
             "invalid_signature"
         );
-        return Order({
-            sellAmount: sellAmount,
-            buyAmount: buyAmount,
-            buyToken: buyToken,
-            sellToken: sellToken,
-            owner: owner,
-            nonce: nonce
-        });
+        return
+            Order({
+                sellAmount: sellAmount,
+                buyAmount: buyAmount,
+                buyToken: buyToken,
+                sellToken: sellToken,
+                owner: owner,
+                nonce: nonce
+            });
     }
 
     function decodeOrders(bytes calldata orderBytes)
@@ -204,7 +207,10 @@ contract PreAMMBatcher {
         pure
         returns (Order[] memory orders)
     {
-        require(orderBytes.length % OFFCHAIN_ORDER_STRIDE == 0, "malformed encoded orders");
+        require(
+            orderBytes.length % OFFCHAIN_ORDER_STRIDE == 0,
+            "malformed encoded orders"
+        );
         orders = new Order[](orderBytes.length / OFFCHAIN_ORDER_STRIDE);
         uint256 count = 0;
         while (orderBytes.length > 0) {
