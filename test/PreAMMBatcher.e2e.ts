@@ -6,7 +6,7 @@ import { debug } from "debug";
 import { deployContract, MockProvider, solidity } from "ethereum-waffle";
 import { BigNumber, Contract, Wallet } from "ethers";
 
-import PreAMMBatcher from "../build/PreAMMBatcher.json";
+import PreAMMBatcher from "../build/artifacts/PreAMMBatcher.json";
 import { Order } from "../src/js/orders.spec";
 
 import { generateTestCase } from "./resources";
