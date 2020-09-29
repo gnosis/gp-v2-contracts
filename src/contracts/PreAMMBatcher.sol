@@ -11,16 +11,17 @@ import "./libraries/Math.sol";
 contract PreAMMBatcher {
     using SafeMath for uint256;
 
-    IUniswapV2Factory uniswapFactory;
-
     bytes32 public constant DOMAIN_SEPARATOR = keccak256("preBatcher-V1");
-    uint256 public constant feeFactor = 333; // Charged fee is (feeFactor-1)/feeFactor
-    mapping(address => uint8) public nonces; // Probably a nonce per tokenpair would be better
+    uint256 public constant FEE_FACTOR = 333; // Charged fee is (FEE_FACTOR-1)/FEE_FACTOR
 
-    uint256 constant ENTRIES_IN_ORDER = 6;
-    uint256 constant ENTRIES_IN_SIGNATURE = 3;
-    uint256 constant OFFCHAIN_ORDER_STRIDE = 32 *
+    uint256 private constant ENTRIES_IN_ORDER = 6;
+    uint256 private constant ENTRIES_IN_SIGNATURE = 3;
+    uint256 private constant OFFCHAIN_ORDER_STRIDE = 32 *
         (ENTRIES_IN_ORDER + ENTRIES_IN_SIGNATURE);
+
+    IUniswapV2Factory private uniswapFactory;
+
+    mapping(address => uint8) public nonces; // Probably a nonce per tokenpair would be better
 
     struct Order {
         uint256 sellAmount;
@@ -110,21 +111,21 @@ contract PreAMMBatcher {
         for (uint256 i = 0; i < sellOrderToken0.length; i++) {
             require(
                 sellOrderToken0[i].sellToken == sellToken,
-                "sellOrderToken0 are not compatible in sellToken"
+                "invalid token0 order sell token"
             );
             require(
                 sellOrderToken0[i].buyToken == buyToken,
-                "sellOrderToken0 are not compatible in buyToken"
+                "invalid token0 order buy token"
             );
         }
         for (uint256 i = 0; i < sellOrderToken1.length; i++) {
             require(
                 sellOrderToken1[i].sellToken == buyToken,
-                "sellOrderToken1 are not compatible in sellToken"
+                "invalid token1 order sell token"
             );
             require(
                 sellOrderToken1[i].buyToken == sellToken,
-                "sellOrderToken1 are not compatible in sellToken"
+                "invalid token1 order buy token"
             );
         }
     }
@@ -381,7 +382,7 @@ contract PreAMMBatcher {
                     address(this),
                     orders[i].sellAmount
                 ),
-                "unsuccessful transferFrom for order"
+                "order transfer failed"
             );
         }
     }
@@ -398,8 +399,8 @@ contract PreAMMBatcher {
                         .sellAmount
                         .mul(price.denominator)
                         .div(price.numerator)
-                        .mul(feeFactor - 1)
-                        .div(feeFactor)
+                        .mul(FEE_FACTOR - 1)
+                        .div(FEE_FACTOR)
                 ),
                 "final token transfer failed"
             );
