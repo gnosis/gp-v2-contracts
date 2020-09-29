@@ -25,7 +25,7 @@ contract PreAMMBatcher {
 
     struct Order {
         uint256 sellAmount;
-            uint256 buyAmount;
+        uint256 buyAmount;
         address sellToken;
         address buyToken;
         address owner;
