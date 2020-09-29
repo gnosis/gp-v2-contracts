@@ -1,6 +1,0 @@
-{
-  "compilerVersion": "0.6.12",
-  "compilerType": "solcjs",
-  "sourceDirectory": "./src/contracts",
-  "outputDirectory": "./build"
-}
