@@ -84,7 +84,7 @@ export const fourOrderTestInput = function (
   };
 };
 
-export const oneOrderSellingToken0IsObmittedTestInput = function (
+export const oneOrderSellingToken0IsOmittedTestInput = function (
   token0: Contract,
   token1: Contract,
   tradersToken0: Wallet[],
@@ -180,7 +180,7 @@ export const noSolutionTestInput = function (
   };
 };
 
-export const oneOrderSellingToken1IsObmittedTestInput = function (
+export const oneOrderSellingToken1IsOmittedTestInput = function (
   token0: Contract,
   token1: Contract,
   tradersToken0: Wallet[],
