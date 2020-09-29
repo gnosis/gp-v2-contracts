@@ -139,7 +139,7 @@ describe("PreAMMBatcher: Unit Tests", () => {
           [testCaseInput.sellOrdersToken1[0].getSmartContractOrder()],
           { gasLimit: 6000000 },
         ),
-      ).to.revertedWith("sellOrderToken1 are not compatible in sellToken");
+      ).to.revertedWith("invalid token1 order sell token");
     });
   });
 
@@ -163,7 +163,7 @@ describe("PreAMMBatcher: Unit Tests", () => {
           testCaseInput.sellOrdersToken1[0].encode(),
           { gasLimit: 6000000 },
         ),
-      ).to.be.revertedWith("unsuccessful transferFrom for order");
+      ).to.be.revertedWith("order transfer failed");
     });
 
     it("transfers correct amount of token0", async () => {
@@ -219,7 +219,7 @@ describe("PreAMMBatcher: Unit Tests", () => {
           testCaseInput.sellOrdersToken1[0].encode(),
           { gasLimit: 6000000 },
         ),
-      ).to.be.revertedWith("unsuccessful transferFrom for order");
+      ).to.be.revertedWith("order transfer failed");
     });
 
     it("transfers correct amount of token1", async () => {
