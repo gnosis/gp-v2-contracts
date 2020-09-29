@@ -1,12 +1,11 @@
+import { ethers, waffle } from "@nomiclabs/buidler";
 import ERC20 from "@openzeppelin/contracts/build/contracts/ERC20PresetMinterPauser.json";
 import UniswapV2Factory from "@uniswap/v2-core/build/UniswapV2Factory.json";
 import UniswapV2Pair from "@uniswap/v2-core/build/UniswapV2Pair.json";
-import { use, expect } from "chai";
+import { expect } from "chai";
 import { debug } from "debug";
-import { deployContract, MockProvider, solidity } from "ethereum-waffle";
 import { BigNumber, Contract, Wallet } from "ethers";
 
-import PreAMMBatcher from "../build/artifacts/PreAMMBatcher.json";
 import { Order } from "../src/js/orders.spec";
 
 import { generateTestCase } from "./resources";
@@ -21,25 +20,17 @@ import {
 } from "./resources/testExamples";
 
 const log = debug("PreAMMBatcher.e2e");
-use(solidity);
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function asyncForEach(array: Order[], callback: any): Promise<void> {
-  for (let index = 0; index < array.length; index++) {
-    await callback(array[index], index, array);
-  }
-}
 
 const setupOrders = async (
   orders: Order[],
   batcher: Contract,
 ): Promise<void> => {
-  await asyncForEach(orders, async (order: Order) => {
+  for (const order of orders) {
     await order.sellToken.mint(order.wallet.address, order.sellAmount);
     await order.sellToken
       .connect(order.wallet)
       .approve(batcher.address, order.sellAmount);
-  });
+  }
 };
 
 const fundUniswap = async (
@@ -55,6 +46,7 @@ const fundUniswap = async (
   await token1.transfer(uniswapPair.address, testCase.fundingAMMToken0);
   await uniswapPair.mint(walletDeployer.address, { gasLimit: 500000 });
 };
+
 describe("PreAMMBatcher: End to End Tests", () => {
   const [
     walletDeployer,
@@ -64,7 +56,8 @@ describe("PreAMMBatcher: End to End Tests", () => {
     walletTrader4,
     walletTrader5,
     walletTrader6,
-  ] = new MockProvider().getWallets();
+  ] = waffle.provider.getWallets();
+
   let batcher: Contract;
   let token0: Contract;
   let token1: Contract;
@@ -103,43 +96,47 @@ describe("PreAMMBatcher: End to End Tests", () => {
           testCase.solution.clearingPrice.numerator,
         );
 
-      await asyncForEach(
-        testCase.solution.sellOrdersToken0,
-        async (order: Order) => {
-          expect(
-            await order.buyToken.balanceOf(order.wallet.address),
-          ).to.be.equal(
-            order.sellAmount
-              .mul(testCase.solution.clearingPrice.denominator)
-              .div(testCase.solution.clearingPrice.numerator)
-              .mul(332)
-              .div(333),
-          );
-        },
-      );
-      await asyncForEach(
-        testCase.solution.sellOrdersToken1,
-        async (order: Order) => {
-          expect(
-            await order.buyToken.balanceOf(order.wallet.address),
-          ).to.be.equal(
-            order.sellAmount
-              .mul(testCase.solution.clearingPrice.numerator)
-              .div(testCase.solution.clearingPrice.denominator)
-              .mul(332)
-              .div(333),
-          );
-        },
-      );
+      for (const order of testCase.solution.sellOrdersToken0) {
+        expect(
+          await order.buyToken.balanceOf(order.wallet.address),
+        ).to.be.equal(
+          order.sellAmount
+            .mul(testCase.solution.clearingPrice.denominator)
+            .div(testCase.solution.clearingPrice.numerator)
+            .mul(332)
+            .div(333),
+        );
+      }
+      for (const order of testCase.solution.sellOrdersToken1) {
+        expect(
+          await order.buyToken.balanceOf(order.wallet.address),
+        ).to.be.equal(
+          order.sellAmount
+            .mul(testCase.solution.clearingPrice.numerator)
+            .div(testCase.solution.clearingPrice.denominator)
+            .mul(332)
+            .div(333),
+        );
+      }
     }
   };
 
   beforeEach(async () => {
-    token0 = await deployContract(walletDeployer, ERC20, ["token0", "18"]);
-    token1 = await deployContract(walletDeployer, ERC20, ["token1", "18"]);
-    uniswapFactory = await deployContract(walletDeployer, UniswapV2Factory, [
-      walletDeployer.address,
+    const PreAMMBatcher = await ethers.getContractFactory("PreAMMBatcher");
+
+    token0 = await waffle.deployContract(walletDeployer, ERC20, [
+      "token0",
+      "18",
     ]);
+    token1 = await waffle.deployContract(walletDeployer, ERC20, [
+      "token1",
+      "18",
+    ]);
+    uniswapFactory = await waffle.deployContract(
+      walletDeployer,
+      UniswapV2Factory,
+      [walletDeployer.address],
+    );
     await uniswapFactory.createPair(token0.address, token1.address, {
       gasLimit: 6000000,
     });
@@ -147,12 +144,11 @@ describe("PreAMMBatcher: End to End Tests", () => {
       token0.address,
       token1.address,
     );
-    uniswapPair = await deployContract(walletDeployer, UniswapV2Pair);
+    uniswapPair = await waffle.deployContract(walletDeployer, UniswapV2Pair);
     uniswapPair = await uniswapPair.attach(uniswapPairAddress);
-    batcher = await deployContract(walletDeployer, PreAMMBatcher, [
-      uniswapFactory.address,
-    ]);
+    batcher = await PreAMMBatcher.deploy(uniswapFactory.address);
   });
+
   describe("Example Scenarios", async () => {
     it("clears baseTestInput - two generic overlapping orders", async () => {
       const testCase = generateTestCase(
@@ -181,6 +177,7 @@ describe("PreAMMBatcher: End to End Tests", () => {
             .toString(),
       );
     });
+
     it("pre-batches four orders and settles left-overs to uniswap", async () => {
       const testCase = generateTestCase(
         fourOrderTestInput(
@@ -206,6 +203,7 @@ describe("PreAMMBatcher: End to End Tests", () => {
       expect(testCase.solution.sellOrdersToken1.length).to.be.equal(1);
       await runScenarioOnchain(testCase);
     });
+
     it("omits one order selling token 1", async () => {
       const testCase = generateTestCase(
         oneOrderSellingToken1IsOmittedTestInput(
@@ -220,6 +218,7 @@ describe("PreAMMBatcher: End to End Tests", () => {
       expect(testCase.solution.sellOrdersToken1.length).to.be.equal(2);
       await runScenarioOnchain(testCase);
     });
+
     it("clears auciton with no solution", async () => {
       const testCase = generateTestCase(
         noSolutionTestInput(
@@ -234,6 +233,7 @@ describe("PreAMMBatcher: End to End Tests", () => {
       expect(testCase.solution.sellOrdersToken1.length).to.be.equal(0);
       await runScenarioOnchain(testCase);
     });
+
     it("switchTokenTestInput", async () => {
       const testCase = generateTestCase(
         switchTokenTestInput(
@@ -249,6 +249,7 @@ describe("PreAMMBatcher: End to End Tests", () => {
       await runScenarioOnchain(testCase);
     });
   });
+
   describe("Bad encoded order", async () => {
     it("rejects invalid signatures", async () => {
       const testCase = generateTestCase(

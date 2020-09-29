@@ -1,29 +1,21 @@
+import { ethers, waffle } from "@nomiclabs/buidler";
 import ERC20 from "@openzeppelin/contracts/build/contracts/IERC20.json";
-import { use, expect } from "chai";
-import {
-  deployContract,
-  deployMockContract,
-  MockProvider,
-  solidity,
-} from "ethereum-waffle";
-import { BigNumber, utils, Contract } from "ethers";
+import UniswapV2Factory from "@uniswap/v2-core/build/UniswapV2Factory.json";
+import UniswapV2Pair from "@uniswap/v2-core/build/UniswapV2Pair.json";
+import { expect } from "chai";
+import { Contract } from "ethers";
 
-import PreAMMBatcher from "../build/artifacts/PreAMMBatcher.json";
-import PreAMMBatcherTestInterface from "../build/artifacts/PreAMMBatcherTestInterface.json";
-import UniswapV2Factory from "../node_modules/@uniswap/v2-core/build/UniswapV2Factory.json";
-import UniswapV2Pair from "../node_modules/@uniswap/v2-core/build/UniswapV2Pair.json";
 import { Order, DOMAIN_SEPARATOR } from "../src/js/orders.spec";
 
 import { baseTestInput } from "./resources/testExamples";
-
-use(solidity);
 
 describe("PreAMMBatcher: Unit Tests", () => {
   const [
     walletDeployer,
     traderWallet1,
     traderWallet2,
-  ] = new MockProvider().getWallets();
+  ] = waffle.provider.getWallets();
+
   let batcher: Contract;
   let batchTester: Contract;
   let token0: Contract;
@@ -31,8 +23,9 @@ describe("PreAMMBatcher: Unit Tests", () => {
   let uniswapPair: Contract;
   let uniswapFactory: Contract;
   let uniswapPairAddress: string;
-  const initialUniswapFundingOfToken0 = utils.parseEther("10");
-  const initialUniswapFundingOfToken1 = utils.parseEther("10");
+
+  const initialUniswapFundingOfToken0 = ethers.utils.parseEther("10");
+  const initialUniswapFundingOfToken1 = ethers.utils.parseEther("10");
 
   const mockRelevantTokenDataForBatchTrade = async (
     sellOrder1: Order,
@@ -69,12 +62,19 @@ describe("PreAMMBatcher: Unit Tests", () => {
   };
 
   beforeEach(async () => {
+    const PreAMMBatcher = await ethers.getContractFactory("PreAMMBatcher");
+    const PreAMMBatcherTestInterface = await ethers.getContractFactory(
+      "PreAMMBatcherTestInterface",
+    );
+
     // deploy all relevant contracts and setup the uniswap pool
-    token0 = await deployMockContract(walletDeployer, ERC20.abi);
-    token1 = await deployMockContract(walletDeployer, ERC20.abi);
-    uniswapFactory = await deployContract(walletDeployer, UniswapV2Factory, [
-      walletDeployer.address,
-    ]);
+    token0 = await waffle.deployMockContract(walletDeployer, ERC20.abi);
+    token1 = await waffle.deployMockContract(walletDeployer, ERC20.abi);
+    uniswapFactory = await waffle.deployContract(
+      walletDeployer,
+      UniswapV2Factory,
+      [walletDeployer.address],
+    );
     await uniswapFactory.createPair(token0.address, token1.address, {
       gasLimit: 6000000,
     });
@@ -82,15 +82,11 @@ describe("PreAMMBatcher: Unit Tests", () => {
       token0.address,
       token1.address,
     );
-    uniswapPair = await deployContract(walletDeployer, UniswapV2Pair);
+    uniswapPair = await waffle.deployContract(walletDeployer, UniswapV2Pair);
     uniswapPair = await uniswapPair.attach(uniswapPairAddress);
-    batcher = await deployContract(walletDeployer, PreAMMBatcher, [
+    batcher = await PreAMMBatcher.deploy(uniswapFactory.address);
+    batchTester = await PreAMMBatcherTestInterface.deploy(
       uniswapFactory.address,
-    ]);
-    batchTester = await deployContract(
-      walletDeployer,
-      PreAMMBatcherTestInterface,
-      [uniswapFactory.address],
     );
 
     await token0.mock.balanceOf
@@ -109,6 +105,7 @@ describe("PreAMMBatcher: Unit Tests", () => {
   it("DOMAIN_SEPARATOR is correct", async () => {
     expect(await batcher.DOMAIN_SEPARATOR()).to.equal(DOMAIN_SEPARATOR);
   });
+
   describe("orderChecks()", () => {
     it("runs as expected in generic setting", async () => {
       const testCaseInput = baseTestInput(
@@ -145,6 +142,7 @@ describe("PreAMMBatcher: Unit Tests", () => {
       ).to.revertedWith("sellOrderToken1 are not compatible in sellToken");
     });
   });
+
   describe("receiveTradeAmounts()", () => {
     it("reverts if transferFrom fails for token0", async () => {
       const testCaseInput = baseTestInput(
@@ -181,17 +179,25 @@ describe("PreAMMBatcher: Unit Tests", () => {
         testCaseInput.sellOrdersToken1[0],
       );
 
-      await batcher.batchTrade(
-        testCaseInput.sellOrdersToken0[0].encode(),
-        testCaseInput.sellOrdersToken1[0].encode(),
-        { gasLimit: 6000000 },
-      );
-      expect("transferFrom").to.be.calledOnContractWith(token0, [
-        traderWallet1.address,
-        batcher.address,
-        testCaseInput.sellOrdersToken0[0].sellAmount.toString(),
-      ]);
+      await token0.mock.transferFrom.reverts();
+      await token0.mock.transferFrom
+        .withArgs(
+          traderWallet1.address,
+          batcher.address,
+          testCaseInput.sellOrdersToken0[0].sellAmount,
+        )
+        .returns(true);
+      await token1.mock.transferFrom.returns(true);
+
+      await expect(
+        batcher.batchTrade(
+          testCaseInput.sellOrdersToken0[0].encode(),
+          testCaseInput.sellOrdersToken1[0].encode(),
+          { gasLimit: 6000000 },
+        ),
+      ).to.not.be.reverted;
     });
+
     it("reverts if transferFrom fails for token1", async () => {
       const testCaseInput = baseTestInput(
         token0,
@@ -215,6 +221,7 @@ describe("PreAMMBatcher: Unit Tests", () => {
         ),
       ).to.be.revertedWith("unsuccessful transferFrom for order");
     });
+
     it("transfers correct amount of token1", async () => {
       const testCaseInput = baseTestInput(
         token0,
@@ -226,18 +233,27 @@ describe("PreAMMBatcher: Unit Tests", () => {
         testCaseInput.sellOrdersToken0[0],
         testCaseInput.sellOrdersToken1[0],
       );
-      await batcher.batchTrade(
-        testCaseInput.sellOrdersToken0[0].encode(),
-        testCaseInput.sellOrdersToken1[0].encode(),
-        { gasLimit: 6000000 },
-      );
-      expect("transferFrom").to.be.calledOnContractWith(token1, [
-        traderWallet2.address,
-        batcher.address,
-        testCaseInput.sellOrdersToken1[0].sellAmount.toString(),
-      ]);
+
+      await token0.mock.transferFrom.returns(true);
+      await token1.mock.transferFrom.reverts();
+      await token1.mock.transferFrom
+        .withArgs(
+          traderWallet2.address,
+          batcher.address,
+          testCaseInput.sellOrdersToken1[0].sellAmount,
+        )
+        .returns(true);
+
+      await expect(
+        batcher.batchTrade(
+          testCaseInput.sellOrdersToken0[0].encode(),
+          testCaseInput.sellOrdersToken1[0].encode(),
+          { gasLimit: 6000000 },
+        ),
+      ).to.not.be.reverted;
     });
   });
+
   describe("isSortedByLimitPrice()", async () => {
     const ASCENDING = 0;
     const DESCENDING = 1;
@@ -296,6 +312,7 @@ describe("PreAMMBatcher: Unit Tests", () => {
         ),
       ).to.be.equal(true, "Failed Descending");
     });
+
     it("returns expected values for generic unsorted set of orders", async () => {
       const unsortedOrders = [
         new Order(1, 2, token0, token1, traderWallet1, 1),
@@ -315,6 +332,7 @@ describe("PreAMMBatcher: Unit Tests", () => {
         ),
       ).to.be.equal(false);
     });
+
     it("returns expected values for empty set of orders", async () => {
       // Empty orderset is sorted.
       const emptyOrders: Order[] = [];
@@ -331,6 +349,7 @@ describe("PreAMMBatcher: Unit Tests", () => {
         ),
       ).to.be.equal(true);
     });
+
     it("returns expected values for singleton order set", async () => {
       // Single Orderset is vacuously sorted
       const singleOrder = [new Order(1, 1, token0, token1, traderWallet1, 1)];
@@ -347,10 +366,9 @@ describe("PreAMMBatcher: Unit Tests", () => {
         ),
       ).to.be.equal(true);
     });
+
     it("reverts with overflowing artithmetic", async () => {
-      const maxUint = BigNumber.from(2)
-        .pow(BigNumber.from(256))
-        .sub(BigNumber.from(1));
+      const maxUint = ethers.constants.MaxUint256;
 
       const overflowingPair = [
         new Order(2, maxUint, token0, token1, traderWallet1, 1),

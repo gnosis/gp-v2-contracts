@@ -1,5 +1,3 @@
-import abi from "ethereumjs-abi";
-import { ecsign } from "ethereumjs-util";
 import { utils, Wallet, Contract, BigNumber } from "ethers";
 
 export const DOMAIN_SEPARATOR =
@@ -39,11 +37,9 @@ export class Order {
 
   encode(): Buffer {
     const digest = this.getOrderDigest();
-    const { v, r, s } = ecsign(
-      Buffer.from(digest.slice(2), "hex"),
-      Buffer.from(this.wallet.privateKey.slice(2), "hex"),
-    );
-    return abi.rawEncode(
+    const signature = this.wallet._signingKey().signDigest(digest);
+    const { v, r, s } = utils.splitSignature(signature);
+    const encodedOrder = utils.defaultAbiCoder.encode(
       [
         "uint256",
         "uint256",
@@ -63,10 +59,11 @@ export class Order {
         this.wallet.address,
         this.nonce.toString(),
         v,
-        utils.hexlify(r),
-        utils.hexlify(s),
+        r,
+        s,
       ],
     );
+    return Buffer.from(encodedOrder.substr(2), "hex");
   }
 
   getSmartContractOrder(): SmartContractOrder {
@@ -112,6 +109,17 @@ export class Order {
           this.nonce.toString(),
         ],
       ),
+    );
+  }
+
+  clone(): Order {
+    return new Order(
+      this.sellAmount,
+      this.buyAmount,
+      this.sellToken,
+      this.buyToken,
+      this.wallet,
+      this.nonce,
     );
   }
 }
