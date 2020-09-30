@@ -3,10 +3,11 @@ import ERC20 from "@openzeppelin/contracts/build/contracts/IERC20.json";
 import UniswapV2Factory from "@uniswap/v2-core/build/UniswapV2Factory.json";
 import UniswapV2Pair from "@uniswap/v2-core/build/UniswapV2Pair.json";
 import { expect } from "chai";
-import { Contract } from "ethers";
+import { Contract, BigNumber } from "ethers";
 
 import { Order, DOMAIN_SEPARATOR } from "../src/js/orders.spec";
 
+import { orderAlwaysValid } from "./resources/orderCreation";
 import { baseTestInput } from "./resources/testExamples";
 
 describe("PreAMMBatcher: Unit Tests", () => {
@@ -107,6 +108,101 @@ describe("PreAMMBatcher: Unit Tests", () => {
   });
 
   describe("orderChecks()", () => {
+    describe("order validity period", () => {
+      it("succeeds if order is within validity period", async () => {
+        const testCaseInput = baseTestInput(
+          token0,
+          token1,
+          [traderWallet1],
+          [traderWallet2],
+        );
+        const now = (await waffle.provider.getBlock("latest")).timestamp;
+        testCaseInput.sellOrdersToken0[0].validFrom = BigNumber.from(now - 60);
+        testCaseInput.sellOrdersToken0[0].validUntil = BigNumber.from(now + 60);
+        testCaseInput.sellOrdersToken1[0].validFrom = BigNumber.from(now - 60);
+        testCaseInput.sellOrdersToken1[0].validUntil = BigNumber.from(now + 60);
+
+        await expect(
+          batchTester.orderChecksTest(
+            [testCaseInput.sellOrdersToken0[0].getSmartContractOrder()],
+            [testCaseInput.sellOrdersToken1[0].getSmartContractOrder()],
+            { gasLimit: 6000000 },
+          ),
+        ).to.not.be.reverted;
+      });
+      it("fails if sell order for token 0 is expired", async () => {
+        const testCaseInput = baseTestInput(
+          token0,
+          token1,
+          [traderWallet1],
+          [traderWallet2],
+        );
+        const now = (await waffle.provider.getBlock("latest")).timestamp;
+        testCaseInput.sellOrdersToken0[0].validUntil = BigNumber.from(now - 60);
+
+        await expect(
+          batchTester.orderChecksTest(
+            [testCaseInput.sellOrdersToken0[0].getSmartContractOrder()],
+            [testCaseInput.sellOrdersToken1[0].getSmartContractOrder()],
+            { gasLimit: 6000000 },
+          ),
+        ).to.be.revertedWith("token0 order not currently valid");
+      });
+      it("fails if sell order for token 1 is expired", async () => {
+        const testCaseInput = baseTestInput(
+          token0,
+          token1,
+          [traderWallet1],
+          [traderWallet2],
+        );
+        const now = (await waffle.provider.getBlock("latest")).timestamp;
+        testCaseInput.sellOrdersToken1[0].validUntil = BigNumber.from(now - 60);
+
+        await expect(
+          batchTester.orderChecksTest(
+            [testCaseInput.sellOrdersToken0[0].getSmartContractOrder()],
+            [testCaseInput.sellOrdersToken1[0].getSmartContractOrder()],
+            { gasLimit: 6000000 },
+          ),
+        ).to.be.revertedWith("token1 order not currently valid");
+      });
+      it("fails if sell order for token 0 is not valid yet", async () => {
+        const testCaseInput = baseTestInput(
+          token0,
+          token1,
+          [traderWallet1],
+          [traderWallet2],
+        );
+        const now = (await waffle.provider.getBlock("latest")).timestamp;
+        testCaseInput.sellOrdersToken0[0].validFrom = BigNumber.from(now + 60);
+
+        await expect(
+          batchTester.orderChecksTest(
+            [testCaseInput.sellOrdersToken0[0].getSmartContractOrder()],
+            [testCaseInput.sellOrdersToken1[0].getSmartContractOrder()],
+            { gasLimit: 6000000 },
+          ),
+        ).to.be.revertedWith("token0 order not currently valid");
+      });
+      it("fails if sell order for token 1 is not yet valid", async () => {
+        const testCaseInput = baseTestInput(
+          token0,
+          token1,
+          [traderWallet1],
+          [traderWallet2],
+        );
+        const now = (await waffle.provider.getBlock("latest")).timestamp;
+        testCaseInput.sellOrdersToken1[0].validFrom = BigNumber.from(now + 60);
+
+        await expect(
+          batchTester.orderChecksTest(
+            [testCaseInput.sellOrdersToken0[0].getSmartContractOrder()],
+            [testCaseInput.sellOrdersToken1[0].getSmartContractOrder()],
+            { gasLimit: 6000000 },
+          ),
+        ).to.be.revertedWith("token1 order not currently valid");
+      });
+    });
     it("runs as expected in generic setting", async () => {
       const testCaseInput = baseTestInput(
         token0,
@@ -139,7 +235,7 @@ describe("PreAMMBatcher: Unit Tests", () => {
           [testCaseInput.sellOrdersToken1[0].getSmartContractOrder()],
           { gasLimit: 6000000 },
         ),
-      ).to.revertedWith("invalid token1 order sell token");
+      ).to.be.revertedWith("invalid token1 order sell token");
     });
   });
 
@@ -260,9 +356,9 @@ describe("PreAMMBatcher: Unit Tests", () => {
 
     it("returns expected values for generic sorted order set", async () => {
       const sortedOrders = [
-        new Order(1, 1, token0, token1, traderWallet1, 1),
-        new Order(1, 2, token0, token1, traderWallet1, 2),
-        new Order(1, 3, token0, token1, traderWallet1, 3),
+        orderAlwaysValid(1, 1, token0, token1, traderWallet1, 1),
+        orderAlwaysValid(1, 2, token0, token1, traderWallet1, 2),
+        orderAlwaysValid(1, 3, token0, token1, traderWallet1, 3),
       ];
 
       expect(
@@ -296,8 +392,8 @@ describe("PreAMMBatcher: Unit Tests", () => {
 
     it("returns expected values for same two orders", async () => {
       const sortedOrders = [
-        new Order(1, 1, token0, token1, traderWallet1, 1),
-        new Order(1, 1, token0, token1, traderWallet1, 2),
+        orderAlwaysValid(1, 1, token0, token1, traderWallet1, 1),
+        orderAlwaysValid(1, 1, token0, token1, traderWallet1, 2),
       ];
       expect(
         await batchTester.isSortedByLimitPriceTest(
@@ -315,9 +411,9 @@ describe("PreAMMBatcher: Unit Tests", () => {
 
     it("returns expected values for generic unsorted set of orders", async () => {
       const unsortedOrders = [
-        new Order(1, 2, token0, token1, traderWallet1, 1),
-        new Order(1, 1, token0, token1, traderWallet1, 2),
-        new Order(1, 3, token0, token1, traderWallet1, 3),
+        orderAlwaysValid(1, 2, token0, token1, traderWallet1, 1),
+        orderAlwaysValid(1, 1, token0, token1, traderWallet1, 2),
+        orderAlwaysValid(1, 3, token0, token1, traderWallet1, 3),
       ];
       expect(
         await batchTester.isSortedByLimitPriceTest(
@@ -352,7 +448,9 @@ describe("PreAMMBatcher: Unit Tests", () => {
 
     it("returns expected values for singleton order set", async () => {
       // Single Orderset is vacuously sorted
-      const singleOrder = [new Order(1, 1, token0, token1, traderWallet1, 1)];
+      const singleOrder = [
+        orderAlwaysValid(1, 1, token0, token1, traderWallet1, 1),
+      ];
       expect(
         await batchTester.isSortedByLimitPriceTest(
           singleOrder.map((x) => x.getSmartContractOrder()),
@@ -371,8 +469,8 @@ describe("PreAMMBatcher: Unit Tests", () => {
       const maxUint = ethers.constants.MaxUint256;
 
       const overflowingPair = [
-        new Order(2, maxUint, token0, token1, traderWallet1, 1),
-        new Order(1, maxUint, token0, token1, traderWallet1, 1),
+        orderAlwaysValid(2, maxUint, token0, token1, traderWallet1, 1),
+        orderAlwaysValid(1, maxUint, token0, token1, traderWallet1, 1),
       ];
       await expect(
         batchTester.isSortedByLimitPriceTest(
