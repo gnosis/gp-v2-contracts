@@ -1,10 +1,11 @@
 pragma experimental ABIEncoderV2;
-pragma solidity ^0.6.2;
+pragma solidity ^0.6.12;
 
 import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 import "../PreAMMBatcher.sol";
 
 contract PreAMMBatcherTestInterface is PreAMMBatcher {
+    // solhint-disable-next-line no-empty-blocks
     constructor(IUniswapV2Factory _factory) public PreAMMBatcher(_factory) {}
 
     function isSortedByLimitPriceTest(
