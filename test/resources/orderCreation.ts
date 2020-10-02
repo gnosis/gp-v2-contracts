@@ -10,10 +10,8 @@ export const orderAlwaysValid = function (
   wallet: Wallet,
   nonce: BigNumber | number,
 ): Order {
-  const orderValidFrom = 0;
-  // if validFrom is zero, then the following value is ignored.
-  // we set it to zero to save on gas.
-  const orderValidUntil = 0;
+  const beginningOfTime = 0;
+  const endOfTime = 2 ** 32 - 1;
 
   return new Order(
     sellAmount,
@@ -21,8 +19,8 @@ export const orderAlwaysValid = function (
     sellToken,
     buyToken,
     wallet,
-    orderValidFrom,
-    orderValidUntil,
+    beginningOfTime,
+    endOfTime,
     nonce,
   );
 };
