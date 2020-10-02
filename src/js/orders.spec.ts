@@ -77,7 +77,7 @@ export class Order {
     };
   }
 
-  asArray(): [string, string, string, string, string, string] {
+  asTuple(): [string, string, string, string, string, string] {
     return [
       this.sellAmount.toString(),
       this.buyAmount.toString(),
