@@ -105,6 +105,7 @@ describe("PreAMMBatcher: Unit Tests", () => {
   it("DOMAIN_SEPARATOR is correct", async () => {
     expect(await batcher.DOMAIN_SEPARATOR()).to.equal(DOMAIN_SEPARATOR);
   });
+
   describe("inverse()", () => {
     it("runs as expected in on generic fraction", async () => {
       const result = await batchTester.inverseTest({
@@ -113,6 +114,7 @@ describe("PreAMMBatcher: Unit Tests", () => {
       });
       assert.equal(result.toString(), "2,1");
     });
+
     it("inverts fraction with zero numerator", async () => {
       const result = await batchTester.inverseTest({
         numerator: 0,
@@ -120,6 +122,7 @@ describe("PreAMMBatcher: Unit Tests", () => {
       });
       assert.equal(result.toString(), "2,0");
     });
+
     it("inverts fraction with zero denominator", async () => {
       const result = await batchTester.inverseTest({
         numerator: 1,
