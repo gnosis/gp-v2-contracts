@@ -98,7 +98,7 @@ contract PreAMMBatcher {
         );
     }
 
-    function inverse(Fraction memory f) public pure returns (Fraction memory) {
+    function inverse(Fraction memory f) internal pure returns (Fraction memory) {
         return Fraction(f.denominator, f.numerator);
     }
 
