@@ -110,6 +110,32 @@ describe("PreAMMBatcher: Unit Tests", () => {
     expect(await batcher.DOMAIN_SEPARATOR()).to.equal(DOMAIN_SEPARATOR);
   });
 
+  describe("inverse()", () => {
+    it("runs as expected in on generic fraction", async () => {
+      const result = await batchTester.inverseTest({
+        numerator: 1,
+        denominator: 2,
+      });
+      assert.equal(result.toString(), "2,1");
+    });
+
+    it("inverts fraction with zero numerator", async () => {
+      const result = await batchTester.inverseTest({
+        numerator: 0,
+        denominator: 2,
+      });
+      assert.equal(result.toString(), "2,0");
+    });
+
+    it("inverts fraction with zero denominator", async () => {
+      const result = await batchTester.inverseTest({
+        numerator: 1,
+        denominator: 0,
+      });
+      assert.equal(result.toString(), "0,1");
+    });
+  });
+
   describe("orderChecks()", () => {
     it("runs as expected in generic setting", async () => {
       const testCaseInput = baseTestInput(
