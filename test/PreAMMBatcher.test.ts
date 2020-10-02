@@ -464,7 +464,7 @@ describe("PreAMMBatcher: Unit Tests", () => {
         batchTester.removeLastElementTest(
           orders.map((x) => x.getSmartContractOrder()),
         ),
-      ).to.be.revertedWith("Can't remove elements from an empty list");
+      ).to.be.revertedWith("Can't remove from empty list");
     });
   });
 });
