@@ -28,6 +28,7 @@ contract PreAMMBatcherTestInterface is PreAMMBatcher {
         returns (Order[] memory)
     {
         return super.removeLastElement(orders);
+    }
 
     function inverseTest(Fraction memory f)
         public
