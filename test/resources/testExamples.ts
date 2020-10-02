@@ -1,7 +1,7 @@
 import { Contract, Wallet, utils } from "ethers";
 
 import { TestCaseInput } from "./models";
-import { orderAlwaysValid } from "./orderCreation";
+import { indefiniteOrder } from "./orderCreation";
 
 export const baseTestInput = function (
   token0: Contract,
@@ -13,7 +13,7 @@ export const baseTestInput = function (
     fundingAMMToken0: utils.parseEther("10"),
     fundingAMMToken1: utils.parseEther("10"),
     sellOrdersToken0: [
-      orderAlwaysValid(
+      indefiniteOrder(
         utils.parseEther("1"),
         utils.parseEther("0.9"),
         token0,
@@ -23,7 +23,7 @@ export const baseTestInput = function (
       ),
     ],
     sellOrdersToken1: [
-      orderAlwaysValid(
+      indefiniteOrder(
         utils.parseEther("0.9"),
         utils.parseEther("0.90111"),
         token1,
@@ -45,7 +45,7 @@ export const fourOrderTestInput = function (
     fundingAMMToken0: utils.parseEther("10"),
     fundingAMMToken1: utils.parseEther("10"),
     sellOrdersToken0: [
-      orderAlwaysValid(
+      indefiniteOrder(
         utils.parseEther("1"),
         utils.parseEther("0.9"),
         token0,
@@ -53,7 +53,7 @@ export const fourOrderTestInput = function (
         tradersToken0[0],
         1,
       ),
-      orderAlwaysValid(
+      indefiniteOrder(
         utils.parseEther("0.5"),
         utils.parseEther("0.45"),
         token0,
@@ -63,7 +63,7 @@ export const fourOrderTestInput = function (
       ),
     ],
     sellOrdersToken1: [
-      orderAlwaysValid(
+      indefiniteOrder(
         utils.parseEther("0.9"),
         utils.parseEther("0.90111"),
         token1,
@@ -71,7 +71,7 @@ export const fourOrderTestInput = function (
         tradersToken1[0],
         1,
       ),
-      orderAlwaysValid(
+      indefiniteOrder(
         utils.parseEther("0.45"),
         utils.parseEther("0.45"),
         token1,
@@ -93,7 +93,7 @@ export const oneOrderSellingToken0IsOmittedTestInput = function (
     fundingAMMToken0: utils.parseEther("10"),
     fundingAMMToken1: utils.parseEther("10"),
     sellOrdersToken0: [
-      orderAlwaysValid(
+      indefiniteOrder(
         utils.parseEther("10.1"),
         utils.parseEther("9.7"),
         token0,
@@ -101,7 +101,7 @@ export const oneOrderSellingToken0IsOmittedTestInput = function (
         tradersToken0[0],
         1,
       ),
-      orderAlwaysValid(
+      indefiniteOrder(
         utils.parseEther("5"), // <--- this order would can not be traded fully against uniswap
         utils.parseEther("4.91"),
         token0,
@@ -111,7 +111,7 @@ export const oneOrderSellingToken0IsOmittedTestInput = function (
       ),
     ],
     sellOrdersToken1: [
-      orderAlwaysValid(
+      indefiniteOrder(
         utils.parseEther("10"),
         utils.parseEther("9"),
         token1,
@@ -133,7 +133,7 @@ export const noSolutionTestInput = function (
     fundingAMMToken0: utils.parseEther("10"),
     fundingAMMToken1: utils.parseEther("10"),
     sellOrdersToken0: [
-      orderAlwaysValid(
+      indefiniteOrder(
         utils.parseEther("10"),
         utils.parseEther("9.7"),
         token0,
@@ -141,7 +141,7 @@ export const noSolutionTestInput = function (
         tradersToken0[0],
         1,
       ),
-      orderAlwaysValid(
+      indefiniteOrder(
         utils.parseEther("5"),
         utils.parseEther("4.9"),
         token0,
@@ -151,7 +151,7 @@ export const noSolutionTestInput = function (
       ),
     ],
     sellOrdersToken1: [
-      orderAlwaysValid(
+      indefiniteOrder(
         utils.parseEther("3"),
         utils.parseEther("2"),
         token1,
@@ -159,7 +159,7 @@ export const noSolutionTestInput = function (
         tradersToken1[0],
         1,
       ),
-      orderAlwaysValid(
+      indefiniteOrder(
         utils.parseEther("3"),
         utils.parseEther("2.5"),
         token1,
@@ -167,7 +167,7 @@ export const noSolutionTestInput = function (
         tradersToken1[1],
         2,
       ),
-      orderAlwaysValid(
+      indefiniteOrder(
         utils.parseEther("3"),
         utils.parseEther("2.6"),
         token1,
@@ -190,7 +190,7 @@ export const oneOrderSellingToken1IsOmittedTestInput = function (
     fundingAMMToken1: utils.parseEther("10"),
 
     sellOrdersToken0: [
-      orderAlwaysValid(
+      indefiniteOrder(
         utils.parseEther("10"),
         utils.parseEther("9"),
         token1,
@@ -198,7 +198,7 @@ export const oneOrderSellingToken1IsOmittedTestInput = function (
         tradersToken0[0],
         1,
       ),
-      orderAlwaysValid(
+      indefiniteOrder(
         utils.parseEther("3"),
         utils.parseEther("2.5"),
         token1,
@@ -206,7 +206,7 @@ export const oneOrderSellingToken1IsOmittedTestInput = function (
         tradersToken0[1],
         2,
       ),
-      orderAlwaysValid(
+      indefiniteOrder(
         utils.parseEther("3"),
         utils.parseEther("2.5"),
         token1,
@@ -214,7 +214,7 @@ export const oneOrderSellingToken1IsOmittedTestInput = function (
         tradersToken0[2],
         3,
       ),
-      orderAlwaysValid(
+      indefiniteOrder(
         utils.parseEther("3"), // <--- this order would can not be traded fully against uniswap
         utils.parseEther("2.99"),
         token1,
@@ -224,7 +224,7 @@ export const oneOrderSellingToken1IsOmittedTestInput = function (
       ),
     ],
     sellOrdersToken1: [
-      orderAlwaysValid(
+      indefiniteOrder(
         utils.parseEther("10"),
         utils.parseEther("9.7"),
         token0,
@@ -232,7 +232,7 @@ export const oneOrderSellingToken1IsOmittedTestInput = function (
         tradersToken1[0],
         1,
       ),
-      orderAlwaysValid(
+      indefiniteOrder(
         utils.parseEther("5"),
         utils.parseEther("4.9"),
         token0,
@@ -254,7 +254,7 @@ export const switchTokenTestInput = function (
     fundingAMMToken0: utils.parseEther("10"),
     fundingAMMToken1: utils.parseEther("10"),
     sellOrdersToken0: [
-      orderAlwaysValid(
+      indefiniteOrder(
         utils.parseEther("10"),
         utils.parseEther("9.7"),
         token0,
@@ -262,7 +262,7 @@ export const switchTokenTestInput = function (
         tradersToken0[0],
         1,
       ),
-      orderAlwaysValid(
+      indefiniteOrder(
         utils.parseEther("5"),
         utils.parseEther("4.9"),
         token0,
@@ -272,7 +272,7 @@ export const switchTokenTestInput = function (
       ),
     ],
     sellOrdersToken1: [
-      orderAlwaysValid(
+      indefiniteOrder(
         utils.parseEther("10"),
         utils.parseEther("9"),
         token1,
@@ -280,7 +280,7 @@ export const switchTokenTestInput = function (
         tradersToken1[0],
         1,
       ),
-      orderAlwaysValid(
+      indefiniteOrder(
         utils.parseEther("3"),
         utils.parseEther("2.5"),
         token1,
@@ -288,7 +288,7 @@ export const switchTokenTestInput = function (
         tradersToken1[1],
         2,
       ),
-      orderAlwaysValid(
+      indefiniteOrder(
         utils.parseEther("3"),
         utils.parseEther("2.6"),
         token1,
@@ -296,7 +296,7 @@ export const switchTokenTestInput = function (
         tradersToken1[2],
         3,
       ),
-      orderAlwaysValid(
+      indefiniteOrder(
         utils.parseEther("3"),
         utils.parseEther("2.9"),
         token1,

@@ -2,7 +2,7 @@ import { Wallet, Contract, BigNumber } from "ethers";
 
 import { Order } from "../../src/js/orders.spec";
 
-export function orderAlwaysValid(
+export function indefiniteOrder(
   sellAmount: BigNumber | number,
   buyAmount: BigNumber | number,
   sellToken: Contract,
@@ -23,4 +23,4 @@ export function orderAlwaysValid(
     endOfTime,
     nonce,
   );
-};
+}

@@ -7,7 +7,7 @@ import { Contract, BigNumber } from "ethers";
 
 import { Order, DOMAIN_SEPARATOR } from "../src/js/orders.spec";
 
-import { orderAlwaysValid } from "./resources/orderCreation";
+import { indefiniteOrder } from "./resources/orderCreation";
 import { baseTestInput } from "./resources/testExamples";
 
 describe("PreAMMBatcher: Unit Tests", () => {
@@ -361,9 +361,9 @@ describe("PreAMMBatcher: Unit Tests", () => {
 
     it("returns expected values for generic sorted order set", async () => {
       const sortedOrders = [
-        orderAlwaysValid(1, 1, token0, token1, traderWallet1, 1),
-        orderAlwaysValid(1, 2, token0, token1, traderWallet1, 2),
-        orderAlwaysValid(1, 3, token0, token1, traderWallet1, 3),
+        indefiniteOrder(1, 1, token0, token1, traderWallet1, 1),
+        indefiniteOrder(1, 2, token0, token1, traderWallet1, 2),
+        indefiniteOrder(1, 3, token0, token1, traderWallet1, 3),
       ];
 
       expect(
@@ -397,8 +397,8 @@ describe("PreAMMBatcher: Unit Tests", () => {
 
     it("returns expected values for same two orders", async () => {
       const sortedOrders = [
-        orderAlwaysValid(1, 1, token0, token1, traderWallet1, 1),
-        orderAlwaysValid(1, 1, token0, token1, traderWallet1, 2),
+        indefiniteOrder(1, 1, token0, token1, traderWallet1, 1),
+        indefiniteOrder(1, 1, token0, token1, traderWallet1, 2),
       ];
       expect(
         await batchTester.isSortedByLimitPriceTest(
@@ -416,9 +416,9 @@ describe("PreAMMBatcher: Unit Tests", () => {
 
     it("returns expected values for generic unsorted set of orders", async () => {
       const unsortedOrders = [
-        orderAlwaysValid(1, 2, token0, token1, traderWallet1, 1),
-        orderAlwaysValid(1, 1, token0, token1, traderWallet1, 2),
-        orderAlwaysValid(1, 3, token0, token1, traderWallet1, 3),
+        indefiniteOrder(1, 2, token0, token1, traderWallet1, 1),
+        indefiniteOrder(1, 1, token0, token1, traderWallet1, 2),
+        indefiniteOrder(1, 3, token0, token1, traderWallet1, 3),
       ];
       expect(
         await batchTester.isSortedByLimitPriceTest(
@@ -454,7 +454,7 @@ describe("PreAMMBatcher: Unit Tests", () => {
     it("returns expected values for singleton order set", async () => {
       // Single Orderset is vacuously sorted
       const singleOrder = [
-        orderAlwaysValid(1, 1, token0, token1, traderWallet1, 1),
+        indefiniteOrder(1, 1, token0, token1, traderWallet1, 1),
       ];
       expect(
         await batchTester.isSortedByLimitPriceTest(
@@ -474,8 +474,8 @@ describe("PreAMMBatcher: Unit Tests", () => {
       const maxUint = ethers.constants.MaxUint256;
 
       const overflowingPair = [
-        orderAlwaysValid(2, maxUint, token0, token1, traderWallet1, 1),
-        orderAlwaysValid(1, maxUint, token0, token1, traderWallet1, 1),
+        indefiniteOrder(2, maxUint, token0, token1, traderWallet1, 1),
+        indefiniteOrder(1, maxUint, token0, token1, traderWallet1, 1),
       ];
       await expect(
         batchTester.isSortedByLimitPriceTest(
