@@ -14,7 +14,7 @@ contract PreAMMBatcher {
     bytes32 public constant DOMAIN_SEPARATOR = keccak256("preBatcher-V1");
     uint256 public constant FEE_FACTOR = 333; // Charged fee is (FEE_FACTOR-1)/FEE_FACTOR
 
-    uint256 private constant ENTRIES_IN_ORDER = 6;
+    uint256 private constant ENTRIES_IN_ORDER = 8;
     uint256 private constant ENTRIES_IN_SIGNATURE = 3;
     uint256 private constant OFFCHAIN_ORDER_STRIDE = 32 *
         (ENTRIES_IN_ORDER + ENTRIES_IN_SIGNATURE);
@@ -29,6 +29,8 @@ contract PreAMMBatcher {
         address sellToken;
         address buyToken;
         address owner;
+        uint32 validFrom;
+        uint32 validUntil;
         uint8 nonce;
     }
 
@@ -106,10 +108,22 @@ contract PreAMMBatcher {
         return Fraction(f.denominator, f.numerator);
     }
 
+    function orderIsCurrentlyValid(Order memory order)
+        private
+        view
+        returns (bool)
+    {
+        // solhint-disable not-rely-on-time
+        return
+            (order.validUntil >= block.timestamp) &&
+            (order.validFrom <= block.timestamp);
+        // solhint-enable not-rely-on-time
+    }
+
     function orderChecks(
         Order[] memory sellOrderToken0,
         Order[] memory sellOrderToken1
-    ) internal pure {
+    ) internal view {
         address buyToken = sellOrderToken0[0].buyToken;
         address sellToken = sellOrderToken0[0].sellToken;
         for (uint256 i = 0; i < sellOrderToken0.length; i++) {
@@ -121,6 +135,10 @@ contract PreAMMBatcher {
                 sellOrderToken0[i].buyToken == buyToken,
                 "invalid token0 order buy token"
             );
+            require(
+                orderIsCurrentlyValid(sellOrderToken0[i]),
+                "token0 order not currently valid"
+            );
         }
         for (uint256 i = 0; i < sellOrderToken1.length; i++) {
             require(
@@ -130,6 +148,10 @@ contract PreAMMBatcher {
             require(
                 sellOrderToken1[i].buyToken == sellToken,
                 "invalid token1 order buy token"
+            );
+            require(
+                orderIsCurrentlyValid(sellOrderToken1[i]),
+                "token1 order not currently valid"
             );
         }
     }
@@ -162,6 +184,8 @@ contract PreAMMBatcher {
             address sellToken,
             address buyToken,
             address owner,
+            uint32 validFrom,
+            uint32 validUntil,
             uint8 nonce,
             uint8 v,
             bytes32 r,
@@ -174,6 +198,8 @@ contract PreAMMBatcher {
                 address,
                 address,
                 address,
+                uint32,
+                uint32,
                 uint8,
                 uint8,
                 bytes32,
@@ -188,6 +214,8 @@ contract PreAMMBatcher {
                 sellToken,
                 buyToken,
                 owner,
+                validFrom,
+                validUntil,
                 nonce
             )
         );
@@ -203,6 +231,8 @@ contract PreAMMBatcher {
                 buyToken: buyToken,
                 sellToken: sellToken,
                 owner: owner,
+                validFrom: validFrom,
+                validUntil: validUntil,
                 nonce: nonce
             });
     }

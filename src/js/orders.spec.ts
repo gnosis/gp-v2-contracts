@@ -9,6 +9,8 @@ export declare type SmartContractOrder = {
   sellToken: string;
   buyToken: string;
   owner: string;
+  validFrom: BigNumber;
+  validUntil: BigNumber;
   nonce: BigNumber;
 };
 export class Order {
@@ -17,6 +19,8 @@ export class Order {
   sellToken: Contract;
   buyToken: Contract;
   wallet: Wallet;
+  validFrom: BigNumber;
+  validUntil: BigNumber;
   nonce: BigNumber;
 
   constructor(
@@ -25,6 +29,8 @@ export class Order {
     sellToken: Contract,
     buyToken: Contract,
     wallet: Wallet,
+    validFrom: BigNumber | number,
+    validUntil: BigNumber | number,
     nonce: BigNumber | number,
   ) {
     this.sellAmount = BigNumber.from(sellAmount);
@@ -32,6 +38,8 @@ export class Order {
     this.sellToken = sellToken;
     this.buyToken = buyToken;
     this.wallet = wallet;
+    this.validFrom = BigNumber.from(validFrom);
+    this.validUntil = BigNumber.from(validUntil);
     this.nonce = BigNumber.from(nonce);
   }
 
@@ -46,6 +54,8 @@ export class Order {
         "address",
         "address",
         "address",
+        "uint32",
+        "uint32",
         "uint8",
         "uint8",
         "bytes32",
@@ -57,6 +67,8 @@ export class Order {
         this.sellToken.address,
         this.buyToken.address,
         this.wallet.address,
+        this.validFrom.toString(),
+        this.validUntil.toString(),
         this.nonce.toString(),
         v,
         r,
@@ -73,19 +85,10 @@ export class Order {
       sellToken: this.sellToken.address,
       buyToken: this.buyToken.address,
       owner: this.wallet.address,
+      validFrom: this.validFrom,
+      validUntil: this.validUntil,
       nonce: this.nonce,
     };
-  }
-
-  asTuple(): [string, string, string, string, string, string] {
-    return [
-      this.sellAmount.toString(),
-      this.buyAmount.toString(),
-      this.sellToken.address,
-      this.buyToken.address,
-      this.wallet.address,
-      this.nonce.toString(),
-    ];
   }
 
   getOrderDigest(): string {
@@ -98,6 +101,8 @@ export class Order {
           "address",
           "address",
           "address",
+          "uint32",
+          "uint32",
           "uint8",
         ],
         [
@@ -107,6 +112,8 @@ export class Order {
           this.sellToken.address,
           this.buyToken.address,
           this.wallet.address,
+          this.validFrom.toString(),
+          this.validUntil.toString(),
           this.nonce.toString(),
         ],
       ),
@@ -120,6 +127,8 @@ export class Order {
       this.sellToken,
       this.buyToken,
       this.wallet,
+      this.validFrom,
+      this.validUntil,
       this.nonce,
     );
   }

@@ -18,7 +18,7 @@ contract PreAMMBatcherTestInterface is PreAMMBatcher {
     function orderChecksTest(
         Order[] memory sellOrderToken0,
         Order[] memory sellOrderToken1
-    ) public pure {
+    ) public view {
         super.orderChecks(sellOrderToken0, sellOrderToken1);
     }
 
