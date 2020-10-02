@@ -109,11 +109,11 @@ contract PreAMMBatcher {
         view
         returns (bool)
     {
+        // solhint-disable not-rely-on-time
         return
-            // solhint-disable-next-line not-rely-on-time
             (order.validUntil >= block.timestamp) &&
-            // solhint-disable-next-line not-rely-on-time
             (order.validFrom <= block.timestamp);
+        // solhint-enable not-rely-on-time
     }
 
     function orderChecks(
