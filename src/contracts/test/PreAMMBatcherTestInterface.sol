@@ -21,4 +21,12 @@ contract PreAMMBatcherTestInterface is PreAMMBatcher {
     ) public pure {
         super.orderChecks(sellOrderToken0, sellOrderToken1);
     }
+
+    function inverseTest(Fraction memory f)
+        public
+        pure
+        returns (Fraction memory)
+    {
+        return super.inverse(f);
+    }
 }

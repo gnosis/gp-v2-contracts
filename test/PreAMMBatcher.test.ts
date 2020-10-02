@@ -2,7 +2,7 @@ import { ethers, waffle } from "@nomiclabs/buidler";
 import ERC20 from "@openzeppelin/contracts/build/contracts/IERC20.json";
 import UniswapV2Factory from "@uniswap/v2-core/build/UniswapV2Factory.json";
 import UniswapV2Pair from "@uniswap/v2-core/build/UniswapV2Pair.json";
-import { expect } from "chai";
+import { expect, assert } from "chai";
 import { Contract } from "ethers";
 
 import { Order, DOMAIN_SEPARATOR } from "../src/js/orders.spec";
@@ -104,6 +104,32 @@ describe("PreAMMBatcher: Unit Tests", () => {
 
   it("DOMAIN_SEPARATOR is correct", async () => {
     expect(await batcher.DOMAIN_SEPARATOR()).to.equal(DOMAIN_SEPARATOR);
+  });
+
+  describe("inverse()", () => {
+    it("runs as expected in on generic fraction", async () => {
+      const result = await batchTester.inverseTest({
+        numerator: 1,
+        denominator: 2,
+      });
+      assert.equal(result.toString(), "2,1");
+    });
+
+    it("inverts fraction with zero numerator", async () => {
+      const result = await batchTester.inverseTest({
+        numerator: 0,
+        denominator: 2,
+      });
+      assert.equal(result.toString(), "2,0");
+    });
+
+    it("inverts fraction with zero denominator", async () => {
+      const result = await batchTester.inverseTest({
+        numerator: 1,
+        denominator: 0,
+      });
+      assert.equal(result.toString(), "0,1");
+    });
   });
 
   describe("orderChecks()", () => {
