@@ -412,7 +412,7 @@ contract PreAMMBatcher {
         pure
         returns (Order[] memory)
     {
-        require(orders.length > 0, "Can't remove elements from an empty list");
+        require(orders.length > 0, "Can't remove from empty list");
         // delete orders[orders.length - 1];
         // return orders;
         Order[] memory newOrders = new Order[](orders.length - 1);

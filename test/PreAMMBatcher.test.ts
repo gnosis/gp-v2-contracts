@@ -406,6 +406,7 @@ describe("PreAMMBatcher: Unit Tests", () => {
       ).to.be.revertedWith("SafeMath: multiplication overflow");
     });
   });
+
   describe("removeLastElement()", () => {
     it("returns list of orders with top removed for generic list", async () => {
       const orders = [
@@ -456,6 +457,7 @@ describe("PreAMMBatcher: Unit Tests", () => {
         );
       }
     });
+
     it("reverts on empty list of orders", async () => {
       const orders: Order[] = [];
       await expect(
