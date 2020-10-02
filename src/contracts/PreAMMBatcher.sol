@@ -304,7 +304,7 @@ contract PreAMMBatcher {
                 // take violated order with highest bid out
                 return
                     calculateSettlementPrice(
-                        removeTopElement(sellOrderToken0),
+                        removeLastElement(sellOrderToken0),
                         sellOrderToken1,
                         uniswapPool
                     );
@@ -320,7 +320,7 @@ contract PreAMMBatcher {
                 return
                     calculateSettlementPrice(
                         sellOrderToken0,
-                        removeTopElement(sellOrderToken1),
+                        removeLastElement(sellOrderToken1),
                         uniswapPool
                     );
             }
@@ -411,11 +411,12 @@ contract PreAMMBatcher {
         }
     }
 
-    function removeTopElement(Order[] memory orders)
-        public
+    function removeLastElement(Order[] memory orders)
+        internal
         pure
         returns (Order[] memory)
     {
+        require(orders.length > 0, "Can't remove from empty list");
         // delete orders[orders.length - 1];
         // return orders;
         Order[] memory newOrders = new Order[](orders.length - 1);

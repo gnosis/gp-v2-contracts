@@ -77,13 +77,14 @@ export class Order {
     };
   }
 
-  asArray(): [string, string, string, string, string] {
+  asTuple(): [string, string, string, string, string, string] {
     return [
       this.sellAmount.toString(),
       this.buyAmount.toString(),
       this.sellToken.address,
       this.buyToken.address,
       this.wallet.address,
+      this.nonce.toString(),
     ];
   }
 

@@ -5,7 +5,11 @@ import UniswapV2Pair from "@uniswap/v2-core/build/UniswapV2Pair.json";
 import { expect, assert } from "chai";
 import { Contract } from "ethers";
 
-import { Order, DOMAIN_SEPARATOR } from "../src/js/orders.spec";
+import {
+  Order,
+  DOMAIN_SEPARATOR,
+  SmartContractOrder,
+} from "../src/js/orders.spec";
 
 import { baseTestInput } from "./resources/testExamples";
 
@@ -426,6 +430,67 @@ describe("PreAMMBatcher: Unit Tests", () => {
           DESCENDING,
         ),
       ).to.be.revertedWith("SafeMath: multiplication overflow");
+    });
+  });
+
+  describe("removeLastElement()", () => {
+    it("returns list of orders with top removed for generic list", async () => {
+      const orders = [
+        new Order(1, 1, token0, token1, traderWallet1, 1),
+        new Order(1, 2, token0, token1, traderWallet1, 2),
+        new Order(1, 3, token0, token1, traderWallet1, 3),
+      ].map((x) => x.getSmartContractOrder());
+
+      const expectedResult = orders.slice(0, orders.length - 1);
+      const result: SmartContractOrder[] = await batchTester.removeLastElementTest(
+        orders,
+      );
+
+      assert.equal(
+        result.length,
+        expectedResult.length,
+        "Resulting list length is incorrect",
+      );
+
+      for (let i = 0; i < result.length; i++) {
+        assert(
+          result[i].sellAmount.eq(expectedResult[i].sellAmount),
+          `Resulting sellAmount disagrees at index ${i}`,
+        );
+        assert(
+          result[i].buyAmount.eq(expectedResult[i].buyAmount),
+          `Resulting buyAmount disagrees at index ${i}`,
+        );
+        assert.equal(
+          result[i].sellToken,
+          expectedResult[i].sellToken,
+          `Resulting sellToken disagrees at index ${i}`,
+        );
+        assert.equal(
+          result[i].buyToken,
+          expectedResult[i].buyToken,
+          `Resulting buyToken disagrees at index ${i}`,
+        );
+        assert.equal(
+          result[i].owner,
+          expectedResult[i].owner,
+          `Resulting owner disagrees at index ${i}`,
+        );
+        assert.equal(
+          result[i].nonce,
+          expectedResult[i].nonce,
+          `Resulting nonce disagrees at index ${i}`,
+        );
+      }
+    });
+
+    it("reverts on empty list of orders", async () => {
+      const orders: Order[] = [];
+      await expect(
+        batchTester.removeLastElementTest(
+          orders.map((x) => x.getSmartContractOrder()),
+        ),
+      ).to.be.revertedWith("Can't remove from empty list");
     });
   });
 });

@@ -22,6 +22,14 @@ contract PreAMMBatcherTestInterface is PreAMMBatcher {
         super.orderChecks(sellOrderToken0, sellOrderToken1);
     }
 
+    function removeLastElementTest(Order[] memory orders)
+        public
+        pure
+        returns (Order[] memory)
+    {
+        return super.removeLastElement(orders);
+    }
+
     function inverseTest(Fraction memory f)
         public
         pure
