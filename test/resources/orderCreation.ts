@@ -2,7 +2,7 @@ import { Wallet, Contract, BigNumber } from "ethers";
 
 import { Order } from "../../src/js/orders.spec";
 
-export const orderAlwaysValid = function (
+export function orderAlwaysValid(
   sellAmount: BigNumber | number,
   buyAmount: BigNumber | number,
   sellToken: Contract,
