@@ -109,10 +109,13 @@ contract PreAMMBatcher {
         view
         returns (bool)
     {
+        // Zero velidFrom is a sentinel value signaling that the order has unlimited validity.
+        // validUntil can then be set to zero to save on gas costs.
         // solhint-disable not-rely-on-time
         return
-            (order.validUntil >= block.timestamp) &&
-            (order.validFrom <= block.timestamp);
+            order.validFrom == 0 ||
+            ((order.validUntil >= block.timestamp) &&
+                (order.validFrom <= block.timestamp));
         // solhint-enable not-rely-on-time
     }
 

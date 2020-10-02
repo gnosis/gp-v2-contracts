@@ -139,6 +139,7 @@ describe("PreAMMBatcher: Unit Tests", () => {
           [traderWallet2],
         );
         const now = (await waffle.provider.getBlock("latest")).timestamp;
+        testCaseInput.sellOrdersToken0[0].validFrom = BigNumber.from(1);
         testCaseInput.sellOrdersToken0[0].validUntil = BigNumber.from(now - 60);
 
         await expect(
@@ -158,6 +159,7 @@ describe("PreAMMBatcher: Unit Tests", () => {
           [traderWallet2],
         );
         const now = (await waffle.provider.getBlock("latest")).timestamp;
+        testCaseInput.sellOrdersToken1[0].validFrom = BigNumber.from(1);
         testCaseInput.sellOrdersToken1[0].validUntil = BigNumber.from(now - 60);
 
         await expect(
@@ -178,6 +180,9 @@ describe("PreAMMBatcher: Unit Tests", () => {
         );
         const now = (await waffle.provider.getBlock("latest")).timestamp;
         testCaseInput.sellOrdersToken0[0].validFrom = BigNumber.from(now + 60);
+        testCaseInput.sellOrdersToken0[0].validUntil = BigNumber.from(
+          2 ** 32 - 1,
+        );
 
         await expect(
           batchTester.orderChecksTest(
@@ -197,6 +202,9 @@ describe("PreAMMBatcher: Unit Tests", () => {
         );
         const now = (await waffle.provider.getBlock("latest")).timestamp;
         testCaseInput.sellOrdersToken1[0].validFrom = BigNumber.from(now + 60);
+        testCaseInput.sellOrdersToken1[0].validUntil = BigNumber.from(
+          2 ** 32 - 1,
+        );
 
         await expect(
           batchTester.orderChecksTest(
