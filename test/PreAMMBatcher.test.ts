@@ -130,6 +130,7 @@ describe("PreAMMBatcher: Unit Tests", () => {
           ),
         ).to.not.be.reverted;
       });
+
       it("fails if sell order for token 0 is expired", async () => {
         const testCaseInput = baseTestInput(
           token0,
@@ -148,6 +149,7 @@ describe("PreAMMBatcher: Unit Tests", () => {
           ),
         ).to.be.revertedWith("token0 order not currently valid");
       });
+
       it("fails if sell order for token 1 is expired", async () => {
         const testCaseInput = baseTestInput(
           token0,
@@ -166,6 +168,7 @@ describe("PreAMMBatcher: Unit Tests", () => {
           ),
         ).to.be.revertedWith("token1 order not currently valid");
       });
+
       it("fails if sell order for token 0 is not valid yet", async () => {
         const testCaseInput = baseTestInput(
           token0,
@@ -184,6 +187,7 @@ describe("PreAMMBatcher: Unit Tests", () => {
           ),
         ).to.be.revertedWith("token0 order not currently valid");
       });
+
       it("fails if sell order for token 1 is not yet valid", async () => {
         const testCaseInput = baseTestInput(
           token0,
@@ -203,6 +207,7 @@ describe("PreAMMBatcher: Unit Tests", () => {
         ).to.be.revertedWith("token1 order not currently valid");
       });
     });
+
     it("runs as expected in generic setting", async () => {
       const testCaseInput = baseTestInput(
         token0,
