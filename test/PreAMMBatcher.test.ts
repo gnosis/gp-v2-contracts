@@ -539,9 +539,9 @@ describe("PreAMMBatcher: Unit Tests", () => {
   describe("removeLastElement()", () => {
     it("returns list of orders with top removed for generic list", async () => {
       const orders = [
-        new Order(1, 1, token0, token1, traderWallet1, 1),
-        new Order(1, 2, token0, token1, traderWallet1, 2),
-        new Order(1, 3, token0, token1, traderWallet1, 3),
+        indefiniteOrder(1, 1, token0, token1, traderWallet1, 1),
+        indefiniteOrder(1, 2, token0, token1, traderWallet1, 2),
+        indefiniteOrder(1, 3, token0, token1, traderWallet1, 3),
       ].map((x) => x.getSmartContractOrder());
 
       const expectedResult = orders.slice(0, orders.length - 1);
