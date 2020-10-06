@@ -9,6 +9,7 @@ import { BigNumber, Contract, Wallet } from "ethers";
 import { Order } from "../src/js/orders.spec";
 
 import { generateTestCase } from "./resources";
+import { testingAccounts } from "./resources/accounts";
 import { TestCase } from "./resources/models";
 import {
   baseTestInput,
@@ -56,7 +57,7 @@ describe("PreAMMBatcher: End to End Tests", () => {
     walletTrader4,
     walletTrader5,
     walletTrader6,
-  ] = waffle.provider.getWallets();
+  ] = testingAccounts(waffle.provider);
 
   let batcher: Contract;
   let token0: Contract;

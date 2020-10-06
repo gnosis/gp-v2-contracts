@@ -11,15 +11,14 @@ import {
   SmartContractOrder,
 } from "../src/js/orders.spec";
 
+import { testingAccounts } from "./resources/accounts";
 import { indefiniteOrder } from "./resources/orderCreation";
 import { baseTestInput } from "./resources/testExamples";
 
 describe("PreAMMBatcher: Unit Tests", () => {
-  const [
-    walletDeployer,
-    traderWallet1,
-    traderWallet2,
-  ] = waffle.provider.getWallets();
+  const [walletDeployer, traderWallet1, traderWallet2] = testingAccounts(
+    waffle.provider,
+  );
 
   let batcher: Contract;
   let batchTester: Contract;

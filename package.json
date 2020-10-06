@@ -3,11 +3,14 @@
   "scripts": {
     "build": "buidler compile",
     "test": "buidler test",
+    "gas-reporter": "GAS_REPORTER=1 buidler test --network gasReporter",
+    "testnet": "buidler node",
     "lint": "yarn lint:sol && yarn lint:ts",
     "lint:sol": "solhint 'src/contracts/**/*.sol'",
     "lint:ts": "eslint --max-warnings 0 ."
   },
   "devDependencies": {
+    "@ethersproject/abstract-provider": "^5.0.5",
     "@nomiclabs/buidler": "^1.4.7",
     "@nomiclabs/buidler-ethers": "^2.0.2",
     "@nomiclabs/buidler-waffle": "^2.1.0",
@@ -18,6 +21,7 @@
     "@typescript-eslint/eslint-plugin": "^4.4.0",
     "@typescript-eslint/parser": "^4.4.0",
     "@uniswap/v2-core": "^1.0.1",
+    "buidler-gas-reporter": "^0.1.3",
     "chai": "^4.2.0",
     "debug": "^4.2.0",
     "eslint": "^7.10.0",
