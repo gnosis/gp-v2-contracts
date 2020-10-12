@@ -20,7 +20,7 @@
     "@uniswap/v2-core": "^1.0.1",
     "chai": "^4.2.0",
     "debug": "^4.2.0",
-    "eslint": "^7.10.0",
+    "eslint": "^7.11.0",
     "eslint-config-prettier": "^6.12.0",
     "eslint-plugin-import": "^2.22.1",
     "eslint-plugin-no-only-tests": "^2.4.0",
