@@ -8,7 +8,7 @@
     "lint:ts": "eslint --max-warnings 0 ."
   },
   "devDependencies": {
-    "@nomiclabs/buidler": "^1.4.7",
+    "@nomiclabs/buidler": "^1.4.8",
     "@nomiclabs/buidler-ethers": "^2.0.2",
     "@nomiclabs/buidler-waffle": "^2.1.0",
     "@openzeppelin/contracts": "^3.2.0",

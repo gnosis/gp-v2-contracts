@@ -472,10 +472,10 @@
     "@types/sinon-chai" "^3.2.3"
     "@types/web3" "1.0.19"
 
-"@nomiclabs/buidler@^1.4.7":
-  version "1.4.7"
-  resolved "https://registry.yarnpkg.com/@nomiclabs/buidler/-/buidler-1.4.7.tgz#88436ba53e0e830d37c16601df59da4dbffde524"
-  integrity sha512-TyJKwKyKwu82uYPneqLf5HKFr96QX7cHDT7O7Ro93zmk1b84+EH9tn3zNIO/+96DMGISp8cCRwZhct89OwblRA==
+"@nomiclabs/buidler@^1.4.8":
+  version "1.4.8"
+  resolved "https://registry.yarnpkg.com/@nomiclabs/buidler/-/buidler-1.4.8.tgz#36ebbd0fb54eb2052b1336bf90ee47825393e5dc"
+  integrity sha512-OUnNWx+WXOJzueJCfyuEXu3qNMq1j9eGDDpgflpRwjPeiQQnvVzfbwrPjs0PlxOC3Xtmaxabtgek5wGxS1C7Ew==
   dependencies:
     "@nomiclabs/ethereumjs-vm" "^4.1.1"
     "@sentry/node" "^5.18.1"
@@ -3786,15 +3786,7 @@ ethereumjs-abi@0.6.7:
     bn.js "^4.11.8"
     ethereumjs-util "^6.0.0"
 
-ethereumjs-abi@^0.6.8:
-  version "0.6.8"
-  resolved "https://registry.yarnpkg.com/ethereumjs-abi/-/ethereumjs-abi-0.6.8.tgz#71bc152db099f70e62f108b7cdfca1b362c6fcae"
-  integrity sha512-Tx0r/iXI6r+lRsdvkFDlut0N08jWMnKRZ6Gkq+Nmw75lZe4e6o3EkSnkaBP5NF6+m5PTGAr9JP43N3LyeoglsA==
-  dependencies:
-    bn.js "^4.11.8"
-    ethereumjs-util "^6.0.0"
-
-"ethereumjs-abi@git+https://github.com/ethereumjs/ethereumjs-abi.git":
+ethereumjs-abi@^0.6.8, "ethereumjs-abi@git+https://github.com/ethereumjs/ethereumjs-abi.git":
   version "0.6.8"
   resolved "git+https://github.com/ethereumjs/ethereumjs-abi.git#1ce6a1d64235fabe2aaf827fd606def55693508f"
   dependencies:
