@@ -35,15 +35,17 @@ contract GPv2Settlement {
     /// @param uniswapFactory_ The Uniswap factory to act as the AMM for this
     /// GPv2 settlement contract.
     constructor(IUniswapV2Factory uniswapFactory_) public {
+        uint256 chainId;
+
         // NOTE: Currently, the only way to get the chain ID in solidity is
         // using assembly.
-        uint256 chainId;
+        // solhint-disable-next-line no-inline-assembly
         assembly {
             chainId := chainid()
         }
 
         replayProtection = keccak256(
-            abi.encodePacked(DOMAIN_SEPARATOR, uint64(chainId), address(this))
+            abi.encodePacked(DOMAIN_SEPARATOR, chainId, address(this))
         );
         uniswapFactory = uniswapFactory_;
     }
