@@ -5,7 +5,8 @@
     "test": "buidler test",
     "lint": "yarn lint:sol && yarn lint:ts",
     "lint:sol": "solhint 'src/contracts/**/*.sol'",
-    "lint:ts": "eslint --max-warnings 0 ."
+    "lint:ts": "eslint --max-warnings 0 .",
+    "fmt:sol": "prettier 'src/contracts/**/*.sol' -w"
   },
   "devDependencies": {
     "@nomiclabs/buidler": "^1.4.8",
