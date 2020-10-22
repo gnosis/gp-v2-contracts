@@ -17,16 +17,16 @@ contract GPv2Settlement {
     /// @dev The Uniswap factory. This is used as the AMM that GPv2 settles with
     /// and is responsible for determining the range of the settlement price as
     /// well as trading surplus that cannot be directly settled in a batch.
-    IUniswapV2Factory public immutable uniswap;
+    IUniswapV2Factory public immutable uniswapFactory;
 
     /// @dev The global nonce for determining the current batch. This is used to
     /// ensure orders can't be replayed in multiple batches.
     uint256 public nonce;
 
-    /// @param uniswap The Uniswap factory to act as the AMM for this GPv2
-    /// settlement contract.
-    constructor(IUniswapV2Factory uniswap_) {
-        uniswap = uniswap_;
+    /// @param uniswapFactory_ The Uniswap factory to act as the AMM for this
+    /// GPv2 settlement contract.
+    constructor(IUniswapV2Factory uniswapFactory_) public {
+        uniswapFactory = uniswapFactory_;
     }
 
     /// @dev Settle the specified orders at a clearing price. Note that it is
