@@ -3,7 +3,7 @@ import IUniswapV2Factory from "@uniswap/v2-core/build/IUniswapV2Factory.json";
 import { expect } from "chai";
 import { Contract } from "ethers";
 
-describe.only("GPv2Settlement", () => {
+describe("GPv2Settlement", () => {
   const [deployer] = waffle.provider.getWallets();
 
   let settlement: Contract;
