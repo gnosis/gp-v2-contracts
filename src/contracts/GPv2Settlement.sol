@@ -12,16 +12,17 @@ contract GPv2Settlement {
     bytes32 public constant DOMAIN_SEPARATOR = keccak256("GPv2");
 
     /// @dev The stride of an encoded order.
-    uint256 private constant ORDER_STRIDE = 120;
+    uint256 private constant ORDER_STRIDE = 130;
 
     /// @dev The Uniswap factory. This is used as the AMM that GPv2 settles with
     /// and is responsible for determining the range of the settlement price as
     /// well as trading surplus that cannot be directly settled in a batch.
     IUniswapV2Factory public immutable uniswapFactory;
 
-    /// @dev The global nonce for determining the current batch. This is used to
-    /// ensure orders can't be replayed in multiple batches.
-    uint256 public nonce;
+    /// @dev A mapping from a token pair ID to a nonce. This represents the
+    /// batch for token pair and is used to ensure orders can't be replayed
+    /// in multiple batches.
+    mapping(bytes20 => uint256) public nonce;
 
     /// @param uniswapFactory_ The Uniswap factory to act as the AMM for this
     /// GPv2 settlement contract.
@@ -46,17 +47,17 @@ contract GPv2Settlement {
     /// encode the following fields:
     /// ```
     /// struct Order {
-    ///     sellAmount: uint112,
-    ///     buyAmount:  uint112,
-    ///     validTo:    uint32,
-    ///     nonce:      uint32,
-    ///     tip:        uint112,
-    ///     validTo:    uint32,
-    ///     flags:      uint8,
+    ///     sellAmount:     uint112,
+    ///     buyAmount:      uint112,
+    ///     executedAmount: uint112,
+    ///     tip:            uint112,
+    ///     nonce:          uint32,
+    ///     validTo:        uint32,
+    ///     flags:          uint8,
     ///     signature: {
-    ///         v: uint8,
-    ///         r: bytes32,
-    ///         s: bytes32,
+    ///         v:          uint8,
+    ///         r:          bytes32,
+    ///         s:          bytes32,
     ///     }
     /// }
     /// ```
@@ -87,5 +88,15 @@ contract GPv2Settlement {
         bytes calldata encodedOrders1
     ) external {
         revert("not yet implemented");
+    }
+
+    /// @dev Returns a unique ID for the specified token pair. Note that the
+    /// order in which the tokens are specified does not matter.
+    /// @param token0 The address one of the tokens of the pair.
+    /// @param token1 The address the other token of the pair.
+    /// @return The token ID unique to the pair.
+    function pairId(IERC20 token0, IERC20 token1) public pure returns (bytes20) {
+      require(token0 != token1, "invalid pair");
+      return (bytes20(address(token0)) ^ bytes20(address(token1)));
     }
 }

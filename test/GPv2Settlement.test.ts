@@ -37,7 +37,29 @@ describe("GPv2Settlement", () => {
 
   describe("nonce", () => {
     it("should should be initialized to zero", async () => {
-      expect(await settlement.nonce()).to.equal(ethers.constants.Zero);
+      expect(await settlement.nonce(`0x${"42".repeat(20)}`)).to.equal(
+        ethers.constants.Zero,
+      );
+    });
+  });
+
+  describe("pairId", () => {
+    it("should return the same ID regardless of token order", async () => {
+      const [token0, token1] = [
+        `0x${"42".repeat(20)}`,
+        `0x${"1337".repeat(10)}`,
+      ];
+
+      expect(await settlement.pairId(token0, token1)).to.equal(
+        await settlement.pairId(token1, token0),
+      );
+    });
+
+    it("should revert for pairs where both tokens are equal", async () => {
+      const token = `0x${"42".repeat(20)}`;
+      await expect(settlement.pairId(token, token)).to.be.revertedWith(
+        "invalid pair",
+      );
     });
   });
 });
