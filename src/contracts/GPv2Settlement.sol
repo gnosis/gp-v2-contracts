@@ -95,8 +95,12 @@ contract GPv2Settlement {
     /// @param token0 The address one of the tokens of the pair.
     /// @param token1 The address the other token of the pair.
     /// @return The token ID unique to the pair.
-    function pairId(IERC20 token0, IERC20 token1) public pure returns (bytes20) {
-      require(token0 != token1, "invalid pair");
-      return (bytes20(address(token0)) ^ bytes20(address(token1)));
+    function pairId(IERC20 token0, IERC20 token1)
+        public
+        pure
+        returns (bytes20)
+    {
+        require(token0 != token1, "invalid pair");
+        return (bytes20(address(token0)) ^ bytes20(address(token1)));
     }
 }
