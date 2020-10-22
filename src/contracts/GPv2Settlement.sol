@@ -20,9 +20,9 @@ contract GPv2Settlement {
     /// well as trading surplus that cannot be directly settled in a batch.
     IUniswapV2Factory public immutable uniswapFactory;
 
-    /// @dev A mapping from a token pair ID to a nonce. This represents the
-    /// batch for token pair and is used to ensure orders can't be replayed
-    /// in multiple batches.
+    /// @dev A mapping from a Uniswap token pair address to its nonce. This
+    /// represents the current batch for that token pair and is used to ensure
+    /// orders can't be replayed in multiple batches.
     mapping(IUniswapV2Pair => uint256) public nonce;
 
     /// @param uniswapFactory_ The Uniswap factory to act as the AMM for this
