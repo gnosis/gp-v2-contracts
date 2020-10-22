@@ -9,10 +9,18 @@ import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 contract GPv2Settlement {
     /// @dev The domain separator used for signing orders that gets mixed in
     /// making signatures for different domains incompatible.
-    bytes32 public constant DOMAIN_SEPARATOR = keccak256("GPv2");
+    bytes4 private constant DOMAIN_SEPARATOR = "GPv2";
 
     /// @dev The stride of an encoded order.
     uint256 private constant ORDER_STRIDE = 130;
+
+    /// @dev Replay protection that is mixed with the order data for signing.
+    /// This is done in order to avoid chain and domain replay protection, so
+    /// that signed orders are only valid for specific GPv2 contracts.
+    ///
+    /// The replay protection is defined as the Keccak-256 hash of `"GPv2"`
+    /// followed by the chain ID and finally the contract address.
+    bytes32 public immutable replayProtection;
 
     /// @dev The Uniswap factory. This is used as the AMM that GPv2 settles with
     /// and is responsible for determining the range of the settlement price as
@@ -27,6 +35,16 @@ contract GPv2Settlement {
     /// @param uniswapFactory_ The Uniswap factory to act as the AMM for this
     /// GPv2 settlement contract.
     constructor(IUniswapV2Factory uniswapFactory_) public {
+        // NOTE: Currently, the only way to get the chain ID in solidity is
+        // using assembly.
+        uint256 chainId;
+        assembly {
+            chainId := chainid()
+        }
+
+        replayProtection = keccak256(
+            abi.encodePacked(DOMAIN_SEPARATOR, uint64(chainId), address(this))
+        );
         uniswapFactory = uniswapFactory_;
     }
 

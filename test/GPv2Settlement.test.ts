@@ -3,7 +3,7 @@ import IUniswapV2Factory from "@uniswap/v2-core/build/IUniswapV2Factory.json";
 import { expect } from "chai";
 import { Contract } from "ethers";
 
-describe("GPv2Settlement", () => {
+describe.only("GPv2Settlement", () => {
   const [deployer] = waffle.provider.getWallets();
 
   let settlement: Contract;
@@ -19,10 +19,14 @@ describe("GPv2Settlement", () => {
     settlement = await GPv2Settlement.deploy(uniswapFactory.address);
   });
 
-  describe("DOMAIN_SEPARATOR", () => {
-    it("should have a well defined domain separator", async () => {
-      expect(await settlement.DOMAIN_SEPARATOR()).to.equal(
-        ethers.utils.id("GPv2"),
+  describe("replayProtection", () => {
+    it("should have a well defined replay protection signature mixer", async () => {
+      const { chainId } = await waffle.provider.getNetwork();
+      expect(await settlement.replayProtection()).to.equal(
+        ethers.utils.solidityKeccak256(
+          ["string", "uint64", "address"],
+          ["GPv2", chainId, settlement.address],
+        ),
       );
     });
   });
