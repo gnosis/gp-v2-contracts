@@ -3,6 +3,7 @@ pragma solidity ^0.6.12;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
+import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 
 /// @title Gnosis Protocol v2 Settlement Contract
 /// @author Gnosis Developers
@@ -19,10 +20,10 @@ contract GPv2Settlement {
     /// well as trading surplus that cannot be directly settled in a batch.
     IUniswapV2Factory public immutable uniswapFactory;
 
-    /// @dev A mapping from a token pair ID to a nonce. This represents the
-    /// batch for token pair and is used to ensure orders can't be replayed
-    /// in multiple batches.
-    mapping(bytes20 => uint256) public nonce;
+    /// @dev A mapping from a Uniswap token pair address to its nonce. This
+    /// represents the current batch for that token pair and is used to ensure
+    /// orders can't be replayed in multiple batches.
+    mapping(IUniswapV2Pair => uint256) public nonce;
 
     /// @param uniswapFactory_ The Uniswap factory to act as the AMM for this
     /// GPv2 settlement contract.
@@ -90,17 +91,35 @@ contract GPv2Settlement {
         revert("not yet implemented");
     }
 
-    /// @dev Returns a unique ID for the specified token pair. Note that the
-    /// order in which the tokens are specified does not matter.
-    /// @param token0 The address one of the tokens of the pair.
-    /// @param token1 The address the other token of the pair.
-    /// @return The token ID unique to the pair.
-    function pairId(IERC20 token0, IERC20 token1)
+    /// @dev Returns a unique pair address for the specified tokens. Note that
+    /// the tokens must be in lexicographical order or else this call reverts.
+    /// This is required to ensure that the `token0` and `token1` are in the
+    /// same order as the Uniswap pair.
+    /// @param token0 The address one token in the pair.
+    /// @param token1 The address the other token in the pair.
+    /// @return The address of the Uniswap token pair.
+    function uniswapPairAddress(IERC20 token0, IERC20 token1)
         public
-        pure
-        returns (bytes20)
+        view
+        returns (IUniswapV2Pair)
     {
-        require(token0 != token1, "invalid pair");
-        return (bytes20(address(token0)) ^ bytes20(address(token1)));
+        require(
+            address(token0) != address(0) && address(token0) < address(token1),
+            "invalid pair"
+        );
+
+        // NOTE: The address of a Uniswap pair is deterministic as it is created
+        // with `CREATE2` instruction. This allows us get the pair address
+        // without requesting any chain data!
+        // See <https://uniswap.org/docs/v2/smart-contract-integration/getting-pair-addresses/>.
+        bytes32 pairAddressBytes = keccak256(
+            abi.encodePacked(
+                hex"ff",
+                address(uniswapFactory),
+                keccak256(abi.encodePacked(address(token0), address(token1))),
+                hex"96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f"
+            )
+        );
+        return IUniswapV2Pair(uint256(pairAddressBytes));
     }
 }
