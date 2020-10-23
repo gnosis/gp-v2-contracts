@@ -25,9 +25,11 @@ describe("GPv2Settlement", () => {
       expect(chainId).to.not.equal(ethers.constants.Zero);
 
       expect(await settlement.replayProtection()).to.equal(
-        ethers.utils.solidityKeccak256(
-          ["string", "uint256", "address"],
-          ["GPv2", chainId, settlement.address],
+        ethers.utils.keccak256(
+          ethers.utils.defaultAbiCoder.encode(
+            ["string", "uint256", "address"],
+            ["GPv2", chainId, settlement.address],
+          ),
         ),
       );
     });

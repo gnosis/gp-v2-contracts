@@ -9,7 +9,7 @@ import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 contract GPv2Settlement {
     /// @dev The domain separator used for signing orders that gets mixed in
     /// making signatures for different domains incompatible.
-    bytes4 private constant DOMAIN_SEPARATOR = "GPv2";
+    string private constant DOMAIN_SEPARATOR = "GPv2";
 
     /// @dev The stride of an encoded order.
     uint256 private constant ORDER_STRIDE = 130;
@@ -45,7 +45,7 @@ contract GPv2Settlement {
         }
 
         replayProtection = keccak256(
-            abi.encodePacked(DOMAIN_SEPARATOR, chainId, address(this))
+            abi.encode(DOMAIN_SEPARATOR, chainId, address(this))
         );
         uniswapFactory = uniswapFactory_;
     }
