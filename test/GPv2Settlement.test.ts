@@ -21,10 +21,27 @@ describe("GPv2Settlement", () => {
     settlement = await GPv2Settlement.deploy(uniswapFactory.address);
   });
 
-  describe("DOMAIN_SEPARATOR", () => {
-    it("should have a well defined domain separator", async () => {
-      expect(await settlement.DOMAIN_SEPARATOR()).to.equal(
-        ethers.utils.id("GPv2"),
+  describe("replayProtection", () => {
+    it("should have a well defined replay protection signature mixer", async () => {
+      const { chainId } = await waffle.provider.getNetwork();
+      expect(chainId).to.not.equal(ethers.constants.Zero);
+
+      expect(await settlement.replayProtection()).to.equal(
+        ethers.utils.keccak256(
+          ethers.utils.defaultAbiCoder.encode(
+            ["string", "uint256", "address"],
+            ["GPv2", chainId, settlement.address],
+          ),
+        ),
+      );
+    });
+
+    it("should have a different replay protection for each deployment", async () => {
+      const GPv2Settlement = await ethers.getContractFactory("GPv2Settlement");
+      const settlement2 = await GPv2Settlement.deploy(uniswapFactory.address);
+
+      expect(await settlement.replayProtection()).to.not.equal(
+        await settlement2.replayProtection(),
       );
     });
   });
