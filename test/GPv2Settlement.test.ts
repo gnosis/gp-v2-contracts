@@ -1,6 +1,7 @@
 import { ethers, waffle } from "@nomiclabs/buidler";
 import IERC20 from "@openzeppelin/contracts/build/contracts/IERC20.json";
 import IUniswapV2Factory from "@uniswap/v2-core/build/IUniswapV2Factory.json";
+import IUniswapV2Pair from "@uniswap/v2-core/build/IUniswapV2Pair.json";
 import UniswapV2Factory from "@uniswap/v2-core/build/UniswapV2Factory.json";
 import { expect } from "chai";
 import { Contract } from "ethers";
@@ -12,7 +13,9 @@ describe("GPv2Settlement", () => {
   let uniswapFactory: Contract;
 
   beforeEach(async () => {
-    const GPv2Settlement = await ethers.getContractFactory("GPv2Settlement");
+    const GPv2Settlement = await ethers.getContractFactory(
+      "GPv2SettlementTestInterface",
+    );
 
     uniswapFactory = await waffle.deployMockContract(
       deployer,
@@ -125,6 +128,73 @@ describe("GPv2Settlement", () => {
       await expect(
         settlement.uniswapPairAddress(ethers.constants.AddressZero, token),
       ).to.be.revertedWith("invalid pair");
+    });
+  });
+
+  describe.only("verifyClearingPrice", () => {
+    let uniswapPair: Contract;
+
+    beforeEach(async () => {
+      uniswapPair = await waffle.deployMockContract(
+        deployer,
+        IUniswapV2Pair.abi,
+      );
+    });
+
+    it("should allow clearing prices within Unswap spot price range", async () => {
+      await uniswapPair.mock.getReserves.returns(1e6, 2e8, 0);
+      await expect(
+        settlement.verifyClearingPriceTest(
+          uniswapPair.address,
+          0,
+          0,
+          1001,
+          200000,
+        ),
+      ).to.not.be.reverted;
+    });
+
+    it("should revert if clearing price is outside of Unswap spot price range", async () => {
+      await uniswapPair.mock.getReserves.returns(1e6, 2e8, 0);
+      await expect(
+        settlement.verifyClearingPriceTest(
+          uniswapPair.address,
+          0,
+          0,
+          10021,
+          2000000,
+        ),
+      ).to.be.revertedWith("Uniswap price not respected");
+      await expect(
+        settlement.verifyClearingPriceTest(
+          uniswapPair.address,
+          0,
+          0,
+          10000,
+          2004001,
+        ),
+      ).to.be.revertedWith("Uniswap price not respected");
+    });
+
+    //    it("", async () => {});
+    //
+    //    it("", async () => {});
+    //
+    //    it("", async () => {});
+    //
+    //    it("", async () => {});
+
+    it("should revert for invalid Uniswap swap amounts", async () => {
+      for (const [d0, d1] of [
+        [1, 0],
+        [0, 1],
+        [-1, -1],
+        [1, 1],
+      ]) {
+        await expect(
+          settlement.verifyClearingPriceTest(uniswapPair.address, d0, d1, 1, 1),
+        ).to.be.revertedWith("invalid Uniswap amounts");
+      }
     });
   });
 });

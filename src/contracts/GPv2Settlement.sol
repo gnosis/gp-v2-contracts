@@ -13,7 +13,13 @@ contract GPv2Settlement {
     string private constant DOMAIN_SEPARATOR = "GPv2";
 
     /// @dev The stride of an encoded order.
-    uint256 private constant ORDER_STRIDE = 130;
+    uint256 private constant ORDER_STRIDE = 126;
+
+    /// @dev The Uniswap fee factor fixed at `(1 - 0.3%) * 1000`.
+    uint256 private constant UNI_FEEFACTOR = 997;
+
+    /// @dev The GPv2 fee factor fixed at `(1 - 0.1%) * 1000`.
+    uint256 private constant GP2_FEEFACTOR = 999;
 
     /// @dev Replay protection that is mixed with the order data for signing.
     /// This is done in order to avoid chain and domain replay protection, so
@@ -72,7 +78,6 @@ contract GPv2Settlement {
     ///     buyAmount:      uint112,
     ///     executedAmount: uint112,
     ///     tip:            uint112,
-    ///     nonce:          uint32,
     ///     validTo:        uint32,
     ///     flags:          uint8,
     ///     signature: {
@@ -101,13 +106,16 @@ contract GPv2Settlement {
     function settle(
         IERC20 token0,
         IERC20 token1,
-        int256 d0,
-        int256 d1,
-        uint256 clearingPrice0,
-        uint256 clearingPrice1,
+        int112 d0,
+        int112 d1,
+        uint112 clearingPrice0,
+        uint112 clearingPrice1,
         bytes calldata encodedOrders0,
         bytes calldata encodedOrders1
     ) external {
+        IUniswapV2Pair pair = uniswapPairAddress(token0, token1);
+        verifyClearingPrice(pair, d0, d1, clearingPrice0, clearingPrice1);
+
         revert("not yet implemented");
     }
 
@@ -141,5 +149,58 @@ contract GPv2Settlement {
             )
         );
         return IUniswapV2Pair(uint256(pairAddressBytes));
+    }
+
+    /// @dev Verifies the specified clearing price is valid. Spefically, this
+    /// method verifies that the ±0.1% fee spread around the clearing price is
+    /// completely within the ±0.3% AMM fee spread around the Uniswap AMM price.
+    /// The AMM price is either defined by the token reserves (AKA spot price)
+    /// in the case the AMM is not traded with, or the actual swap amount (AKA
+    /// effective price) otherwise.
+    function verifyClearingPrice(
+        IUniswapV2Pair pair,
+        int112 d0,
+        int112 d1,
+        uint112 clearingPrice0,
+        uint112 clearingPrice1
+    ) internal view {
+        uint256 uniPrice0;
+        uint256 uniPrice1;
+        if (d0 | d1 == 0) {
+            // NOTE: In case the amounts swapped with the AMM is 0, we want to
+            // ensure that the clearing price with spread is within the AMM
+            // price spread.
+            (uint112 reserve0, uint112 reserve1, ) = pair.getReserves();
+            (uniPrice0, uniPrice1) = (uint256(reserve0), uint256(reserve1));
+        } else {
+            // NOTE: We want to check that exactly only one of `d0` or `d1` is
+            // strictly negative, and the other is strictly positive.
+            // SAFETY: `int112 * int112` cannot overflow a `int256`.
+            require(int256(d0) * int256(d1) < 0, "invalid Uniswap amounts");
+
+            // NOTE: Determine the effective AMM price **before fees**, this is
+            // required when verifying the clearing price as the direction of
+            // the trade is important here.
+            if (d0 < 0) {
+                (uniPrice0, uniPrice1) = (
+                    1000 * uint256(-d0),
+                    UNI_FEEFACTOR * uint256(d1)
+                );
+            } else {
+                (uniPrice0, uniPrice1) = (
+                    UNI_FEEFACTOR * uint256(d0),
+                    1000 * uint256(-d1)
+                );
+            }
+        }
+
+        // SAFETY: `uint112 * uint112 * 1000^2` cannot overflow a `uint256`.
+        uint256 xPrice01 = uint256(clearingPrice0) * uniPrice1;
+        uint256 xPrice10 = uint256(clearingPrice1) * uniPrice0;
+        require(
+            xPrice01 * UNI_FEEFACTOR < xPrice10 * GP2_FEEFACTOR &&
+                xPrice10 * UNI_FEEFACTOR < xPrice01 * GP2_FEEFACTOR,
+            "Uniswap price not respected"
+        );
     }
 }
