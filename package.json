@@ -28,7 +28,7 @@
     "eslint-plugin-import": "^2.22.1",
     "eslint-plugin-no-only-tests": "^2.4.0",
     "eslint-plugin-prettier": "^3.1.4",
-    "ethereum-waffle": "^3.1.1",
+    "ethereum-waffle": "^3.1.2",
     "ethers": "^5.0.19",
     "prettier": "^2.1.2",
     "prettier-plugin-solidity": "^1.0.0-alpha.59",
