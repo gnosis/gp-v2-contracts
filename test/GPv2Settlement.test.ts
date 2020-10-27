@@ -205,9 +205,11 @@ describe("GPv2Settlement", () => {
         untouchedAmountTokenIn,
       );
     }
+
     it("swaps when the sold token is Uniswap's token0", async () => {
       await tradeWithAddressOrder((left, right) => left < right);
     });
+
     it("swaps when the sold token is Uniswap's token1", async () => {
       await tradeWithAddressOrder((left, right) => left > right);
     });
