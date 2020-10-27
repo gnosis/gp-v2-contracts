@@ -189,7 +189,7 @@ describe("GPv2Settlement", () => {
       await tokenIn.mint(settlementTester.address, untouchedAmountTokenIn);
 
       await expect(
-        settlementTester.testUniswapTrade(
+        settlementTester.uniswapTradeTest(
           tokenIn.address,
           tokenOut.address,
           amountIn,

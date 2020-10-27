@@ -12,7 +12,7 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
         GPv2Settlement(uniswapFactory_)
     {}
 
-    function testUniswapTrade(
+    function uniswapTradeTest(
         IERC20 tokenIn,
         IERC20 tokenOut,
         uint256 amountIn,
