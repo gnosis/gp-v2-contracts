@@ -12,7 +12,9 @@ describe("GPv2Settlement", () => {
   let uniswapFactory: Contract;
 
   beforeEach(async () => {
-    const GPv2Settlement = await ethers.getContractFactory("GPv2Settlement");
+    const GPv2Settlement = await ethers.getContractFactory(
+      "GPv2SettlementTestInterface",
+    );
 
     uniswapFactory = await waffle.deployMockContract(
       deployer,
@@ -54,11 +56,32 @@ describe("GPv2Settlement", () => {
     });
   });
 
-  describe("nonce", () => {
-    it("should should be initialized to zero", async () => {
-      expect(await settlement.nonce(`0x${"42".repeat(20)}`)).to.equal(
+  describe("nonces", () => {
+    it("should be initialized to zero", async () => {
+      expect(await settlement.nonces(`0x${"42".repeat(20)}`)).to.equal(
         ethers.constants.Zero,
       );
+    });
+  });
+
+  describe("fetchIncrementNonce", () => {
+    it("should increment pair nonce by one", async () => {
+      const pair = `0x${"42".repeat(20)}`;
+      await settlement.fetchIncrementNonceTest(pair);
+      expect(await settlement.nonces(pair)).to.equal(ethers.constants.One);
+    });
+
+    it("should return the value before incrementing", async () => {
+      const pair = `0x${"42".repeat(20)}`;
+
+      expect(
+        await settlement.callStatic.fetchIncrementNonceTest(pair),
+      ).to.equal(ethers.constants.Zero);
+
+      await settlement.fetchIncrementNonceTest(pair);
+      expect(
+        await settlement.callStatic.fetchIncrementNonceTest(pair),
+      ).to.equal(ethers.constants.One);
     });
   });
 

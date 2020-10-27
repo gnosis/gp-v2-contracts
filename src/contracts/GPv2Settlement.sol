@@ -31,7 +31,7 @@ contract GPv2Settlement {
     /// @dev A mapping from a Uniswap token pair address to its nonce. This
     /// represents the current batch for that token pair and is used to ensure
     /// orders can't be replayed in multiple batches.
-    mapping(IUniswapV2Pair => uint256) public nonce;
+    mapping(IUniswapV2Pair => uint256) public nonces;
 
     /// @param uniswapFactory_ The Uniswap factory to act as the AMM for this
     /// GPv2 settlement contract.
@@ -50,6 +50,8 @@ contract GPv2Settlement {
         );
         uniswapFactory = uniswapFactory_;
     }
+
+    // solhint-disable no-unused-vars
 
     /// @dev Settle the specified orders at a clearing price. Note that it is
     /// the responsibility of the caller to ensure that all GPv2 invariants are
@@ -108,8 +110,13 @@ contract GPv2Settlement {
         bytes calldata encodedOrders0,
         bytes calldata encodedOrders1
     ) external {
+        IUniswapV2Pair pair = uniswapPairAddress(token0, token1);
+        uint256 nonce = fetchIncrementNonce(pair);
+
         revert("not yet implemented");
     }
+
+    // solhint-enable
 
     /// @dev Returns a unique pair address for the specified tokens. Note that
     /// the tokens must be in lexicographical order or else this call reverts.
@@ -141,5 +148,21 @@ contract GPv2Settlement {
             )
         );
         return IUniswapV2Pair(uint256(pairAddressBytes));
+    }
+
+    /// @dev Increments the nonce for the specified pair and returns the
+    /// previous value (i.e. before incrementing).
+    /// @param pair The token pair to increment and retrieve the nonce for.
+    /// @return nonce The nonce before incrementing.
+    function fetchIncrementNonce(IUniswapV2Pair pair)
+        internal
+        returns (uint256 nonce)
+    {
+        nonce = nonces[pair];
+
+        // SAFETY: This is the only place the nonce is modified. The `nonce`
+        // cannot realistically overflow by adding one at a time, as that would
+        // take 2^256 transactions to achieve!
+        nonces[pair] = nonce + 1;
     }
 }
