@@ -1,9 +1,11 @@
 import { ethers, waffle } from "@nomiclabs/buidler";
+import ERC20 from "@openzeppelin/contracts/build/contracts/ERC20PresetMinterPauser.json";
 import IERC20 from "@openzeppelin/contracts/build/contracts/IERC20.json";
 import IUniswapV2Factory from "@uniswap/v2-core/build/IUniswapV2Factory.json";
 import UniswapV2Factory from "@uniswap/v2-core/build/UniswapV2Factory.json";
-import { expect } from "chai";
-import { Contract } from "ethers";
+import UniswapV2Pair from "@uniswap/v2-core/build/UniswapV2Pair.json";
+import { expect, assert } from "chai";
+import { BigNumber, Contract } from "ethers";
 
 describe("GPv2Settlement", () => {
   const [deployer] = waffle.provider.getWallets();
@@ -125,6 +127,89 @@ describe("GPv2Settlement", () => {
       await expect(
         settlement.uniswapPairAddress(ethers.constants.AddressZero, token),
       ).to.be.revertedWith("invalid pair");
+    });
+  });
+
+  describe("uniswapTrade", () => {
+    async function tradeWithAddressOrder(
+      ordering: (left: string, right: string) => boolean,
+    ) {
+      uniswapFactory = await waffle.deployContract(deployer, UniswapV2Factory, [
+        deployer.address,
+      ]);
+      const tokenA = await waffle.deployContract(deployer, ERC20, [
+        "tokenA",
+        "18",
+      ]);
+      const tokenB = await waffle.deployContract(deployer, ERC20, [
+        "tokenB",
+        "18",
+      ]);
+      // tokenIn and tokenOut are sorted according to the chosen ordering
+      const [tokenIn, tokenOut] = ordering(tokenA.address, tokenB.address)
+        ? [tokenA, tokenB]
+        : [tokenB, tokenA];
+
+      await uniswapFactory.createPair(tokenA.address, tokenB.address, {
+        gasLimit: 6000000,
+      });
+      const pairAddress = await uniswapFactory.getPair(
+        tokenA.address,
+        tokenB.address,
+      );
+      let pair = await waffle.deployContract(deployer, UniswapV2Pair);
+      pair = await pair.attach(pairAddress);
+
+      // Uniswap pool has a price of one
+      const poolIn = BigNumber.from(10).pow(21);
+      const poolOut = BigNumber.from(10).pow(21);
+      await tokenIn.mint(pair.address, poolIn);
+      await tokenOut.mint(pair.address, poolOut);
+      // store deposits in Uniswap's reserves
+      await pair.mint(deployer.address);
+
+      const amountIn = BigNumber.from(10).pow(18);
+      const maxAmountOut = poolOut
+        .mul(amountIn)
+        .mul(997)
+        .div(1000)
+        .div(poolIn.add(amountIn.mul(997).div(1000).add(1)));
+      assert(maxAmountOut.gt(0));
+
+      const GPv2SettlementTestInterface = await ethers.getContractFactory(
+        "GPv2SettlementTestInterface",
+      );
+      const settlementTester = await GPv2SettlementTestInterface.deploy(
+        uniswapFactory.address,
+      );
+      await tokenIn.mint(settlementTester.address, amountIn);
+
+      // extra amount that should not be affected by the settlement
+      const untouchedAmountTokenIn = BigNumber.from(10).pow(19);
+      await tokenIn.mint(settlementTester.address, untouchedAmountTokenIn);
+
+      await expect(
+        settlementTester.testUniswapTrade(
+          tokenIn.address,
+          tokenOut.address,
+          amountIn,
+          maxAmountOut,
+          { gasLimit: 6000000 },
+        ),
+      ).not.to.be.reverted;
+
+      expect(await tokenOut.balanceOf(settlementTester.address)).to.be.equal(
+        maxAmountOut,
+      );
+      expect(await tokenIn.balanceOf(settlementTester.address)).to.be.equal(
+        untouchedAmountTokenIn,
+      );
+    }
+    it("swaps when the sold token is Uniswap's token0", async () => {
+      await tradeWithAddressOrder((left, right) => left < right);
+    });
+    it("swaps when the sold token is Uniswap's token1", async () => {
+      await tradeWithAddressOrder((left, right) => left > right);
     });
   });
 });
