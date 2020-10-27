@@ -52,43 +52,6 @@ contract GPv2Settlement {
         uniswapFactory = uniswapFactory_;
     }
 
-    /// @dev Execute a Uniswap trade exchanging the given amount of tokenIn
-    /// for the given amount of tokenOut.
-    ///
-    /// @param tokenIn The token sold on Uniswap.
-    /// @param tokenOut The token bought on Uniswap.
-    /// @param amountIn The amount sold.
-    /// @param amountOut The amount bought.
-    function uniswapTrade(
-        IERC20 tokenIn,
-        IERC20 tokenOut,
-        uint256 amountIn,
-        uint256 amountOut
-    ) internal {
-        bool depositToken0ReceiveToken1 = address(tokenIn) < address(tokenOut);
-
-        IERC20 token0;
-        IERC20 token1;
-        uint256 amount0Out;
-        uint256 amount1Out;
-        if (depositToken0ReceiveToken1) {
-            (token0, token1) = (tokenIn, tokenOut);
-            (amount0Out, amount1Out) = (0, amountOut);
-        } else {
-            (token0, token1) = (tokenOut, tokenIn);
-            (amount0Out, amount1Out) = (amountOut, 0);
-        }
-
-        IUniswapV2Pair uniswapPair = uniswapPairAddress(token0, token1);
-
-        require(
-            tokenIn.transfer(address(uniswapPair), amountIn),
-            "transfer to uniswap failed"
-        );
-
-        uniswapPair.swap(amount0Out, amount1Out, address(this), "");
-    }
-
     /// @dev Settle the specified orders at a clearing price. Note that it is
     /// the responsibility of the caller to ensure that all GPv2 invariants are
     /// upheld for the input settlement, otherwise this call will revert.
@@ -179,5 +142,42 @@ contract GPv2Settlement {
             )
         );
         return IUniswapV2Pair(uint256(pairAddressBytes));
+    }
+
+    /// @dev Execute a Uniswap trade exchanging the given amount of tokenIn
+    /// for the given amount of tokenOut.
+    ///
+    /// @param tokenIn The token sold on Uniswap.
+    /// @param tokenOut The token bought on Uniswap.
+    /// @param amountIn The amount sold.
+    /// @param amountOut The amount bought.
+    function uniswapTrade(
+        IERC20 tokenIn,
+        IERC20 tokenOut,
+        uint256 amountIn,
+        uint256 amountOut
+    ) internal {
+        bool depositToken0ReceiveToken1 = address(tokenIn) < address(tokenOut);
+
+        IERC20 token0;
+        IERC20 token1;
+        uint256 amount0Out;
+        uint256 amount1Out;
+        if (depositToken0ReceiveToken1) {
+            (token0, token1) = (tokenIn, tokenOut);
+            (amount0Out, amount1Out) = (0, amountOut);
+        } else {
+            (token0, token1) = (tokenOut, tokenIn);
+            (amount0Out, amount1Out) = (amountOut, 0);
+        }
+
+        IUniswapV2Pair uniswapPair = uniswapPairAddress(token0, token1);
+
+        require(
+            tokenIn.transfer(address(uniswapPair), amountIn),
+            "transfer to uniswap failed"
+        );
+
+        uniswapPair.swap(amount0Out, amount1Out, address(this), "");
     }
 }
