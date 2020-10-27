@@ -131,7 +131,7 @@ describe("GPv2Settlement", () => {
     });
   });
 
-  describe.only("verifyClearingPrice", () => {
+  describe("verifyClearingPrice", () => {
     let uniswapPair: Contract;
 
     beforeEach(async () => {
@@ -141,17 +141,23 @@ describe("GPv2Settlement", () => {
       );
     });
 
-    it("should allow clearing prices within Unswap spot price range", async () => {
+    it("should allow clearing prices within Uniswap spot price range", async () => {
       await uniswapPair.mock.getReserves.returns(1e6, 2e8, 0);
-      await expect(
-        settlement.verifyClearingPriceTest(
-          uniswapPair.address,
-          0,
-          0,
-          1001,
-          200000,
-        ),
-      ).to.not.be.reverted;
+      for (const [clearingPrice0, clearingPrice1] of [
+        [1000, 200000],
+        [997, 199800], // NOTE: Minimum price
+        [999, 199400], // NOTE: Maximum price
+      ]) {
+        await expect(
+          settlement.verifyClearingPriceTest(
+            uniswapPair.address,
+            0,
+            0,
+            clearingPrice0,
+            clearingPrice1,
+          ),
+        ).to.not.be.reverted;
+      }
     });
 
     it("should revert if clearing price is outside of Unswap spot price range", async () => {
@@ -170,19 +176,66 @@ describe("GPv2Settlement", () => {
           uniswapPair.address,
           0,
           0,
-          10000,
-          2004001,
+          9999,
+          2004000,
         ),
       ).to.be.revertedWith("Uniswap price not respected");
     });
 
-    //    it("", async () => {});
-    //
-    //    it("", async () => {});
-    //
-    //    it("", async () => {});
-    //
-    //    it("", async () => {});
+    it("should allow clearing prices within Uniswap effective price range", async () => {
+      // NOTE: If `d0` is negative, then we are removing token 0 from the
+      // Uniswap reserves, i.e. we are buying token 0 for token 1. Conversely,
+      // if `d1` is negative, then we are buying token 1 for token 0.
+
+      for (const [clearingPrice0, clearingPrice1] of [
+        [1000, 199800], // NOTE: Minimum price
+        [9990, 1988018], // NOTE: Maximum price
+      ]) {
+        await expect(
+          settlement.verifyClearingPriceTest(
+            uniswapPair.address,
+            -1,
+            200,
+            clearingPrice0,
+            clearingPrice1,
+          ),
+        ).to.not.be.reverted;
+      }
+
+      for (const [clearingPrice0, clearingPrice1] of [
+        [994009, 199800000], // NOTE: Minimum price
+        [999, 200000], // NOTE: Maximum price
+      ]) {
+        await expect(
+          settlement.verifyClearingPriceTest(
+            uniswapPair.address,
+            1,
+            -200,
+            clearingPrice0,
+            clearingPrice1,
+          ),
+        ).to.not.be.reverted;
+      }
+    });
+
+    it("should revert if clearing price is outside of Uniswap effective price range", async () => {
+      for (const [d0, d1, clearingPrice0, clearingPrice1] of [
+        [-1, 200, 999, 199800],
+        [-1, 200, 9991, 1988018],
+        [1, -200, 994008, 199800000],
+        [1, -200, 1000, 200000],
+      ]) {
+        await expect(
+          settlement.verifyClearingPriceTest(
+            uniswapPair.address,
+            d0,
+            d1,
+            clearingPrice0,
+            clearingPrice1,
+          ),
+        ).to.be.revertedWith("Uniswap price not respected");
+      }
+    });
 
     it("should revert for invalid Uniswap swap amounts", async () => {
       for (const [d0, d1] of [

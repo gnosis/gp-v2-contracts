@@ -1,6 +1,8 @@
 // SPDX-license-identifier: LGPL-3.0-or-newer
 pragma solidity ^0.6.12;
 
+import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/math/SignedSafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
@@ -8,12 +10,18 @@ import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 /// @title Gnosis Protocol v2 Settlement Contract
 /// @author Gnosis Developers
 contract GPv2Settlement {
+    using SafeMath for uint256;
+    using SignedSafeMath for int256;
+
     /// @dev The domain separator used for signing orders that gets mixed in
     /// making signatures for different domains incompatible.
     string private constant DOMAIN_SEPARATOR = "GPv2";
 
     /// @dev The stride of an encoded order.
     uint256 private constant ORDER_STRIDE = 126;
+
+    /// @dev The common fee multiple used for the fee factors fixed at `1000`.
+    uint256 private constant FEE_MULTIPLE = 1000;
 
     /// @dev The Uniswap fee factor fixed at `(1 - 0.3%) * 1000`.
     uint256 private constant UNI_FEEFACTOR = 997;
@@ -108,8 +116,8 @@ contract GPv2Settlement {
         IERC20 token1,
         int112 d0,
         int112 d1,
-        uint112 clearingPrice0,
-        uint112 clearingPrice1,
+        uint256 clearingPrice0,
+        uint256 clearingPrice1,
         bytes calldata encodedOrders0,
         bytes calldata encodedOrders1
     ) external {
@@ -161,8 +169,8 @@ contract GPv2Settlement {
         IUniswapV2Pair pair,
         int112 d0,
         int112 d1,
-        uint112 clearingPrice0,
-        uint112 clearingPrice1
+        uint256 clearingPrice0,
+        uint256 clearingPrice1
     ) internal view {
         uint256 uniPrice0;
         uint256 uniPrice1;
@@ -175,31 +183,32 @@ contract GPv2Settlement {
         } else {
             // NOTE: We want to check that exactly only one of `d0` or `d1` is
             // strictly negative, and the other is strictly positive.
-            // SAFETY: `int112 * int112` cannot overflow a `int256`.
-            require(int256(d0) * int256(d1) < 0, "invalid Uniswap amounts");
+            require(
+                (d0 < 0 && 0 < d1) || (d1 < 0 && 0 < d0),
+                "invalid Uniswap amounts"
+            );
 
             // NOTE: Determine the effective AMM price **before fees**, this is
             // required when verifying the clearing price as the direction of
             // the trade is important here.
             if (d0 < 0) {
                 (uniPrice0, uniPrice1) = (
-                    1000 * uint256(-d0),
-                    UNI_FEEFACTOR * uint256(d1)
+                    uint256(-d0).mul(FEE_MULTIPLE),
+                    uint256(d1).mul(UNI_FEEFACTOR)
                 );
             } else {
                 (uniPrice0, uniPrice1) = (
-                    UNI_FEEFACTOR * uint256(d0),
-                    1000 * uint256(-d1)
+                    uint256(d0).mul(UNI_FEEFACTOR),
+                    uint256(-d1).mul(FEE_MULTIPLE)
                 );
             }
         }
 
-        // SAFETY: `uint112 * uint112 * 1000^2` cannot overflow a `uint256`.
-        uint256 xPrice01 = uint256(clearingPrice0) * uniPrice1;
-        uint256 xPrice10 = uint256(clearingPrice1) * uniPrice0;
+        uint256 xPrice01 = clearingPrice0.mul(uniPrice1);
+        uint256 xPrice10 = clearingPrice1.mul(uniPrice0);
         require(
-            xPrice01 * UNI_FEEFACTOR < xPrice10 * GP2_FEEFACTOR &&
-                xPrice10 * UNI_FEEFACTOR < xPrice01 * GP2_FEEFACTOR,
+            xPrice01.mul(UNI_FEEFACTOR) <= xPrice10.mul(GP2_FEEFACTOR) &&
+                xPrice10.mul(UNI_FEEFACTOR) <= xPrice01.mul(GP2_FEEFACTOR),
             "Uniswap price not respected"
         );
     }

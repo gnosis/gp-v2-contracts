@@ -5,11 +5,14 @@ import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 import "../GPv2Settlement.sol";
 
 contract GPv2SettlementTestInterface is GPv2Settlement {
-    // solhint-disable-next-line no-empty-blocks
+    // solhint-disable no-empty-blocks
+
     constructor(IUniswapV2Factory uniswapFactory_)
         public
         GPv2Settlement(uniswapFactory_)
     {}
+
+    // solhint-enable
 
     function verifyClearingPriceTest(
         IUniswapV2Pair pair,
