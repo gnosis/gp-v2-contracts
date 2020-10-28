@@ -182,11 +182,10 @@ describe("GPv2Settlement", () => {
       ).to.be.revertedWith("Uniswap price not respected");
     });
 
-    it("should allow clearing prices within Uniswap effective price range", async () => {
+    it("should allow clearing prices within Uniswap effective token 0 buy price range", async () => {
       // NOTE: If `d0` is negative, then we are removing token 0 from the
       // Uniswap reserves, i.e. we are buying token 0 for token 1. Conversely,
       // if `d1` is negative, then we are buying token 1 for token 0.
-
       for (const [clearingPrice0, clearingPrice1] of [
         [1000, 199800], // NOTE: Minimum price
         [9990, 1988018], // NOTE: Maximum price
@@ -201,7 +200,9 @@ describe("GPv2Settlement", () => {
           ),
         ).to.not.be.reverted;
       }
+    });
 
+    it("should allow clearing prices within Uniswap effective token 1 buy price range", async () => {
       for (const [clearingPrice0, clearingPrice1] of [
         [994009, 199800000], // NOTE: Minimum price
         [999, 200000], // NOTE: Maximum price
