@@ -3,7 +3,7 @@ import IERC20 from "@openzeppelin/contracts/build/contracts/IERC20.json";
 import IUniswapV2Factory from "@uniswap/v2-core/build/IUniswapV2Factory.json";
 import UniswapV2Factory from "@uniswap/v2-core/build/UniswapV2Factory.json";
 import { expect } from "chai";
-import { Contract } from "ethers";
+import { Contract, BigNumber } from "ethers";
 
 describe("GPv2Settlement", () => {
   const [deployer] = waffle.provider.getWallets();
@@ -65,23 +65,25 @@ describe("GPv2Settlement", () => {
   });
 
   describe("fetchIncrementNonce", () => {
+    const pair = `0x${"42".repeat(20)}`;
+
     it("should increment pair nonce by one", async () => {
-      const pair = `0x${"42".repeat(20)}`;
+      await settlement.setNonce(pair, 1336);
       await settlement.fetchIncrementNonceTest(pair);
-      expect(await settlement.nonces(pair)).to.equal(ethers.constants.One);
+      expect(await settlement.nonces(pair)).to.equal(BigNumber.from(1337));
     });
 
-    it("should return the value before incrementing", async () => {
-      const pair = `0x${"42".repeat(20)}`;
-
-      expect(
-        await settlement.callStatic.fetchIncrementNonceTest(pair),
-      ).to.equal(ethers.constants.Zero);
-
-      await settlement.fetchIncrementNonceTest(pair);
+    it("should start with nonce 1", async () => {
       expect(
         await settlement.callStatic.fetchIncrementNonceTest(pair),
       ).to.equal(ethers.constants.One);
+    });
+
+    it("should return the value after incrementing", async () => {
+      await settlement.setNonce(pair, 41);
+      expect(
+        await settlement.callStatic.fetchIncrementNonceTest(pair),
+      ).to.equal(BigNumber.from(42));
     });
   });
 

@@ -14,6 +14,10 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
 
     // solhint-enable
 
+    function setNonce(IUniswapV2Pair pair, uint256 nonce) external {
+        nonces[pair] = nonce;
+    }
+
     function fetchIncrementNonceTest(IUniswapV2Pair pair)
         external
         returns (uint256)
