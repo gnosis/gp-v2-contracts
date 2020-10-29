@@ -183,7 +183,7 @@ describe("GPv2Settlement", () => {
     const executedAmount = fillUint(112, 6);
     const signature = ethers.utils.splitSignature(`${fillBytes(64, 0)}01`);
 
-    it("should round trip encoded executed order data", async () => {
+    it("should round-trip encode executed order data", async () => {
       const encodedOrder = encodeExecutedOrder(
         order,
         executedAmount,
