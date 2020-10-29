@@ -197,7 +197,7 @@ contract GPv2Settlement {
         )
     {
         // NOTE: This is currently unnecessarily gas inefficient. Specifically,
-        // there is a potentially extrenuous check to the encoded order length
+        // there is a potentially extraneuous check to the encoded order length
         // (this can be verified once for the total encoded orders length).
         // Additionally, Solidity generates bounds checks for each `abi.decode`
         // and slice operation. Unfortunately using `assmebly { calldataload }`
