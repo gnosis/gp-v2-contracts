@@ -28,10 +28,16 @@ contract GPv2Settlement {
     /// well as trading surplus that cannot be directly settled in a batch.
     IUniswapV2Factory public immutable uniswapFactory;
 
-    /// @dev A mapping from a Uniswap token pair address to its nonce. This
-    /// represents the current batch for that token pair and is used to ensure
-    /// orders can't be replayed in multiple batches.
-    mapping(IUniswapV2Pair => uint256) public nonce;
+    /// @dev A mapping from a Uniswap token pair address to the nonce of the
+    /// last settled batch (a value of 0 indicates that no batches have been
+    /// settled for the specified pair). This is used to ensure orders can't be
+    /// replayed in multiple batches.
+    ///
+    /// The next batch to be settled for the specified pair will use the nonce
+    /// `nonces[pair] + 1`. This is so the no batches with nonce `0` can exist
+    /// as that value is reserved for orders to indicate that they can be
+    /// replayed in any batch.
+    mapping(IUniswapV2Pair => uint256) public nonces;
 
     /// @param uniswapFactory_ The Uniswap factory to act as the AMM for this
     /// GPv2 settlement contract.
@@ -50,6 +56,9 @@ contract GPv2Settlement {
         );
         uniswapFactory = uniswapFactory_;
     }
+
+    // TODO(nlordell): Remove this once the `settle` function is implemented.
+    // solhint-disable no-unused-vars
 
     /// @dev Settle the specified orders at a clearing price. Note that it is
     /// the responsibility of the caller to ensure that all GPv2 invariants are
@@ -108,8 +117,13 @@ contract GPv2Settlement {
         bytes calldata encodedOrders0,
         bytes calldata encodedOrders1
     ) external {
+        IUniswapV2Pair pair = uniswapPairAddress(token0, token1);
+        uint256 nonce = fetchIncrementNonce(pair);
+
         revert("not yet implemented");
     }
+
+    // solhint-enable
 
     /// @dev Returns a unique pair address for the specified tokens. Note that
     /// the tokens must be in lexicographical order or else this call reverts.
@@ -141,5 +155,28 @@ contract GPv2Settlement {
             )
         );
         return IUniswapV2Pair(uint256(pairAddressBytes));
+    }
+
+    /// @dev Increments the nonce for the specified pair and returns the new
+    /// value (i.e. after incrementing).
+    ///
+    /// Note that the nonce value after incrementing is used for a batch as this
+    /// ensures that the nonce `0` is never used for a batch. This is important
+    /// as `0` is a special nonce value used for orders that have disabled
+    /// replay protection.
+    /// @param pair The token pair to increment and retrieve the nonce for.
+    /// @return nonce The nonce before incrementing.
+    function fetchIncrementNonce(IUniswapV2Pair pair)
+        internal
+        returns (uint256 nonce)
+    {
+        // NOTE: The nonce is offset by 1 as `0` is a special value to signal
+        // that an order can be replayed in all batches.
+        nonce = nonces[pair] + 1;
+
+        // SAFETY: This is the only place the nonce is modified. The `nonce`
+        // cannot realistically overflow by adding one at a time, as that would
+        // take 2^256 transactions to achieve!
+        nonces[pair] = nonce;
     }
 }
