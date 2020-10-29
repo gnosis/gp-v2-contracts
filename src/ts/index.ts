@@ -94,7 +94,7 @@ function timestamp(time: number | Date): number {
  * @param order The order data to be encoded.
  * @param executedAmount The amount of the order that is actually traded.
  * @param signature The signature for the order data.
- * @return A hex-string representing the encded executed order.
+ * @return A hex-string representing the encoded executed order.
  */
 export function encodeExecutedOrder(
   order: Order,
