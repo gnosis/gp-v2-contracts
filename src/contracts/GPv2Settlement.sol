@@ -13,7 +13,7 @@ contract GPv2Settlement {
     string private constant DOMAIN_SEPARATOR = "GPv2";
 
     /// @dev The stride of an encoded order.
-    uint256 private constant ORDER_STRIDE = 130;
+    uint256 private constant ORDER_STRIDE = 126;
 
     /// @dev Replay protection that is mixed with the order data for signing.
     /// This is done in order to avoid chain and domain replay protection, so
@@ -79,11 +79,10 @@ contract GPv2Settlement {
     /// struct Order {
     ///     sellAmount:     uint112,
     ///     buyAmount:      uint112,
-    ///     executedAmount: uint112,
-    ///     tip:            uint112,
-    ///     nonce:          uint32,
     ///     validTo:        uint32,
+    ///     tip:            uint112,
     ///     flags:          uint8,
+    ///     executedAmount: uint112,
     ///     signature: {
     ///         v:          uint8,
     ///         r:          bytes32,
@@ -178,5 +177,49 @@ contract GPv2Settlement {
         // cannot realistically overflow by adding one at a time, as that would
         // take 2^256 transactions to achieve!
         nonces[pair] = nonce;
+    }
+
+    /// @dev Decodes an order from calldata bytes returning order parameters.
+    /// @param encodedOrder The order as encoded calldata bytes.
+    function decodeOrder(bytes calldata encodedOrder)
+        internal
+        pure
+        returns (
+            uint112 sellAmount,
+            uint112 buyAmount,
+            uint32 validTo,
+            uint112 tip,
+            uint8 flags,
+            uint112 executedAmount,
+            uint8 v,
+            bytes32 r,
+            bytes32 s
+        )
+    {
+        // NOTE: This is currently unnecessarily gas inefficient. Specifically,
+        // there is a potentially extrenuous check to the encoded order length
+        // (this can be verified once for the total encoded orders length).
+        // Additionally, Solidity generates bounds checks for each `abi.decode`
+        // and slice operation. Unfortunately using `assmebly { calldataload }`
+        // is quite ugly here since there is no mechanism to get calldata
+        // offsets (like there is for memory offsets) without manual
+        // computation, which is brittle as changes to the `settle` function
+        // signature would require manual adjustments to the computation. Once
+        // gas benchmarking is set up, we can evaluate if it is worth the extra
+        // effort.
+
+        require(encodedOrder.length == ORDER_STRIDE, "malformed order data");
+
+        sellAmount = uint112(abi.decode(encodedOrder[0:], (uint256)) >> 144);
+        buyAmount = uint112(abi.decode(encodedOrder[14:], (uint256)) >> 144);
+        validTo = uint32(abi.decode(encodedOrder[28:], (uint256)) >> 224);
+        tip = uint112(abi.decode(encodedOrder[32:], (uint256)) >> 144);
+        flags = uint8(abi.decode(encodedOrder[46:], (uint256)) >> 248);
+        executedAmount = uint112(
+            abi.decode(encodedOrder[47:], (uint256)) >> 144
+        );
+        v = uint8(abi.decode(encodedOrder[61:], (uint256)) >> 248);
+        r = bytes32(abi.decode(encodedOrder[62:], (uint256)));
+        s = bytes32(abi.decode(encodedOrder[94:], (uint256)));
     }
 }

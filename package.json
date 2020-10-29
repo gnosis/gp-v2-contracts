@@ -10,6 +10,9 @@
     "lint:ts": "eslint --max-warnings 0 .",
     "fmt:sol": "prettier 'src/contracts/**/*.sol' -w"
   },
+  "dependencies": {
+    "ethers": "^5.0.19"
+  },
   "devDependencies": {
     "@nomiclabs/buidler": "^1.4.8",
     "@nomiclabs/buidler-ethers": "^2.0.2",
@@ -29,7 +32,6 @@
     "eslint-plugin-no-only-tests": "^2.4.0",
     "eslint-plugin-prettier": "^3.1.4",
     "ethereum-waffle": "^3.2.0",
-    "ethers": "^5.0.19",
     "prettier": "^2.1.2",
     "prettier-plugin-solidity": "^1.0.0-alpha.59",
     "solhint": "^3.3.1",
