@@ -214,11 +214,11 @@ contract GPv2Settlement {
         buyAmount = uint112(abi.decode(encodedOrder[14:], (uint256)) >> 144);
         validTo = uint32(abi.decode(encodedOrder[28:], (uint256)) >> 224);
         tip = uint112(abi.decode(encodedOrder[32:], (uint256)) >> 144);
-        flags = uint8(abi.decode(encodedOrder[46:], (uint256)) >> 248);
+        flags = uint8(encodedOrder[46]);
         executedAmount = uint112(
             abi.decode(encodedOrder[47:], (uint256)) >> 144
         );
-        v = uint8(abi.decode(encodedOrder[61:], (uint256)) >> 248);
+        v = uint8(encodedOrder[61]);
         r = bytes32(abi.decode(encodedOrder[62:], (uint256)));
         s = bytes32(abi.decode(encodedOrder[94:], (uint256)));
     }

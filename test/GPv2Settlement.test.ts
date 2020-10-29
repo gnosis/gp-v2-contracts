@@ -161,25 +161,35 @@ describe("GPv2Settlement", () => {
   });
 
   describe("decodeOrder", () => {
+    const fillBytes = (bytes: number, marker: number) =>
+      `0x${[...Array(bytes)]
+        .map((_, i) =>
+          (i + (marker << 4)).toString(16).padStart(2, "0").substr(0, 2),
+        )
+        .join("")}`;
+    const fillUint = (bits: number, marker: number) =>
+      BigNumber.from(fillBytes(bits / 8, marker));
+
     const order = {
       sellToken: `0x${"5311".repeat(10)}`,
       buyToken: `0x${"b111".repeat(10)}`,
-      sellAmount: BigNumber.from(42).mul(ethers.constants.WeiPerEther),
-      buyAmount: BigNumber.from(1337).mul(ethers.constants.WeiPerEther),
-      validTo: 3600 + ~~(Date.now() / 1000),
-      nonce: 42,
-      tip: ethers.constants.WeiPerEther,
+      sellAmount: fillUint(112, 1),
+      buyAmount: fillUint(112, 2),
+      validTo: fillUint(32, 3).toNumber(),
+      nonce: fillUint(32, 4).toNumber(),
+      tip: fillUint(112, 5),
       flags: OrderFlags.BUY_ORDER,
     };
-    const executedAmount = BigNumber.from(123456789);
-    const zeroSignature = ethers.utils.splitSignature(`0x${"00".repeat(65)}`);
+    const executedAmount = fillUint(112, 6);
+    const signature = ethers.utils.splitSignature(`${fillBytes(64, 0)}01`);
 
     it("should round trip encoded executed order data", async () => {
       const encodedOrder = encodeExecutedOrder(
         order,
         executedAmount,
-        zeroSignature,
+        signature,
       );
+
       expect(await settlement.decodeOrderTest(encodedOrder)).to.deep.equal([
         order.sellAmount,
         order.buyAmount,
@@ -187,20 +197,20 @@ describe("GPv2Settlement", () => {
         order.tip,
         order.flags,
         executedAmount,
-        zeroSignature.v,
-        zeroSignature.r,
-        zeroSignature.s,
+        signature.v,
+        signature.r,
+        signature.s,
       ]);
     });
 
     it("should encode replayable orders", async () => {
-      const decodedOrder = await settlement.decodeOrderTest(
-        encodeExecutedOrder(
-          { ...order, nonce: REPLAYABLE_NONCE },
-          executedAmount,
-          zeroSignature,
-        ),
+      const encodedOrder = encodeExecutedOrder(
+        { ...order, nonce: REPLAYABLE_NONCE },
+        executedAmount,
+        signature,
       );
+      const decodedOrder = await settlement.decodeOrderTest(encodedOrder);
+
       expect(decodedOrder[4]).to.equal(
         order.flags | OrderEncodingFlags.REPLAYABLE_NONCE,
       );
@@ -212,8 +222,9 @@ describe("GPv2Settlement", () => {
       const encodedOrder = encodeExecutedOrder(
         order,
         executedAmount,
-        zeroSignature,
+        signature,
       );
+
       expect(
         await settlement.decodeOrderMemoryTest(encodedOrder),
       ).to.deep.equal(ethers.constants.Zero);
