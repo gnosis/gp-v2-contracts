@@ -8,7 +8,6 @@ export interface Order {
   sellToken: string;
   /** Buy token address. */
   buyToken: string;
-
   /**
    * The order sell amount.
    *
@@ -27,7 +26,6 @@ export interface Order {
    * orders, this represents a component of the limit price fraction.
    */
   buyAmount: BigNumberish;
-
   /** The timestamp this order is valid until */
   validTo: number | Date;
   /**
@@ -38,7 +36,6 @@ export interface Order {
    * trading strategies where orders are valid forever.
    */
   nonce: number;
-
   /**
    * Additional fee to give to the protocol.
    *
@@ -47,7 +44,6 @@ export interface Order {
    * fees) still get executed.
    */
   tip: BigNumberish;
-
   /** Additional order flags. See {@link OrderFlags}. */
   flags: OrderFlags;
 }

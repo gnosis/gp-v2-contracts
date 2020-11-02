@@ -93,7 +93,17 @@ contract GPv2Settlement {
     ///
     /// Note that the encoded order data does not contain which token is the
     /// sell or buy token. This data is implicit from which parameter the order
-    /// was specified from.
+    /// was specified from, either `encodedOrder0` (which sells token 0 and buys
+    /// token 1) or `encodedOrder1` (which sells token 1 and buys token 0).
+    /// Additionally, the nonce is not encoded as part of the order bytes as the
+    /// nonce is included in the signature. For an order to be valid it must
+    /// either be the current nonce, or be a replayable order (nonce of 0). If
+    /// the nonce were incorrect (i.e. attempted to use an order in a different
+    /// batch than it was signed for), then the signature recovery would fail.
+    /// This allows us to encode the nonce value in a single bit as part of the
+    /// flags, were a `0` represents the nonce should be for the current batch
+    /// and a `1` represents that it is a replayble order and the nonce should
+    /// be 0.
     ///
     /// @param token0 The address of token 0 being traded in the batch.
     /// @param token1 The address of token 1 being traded in the batch.
@@ -210,13 +220,19 @@ contract GPv2Settlement {
 
         require(encodedOrder.length == ORDER_STRIDE, "malformed order data");
 
-        sellAmount = uint112(abi.decode(encodedOrder[0:], (uint256)) >> 144);
-        buyAmount = uint112(abi.decode(encodedOrder[14:], (uint256)) >> 144);
-        validTo = uint32(abi.decode(encodedOrder[28:], (uint256)) >> 224);
-        tip = uint112(abi.decode(encodedOrder[32:], (uint256)) >> 144);
+        sellAmount = uint112(
+            abi.decode(encodedOrder[0:], (uint256)) >> (256 - 112)
+        );
+        buyAmount = uint112(
+            abi.decode(encodedOrder[14:], (uint256)) >> (256 - 112)
+        );
+        validTo = uint32(
+            abi.decode(encodedOrder[28:], (uint256)) >> (256 - 32)
+        );
+        tip = uint112(abi.decode(encodedOrder[32:], (uint256)) >> (256 - 112));
         flags = uint8(encodedOrder[46]);
         executedAmount = uint112(
-            abi.decode(encodedOrder[47:], (uint256)) >> 144
+            abi.decode(encodedOrder[47:], (uint256)) >> (256 - 112)
         );
         v = uint8(encodedOrder[61]);
         r = bytes32(abi.decode(encodedOrder[62:], (uint256)));
