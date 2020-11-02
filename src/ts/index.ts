@@ -44,24 +44,26 @@ export interface Order {
    * fees) still get executed.
    */
   tip: BigNumberish;
-  /** Additional order flags. See {@link OrderFlags}. */
+  /** Additional order options. See {@link OrderFlags}. */
   flags: OrderFlags;
 }
 
 /**
- * Order flags for enabling certain order features. By default, all orders are
- * fill-or-kill sell orders.
+ * Order flags for enabling certain order features.
  */
-export enum OrderFlags {
-  /** Specifies the order is a sell order */
-  SELL_ORDER = 0x00,
-  /** Specifies the order is a buy order */
-  BUY_ORDER = 0x01,
-  /** Specifies the order is partially fillable */
-  PARTIAL_FILL = 0x02,
+export interface OrderFlags {
+  /** The order kind. */
+  kind: OrderKind;
+  /** Specifies whether or not the order is partially fillable. */
+  partiallyFillable: boolean;
+}
 
-  /** The mask for reserved values that must be 0. */
-  RESERVED_MASK = 0xfc,
+/** Order kind. */
+export const enum OrderKind {
+  /** A sell order. */
+  SELL,
+  /** A buy order. */
+  BUY,
 }
 
 /**
@@ -70,17 +72,42 @@ export enum OrderFlags {
  */
 export const REPLAYABLE_NONCE = 0;
 
-/**
- * Additional order flags used to efficiently encode order information. These
- * flags are added at encoding time but not included in the signature.
- */
-export enum OrderEncodingFlags {
-  /** Encode that the nonce should be {@link REPLAYABLE_NONCE} */
-  REPLAYABLE_NONCE = 0x80,
-}
-
 function timestamp(time: number | Date): number {
   return typeof time === "number" ? time : ~~(time.getTime() / 1000);
+}
+
+/**
+ * Converts the {@link OrderFlags} into its numerical representation.
+ * @param flags The order data to be encoded.
+ * @return Encoded order bit-flag value.
+ */
+export function encodeOrderFlags(flags: OrderFlags): number {
+  const kind = flags.kind === OrderKind.SELL ? 0x00 : 0x01;
+  const partiallyFillable = flags.partiallyFillable ? 0x02 : 0x00;
+  return kind | partiallyFillable;
+}
+
+/**
+ * Converts the {@link OrderFlags} into its numerical representation for
+ * executed orders. This is slightly different that {@link encodeOrderFlags}
+ * as additional encoding information (such as nonce) are added in order to
+ * save calldata.
+ * @param flags The order data to be encoded.
+ * @param nonce The order nonce.
+ * @return Encoded executed order bit-flag value.
+ */
+export function encodeExecutedOrderFlags({
+  flags,
+  nonce,
+}: {
+  flags: OrderFlags;
+  nonce: number;
+}): number {
+  // NOTE: The nonce is encoded as a bit in the flags. This is done to save 4
+  // bytes per order as the nonce can only be the current nonce or 0 for the
+  // order to be valid.
+  const encodingFlags = nonce === 0 ? 0x80 : 0x00;
+  return encodeOrderFlags(flags) | encodingFlags;
 }
 
 /**
@@ -97,11 +124,6 @@ export function encodeExecutedOrder(
   executedAmount: BigNumberish,
   signature: SignatureLike,
 ): string {
-  // NOTE: The nonce is encoded as a bit in the flags. This is done to save 4
-  // bytes per order as the nonce can only be the current nonce or 0 for the
-  // order to be valid.
-  const encodingFlags =
-    order.nonce === 0 ? OrderEncodingFlags.REPLAYABLE_NONCE : 0;
   const sig = ethers.utils.splitSignature(signature);
 
   return ethers.utils.solidityPack(
@@ -121,7 +143,7 @@ export function encodeExecutedOrder(
       order.buyAmount,
       timestamp(order.validTo),
       order.tip,
-      order.flags | encodingFlags,
+      encodeExecutedOrderFlags(order),
       executedAmount,
       sig.v,
       sig.r,

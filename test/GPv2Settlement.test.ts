@@ -7,9 +7,9 @@ import { Contract, BigNumber } from "ethers";
 
 import {
   REPLAYABLE_NONCE,
-  OrderFlags,
-  OrderEncodingFlags,
+  OrderKind,
   encodeExecutedOrder,
+  encodeExecutedOrderFlags,
 } from "../src/ts";
 
 describe("GPv2Settlement", () => {
@@ -178,7 +178,10 @@ describe("GPv2Settlement", () => {
       validTo: fillUint(32, 3).toNumber(),
       nonce: fillUint(32, 4).toNumber(),
       tip: fillUint(112, 5),
-      flags: OrderFlags.BUY_ORDER,
+      flags: {
+        kind: OrderKind.BUY,
+        partiallyFillable: true,
+      },
     };
     const executedAmount = fillUint(112, 6);
     const signature = ethers.utils.splitSignature(`${fillBytes(64, 0)}01`);
@@ -195,7 +198,7 @@ describe("GPv2Settlement", () => {
         order.buyAmount,
         order.validTo,
         order.tip,
-        order.flags,
+        encodeExecutedOrderFlags(order),
         executedAmount,
         signature.v,
         signature.r,
@@ -211,9 +214,15 @@ describe("GPv2Settlement", () => {
       );
       const decodedOrder = await settlement.decodeOrderTest(encodedOrder);
 
-      expect(decodedOrder[4]).to.equal(
-        order.flags | OrderEncodingFlags.REPLAYABLE_NONCE,
-      );
+      // NOTE: The expected bit-flag value here is:
+      // bit | 7 | 6-2 | 1 | 0
+      // ----------------------
+      // val | 1 |  0  | 1 | 1
+      //       ^         ^   ^
+      //       +---------+---+-- replayable order (nonce = 0)
+      //                 +---+-- partially fillable
+      //                     +-- buy order
+      expect(decodedOrder[4]).to.equal(0x83);
     });
 
     it("should not allocate memory", async () => {
