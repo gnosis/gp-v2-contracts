@@ -5,6 +5,13 @@ import UniswapV2Factory from "@uniswap/v2-core/build/UniswapV2Factory.json";
 import { expect } from "chai";
 import { Contract, BigNumber } from "ethers";
 
+import {
+  REPLAYABLE_NONCE,
+  OrderKind,
+  encodeExecutedOrder,
+  encodeExecutedOrderFlags,
+} from "../src/ts";
+
 describe("GPv2Settlement", () => {
   const [deployer] = waffle.provider.getWallets();
 
@@ -150,6 +157,86 @@ describe("GPv2Settlement", () => {
       await expect(
         settlement.uniswapPairAddress(ethers.constants.AddressZero, token),
       ).to.be.revertedWith("invalid pair");
+    });
+  });
+
+  describe("decodeOrder", () => {
+    const fillBytes = (bytes: number, marker: number) =>
+      `0x${[...Array(bytes)]
+        .map((_, i) =>
+          (i + (marker << 4)).toString(16).padStart(2, "0").substr(0, 2),
+        )
+        .join("")}`;
+    const fillUint = (bits: number, marker: number) =>
+      BigNumber.from(fillBytes(bits / 8, marker));
+
+    const order = {
+      sellToken: `0x${"5311".repeat(10)}`,
+      buyToken: `0x${"b111".repeat(10)}`,
+      sellAmount: fillUint(112, 1),
+      buyAmount: fillUint(112, 2),
+      validTo: fillUint(32, 3).toNumber(),
+      nonce: fillUint(32, 4).toNumber(),
+      tip: fillUint(112, 5),
+      flags: {
+        kind: OrderKind.BUY,
+        partiallyFillable: true,
+      },
+    };
+    const executedAmount = fillUint(112, 6);
+    const signature = ethers.utils.splitSignature(`${fillBytes(64, 0)}01`);
+
+    it("should round-trip encode executed order data", async () => {
+      const encodedOrder = encodeExecutedOrder(
+        order,
+        executedAmount,
+        signature,
+      );
+
+      expect(await settlement.decodeOrderTest(encodedOrder)).to.deep.equal([
+        order.sellAmount,
+        order.buyAmount,
+        order.validTo,
+        order.tip,
+        encodeExecutedOrderFlags(order),
+        executedAmount,
+        signature.v,
+        signature.r,
+        signature.s,
+      ]);
+    });
+
+    it("should encode replayable orders", async () => {
+      const encodedOrder = encodeExecutedOrder(
+        { ...order, nonce: REPLAYABLE_NONCE },
+        executedAmount,
+        signature,
+      );
+      const decodedOrder = await settlement.decodeOrderTest(encodedOrder);
+
+      // NOTE: The expected bit-flag value here is:
+      // bit | 7 | 6-2 | 1 | 0
+      // ----------------------
+      // val | 1 |  0  | 1 | 1
+      //       ^         ^   ^
+      //       +---------+---+-- replayable order (nonce = 0)
+      //                 +---+-- partially fillable
+      //                     +-- buy order
+      expect(decodedOrder[4]).to.equal(0x83);
+    });
+
+    it("should not allocate memory", async () => {
+      // NOTE: We want to make sure that calls to `decodeOrder` does not require
+      // additional memory allocations to save on memory per orders.
+      const encodedOrder = encodeExecutedOrder(
+        order,
+        executedAmount,
+        signature,
+      );
+
+      expect(
+        await settlement.decodeOrderMemoryTest(encodedOrder),
+      ).to.deep.equal(ethers.constants.Zero);
     });
   });
 });
