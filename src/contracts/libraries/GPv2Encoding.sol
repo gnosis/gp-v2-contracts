@@ -28,7 +28,12 @@ library GPv2Encoding {
     enum OrderFill {Full, Partial}
 
     /// @dev The stride of an encoded order.
-    uint256 public constant ORDER_STRIDE = 204;
+    uint256 internal constant ORDER_STRIDE = 204;
+
+    /// @dev Bit position for the [`OrderKind`] encoded in the flags.
+    uint8 internal constant ORDER_KIND_BIT = 0;
+    /// @dev Bit position for the [`OrderFill`] encoded in the flags.
+    uint8 internal constant ORDER_FILL_BIT = 1;
 
     /// @dev Decodes a signed order from calldata bytes into memory.
     /// Orders are tightly packed in order to reduce calldata and associated gas
@@ -107,5 +112,8 @@ library GPv2Encoding {
         );
         order.owner = ecrecover(digest, v, r, s);
         require(order.owner != address(0), "GPv2: invalid signature");
+
+        order.kind = OrderKind((flags >> ORDER_KIND_BIT) & 0x1);
+        order.fill = OrderFill((flags >> ORDER_FILL_BIT) & 0x1);
     }
 }
