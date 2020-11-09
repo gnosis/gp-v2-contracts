@@ -81,27 +81,22 @@ describe.only("GPv2Encoding", () => {
         encoder.encodedOrders,
       );
 
-      expect(decodedOrders.length).to.equal(1);
-
       // NOTE: Ethers.js returns a tuple and not a struct with named fields for
       // `ABIEncoderV2` structs.
-      const decodedOwner = decodedOrders[0][0];
-      const decodedOrder = {
-        sellToken: decodedOrders[0][1],
-        buyToken: decodedOrders[0][2],
-        sellAmount: decodedOrders[0][3],
-        buyAmount: decodedOrders[0][4],
-        validTo: decodedOrders[0][5],
-        nonce: decodedOrders[0][6],
-        tip: decodedOrders[0][7],
-        kind: decodedOrders[0][8],
-        partiallyFillable: decodedOrders[0][9],
-      };
-      const decodedExecutedAmount = decodedOrders[0][12];
-
-      expect(decodedOwner).to.equal(await traders[0].getAddress());
-      expect(decodedOrder).to.deep.equal(order);
-      expect(decodedExecutedAmount).to.deep.equal(executedAmount);
+      expect(decodedOrders.length).to.equal(1);
+      expect(decodedOrders[0]).to.deep.equal([
+        await traders[0].getAddress(),
+        order.sellToken,
+        order.buyToken,
+        order.sellAmount,
+        order.buyAmount,
+        order.validTo,
+        order.nonce,
+        order.tip,
+        order.kind,
+        order.partiallyFillable,
+        executedAmount,
+      ]);
     });
 
     it("should not allocate memory", async () => {

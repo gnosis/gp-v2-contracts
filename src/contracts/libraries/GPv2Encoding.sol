@@ -19,8 +19,6 @@ library GPv2Encoding {
         uint256 tip;
         OrderKind kind;
         bool partiallyFillable;
-        uint8 sellTokenIndex;
-        uint8 buyTokenIndex;
         uint256 executedAmount;
     }
 
@@ -61,13 +59,23 @@ library GPv2Encoding {
     /// token indices part of the order map to tokens in this array.
     /// @param encodedOrder The order as encoded calldata bytes.
     /// @param order The memory location to decode the order to.
+    /// @return sellTokenIndex The index of the sell token in the token array.
+    /// @return buyTokenIndex The index of the buy token in the token array.
     /// @return digest The 32-byte order hash.
     function decodeSignedOrder(
         bytes32 domainSeparator,
         IERC20[] calldata tokens,
         bytes calldata encodedOrder,
         Order memory order
-    ) internal view returns (bytes32 digest) {
+    )
+        internal
+        view
+        returns (
+            uint8 sellTokenIndex,
+            uint8 buyTokenIndex,
+            bytes32 digest
+        )
+    {
         // NOTE: This is currently unnecessarily gas inefficient. Specifically,
         // there is a potentially extraneous check to the encoded order length
         // (this can be verified once for the total encoded orders length).
@@ -85,10 +93,10 @@ library GPv2Encoding {
             "GPv2: malformed order data"
         );
 
-        order.sellTokenIndex = uint8(encodedOrder[0]);
-        order.sellToken = tokens[order.sellTokenIndex];
-        order.buyTokenIndex = uint8(encodedOrder[1]);
-        order.buyToken = tokens[order.buyTokenIndex];
+        sellTokenIndex = uint8(encodedOrder[0]);
+        order.sellToken = tokens[sellTokenIndex];
+        buyTokenIndex = uint8(encodedOrder[1]);
+        order.buyToken = tokens[buyTokenIndex];
         order.sellAmount = abi.decode(encodedOrder[2:], (uint256));
         order.buyAmount = abi.decode(encodedOrder[34:], (uint256));
         order.validTo = uint32(
