@@ -10,6 +10,7 @@ contract GPv2EncodingTestInterface {
 
     function decodeSignedOrdersTest(
         IERC20[] calldata tokens,
+        uint256 orderCount,
         bytes calldata encodedOrders
     )
         external
@@ -22,10 +23,8 @@ contract GPv2EncodingTestInterface {
     {
         // solhint-disable no-inline-assembly
 
-        uint256 orderCount = encodedOrders.length / GPv2Encoding.ORDER_STRIDE;
-        orders = new GPv2Encoding.Order[](
-            orderCount
-        );
+        uint256 stride = GPv2Encoding.ORDER_STRIDE;
+        orders = new GPv2Encoding.Order[](orderCount);
 
         // NOTE: Solidity keeps a total memory count at address 0x40. Check
         // before and after decoding an order to compute memory usage growth per
@@ -36,14 +35,22 @@ contract GPv2EncodingTestInterface {
         gas_ = gasleft();
 
         uint256 start;
-        uint256 end;
+        bytes calldata encodedOrder;
         for (uint256 i = 0; i < orderCount; i++) {
-            start = i * GPv2Encoding.ORDER_STRIDE;
-            end = start + GPv2Encoding.ORDER_STRIDE;
+            start = i * stride;
+            if (i == orderCount - 1) {
+                // NOTE: Last order uses all remaining bytes. This allows the
+                // `decodeSignedOrder` method to be tested with short and long
+                // order bytes as well.
+                encodedOrder = encodedOrders[start:];
+            } else {
+                encodedOrder = encodedOrders[start:][:stride];
+            }
+
             GPv2Encoding.decodeSignedOrder(
-                tokens,
-                encodedOrders[start:end],
                 DOMAIN_SEPARATOR,
+                tokens,
+                encodedOrder,
                 orders[i]
             );
         }
