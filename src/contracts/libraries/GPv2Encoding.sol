@@ -69,7 +69,7 @@ library GPv2Encoding {
         Order memory order
     )
         internal
-        view
+        pure
         returns (
             uint8 sellTokenIndex,
             uint8 buyTokenIndex,
@@ -107,29 +107,24 @@ library GPv2Encoding {
         );
         order.tip = abi.decode(encodedOrder[74:], (uint256));
         uint8 flags = uint8(encodedOrder[106]);
+        order.kind = OrderKind((flags >> ORDER_KIND_BIT) & 0x1);
+        order.partiallyFillable =
+            (flags >> ORDER_PARTIALLY_FILLABLE_BIT) & 0x01 == 0x01;
         order.executedAmount = abi.decode(encodedOrder[107:], (uint256));
         uint8 v = uint8(encodedOrder[139]);
         bytes32 r = abi.decode(encodedOrder[140:], (bytes32));
         bytes32 s = abi.decode(encodedOrder[172:], (bytes32));
 
-        digest = keccak256(
-            abi.encodePacked(
-                domainSeparator,
-                order.sellToken,
-                order.buyToken,
-                order.sellAmount,
-                order.buyAmount,
-                order.validTo,
-                order.nonce,
-                order.tip,
-                flags
-            )
-        );
+        // NOTE: In order to avoid a memory allocation per call (which could
+        // become expensive due to the quadratic nature of memory costs), use
+        // the memory region reserved by the caller for the order result for
+        // the data to be hashed.
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            mstore(order, domainSeparator)
+            digest := keccak256(order, 320)
+        }
         order.owner = ecrecover(digest, v, r, s);
         require(order.owner != address(0), "GPv2: invalid signature");
-
-        order.kind = OrderKind((flags >> ORDER_KIND_BIT) & 0x1);
-        order.partiallyFillable =
-            (flags >> ORDER_PARTIALLY_FILLABLE_BIT) & 0x01 == 0x01;
     }
 }

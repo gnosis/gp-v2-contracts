@@ -12,7 +12,7 @@ function fillUint(bits: number, byte: number): BigNumber {
   return BigNumber.from(fillBytes(bits / 8, byte));
 }
 
-describe.only("GPv2Encoding", () => {
+describe("GPv2Encoding", () => {
   const [, ...traders] = waffle.provider.getWallets();
 
   let encoding: Contract;
@@ -28,33 +28,6 @@ describe.only("GPv2Encoding", () => {
   });
 
   describe("decodeSignedOrder", () => {
-    /*
-    const fillBytes = (bytes: number, marker: number) =>
-      `0x${[...Array(bytes)]
-        .map((_, i) =>
-          (i + (marker << 4)).toString(16).padStart(2, "0").substr(0, 2),
-        )
-        .join("")}`;
-    const fillUint = (bits: number, marker: number) =>
-      BigNumber.from(fillBytes(bits / 8, marker));
-
-    const order = {
-      sellToken: `0x${"5311".repeat(10)}`,
-      buyToken: `0x${"b111".repeat(10)}`,
-      sellAmount: fillUint(112, 1),
-      buyAmount: fillUint(112, 2),
-      validTo: fillUint(32, 3).toNumber(),
-      nonce: fillUint(32, 4).toNumber(),
-      tip: fillUint(112, 5),
-      flags: {
-        kind: OrderKind.BUY,
-        partiallyFillable: true,
-      },
-    };
-    const executedAmount = fillUint(112, 6);
-    const signature = ethers.utils.splitSignature(`${fillBytes(64, 0)}01`);
-    */
-
     it("should round-trip encode executed order data", async () => {
       // NOTE: Pay extra attention to use all bytes for each field, and that
       // they all have different values to make sure the are correctly
@@ -67,8 +40,8 @@ describe.only("GPv2Encoding", () => {
         validTo: fillUint(32, 0x05).toNumber(),
         nonce: fillUint(32, 0x06).toNumber(),
         tip: fillUint(256, 0x07),
-        kind: OrderKind.SELL,
-        partiallyFillable: false,
+        kind: OrderKind.BUY,
+        partiallyFillable: true,
       };
       const executedAmount = fillUint(256, 0x08);
 
@@ -125,7 +98,13 @@ describe.only("GPv2Encoding", () => {
         encoder.orderCount,
         encoder.encodedOrders,
       );
-      expect(mem).to.deep.equal(ethers.constants.Zero);
+
+      // NOTE: Currently, the `ecrecover` call requires 32 bytes of memory to
+      // be allocated per call. This is because `STATICCALL` writes the output
+      // to memory, and the compiler does not seem to optimize the extra memory
+      // copy away (despite the result being saved immediately to memory). In
+      // the future, we can optimize this away with some `assembly`.
+      expect(mem.toNumber()).to.equal(32);
     });
 
     it("should revert if order bytes are too short.", async () => {
