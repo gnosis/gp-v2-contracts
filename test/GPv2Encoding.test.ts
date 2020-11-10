@@ -1,6 +1,6 @@
-import { ethers, waffle } from "@nomiclabs/buidler";
 import { expect } from "chai";
 import { Contract, BigNumber } from "ethers";
+import { ethers, waffle } from "hardhat";
 
 import { OrderKind, OrderEncoder } from "../src/ts";
 
@@ -72,7 +72,7 @@ describe("GPv2Encoding", () => {
       ]);
     });
 
-    it("should not allocate memory", async () => {
+    it("should allocate minimal memory", async () => {
       // NOTE: We want to make sure that calls to `decodeOrder` does not require
       // additional memory allocations to save on memory per orders.
       //todo
