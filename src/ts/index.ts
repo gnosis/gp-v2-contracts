@@ -60,6 +60,9 @@ export interface Order {
   partiallyFillable: boolean;
 }
 
+/**
+ * Gnosis Protocol v2 order flags.
+ */
 export type OrderFlags = Pick<Order, "kind" | "partiallyFillable">;
 
 /**
