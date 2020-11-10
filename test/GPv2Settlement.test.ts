@@ -1,6 +1,6 @@
-import { ethers, waffle } from "@nomiclabs/buidler";
 import { expect } from "chai";
 import { Contract } from "ethers";
+import { ethers, waffle } from "hardhat";
 
 describe("GPv2Settlement", () => {
   let settlement: Contract;

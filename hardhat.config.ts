@@ -1,6 +1,4 @@
-import { usePlugin } from "@nomiclabs/buidler/config";
-
-usePlugin("@nomiclabs/buidler-waffle");
+import "@nomiclabs/hardhat-waffle";
 
 export default {
   paths: {
@@ -8,7 +6,7 @@ export default {
     cache: "build/cache",
     sources: "src/contracts",
   },
-  solc: {
+  solidity: {
     version: "0.6.12",
   },
 };

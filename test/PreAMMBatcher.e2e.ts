@@ -1,10 +1,10 @@
-import { ethers, waffle } from "@nomiclabs/buidler";
 import ERC20 from "@openzeppelin/contracts/build/contracts/ERC20PresetMinterPauser.json";
 import UniswapV2Factory from "@uniswap/v2-core/build/UniswapV2Factory.json";
 import UniswapV2Pair from "@uniswap/v2-core/build/UniswapV2Pair.json";
 import { expect } from "chai";
 import { debug } from "debug";
 import { BigNumber, Contract, Wallet } from "ethers";
+import { ethers, waffle } from "hardhat";
 
 import { Order } from "../src/js/orders.spec";
 
