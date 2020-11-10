@@ -22,7 +22,7 @@
     "@types/debug": "^4.1.5",
     "@types/mocha": "^8.0.3",
     "@typescript-eslint/eslint-plugin": "^4.6.1",
-    "@typescript-eslint/parser": "^4.6.1",
+    "@typescript-eslint/parser": "^4.7.0",
     "@uniswap/v2-core": "^1.0.1",
     "chai": "^4.2.0",
     "debug": "^4.2.0",
