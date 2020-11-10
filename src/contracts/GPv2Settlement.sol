@@ -37,7 +37,7 @@ contract GPv2Settlement {
     /// the responsibility of the caller to ensure that all GPv2 invariants are
     /// upheld for the input settlement, otherwise this call will revert.
     /// Namely:
-    /// - The fee factor is cannot lead to fees > 0.1%
+    /// - The fee factor cannot lead to fees > 0.1%
     /// - All orders are valid and signed
     /// - Accounts have sufficient balance and approval.
     /// - Settlement contract has sufficient balance to execute trades. Note
@@ -48,6 +48,14 @@ contract GPv2Settlement {
     ///     settlement
     ///   - Critically, user orders are entirely protected
     ///
+    /// Note that settlements can specify fees encoded as a fee factor.  The fee
+    /// factor to use for the trade. The actual fee is computed as
+    /// `1 / feeFactor`. This means that the received amount is expected to be
+    /// `executedBuyAmount * (feeFactor - 1) / feeFactor`. Note that a value of
+    /// `0` is reserved to mean no fees. This is useful for example when
+    /// settling directly with Uniswap where we don't want users to incur
+    /// additional fees.
+    ///
     /// Note that some parameters are encoded as packed bytes in order to save
     /// calldata gas. For more information on encoding format consult the
     /// [`GPv2Encoding`] library.
@@ -56,9 +64,7 @@ contract GPv2Settlement {
     /// Orders and interactions encode tokens as indices into this array.
     /// @param clearingPrices An array of clearing prices where the `i`-th price
     /// is for the `i`-th token in the [`tokens`] array.
-    /// @param feeFactor The fee factor to use for the trade. The actual fee
-    /// is computed as `1 / feeFactor`. This means that the received amount is
-    /// expected to tbe `executedBuyAmount * (feeFactor - 1) / feeFactor`.
+    /// @param feeFactor The fee factor to use for the trade.
     /// @param encodedOrders Encoded signed EOA orders.
     /// @param encodedInteractions Encoded smart contract interactions.
     /// @param encodedOrderRefunds Encoded order refunds for clearing storage
@@ -77,5 +83,6 @@ contract GPv2Settlement {
         require(encodedOrders.length == 0, "not yet implemented");
         require(encodedInteractions.length == 0, "not yet implemented");
         require(encodedOrderRefunds.length == 0, "not yet implemented");
+        revert("not yet implemented");
     }
 }
