@@ -4,4 +4,7 @@ pragma experimental ABIEncoderV2;
 
 import "../GPv2Settlement.sol";
 
-contract GPv2SettlementTestInterface is GPv2Settlement {}
+// solhint-disable-next-line no-empty-blocks
+contract GPv2SettlementTestInterface is GPv2Settlement {
+
+}
