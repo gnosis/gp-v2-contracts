@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { Contract, BigNumber } from "ethers";
 import { ethers, waffle } from "hardhat";
 
-import { OrderKind, OrderEncoder } from "../src/ts";
+import { OrderKind, OrderEncoder, hashOrder } from "../src/ts";
 
 function fillBytes(count: number, byte: number): string {
   return ethers.utils.hexlify([...Array(count)].map(() => byte));
@@ -69,6 +69,9 @@ describe("GPv2Encoding", () => {
         order.kind,
         order.partiallyFillable,
         executedAmount,
+        0,
+        1,
+        hashOrder(domainSeparator, order),
       ]);
     });
 

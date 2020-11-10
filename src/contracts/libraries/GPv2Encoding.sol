@@ -20,6 +20,9 @@ library GPv2Encoding {
         OrderKind kind;
         bool partiallyFillable;
         uint256 executedAmount;
+        uint8 sellTokenIndex;
+        uint8 buyTokenIndex;
+        bytes32 digest;
     }
 
     /// @dev An enum describing an order kind, either a buy or a sell order.
@@ -59,23 +62,12 @@ library GPv2Encoding {
     /// token indices part of the order map to tokens in this array.
     /// @param encodedOrder The order as encoded calldata bytes.
     /// @param order The memory location to decode the order to.
-    /// @return sellTokenIndex The index of the sell token in the token array.
-    /// @return buyTokenIndex The index of the buy token in the token array.
-    /// @return digest The 32-byte order hash.
     function decodeSignedOrder(
         bytes32 domainSeparator,
         IERC20[] calldata tokens,
         bytes calldata encodedOrder,
         Order memory order
-    )
-        internal
-        pure
-        returns (
-            uint8 sellTokenIndex,
-            uint8 buyTokenIndex,
-            bytes32 digest
-        )
-    {
+    ) internal pure {
         // NOTE: This is currently unnecessarily gas inefficient. Specifically,
         // there is a potentially extraneous check to the encoded order length
         // (this can be verified once for the total encoded orders length).
@@ -93,10 +85,10 @@ library GPv2Encoding {
             "GPv2: malformed order data"
         );
 
-        sellTokenIndex = uint8(encodedOrder[0]);
-        order.sellToken = tokens[sellTokenIndex];
-        buyTokenIndex = uint8(encodedOrder[1]);
-        order.buyToken = tokens[buyTokenIndex];
+        order.sellTokenIndex = uint8(encodedOrder[0]);
+        order.sellToken = tokens[order.sellTokenIndex];
+        order.buyTokenIndex = uint8(encodedOrder[1]);
+        order.buyToken = tokens[order.buyTokenIndex];
         order.sellAmount = abi.decode(encodedOrder[2:], (uint256));
         order.buyAmount = abi.decode(encodedOrder[34:], (uint256));
         order.validTo = uint32(
@@ -119,11 +111,14 @@ library GPv2Encoding {
         // become expensive due to the quadratic nature of memory costs), use
         // the memory region reserved by the caller for the order result for
         // the data to be hashed.
+        bytes32 digest;
         // solhint-disable-next-line no-inline-assembly
         assembly {
             mstore(order, domainSeparator)
             digest := keccak256(order, 320)
         }
+        order.digest = digest;
+
         order.owner = ecrecover(digest, v, r, s);
         require(order.owner != address(0), "GPv2: invalid signature");
     }
