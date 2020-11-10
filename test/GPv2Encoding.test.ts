@@ -69,8 +69,8 @@ describe("GPv2Encoding", () => {
         order.kind,
         order.partiallyFillable,
         executedAmount,
-        0,
-        1,
+        encoder.tokens.indexOf(order.sellToken),
+        encoder.tokens.indexOf(order.buyToken),
         hashOrder(domainSeparator, order),
       ]);
     });
