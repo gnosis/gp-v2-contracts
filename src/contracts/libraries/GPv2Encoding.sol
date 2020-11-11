@@ -41,7 +41,7 @@ library GPv2Encoding {
     /// Orders are tightly packed in order to reduce calldata and associated gas
     /// costs. They contain the following fields:
     /// ```
-    /// struct Order {
+    /// struct EncodedOrder {
     ///     uint8 sellTokenIndex;
     ///     uint8 buyTokenIndex;
     ///     uint256 sellAmount;
@@ -115,6 +115,9 @@ library GPv2Encoding {
         // solhint-disable-next-line no-inline-assembly
         assembly {
             mstore(order, domainSeparator)
+            // NOTE: Structs are not packed in solidity. Additionally there are
+            // 10 parameters per order to hash and ecrecover, for a total of
+            // `10 * sizeof(uint) = 320` bytes.
             digest := keccak256(order, 320)
         }
         order.digest = digest;

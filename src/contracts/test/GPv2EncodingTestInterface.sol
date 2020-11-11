@@ -5,8 +5,8 @@ pragma experimental ABIEncoderV2;
 import "../libraries/GPv2Encoding.sol";
 
 contract GPv2EncodingTestInterface {
-    bytes32
-        public constant DOMAIN_SEPARATOR = 0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f;
+    bytes32 public constant DOMAIN_SEPARATOR =
+        0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f;
 
     function decodeSignedOrdersTest(
         IERC20[] calldata tokens,
