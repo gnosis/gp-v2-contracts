@@ -85,6 +85,8 @@ export const enum OrderKind {
  */
 export const REPLAYABLE_NONCE = 0;
 
+const ORDER_STRIDE = 204;
+
 function timestamp(time: number | Date): number {
   return typeof time === "number" ? time : ~~(time.getTime() / 1000);
 }
@@ -139,8 +141,9 @@ export class OrderEncoder {
    * Gets the number of orders currently encoded.
    */
   public get orderCount(): number {
-    // NOTE: Each order is 204 bytes long, so 408 hex characters.
-    return (this._encodedOrders.length - 2) / 408;
+    // NOTE: `ORDER_STRIDE` multiplied by 2 as hex strings encode one byte in
+    // 2 characters.
+    return (this._encodedOrders.length - 2) / (ORDER_STRIDE * 2);
   }
 
   /**
