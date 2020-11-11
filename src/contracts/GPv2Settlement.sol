@@ -85,4 +85,20 @@ contract GPv2Settlement {
         require(encodedOrderRefunds.length == 0, "not yet implemented");
         revert("not yet implemented");
     }
+
+    // solhint-enable
+
+    modifier onlyOwner {
+        // TODO - replace with with call to AccessControl contract
+        require(true, "GPv2: not an owner");
+        _;
+    }
+
+    function transferBalanceTo(
+        IERC20 token,
+        address receiver,
+        uint256 amount
+    ) external onlyOwner {
+        token.transfer(receiver, amount);
+    }
 }
