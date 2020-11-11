@@ -108,10 +108,10 @@ export class OrderEncoder {
 
   /**
    * Creates a new order encoder instance.
-   * @param domainSeparator Optionally specified domain separator used for
-   * signing orders to encode. See {@link hashOrder} for more details.
+   * @param domainSeparator Domain separator used for signing orders to encode.
+   * See {@link hashOrder} for more details.
    */
-  public constructor(public readonly domainSeparator?: string) {}
+  public constructor(public readonly domainSeparator: string) {}
 
   /**
    * Gets the array of token addresses used by the currently encoded orders.
@@ -144,12 +144,14 @@ export class OrderEncoder {
   }
 
   /**
-   * Returns the signature for the specified order.
-   * @param owner The owner for the order used to sign.
-   * @param domainSeparator The domain separator to add to the digest used for
-   * signing. See {@link hashOrder} for more details.
-   * @param order The order to compute the digest for.
-   * @return Signature for the order.
+   * Encodes a signed order, appending it to the `calldata` bytes that are being
+   * built.
+   *
+   * Additionally, if the order references new tokens that the encoder has not
+   * yet seen, they are added to the tokens array.
+   * @param order The order to encode.
+   * @param executedAmount The executed trade amount for the order.
+   * @param signature The signature for the order data.
    */
   public encodeOrder(
     order: Order,
