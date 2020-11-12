@@ -140,7 +140,11 @@ describe("GPv2Encoding", () => {
 
     it("should revert for invalid order signatures", async () => {
       const encoder = new OrderEncoder(domainSeparator);
-      await encoder.signEncodeOrder(traders[0], sampleOrder, sampleOrder.sellAmount);
+      await encoder.signEncodeOrder(
+        traders[0],
+        sampleOrder,
+        sampleOrder.sellAmount,
+      );
 
       // NOTE: `v` must be either `27` or `28`, so just set it to something else
       // to generate an invalid signature.
@@ -160,7 +164,11 @@ describe("GPv2Encoding", () => {
       const lastToken = fillBytes(20, 0x03);
 
       const encoder = new OrderEncoder(domainSeparator);
-      await encoder.signEncodeOrder(traders[0], sampleOrder, sampleOrder.sellAmount);
+      await encoder.signEncodeOrder(
+        traders[0],
+        sampleOrder,
+        sampleOrder.sellAmount,
+      );
       await encoder.signEncodeOrder(
         traders[1],
         {
@@ -186,7 +194,11 @@ describe("GPv2Encoding", () => {
       const lastToken = fillBytes(20, 0x03);
 
       const encoder = new OrderEncoder(domainSeparator);
-      await encoder.signEncodeOrder(traders[0], sampleOrder, sampleOrder.sellAmount);
+      await encoder.signEncodeOrder(
+        traders[0],
+        sampleOrder,
+        sampleOrder.sellAmount,
+      );
       await encoder.signEncodeOrder(
         traders[1],
         {
