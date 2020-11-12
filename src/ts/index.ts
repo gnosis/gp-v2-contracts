@@ -1,6 +1,35 @@
 import { ethers, BigNumberish, Signature, SignatureLike, Wallet } from "ethers";
 
 /**
+ * EIP-712 domain data used by GPv2.
+ *
+ * Note, that EIP-712 allows for an extra `salt` to be added to the domain that
+ * isn't used.
+ * <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-712.md#definition-of-domainseparator>
+ */
+export interface EIP712Domain {
+  name: string;
+  version: string;
+  chainId: number;
+  verifyingContract: string;
+}
+
+/**
+ * Return the Gnosis Protocol v2 domain used for EIP-712 signing.
+ */
+export function domain(
+  chainId: number,
+  verifyingContract: string,
+): EIP712Domain {
+  return {
+    name: "Gnosis Protocol",
+    version: "v2",
+    chainId,
+    verifyingContract,
+  };
+}
+
+/**
  * Gnosis Protocol v2 order data.
  */
 export interface Order {

@@ -7,16 +7,11 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 /// @author Gnosis Developers
 contract GPv2Settlement {
     /// @dev The domain separator used for signing orders that gets mixed in
-    /// making signatures for different domains incompatible.
-    string private constant DOMAIN_SEPARATOR = "GPv2";
-
-    /// @dev Replay protection that is mixed with the order data for signing.
-    /// This is done in order to avoid chain and domain replay protection, so
-    /// that signed orders are only valid for specific GPv2 contracts.
-    ///
-    /// The replay protection is defined as the Keccak-256 hash of `"GPv2"`
-    /// followed by the chain ID and finally the contract address.
-    bytes32 public immutable replayProtection;
+    /// making signatures for different domains incompatible. This domain
+    /// separator is computed following the EIP-712 standard and has replay
+    /// protection mixed in so that signed orders are only valid for specific
+    /// GPv2 contracts.
+    bytes32 internal immutable domainSeparator;
 
     constructor() public {
         uint256 chainId;
@@ -28,8 +23,16 @@ contract GPv2Settlement {
             chainId := chainid()
         }
 
-        replayProtection = keccak256(
-            abi.encode(DOMAIN_SEPARATOR, chainId, address(this))
+        domainSeparator = keccak256(
+            abi.encode(
+                keccak256(
+                    "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                ),
+                keccak256("Gnosis Protocol"),
+                keccak256("v2"),
+                chainId,
+                address(this)
+            )
         );
     }
 
