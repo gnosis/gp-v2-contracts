@@ -8,6 +8,12 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 library GPv2Encoding {
     /// @dev A struct representing an executed order that can be used for
     /// settling a batch.
+    ///
+    /// The memory layout for an order is very important for optimizations for
+    /// recovering the order address. Specifically, all the signed order
+    /// parameters appear in contiguous memory (`sellToken` to
+    /// `partiallyFillable`). This allows the memory reserved for decoding an
+    /// order to also be used for hashing, providing some added effeciency.
     struct Order {
         address owner;
         IERC20 sellToken;
@@ -38,8 +44,11 @@ library GPv2Encoding {
     uint8 internal constant ORDER_PARTIALLY_FILLABLE_BIT = 1;
 
     /// @dev Decodes a signed order from calldata bytes into memory.
-    /// Orders are tightly packed in order to reduce calldata and associated gas
-    /// costs. They contain the following fields:
+    ///
+    /// Orders are tightly packed and compress some data such as buy and sell
+    /// tokens in order to reduce calldata size and associated gas costs. As
+    /// such it is not identical to the decoded [`Order`] and contains the
+    /// following fields:
     /// ```
     /// struct EncodedOrder {
     ///     uint8 sellTokenIndex;
@@ -58,6 +67,9 @@ library GPv2Encoding {
     ///     } signature;
     /// }
     /// ```
+    ///
+    /// @param domainSeparator The domain separator used for hashing and signing
+    /// the order.
     /// @param tokens The list of tokens included in the settlement. The encoded
     /// token indices part of the order map to tokens in this array.
     /// @param encodedOrder The order as encoded calldata bytes.
@@ -116,8 +128,8 @@ library GPv2Encoding {
         assembly {
             mstore(order, domainSeparator)
             // NOTE: Structs are not packed in solidity. Additionally there are
-            // 10 parameters per order to hash and ecrecover, for a total of
-            // `10 * sizeof(uint) = 320` bytes.
+            // 10 signed parameters per order to hash and ecrecover, for a total
+            // of `10 * sizeof(uint) = 320` bytes.
             digest := keccak256(order, 320)
         }
         order.digest = digest;
