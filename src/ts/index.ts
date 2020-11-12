@@ -8,9 +8,21 @@ import { ethers, BigNumberish, Signature, SignatureLike, Wallet } from "ethers";
  * <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-712.md#definition-of-domainseparator>
  */
 export interface EIP712Domain {
+  /**
+   * The user readable name of signing domain.
+   */
   name: string;
+  /**
+   * The current major version of the signing domain.
+   */
   version: string;
+  /**
+   * The EIP-155 chain ID.
+   */
   chainId: number;
+  /**
+   * The address of the contract that will verify the EIP-712 signature.
+   */
   verifyingContract: string;
 }
 
