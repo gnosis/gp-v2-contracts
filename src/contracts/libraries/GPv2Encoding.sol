@@ -11,11 +11,11 @@ library GPv2Encoding {
     ///
     /// The memory layout for an order is very important for optimizations for
     /// recovering the order address. Specifically, all the signed order
-    /// parameters appear in contiguous memory (`sellToken` to
-    /// `partiallyFillable`). This allows the memory reserved for decoding an
-    /// order to also be used for hashing, providing some added effeciency.
+    /// parameters appear in contiguous memory as the first 9 fields from
+    /// `sellToken` to `partiallyFillable`. This allows the memory reserved for
+    /// decoding an order to also be used for computing the order digest during
+    /// the decoding process for some added effeciency.
     struct Order {
-        address owner;
         IERC20 sellToken;
         IERC20 buyToken;
         uint256 sellAmount;
@@ -25,10 +25,11 @@ library GPv2Encoding {
         uint256 tip;
         OrderKind kind;
         bool partiallyFillable;
-        uint256 executedAmount;
         uint8 sellTokenIndex;
         uint8 buyTokenIndex;
+        uint256 executedAmount;
         bytes32 digest;
+        address owner;
     }
 
     /// @dev An enum describing an order kind, either a buy or a sell order.
@@ -98,9 +99,7 @@ library GPv2Encoding {
         );
 
         order.sellTokenIndex = uint8(encodedOrder[0]);
-        order.sellToken = tokens[order.sellTokenIndex];
         order.buyTokenIndex = uint8(encodedOrder[1]);
-        order.buyToken = tokens[order.buyTokenIndex];
         order.sellAmount = abi.decode(encodedOrder[2:], (uint256));
         order.buyAmount = abi.decode(encodedOrder[34:], (uint256));
         order.validTo = uint32(
@@ -111,30 +110,53 @@ library GPv2Encoding {
         );
         order.tip = abi.decode(encodedOrder[74:], (uint256));
         uint8 flags = uint8(encodedOrder[106]);
-        order.kind = OrderKind((flags >> ORDER_KIND_BIT) & 0x1);
-        order.partiallyFillable =
-            (flags >> ORDER_PARTIALLY_FILLABLE_BIT) & 0x01 == 0x01;
         order.executedAmount = abi.decode(encodedOrder[107:], (uint256));
         uint8 v = uint8(encodedOrder[139]);
         bytes32 r = abi.decode(encodedOrder[140:], (bytes32));
         bytes32 s = abi.decode(encodedOrder[172:], (bytes32));
 
-        // NOTE: In order to avoid a memory allocation per call (which could
-        // become expensive due to the quadratic nature of memory costs), use
-        // the memory region reserved by the caller for the order result for
-        // the data to be hashed.
-        bytes32 digest;
+        order.sellToken = tokens[order.sellTokenIndex];
+        order.buyToken = tokens[order.buyTokenIndex];
+        order.kind = OrderKind((flags >> ORDER_KIND_BIT) & 0x1);
+        order.partiallyFillable =
+            (flags >> ORDER_PARTIALLY_FILLABLE_BIT) & 0x01 == 0x01;
+
+        bytes32 orderDigest;
+        bytes32 signingDigest;
+
+        // NOTE: In order to avoid a memory allocation per call by using the
+        // built-in `abi.encode`, we reuse the memory region reserved by the
+        // caller for the order result as input to compute the hash.
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            mstore(order, domainSeparator)
-            // NOTE: Structs are not packed in solidity. Additionally there are
-            // 10 signed parameters per order to hash and ecrecover, for a total
-            // of `10 * sizeof(uint) = 320` bytes.
-            digest := keccak256(order, 320)
+            // NOTE: Structs are not packed in Solidity, and there are 9 order
+            // fields to hash for a total of `9 * sizeof(uint) = 288` bytes.
+            orderDigest := keccak256(order, 288)
         }
-        order.digest = digest;
 
-        order.owner = ecrecover(digest, v, r, s);
+        // NOTE: Now compute the digest that was used for signing. This is not
+        // the same as the order digest as it includes a message signature
+        // prefix as well as the domain separator. This is done using a scratch
+        // region of Solidity memory past the last allocation (which is stored
+        // at `0x40` memory address).
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            let scratch := mload(0x40)
+
+            // NOTE: Message prefix is right-padded with 0's so that the first
+            // byte of the message prefix is at `scratch` memory location. 4 0's
+            // are needed as the message prefix is exactly 28 bytes long.
+            // Consequently, the two hashes are stored at 28 and 60 bytes from
+            // the start of the message, and the total length is 92 bytes.
+            mstore(scratch, "\x19Ethereum Signed Message:\n64\x00\x00\x00\x00")
+            mstore(add(scratch, 28), domainSeparator)
+            mstore(add(scratch, 60), orderDigest)
+            signingDigest := keccak256(scratch, 92)
+        }
+
+        order.digest = orderDigest;
+        order.owner = ecrecover(signingDigest, v, r, s);
+
         require(order.owner != address(0), "GPv2: invalid signature");
     }
 }
