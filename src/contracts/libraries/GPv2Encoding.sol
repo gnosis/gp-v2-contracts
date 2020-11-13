@@ -13,7 +13,7 @@ library GPv2Encoding {
     /// recovering the order address. Specifically, the first 10 fields are
     /// ordered precisely to allow hashing to occur in place.
     struct Order {
-        address owner;
+        bytes32 typeHash;
         IERC20 sellToken;
         IERC20 buyToken;
         uint256 sellAmount;
@@ -27,6 +27,7 @@ library GPv2Encoding {
         uint8 buyTokenIndex;
         uint256 executedAmount;
         bytes32 digest;
+        address owner;
     }
 
     /// @dev An enum describing an order kind, either a buy or a sell order.
@@ -133,6 +134,7 @@ library GPv2Encoding {
         bytes32 r = abi.decode(encodedOrder[140:], (bytes32));
         bytes32 s = abi.decode(encodedOrder[172:], (bytes32));
 
+        order.typeHash = ORDER_TYPE_HASH;
         order.sellToken = tokens[sellTokenIndex];
         order.sellTokenIndex = sellTokenIndex;
         order.buyToken = tokens[buyTokenIndex];
@@ -141,23 +143,12 @@ library GPv2Encoding {
         order.partiallyFillable =
             (flags >> ORDER_PARTIALLY_FILLABLE_BIT) & 0x01 == 0x01;
 
-        // NOTE: In order to avoid a memory allocation per call by using the
-        // built-in `abi.encode`, we reuse the memory region reserved by the
-        // caller for the order result as input to compute the hash, using the
-        // memory slot reserved for the order `owner` for the order type hash
-        // which is required by EIP-712 as a prefix to the order data.
-        // Furthermore structs are not packed in Solidity, and there is the
-        // order type hash prefix followed by the 9 order fields to hash for a
-        // total of `10 * sizeof(uint) = 320` bytes.
+        // NOTE: Compute the hash in-place as the order struct is conviently
+        // laid out such that the first 10 words are what get included in the
+        // struct hash for a total of `10 * sizeof(uint) = 320` bytes.
         bytes32 orderDigest;
-        // TODO: This temporary stack variable is required as the compiler does
-        // not support non-literal constants in inline assembly. This should be
-        // removed once the constant is replaced with a pre-computed value for
-        // deployment.
-        bytes32 orderTypeHash = ORDER_TYPE_HASH;
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            mstore(order, orderTypeHash)
             orderDigest := keccak256(order, 320)
         }
 

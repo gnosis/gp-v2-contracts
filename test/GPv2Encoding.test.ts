@@ -94,7 +94,7 @@ describe("GPv2Encoding", () => {
       // `ABIEncoderV2` structs.
       expect(decodedOrders.length).to.equal(1);
       expect(decodedOrders[0]).to.deep.equal([
-        await traders[0].getAddress(),
+        ORDER_TYPE_HASH,
         order.sellToken,
         order.buyToken,
         order.sellAmount,
@@ -108,6 +108,7 @@ describe("GPv2Encoding", () => {
         encoder.tokens.indexOf(order.buyToken),
         executedAmount,
         hashOrder(order),
+        await traders[0].getAddress(),
       ]);
     });
 
@@ -124,7 +125,8 @@ describe("GPv2Encoding", () => {
       );
 
       const traderAddress = await traders[0].getAddress();
-      for (const [owner] of decodedOrders) {
+      for (const decodedOrder of decodedOrders) {
+        const owner = decodedOrder.slice(-1).pop();
         expect(owner).to.equal(traderAddress);
       }
     });
