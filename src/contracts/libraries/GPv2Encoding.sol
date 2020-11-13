@@ -79,8 +79,8 @@ library GPv2Encoding {
     ///   be used when recovering the signing address from the signature.
     /// - Generic message signature, this scheme will be used **only** if the
     ///   `v` signature parameter's MSB is set. This is done as there are only
-    ///   two possible values `v` can have 27 or 28, which only take up 5 bits
-    ///   of the `uint8`.
+    ///   two possible values `v` can have: 27 or 28, which only take up the
+    ///   lower 5 bits of the `uint8`.
     ///
     /// @param domainSeparator The domain separator used for hashing and signing
     /// the order.
@@ -134,24 +134,20 @@ library GPv2Encoding {
         order.partiallyFillable =
             (flags >> ORDER_PARTIALLY_FILLABLE_BIT) & 0x01 == 0x01;
 
+        bytes32 orderTypeHash = ORDER_TYPE_HASH;
         bytes32 orderDigest;
 
         // NOTE: In order to avoid a memory allocation per call by using the
         // built-in `abi.encode`, we reuse the memory region reserved by the
         // caller for the order result as input to compute the hash.
-        {
-            // NOTE: Scope `orderTypeHash` to reduce local variables.
-            bytes32 orderTypeHash = ORDER_TYPE_HASH;
-
-            // solhint-disable-next-line no-inline-assembly
-            assembly {
-                // NOTE: Structs are not packed in Solidity, and there is the order
-                // type hash, which is temporarily stored in the slot reserved for
-                // the `owner` field as well as 9 order fields to hash for a total
-                // of `10 * sizeof(uint) = 320` bytes.
-                mstore(order, orderTypeHash)
-                orderDigest := keccak256(order, 320)
-            }
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            // NOTE: Structs are not packed in Solidity, and there is the order
+            // type hash, which is temporarily stored in the slot reserved for
+            // the `owner` field as well as 9 order fields to hash for a total
+            // of `10 * sizeof(uint) = 320` bytes.
+            mstore(order, orderTypeHash)
+            orderDigest := keccak256(order, 320)
         }
 
         bytes32 signingDigest;
@@ -160,7 +156,7 @@ library GPv2Encoding {
         // the same as the order digest as it is dependant on the signature
         // scheme being used. In both cases, the signing digest is computed from
         // a prefix followed by the domain separator and finally the order
-        // the order digest. The prefix depends on the scheme being used:
+        // the order digest:
         // - If the order is signed using the EIP-712 sheme, then the prefix is
         //   the 2-byte value 0x1901,
         // - If the order is signed using generic message scheme, then the
