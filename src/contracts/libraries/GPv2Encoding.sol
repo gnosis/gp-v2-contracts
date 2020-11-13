@@ -3,6 +3,8 @@ pragma solidity ^0.6.12;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import "hardhat/console.sol";
+
 /// @title Gnosis Protocol v2 Encoding Library.
 /// @author Gnosis Developers
 library GPv2Encoding {
@@ -39,6 +41,9 @@ library GPv2Encoding {
     uint256 internal constant ORDER_STRIDE = 204;
 
     /// @dev The order EIP-712 type hash.
+    ///
+    /// This type hash is computed as per the EIP-712 standard as the hash of
+    /// the `Order` struct fields: `keccak256("Order(...)")`.
     bytes32 internal constant ORDER_TYPE_HASH =
         0x70874c19b8f223ec3e4476223f761070db29e881be331cda28425f9079d3a76b;
 
@@ -93,7 +98,7 @@ library GPv2Encoding {
         IERC20[] calldata tokens,
         bytes calldata encodedOrder,
         Order memory order
-    ) internal pure {
+    ) internal view {
         // NOTE: This is currently unnecessarily gas inefficient. Specifically,
         // there is a potentially extraneous check to the encoded order length
         // (this can be verified once for the total encoded orders length).
@@ -123,80 +128,76 @@ library GPv2Encoding {
         );
         order.tip = abi.decode(encodedOrder[74:], (uint256));
         uint8 flags = uint8(encodedOrder[106]);
-        uint256 executedAmount = abi.decode(encodedOrder[107:], (uint256));
+        order.executedAmount = abi.decode(encodedOrder[107:], (uint256));
         uint8 v = uint8(encodedOrder[139]);
         bytes32 r = abi.decode(encodedOrder[140:], (bytes32));
         bytes32 s = abi.decode(encodedOrder[172:], (bytes32));
 
         order.sellToken = tokens[sellTokenIndex];
+        order.sellTokenIndex = sellTokenIndex;
         order.buyToken = tokens[buyTokenIndex];
+        order.buyTokenIndex = buyTokenIndex;
         order.kind = OrderKind((flags >> ORDER_KIND_BIT) & 0x1);
         order.partiallyFillable =
             (flags >> ORDER_PARTIALLY_FILLABLE_BIT) & 0x01 == 0x01;
 
+        // NOTE: In order to avoid allocating and copying 10 words of data per
+        // call, reuse the memory region reserved by the caller for the order
+        // result as input for computing the hash. Specifically, we use the slot
+        // reserved for the order `owner` for the order type hash. Since the
+        // owner is set later on, the type hash will be overwritten and we don't
+        // need to restore it ourselves. Furthermore, Structs are not packed in
+        // Solidity and there are 10 fields to hash for a total of
+        // `10 * sizeof(uint) = 320` bytes.
         bytes32 orderDigest;
-
-        // NOTE: In order to avoid a memory allocation per call by using the
-        // built-in `abi.encode`, we reuse the memory region reserved by the
-        // caller for the order result as input to compute the hash.
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            // NOTE: Structs are not packed in Solidity, and there is the order
-            // type hash, which is temporarily stored in the slot reserved for
-            // the `owner` field as well as 9 order fields to hash for a total
-            // of `10 * sizeof(uint) = 320` bytes.
             mstore(order, ORDER_TYPE_HASH)
             orderDigest := keccak256(order, 320)
         }
 
-        bytes32 signingDigest;
-
-        // NOTE: Now compute the digest that was used for signing. This is not
-        // the same as the order digest as it is dependant on the signature
-        // scheme being used. In both cases, the signing digest is computed from
-        // a prefix followed by the domain separator and finally the order
-        // the order digest:
-        // - If the order is signed using the EIP-712 sheme, then the prefix is
-        //   the 2-byte value 0x1901,
-        // - If the order is signed using generic message scheme, then the
-        //   prefix is the 28-byte "\x19Ethereum Signed Message\n64" where 64 is
-        //   the length the domain separator and order digest.
+        // NOTE: Solidity allocates, but does not free, memory when calling the
+        // ABI encoding methods as well as the `ecrecover` precompile. However,
+        // we can restore the free memory pointer to before we made allocations
+        // to effectively free the memory.
+        // <https://solidity.readthedocs.io/en/v0.7.4/internals/layout_in_memory.html>
+        uint256 freeMemoryPointer;
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            // NOTE: Use the region of memory dedicated to the last 4 order
-            // fields to compute the hash in order to prevent further memory
-            // allocations. This is safe as those words have not yet been set
-            // and their values are being stored in stack variables.
-            // Specifically we use:
-            // - `sellTokenIndex` field slot for the prefix (320 byte offset),
-            // - `buyTokenIndex` field slot for the domain separator (352 byte
-            //    offset),
-            // - `executedAmount` field slot for the order digest (384 byte
-            //    offset),
-            mstore(add(order, 352), domainSeparator)
-            mstore(add(order, 384), orderDigest)
-            switch and(v, 0x80)
-                case 0 {
-                    mstore(add(order, 320), 0x1901)
-                    signingDigest := keccak256(add(order, 350), 66)
-                }
-                default {
-                    mstore(
-                        add(order, 320),
-                        // NOTE: Strings are left-padded, so add 0's to make it
-                        // right padded instead.
-                        "\x00\x00\x00\x00\x19Ethereum Signed Message:\n64"
-                    )
-                    signingDigest := keccak256(add(order, 324), 92)
-                }
+            freeMemoryPointer := mload(0x40)
+        }
+
+        bytes32 signingDigest;
+        if (v & 0x80 == 0) {
+            // NOTE: The order is signed using the EIP-712 sheme, the signing
+            // hash is `"\x19\x01" || domainSeparator || orderDigest`.
+            signingDigest = keccak256(
+                abi.encodePacked("\x19\x01", domainSeparator, orderDigest)
+            );
+        } else {
+            // NOTE: The order is signed using generic message scheme, prefixed
+            // with `"\x19Ethereum Signed Message:\n64"` where 64 is length of
+            // the message being signed, which for Gnosis Protocol is
+            // `domainSeparator || orderDigest`.
+            signingDigest = keccak256(
+                abi.encodePacked(
+                    "\x19Ethereum Signed Message:\n64",
+                    domainSeparator,
+                    orderDigest
+                )
+            );
         }
 
         order.owner = ecrecover(signingDigest, v & 0x1f, r, s);
-        order.sellTokenIndex = sellTokenIndex;
-        order.buyTokenIndex = buyTokenIndex;
-        order.executedAmount = executedAmount;
         order.digest = orderDigest;
-
         require(order.owner != address(0), "GPv2: invalid signature");
+
+        // NOTE: Restore the free memory pointer. This is safe as the memory
+        // used can be discarded, and the memory pointed to by the free memory
+        // pointer **does not have to point to zero-ed out memory**.
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            mstore(0x40, freeMemoryPointer)
+        }
     }
 }

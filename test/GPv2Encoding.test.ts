@@ -232,7 +232,7 @@ describe("GPv2Encoding", () => {
       ).to.be.reverted;
     });
 
-    it("should allocate minimal memory", async () => {
+    it("should not allocate additional memory", async () => {
       // NOTE: We want to make sure that calls to `decodeOrder` does not require
       // additional memory allocations to save on memory per orders.
       //todo
@@ -255,13 +255,7 @@ describe("GPv2Encoding", () => {
         encoder.orderCount,
         encoder.encodedOrders,
       );
-
-      // NOTE: Currently, the `ecrecover` call requires 32 bytes of memory to
-      // be allocated per call. This is because `STATICCALL` writes the output
-      // to memory, and the compiler does not seem to optimize the extra memory
-      // copy away (despite the result being saved immediately to memory). In
-      // the future, we can optimize this away with some `assembly`.
-      expect(mem.toNumber()).to.equal(64);
+      expect(mem.toNumber()).to.equal(0);
     });
   });
 });
