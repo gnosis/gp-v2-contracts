@@ -235,7 +235,6 @@ describe("GPv2Encoding", () => {
     it("should not allocate additional memory", async () => {
       // NOTE: We want to make sure that calls to `decodeOrder` does not require
       // additional memory allocations to save on memory per orders.
-      //todo
       const encoder = new OrderEncoder(testDomain);
       await encoder.signEncodeOrder(
         SigningScheme.TYPED_DATA,
