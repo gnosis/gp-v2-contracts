@@ -46,7 +46,7 @@ describe("GPv2Encoding", () => {
       const executedAmount = fillUint(256, 0x08);
 
       const encoder = new OrderEncoder(domainSeparator);
-      encoder.signEncodeOrder(traders[0], order, executedAmount);
+      await encoder.signEncodeOrder(traders[0], order, executedAmount);
 
       const [decodedOrders] = await encoding.decodeSignedOrdersTest(
         encoder.tokens,
@@ -58,7 +58,6 @@ describe("GPv2Encoding", () => {
       // `ABIEncoderV2` structs.
       expect(decodedOrders.length).to.equal(1);
       expect(decodedOrders[0]).to.deep.equal([
-        await traders[0].getAddress(),
         order.sellToken,
         order.buyToken,
         order.sellAmount,
@@ -68,10 +67,11 @@ describe("GPv2Encoding", () => {
         order.tip,
         order.kind,
         order.partiallyFillable,
-        executedAmount,
         encoder.tokens.indexOf(order.sellToken),
         encoder.tokens.indexOf(order.buyToken),
-        hashOrder(domainSeparator, order),
+        executedAmount,
+        hashOrder(order),
+        await traders[0].getAddress(),
       ]);
     });
 
@@ -80,7 +80,7 @@ describe("GPv2Encoding", () => {
       // additional memory allocations to save on memory per orders.
       //todo
       const encoder = new OrderEncoder(domainSeparator);
-      encoder.signEncodeOrder(
+      await encoder.signEncodeOrder(
         traders[0],
         {
           sellToken: ethers.constants.AddressZero,
@@ -140,7 +140,11 @@ describe("GPv2Encoding", () => {
 
     it("should revert for invalid order signatures", async () => {
       const encoder = new OrderEncoder(domainSeparator);
-      encoder.signEncodeOrder(traders[0], sampleOrder, sampleOrder.sellAmount);
+      await encoder.signEncodeOrder(
+        traders[0],
+        sampleOrder,
+        sampleOrder.sellAmount,
+      );
 
       // NOTE: `v` must be either `27` or `28`, so just set it to something else
       // to generate an invalid signature.
@@ -160,8 +164,12 @@ describe("GPv2Encoding", () => {
       const lastToken = fillBytes(20, 0x03);
 
       const encoder = new OrderEncoder(domainSeparator);
-      encoder.signEncodeOrder(traders[0], sampleOrder, sampleOrder.sellAmount);
-      encoder.signEncodeOrder(
+      await encoder.signEncodeOrder(
+        traders[0],
+        sampleOrder,
+        sampleOrder.sellAmount,
+      );
+      await encoder.signEncodeOrder(
         traders[1],
         {
           ...sampleOrder,
@@ -186,8 +194,12 @@ describe("GPv2Encoding", () => {
       const lastToken = fillBytes(20, 0x03);
 
       const encoder = new OrderEncoder(domainSeparator);
-      encoder.signEncodeOrder(traders[0], sampleOrder, sampleOrder.sellAmount);
-      encoder.signEncodeOrder(
+      await encoder.signEncodeOrder(
+        traders[0],
+        sampleOrder,
+        sampleOrder.sellAmount,
+      );
+      await encoder.signEncodeOrder(
         traders[1],
         {
           ...sampleOrder,

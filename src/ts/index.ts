@@ -1,4 +1,4 @@
-import { ethers, BigNumberish, Signature, SignatureLike, Wallet } from "ethers";
+import { ethers, BigNumberish, SignatureLike, Signer } from "ethers";
 
 /**
  * EIP-712 domain data used by GPv2.
@@ -156,7 +156,7 @@ export class OrderEncoder {
   /**
    * Creates a new order encoder instance.
    * @param domainSeparator Domain separator used for signing orders to encode.
-   * See {@link hashOrder} for more details.
+   * See {@link signOrder} for more details.
    */
   public constructor(public readonly domainSeparator: string) {}
 
@@ -248,15 +248,15 @@ export class OrderEncoder {
    * @param executedAmount The executed trade amount for the order.
    * @return Signature for the order.
    */
-  public signEncodeOrder(
-    owner: Wallet,
+  public async signEncodeOrder(
+    owner: Signer,
     order: Order,
     executedAmount: BigNumberish,
-  ): void {
+  ): Promise<void> {
     if (!this.domainSeparator) {
       throw new Error("domain separator not specified");
     }
-    const signature = signOrder(owner, this.domainSeparator, order);
+    const signature = await signOrder(owner, this.domainSeparator, order);
     this.encodeOrder(order, executedAmount, signature);
   }
 
@@ -279,18 +279,13 @@ export class OrderEncoder {
 
 /**
  * Compute the 32-byte digest for the specified order.
- * @param domainSeparator The domain separator to add to the digest. This is
- * used by the smart contract to ensure order's can't be replayed across
- * different applications (domains), but also different deployments (as the
- * contract chain ID and address is used to salt the domain separator value).
  * @param order The order to compute the digest for.
  * @return Hex-encoded 32-byte order digest.
  */
-export function hashOrder(domainSeparator: string, order: Order): string {
+export function hashOrder(order: Order): string {
   return ethers.utils.keccak256(
     ethers.utils.defaultAbiCoder.encode(
       [
-        "bytes32",
         "address",
         "address",
         "uint256",
@@ -302,7 +297,6 @@ export function hashOrder(domainSeparator: string, order: Order): string {
         "bool",
       ],
       [
-        domainSeparator,
         order.sellToken,
         order.buyToken,
         order.sellAmount,
@@ -320,22 +314,21 @@ export function hashOrder(domainSeparator: string, order: Order): string {
 /**
  * Returns the signature for the specified order.
  * @param owner The owner for the order used to sign.
- * @param domainSeparator The domain separator to add to the digest used for
- * signing. See {@link hashOrder} for more details.
+ * @param domainSeparator The domain separator to add to the digest. This is
+ * used by the smart contract to ensure order's can't be replayed across
+ * different applications (domains), but also different deployments (as the
+ * contract chain ID and address is used to salt the domain separator value).
  * @param order The order to sign.
- * @return Signature for the order.
+ * @return Hex-encoded signature for the order.
  */
 export function signOrder(
-  owner: Wallet,
+  owner: Signer,
   domainSeparator: string,
   order: Order,
-): Signature {
-  const digest = hashOrder(domainSeparator, order);
-  // NOTE: We need to sign directly with the signing key here on an Ethers.js
-  // wallet and not the `Signer` API, as the latter uses the `"\x19Ethereum
-  // Signed Message:\n" + len(message)` prefix. This is likely to change in the
-  // future as wallets generally don't provide a method for doing this as it is
-  // considered unsafe.
-  // <https://github.com/gnosis/oba-contracts/issues/129>
-  return owner._signingKey().signDigest(digest);
+): Promise<string> {
+  return owner.signMessage(
+    ethers.utils.arrayify(
+      ethers.utils.hexConcat([domainSeparator, hashOrder(order)]),
+    ),
+  );
 }
