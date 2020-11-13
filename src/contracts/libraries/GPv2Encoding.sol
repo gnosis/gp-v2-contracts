@@ -10,11 +10,8 @@ library GPv2Encoding {
     /// settling a batch.
     ///
     /// The memory layout for an order is very important for optimizations for
-    /// recovering the order address. Specifically, all the signed order
-    /// parameters appear in contiguous memory, the 9 fields from `sellToken` to
-    /// `partiallyFillable`. This allows the memory reserved for decoding an
-    /// order to also be used for computing the order digest during the decoding
-    /// process for some added effeciency.
+    /// recovering the order address. Specifically, the first 10 fields are
+    /// ordered precisely to allow hashing to occur in place.
     struct Order {
         address owner;
         IERC20 sellToken;
@@ -139,14 +136,14 @@ library GPv2Encoding {
         order.partiallyFillable =
             (flags >> ORDER_PARTIALLY_FILLABLE_BIT) & 0x01 == 0x01;
 
-        // NOTE: In order to avoid allocating and copying 10 words of data per
-        // call, reuse the memory region reserved by the caller for the order
-        // result as input for computing the hash. Specifically, we use the slot
-        // reserved for the order `owner` for the order type hash. Since the
-        // owner is set later on, the type hash will be overwritten and we don't
-        // need to restore it ourselves. Furthermore, Structs are not packed in
-        // Solidity and there are 10 fields to hash for a total of
-        // `10 * sizeof(uint) = 320` bytes.
+        // NOTE: In order to avoid a memory allocation per call by using the
+        // built-in `abi.encode`, we reuse the memory region reserved by the
+        // caller for the order result as input to compute the hash, using the
+        // memory slot reserved for the order `owner` for the order type hash
+        // which is required by EIP-712 as a prefix to the order data.
+        // Furthermore structs are not packed in Solidity, and there is the
+        // order type hash prefix followed by the 9 order fields to hash for a
+        // total of `10 * sizeof(uint) = 320` bytes.
         bytes32 orderDigest;
         // solhint-disable-next-line no-inline-assembly
         assembly {
