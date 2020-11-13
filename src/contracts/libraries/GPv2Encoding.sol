@@ -183,9 +183,11 @@ library GPv2Encoding {
             );
         }
 
-        order.owner = ecrecover(signingDigest, v & 0x1f, r, s);
+        address orderOwner = ecrecover(signingDigest, v & 0x1f, r, s);
+        require(orderOwner != address(0), "GPv2: invalid signature");
+
+        order.owner = orderOwner;
         order.digest = orderDigest;
-        require(order.owner != address(0), "GPv2: invalid signature");
 
         // NOTE: Restore the free memory pointer. This is safe as the memory
         // used can be discarded, and the memory pointed to by the free memory
