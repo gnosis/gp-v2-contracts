@@ -127,7 +127,6 @@ library GPv2Encoding {
             abi.decode(encodedOrder[70:], (uint256)) >> (256 - 32)
         );
         order.tip = abi.decode(encodedOrder[74:], (uint256));
-        uint8 flags = uint8(encodedOrder[106]);
         order.executedAmount = abi.decode(encodedOrder[107:], (uint256));
         uint8 v = uint8(encodedOrder[139]);
         bytes32 r = abi.decode(encodedOrder[140:], (bytes32));
@@ -137,24 +136,29 @@ library GPv2Encoding {
         order.sellTokenIndex = sellTokenIndex;
         order.buyToken = tokens[buyTokenIndex];
         order.buyTokenIndex = buyTokenIndex;
+        {
+        uint8 flags = uint8(encodedOrder[106]);
         order.kind = OrderKind((flags >> ORDER_KIND_BIT) & 0x1);
         order.partiallyFillable =
             (flags >> ORDER_PARTIALLY_FILLABLE_BIT) & 0x01 == 0x01;
-
-        // NOTE: In order to avoid allocating and copying 10 words of data per
-        // call, reuse the memory region reserved by the caller for the order
-        // result as input for computing the hash. Specifically, we use the slot
-        // reserved for the order `owner` for the order type hash. Since the
-        // owner is set later on, the type hash will be overwritten and we don't
-        // need to restore it ourselves. Furthermore, Structs are not packed in
-        // Solidity and there are 10 fields to hash for a total of
-        // `10 * sizeof(uint) = 320` bytes.
-        bytes32 orderDigest;
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            mstore(order, ORDER_TYPE_HASH)
-            orderDigest := keccak256(order, 320)
         }
+
+        // NOTE: Compute the EIP-712 order struct hash.
+        bytes32 orderDigest =
+            keccak256(
+                abi.encode(
+                    ORDER_TYPE_HASH,
+                    order.sellToken,
+                    order.buyToken,
+                    order.sellAmount,
+                    order.buyAmount,
+                    order.validTo,
+                    order.nonce,
+                    order.tip,
+                    order.kind,
+                    order.partiallyFillable
+                )
+            );
 
         bytes32 signingDigest;
         if (v & 0x80 == 0) {
