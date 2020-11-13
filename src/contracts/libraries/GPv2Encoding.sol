@@ -98,7 +98,7 @@ library GPv2Encoding {
         IERC20[] calldata tokens,
         bytes calldata encodedOrder,
         Order memory order
-    ) internal view {
+    ) internal pure {
         // NOTE: This is currently unnecessarily gas inefficient. Specifically,
         // there is a potentially extraneous check to the encoded order length
         // (this can be verified once for the total encoded orders length).
@@ -156,17 +156,6 @@ library GPv2Encoding {
             orderDigest := keccak256(order, 320)
         }
 
-        // NOTE: Solidity allocates, but does not free, memory when calling the
-        // ABI encoding methods as well as the `ecrecover` precompile. However,
-        // we can restore the free memory pointer to before we made allocations
-        // to effectively free the memory.
-        // <https://solidity.readthedocs.io/en/v0.7.4/internals/layout_in_memory.html>
-        uint256 freeMemoryPointer;
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            freeMemoryPointer := mload(0x40)
-        }
-
         bytes32 signingDigest;
         if (v & 0x80 == 0) {
             // NOTE: The order is signed using the EIP-712 sheme, the signing
@@ -191,13 +180,5 @@ library GPv2Encoding {
         order.owner = ecrecover(signingDigest, v & 0x1f, r, s);
         order.digest = orderDigest;
         require(order.owner != address(0), "GPv2: invalid signature");
-
-        // NOTE: Restore the free memory pointer. This is safe as the memory
-        // used can be discarded, and the memory pointed to by the free memory
-        // pointer **does not have to point to zero-ed out memory**.
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            mstore(0x40, freeMemoryPointer)
-        }
     }
 }
