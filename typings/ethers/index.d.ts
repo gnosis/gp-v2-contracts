@@ -3,6 +3,7 @@
  */
 
 import { ethers } from "ethers";
+import { ethers } from "hardhat";
 
 declare module "ethers" {
   /**
@@ -22,11 +23,6 @@ declare module "ethers" {
      * Signs the typed data value with types data structure for domain using the
      * EIP-712 specification.
      */
-    _signTypedData?: (
-      domain: TypedDataDomain,
-      types: Record<string, Array<TypedDataField>>,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      value: Record<string, any>,
-    ) => Promise<string>;
+    _signTypedData?: typeof ethers.VoidSigner.prototype._signTypedData;
   }
 }
