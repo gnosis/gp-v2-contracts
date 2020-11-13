@@ -134,7 +134,6 @@ library GPv2Encoding {
         order.partiallyFillable =
             (flags >> ORDER_PARTIALLY_FILLABLE_BIT) & 0x01 == 0x01;
 
-        bytes32 orderTypeHash = ORDER_TYPE_HASH;
         bytes32 orderDigest;
 
         // NOTE: In order to avoid a memory allocation per call by using the
@@ -146,7 +145,7 @@ library GPv2Encoding {
             // type hash, which is temporarily stored in the slot reserved for
             // the `owner` field as well as 9 order fields to hash for a total
             // of `10 * sizeof(uint) = 320` bytes.
-            mstore(order, orderTypeHash)
+            mstore(order, ORDER_TYPE_HASH)
             orderDigest := keccak256(order, 320)
         }
 
@@ -184,6 +183,8 @@ library GPv2Encoding {
                 default {
                     mstore(
                         add(order, 320),
+                        // NOTE: Strings are left-padded, so add 0's to make it
+                        // right padded instead.
                         "\x00\x00\x00\x00\x19Ethereum Signed Message:\n64"
                     )
                     signingDigest := keccak256(add(order, 324), 92)
