@@ -5,6 +5,14 @@ pragma experimental ABIEncoderV2;
 import "../GPv2Settlement.sol";
 
 contract GPv2SettlementTestInterface is GPv2Settlement {
+    constructor(GPv2AccessControl _controller)
+        public
+        GPv2Settlement(_controller)
+    // solhint-disable-next-line no-empty-blocks
+    {
+
+    }
+
     function domainSeparatorTest() public view returns (bytes32) {
         return domainSeparator;
     }

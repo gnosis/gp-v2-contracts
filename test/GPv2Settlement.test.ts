@@ -6,13 +6,18 @@ import { domain } from "../src/ts";
 
 describe("GPv2Settlement", () => {
   let settlement: Contract;
+  let controller: Contract;
 
   beforeEach(async () => {
+    const GPv2AccessControl = await ethers.getContractFactory(
+      "GPv2AccessControl",
+    );
+    controller = await GPv2AccessControl.deploy();
+
     const GPv2Settlement = await ethers.getContractFactory(
       "GPv2SettlementTestInterface",
     );
-
-    settlement = await GPv2Settlement.deploy();
+    settlement = await GPv2Settlement.deploy(controller.address);
   });
 
   describe("domainSeparator", () => {
@@ -31,7 +36,7 @@ describe("GPv2Settlement", () => {
       const GPv2Settlement = await ethers.getContractFactory(
         "GPv2SettlementTestInterface",
       );
-      const settlement2 = await GPv2Settlement.deploy();
+      const settlement2 = await GPv2Settlement.deploy(controller.address);
 
       expect(await settlement.domainSeparatorTest()).to.not.equal(
         await settlement2.domainSeparatorTest(),

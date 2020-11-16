@@ -2,6 +2,7 @@
 pragma solidity ^0.6.12;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./GPv2AccessControl.sol";
 
 /// @title Gnosis Protocol v2 Settlement Contract
 /// @author Gnosis Developers
@@ -12,8 +13,10 @@ contract GPv2Settlement {
     /// protection mixed in so that signed orders are only valid for specific
     /// GPv2 contracts.
     bytes32 internal immutable domainSeparator;
+    GPv2AccessControl private controller;
 
-    constructor() public {
+    constructor(GPv2AccessControl _controller) public {
+        controller = _controller;
         uint256 chainId;
 
         // NOTE: Currently, the only way to get the chain ID in solidity is
@@ -34,6 +37,13 @@ contract GPv2Settlement {
                 address(this)
             )
         );
+    }
+
+    /// @dev This modifier is called by settle function to block any non-listed
+    /// senders from settling batches.
+    modifier onlySolver {
+        require(controller.isSolver(msg.sender), "GPv2: not a solver");
+        _;
     }
 
     /// @dev Settle the specified orders at a clearing price. Note that it is
@@ -79,7 +89,7 @@ contract GPv2Settlement {
         bytes calldata encodedOrders,
         bytes calldata encodedInteractions,
         bytes calldata encodedOrderRefunds
-    ) external pure {
+    ) external view onlySolver {
         require(tokens.length == 0, "not yet implemented");
         require(clearingPrices.length == 0, "not yet implemented");
         require(feeFactor == 0, "not yet implemented");

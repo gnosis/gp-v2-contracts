@@ -11,6 +11,7 @@ describe("GPv2AccessControl", () => {
       "GPv2AccessControl",
     );
 
+    // Owner will default to admin account declared above.
     accessController = await GPv2AccessControl.deploy();
   });
 
@@ -48,6 +49,11 @@ describe("GPv2AccessControl", () => {
         await expect(accessController.getSolverAt(1)).to.be.revertedWith(
           "EnumerableSet: index out of bounds",
         );
+      });
+
+      it("returns expected address when called correctly", async () => {
+        await accessController.addSolver(solver.address);
+        expect(await accessController.getSolverAt(0)).to.equal(solver.address);
       });
 
       it("returns expected address when called correctly", async () => {
