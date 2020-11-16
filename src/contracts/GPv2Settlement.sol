@@ -96,6 +96,6 @@ contract GPv2Settlement {
         require(encodedOrders.length == 0, "not yet implemented");
         require(encodedInteractions.length == 0, "not yet implemented");
         require(encodedOrderRefunds.length == 0, "not yet implemented");
-        revert("not yet implemented");
+        revert("Final: not yet implemented");
     }
 }

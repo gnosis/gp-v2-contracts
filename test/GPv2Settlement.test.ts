@@ -5,6 +5,7 @@ import { ethers, waffle } from "hardhat";
 import { domain } from "../src/ts";
 
 describe("GPv2Settlement", () => {
+  const [owner, solver] = waffle.provider.getWallets();
   let settlement: Contract;
   let controller: Contract;
 
@@ -41,6 +42,20 @@ describe("GPv2Settlement", () => {
       expect(await settlement.domainSeparatorTest()).to.not.equal(
         await settlement2.domainSeparatorTest(),
       );
+    });
+  });
+
+  describe("settle", () => {
+    it("rejects transactions from non-solvers", async () => {
+      await expect(settlement.settle([], [], 0, [], [], [])).to.be.revertedWith(
+        "GPv2: not a solver",
+      );
+    });
+    it("accepts transactions from solvers", async () => {
+      await controller.addSolver(solver.address);
+      await expect(
+        settlement.connect(solver.address).settle([], [], 0, [], [], []),
+      ).revertedWith("Final: not yet implemented");
     });
   });
 });
