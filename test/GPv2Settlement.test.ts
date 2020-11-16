@@ -53,6 +53,8 @@ describe("GPv2Settlement", () => {
     });
     it("accepts transactions from solvers", async () => {
       await controller.addSolver(solver.address);
+      // TODO - this will have to be changed when other contraints become active
+      // and when settle function no longer reverts.
       await expect(
         settlement.connect(solver.address).settle([], [], 0, [], [], []),
       ).revertedWith("Final: not yet implemented");
