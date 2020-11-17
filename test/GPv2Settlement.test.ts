@@ -13,12 +13,12 @@ describe("GPv2Settlement", () => {
     const GPv2AccessControl = await ethers.getContractFactory(
       "GPv2AccessControl",
     );
-    controller = await GPv2AccessControl.deploy();
+    controller = await GPv2AccessControl.connect(owner).deploy();
 
     const GPv2Settlement = await ethers.getContractFactory(
       "GPv2SettlementTestInterface",
     );
-    settlement = await GPv2Settlement.deploy(controller.address);
+    settlement = await GPv2Settlement.connect(owner).deploy(controller.address);
   });
 
   describe("domainSeparator", () => {
