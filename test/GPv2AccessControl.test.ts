@@ -34,7 +34,7 @@ describe("GPv2SimpleAuthentication", () => {
   });
 
   describe("removeSolver", () => {
-    it("should allow owner to add solver", async () => {
+    it("should allow owner to remove solver", async () => {
       await expect(authenticator.connect(owner).removeSolver(solver.address)).to
         .not.be.reverted;
     });
