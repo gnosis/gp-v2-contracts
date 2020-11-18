@@ -6,7 +6,12 @@ import "../libraries/GPv2Encoding.sol";
 
 contract GPv2EncodingTestInterface {
     bytes32 public constant DOMAIN_SEPARATOR =
-        keccak256(abi.encode(keccak256("EIP712Domain(string name)"), keccak256("test")));
+        keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name)"),
+                keccak256("test")
+            )
+        );
 
     function orderTypeHashTest() external pure returns (bytes32) {
         return (GPv2Encoding.ORDER_TYPE_HASH);
