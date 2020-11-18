@@ -7,18 +7,18 @@ import { domain } from "../src/ts";
 describe("GPv2Settlement", () => {
   const [owner, solver] = waffle.provider.getWallets();
   let settlement: Contract;
-  let controller: Contract;
+  let authenticator: Contract;
 
   beforeEach(async () => {
-    const GPv2AccessControl = await ethers.getContractFactory(
-      "GPv2AccessControl",
+    const GPv2SimpleAuthentication = await ethers.getContractFactory(
+      "GPv2SimpleAuthentication",
     );
-    controller = await GPv2AccessControl.connect(owner).deploy();
+    authenticator = await GPv2SimpleAuthentication.connect(owner).deploy();
 
     const GPv2Settlement = await ethers.getContractFactory(
       "GPv2SettlementTestInterface",
     );
-    settlement = await GPv2Settlement.deploy(controller.address);
+    settlement = await GPv2Settlement.deploy(authenticator.address);
   });
 
   describe("domainSeparator", () => {
@@ -37,7 +37,7 @@ describe("GPv2Settlement", () => {
       const GPv2Settlement = await ethers.getContractFactory(
         "GPv2SettlementTestInterface",
       );
-      const settlement2 = await GPv2Settlement.deploy(controller.address);
+      const settlement2 = await GPv2Settlement.deploy(authenticator.address);
 
       expect(await settlement.domainSeparatorTest()).to.not.equal(
         await settlement2.domainSeparatorTest(),
@@ -53,7 +53,7 @@ describe("GPv2Settlement", () => {
     });
 
     it("accepts transactions from solvers", async () => {
-      await controller.addSolver(solver.address);
+      await authenticator.addSolver(solver.address);
       // TODO - this will have to be changed when other contraints become active
       // and when settle function no longer reverts.
       await expect(

@@ -2,7 +2,7 @@
 pragma solidity ^0.6.12;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./GPv2AccessControl.sol";
+import "./GPv2SimpleAuthentication.sol";
 
 /// @title Gnosis Protocol v2 Settlement Contract
 /// @author Gnosis Developers
@@ -13,9 +13,9 @@ contract GPv2Settlement {
     /// protection mixed in so that signed orders are only valid for specific
     /// GPv2 contracts.
     bytes32 internal immutable domainSeparator;
-    GPv2Authentication private authenticator;
+    GPv2SimpleAuthentication private authenticator;
 
-    constructor(GPv2AccessControl _authenticator) public {
+    constructor(GPv2SimpleAuthentication _authenticator) public {
         authenticator = _authenticator;
         uint256 chainId;
 

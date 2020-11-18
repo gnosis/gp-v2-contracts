@@ -4,7 +4,7 @@ pragma solidity ^0.6.12;
 import "../GPv2Settlement.sol";
 
 contract GPv2SettlementTestInterface is GPv2Settlement {
-    constructor(GPv2AccessControl _controller)
+    constructor(GPv2SimpleAuthentication _controller)
         public
         GPv2Settlement(_controller)
     // solhint-disable-next-line no-empty-blocks
