@@ -18,7 +18,7 @@ describe("GPv2Settlement", () => {
     const GPv2Settlement = await ethers.getContractFactory(
       "GPv2SettlementTestInterface",
     );
-    settlement = await GPv2Settlement.connect(owner).deploy(controller.address);
+    settlement = await GPv2Settlement.deploy(controller.address);
   });
 
   describe("domainSeparator", () => {
