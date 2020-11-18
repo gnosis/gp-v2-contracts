@@ -155,7 +155,7 @@ library GPv2Encoding {
         // ABI encoding methods as well as the `ecrecover` precompile. However,
         // we can restore the free memory pointer to before we made allocations
         // to effectively free the memory.
-        // <https://solidity.readthedocs.io/en/v0.7.4/internals/layout_in_memory.html>
+        // <https://solidity.readthedocs.io/en/v0.6.12/internals/layout_in_memory.html>
         uint256 freeMemoryPointer;
         // solhint-disable-next-line no-inline-assembly
         assembly {
