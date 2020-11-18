@@ -6,7 +6,16 @@ import "../libraries/GPv2Encoding.sol";
 
 contract GPv2EncodingTestInterface {
     bytes32 public constant DOMAIN_SEPARATOR =
-        0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f;
+        keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name)"),
+                keccak256("test")
+            )
+        );
+
+    function orderTypeHashTest() external pure returns (bytes32) {
+        return (GPv2Encoding.ORDER_TYPE_HASH);
+    }
 
     function decodeSignedOrdersTest(
         IERC20[] calldata tokens,
@@ -24,6 +33,8 @@ contract GPv2EncodingTestInterface {
         // solhint-disable no-inline-assembly
 
         uint256 stride = GPv2Encoding.ORDER_STRIDE;
+        bytes32 domainSeparator = DOMAIN_SEPARATOR;
+
         orders = new GPv2Encoding.Order[](orderCount);
 
         // NOTE: Solidity keeps a total memory count at address 0x40. Check
@@ -48,7 +59,7 @@ contract GPv2EncodingTestInterface {
             }
 
             GPv2Encoding.decodeSignedOrder(
-                DOMAIN_SEPARATOR,
+                domainSeparator,
                 tokens,
                 encodedOrder,
                 orders[i]
