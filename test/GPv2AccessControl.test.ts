@@ -26,6 +26,7 @@ describe("GPv2AccessControl", () => {
       await expect(accessController.addSolver(solver.address)).to.not.be
         .reverted;
     });
+
     it("should not allow non-owner to add solver", async () => {
       await expect(
         accessController.connect(nonOwner).addSolver(solver.address),
@@ -38,6 +39,7 @@ describe("GPv2AccessControl", () => {
       await expect(accessController.connect(owner).removeSolver(solver.address))
         .to.not.be.reverted;
     });
+
     it("should not allow non-owner to remove solver", async () => {
       await expect(
         accessController.connect(nonOwner).removeSolver(solver.address),
