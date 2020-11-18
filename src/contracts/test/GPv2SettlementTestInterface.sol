@@ -9,9 +9,6 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
         GPv2Settlement(_controller)
     // solhint-disable-next-line no-empty-blocks
     {
-        // According to the solidity docs:
-        // https://docs.soliditylang.org/en/develop/contracts.html#arguments-for-base-constructors
-        // This is how we inherit base constructors.
     }
 
     function domainSeparatorTest() public view returns (bytes32) {
