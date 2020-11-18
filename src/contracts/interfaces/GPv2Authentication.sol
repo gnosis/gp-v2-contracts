@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-newer
 pragma solidity ^0.6.12;
 
-/// @title Gnosis Protocol v2 Authentication interface
+/// @title Gnosis Protocol v2 Authentication Interface
 /// @author Gnosis Developers
 interface GPv2Authentication {
     /// @dev determines whether the provided address is an authenticated solver.
