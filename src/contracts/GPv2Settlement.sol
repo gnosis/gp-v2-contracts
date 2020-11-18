@@ -15,8 +15,8 @@ contract GPv2Settlement {
     bytes32 internal immutable domainSeparator;
     GPv2Authentication private authenticator;
 
-    constructor(GPv2AccessControl _controller) public {
-        controller = _controller;
+    constructor(GPv2AccessControl _authenticator) public {
+        authenticator = _authenticator;
         uint256 chainId;
 
         // NOTE: Currently, the only way to get the chain ID in solidity is
@@ -42,7 +42,7 @@ contract GPv2Settlement {
     /// @dev This modifier is called by settle function to block any non-listed
     /// senders from settling batches.
     modifier onlySolver {
-        require(controller.isSolver(msg.sender), "GPv2: not a solver");
+        require(authenticator.isSolver(msg.sender), "GPv2: not a solver");
         _;
     }
 
