@@ -1,5 +1,4 @@
-[Optional] 
-Fixes #issue
+Closes #issue
 
 *<Context of what this change does, why it is needed and how it is accomplished>*
 
