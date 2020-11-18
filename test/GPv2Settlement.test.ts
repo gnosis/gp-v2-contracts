@@ -51,6 +51,7 @@ describe("GPv2Settlement", () => {
         "GPv2: not a solver",
       );
     });
+
     it("accepts transactions from solvers", async () => {
       await controller.addSolver(solver.address);
       // TODO - this will have to be changed when other contraints become active
