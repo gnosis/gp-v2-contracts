@@ -1,3 +1,4 @@
-build/
+build/*
+!build/deployed
 node_modules/
 yarn-error.log
