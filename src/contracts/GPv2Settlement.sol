@@ -13,7 +13,7 @@ contract GPv2Settlement {
     /// protection mixed in so that signed orders are only valid for specific
     /// GPv2 contracts.
     bytes32 internal immutable domainSeparator;
-    GPv2AccessControl private controller;
+    GPv2Authentication private authenticator;
 
     constructor(GPv2AccessControl _controller) public {
         controller = _controller;
