@@ -21,7 +21,7 @@ function fillUint(bits: number, byte: number): BigNumber {
 describe("GPv2Encoding", () => {
   const [, ...traders] = waffle.provider.getWallets();
 
-  const testDomain = {};
+  const testDomain = { name: "test" };
   const sampleOrder = {
     sellToken: fillBytes(20, 0x01),
     buyToken: fillBytes(20, 0x02),

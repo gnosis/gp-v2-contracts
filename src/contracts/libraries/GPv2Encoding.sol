@@ -37,10 +37,15 @@ library GPv2Encoding {
 
     /// @dev The order EIP-712 type hash.
     ///
-    /// This type hash is computed as per the EIP-712 standard as the hash of
-    /// the `Order` struct fields: `keccak256("Order(...)")`.
+    /// Note that this type hash does not include all fields like `owner` and
+    /// `*TokenIndex`. This is because these fields are not signed but a part of
+    /// the encoded order data and are useful to the settlement contract.
     bytes32 internal constant ORDER_TYPE_HASH =
-        0x70874c19b8f223ec3e4476223f761070db29e881be331cda28425f9079d3a76b;
+        // TODO: Replace this with the pre-computed value once the contract is
+        // ready to be deployed.
+        keccak256(
+            "Order(address sellToken,address buyToken,uint256 sellAmount,uint256 buyAmount,uint32 validTo,uint32 nonce,uint256 tip,uint8 kind,bool partiallyFillable)"
+        );
 
     /// @dev Bit position for the [`OrderKind`] encoded in the flags.
     uint8 internal constant ORDER_KIND_BIT = 0;
@@ -78,9 +83,9 @@ library GPv2Encoding {
     /// - EIP-712 for signing typed data, this is the default scheme that will
     ///   be used when recovering the signing address from the signature.
     /// - Generic message signature, this scheme will be used **only** if the
-    ///   `v` signature parameter's MSB is set. This is done as there are only
-    ///   two possible values `v` can have: 27 or 28, which only take up the
-    ///   lower 5 bits of the `uint8`.
+    ///   `v` signature parameter's most significant bit is set. This is done as
+    ///   there are only two possible values `v` can have: 27 or 28, which only
+    ///   take up the lower 5 bits of the `uint8`.
     ///
     /// @param domainSeparator The domain separator used for hashing and signing
     /// the order.
@@ -145,9 +150,14 @@ library GPv2Encoding {
         // order type hash prefix followed by the 9 order fields to hash for a
         // total of `10 * sizeof(uint) = 320` bytes.
         bytes32 orderDigest;
+        // TODO: This temporary stack variable is required as the compiler does
+        // not support non-literal constants in inline assembly. This should be
+        // removed once the constant is replaced with a pre-computed value for
+        // deployment.
+        bytes32 orderTypeHash = ORDER_TYPE_HASH;
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            mstore(order, ORDER_TYPE_HASH)
+            mstore(order, orderTypeHash)
             orderDigest := keccak256(order, 320)
         }
 
@@ -164,15 +174,17 @@ library GPv2Encoding {
 
         bytes32 signingDigest;
         if (v & 0x80 == 0) {
-            // NOTE: The order is signed using the EIP-712 sheme, the signing
-            // hash is `"\x19\x01" || domainSeparator || orderDigest`.
+            // NOTE: The most significant bit **is not set**, so the order is
+            // signed using the EIP-712 sheme, the signing hash is of:
+            // `"\x19\x01" || domainSeparator || orderDigest`.
             signingDigest = keccak256(
                 abi.encodePacked("\x19\x01", domainSeparator, orderDigest)
             );
         } else {
-            // NOTE: The order is signed using generic message scheme, prefixed
-            // with `"\x19Ethereum Signed Message:\n64"` where 64 is length of
-            // the message being signed, which for Gnosis Protocol is
+            // NOTE: The most significant bit **is set**, so the order is signed
+            // using generic message scheme, the signing hash is of:
+            // `"\x19Ethereum Signed Message:\n" || length || data` where the
+            // length is a constant 64 bytes and the data is defined as:
             // `domainSeparator || orderDigest`.
             signingDigest = keccak256(
                 abi.encodePacked(
