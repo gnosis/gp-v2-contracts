@@ -3,10 +3,11 @@ pragma solidity ^0.6.12;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
+import "./interfaces/GPv2Authentication.sol";
 
 /// @title Gnosis Protocol v2 Access Control Contract
 /// @author Gnosis Developers
-contract GPv2AccessControl is Ownable {
+contract GPv2AccessControl is Ownable, GPv2Authentication {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     EnumerableSet.AddressSet private solvers;
@@ -15,7 +16,12 @@ contract GPv2AccessControl is Ownable {
         solvers.add(solverAddress);
     }
 
-    function isSolver(address prospectiveSolver) public view returns (bool) {
+    function isSolver(address prospectiveSolver)
+        public
+        view
+        override
+        returns (bool)
+    {
         return solvers.contains(prospectiveSolver);
     }
 
