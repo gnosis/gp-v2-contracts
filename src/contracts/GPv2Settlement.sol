@@ -15,7 +15,7 @@ contract GPv2Settlement {
     bytes32 internal immutable domainSeparator;
 
     /// @dev The authenticator is used to determine who can call the settle function.
-    /// That is, only authorised solvers have the ability to invoke settlements. 
+    /// That is, only authorised solvers have the ability to invoke settlements.
     /// Any valid authenticator implements an isSolver method called by the onlySolver
     /// modifier below.
     GPv2SimpleAuthentication private authenticator;
