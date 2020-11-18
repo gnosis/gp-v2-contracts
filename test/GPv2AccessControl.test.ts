@@ -3,7 +3,7 @@ import { Contract } from "ethers";
 import { ethers, waffle } from "hardhat";
 
 describe("GPv2AccessControl", () => {
-  const [admin, solver] = waffle.provider.getWallets();
+  const [owner, nonOwner, solver] = waffle.provider.getWallets();
   let accessController: Contract;
 
   beforeEach(async () => {
@@ -17,7 +17,7 @@ describe("GPv2AccessControl", () => {
 
   describe("constructor", () => {
     it("should set deployer as owner", async () => {
-      expect(await accessController.owner()).to.equal(admin.address);
+      expect(await accessController.owner()).to.equal(owner.address);
     });
   });
 
@@ -25,6 +25,23 @@ describe("GPv2AccessControl", () => {
     it("should allow to add solver", async () => {
       await expect(accessController.addSolver(solver.address)).to.not.be
         .reverted;
+    });
+    it("should not allow non-owner to add solver", async () => {
+      await expect(
+        accessController.connect(nonOwner).addSolver(solver.address),
+      ).to.be.revertedWith("caller is not the owner");
+    });
+  });
+
+  describe("removeSolver", () => {
+    it("should allow owner to add solver", async () => {
+      await expect(accessController.connect(owner).removeSolver(solver.address))
+        .to.not.be.reverted;
+    });
+    it("should not allow non-owner to remove solver", async () => {
+      await expect(
+        accessController.connect(nonOwner).removeSolver(solver.address),
+      ).to.be.revertedWith("caller is not the owner");
     });
   });
 

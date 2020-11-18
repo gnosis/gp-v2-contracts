@@ -12,8 +12,12 @@ contract GPv2AccessControl is Ownable, GPv2Authentication {
 
     EnumerableSet.AddressSet private solvers;
 
-    function addSolver(address solverAddress) public {
-        solvers.add(solverAddress);
+    function addSolver(address solver) public onlyOwner {
+        solvers.add(solver);
+    }
+
+    function removeSolver(address solver) public onlyOwner {
+        solvers.remove(solver);
     }
 
     function isSolver(address prospectiveSolver)
