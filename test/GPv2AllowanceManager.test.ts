@@ -16,13 +16,19 @@ function composeTransfers(
 }
 
 describe("GPv2AllowanceManager", () => {
-  const [deployer, nonOwner, ...traders] = waffle.provider.getWallets();
+  const [
+    deployer,
+    recipient,
+    nonRecipient,
+    ...traders
+  ] = waffle.provider.getWallets();
 
   let allowanceManager: Contract;
 
   beforeEach(async () => {
     const GPv2AllowanceManager = await ethers.getContractFactory(
       "GPv2AllowanceManager",
+      recipient,
     );
 
     allowanceManager = await GPv2AllowanceManager.deploy();
@@ -31,8 +37,8 @@ describe("GPv2AllowanceManager", () => {
   describe("transferIn", () => {
     it("should revert if not called by the owner", async () => {
       await expect(
-        allowanceManager.connect(nonOwner).transferIn([]),
-      ).to.be.revertedWith("not allowance owner");
+        allowanceManager.connect(nonRecipient).transferIn([]),
+      ).to.be.revertedWith("not allowance recipient");
     });
 
     it("should execute ERC20 transfers", async () => {
@@ -44,10 +50,10 @@ describe("GPv2AllowanceManager", () => {
 
       const amount = ethers.utils.parseEther("13.37");
       await tokens[0].mock.transferFrom
-        .withArgs(traders[0].address, deployer.address, amount)
+        .withArgs(traders[0].address, recipient.address, amount)
         .returns(true);
       await tokens[1].mock.transferFrom
-        .withArgs(traders[1].address, deployer.address, amount)
+        .withArgs(traders[1].address, recipient.address, amount)
         .returns();
 
       await expect(
@@ -73,7 +79,7 @@ describe("GPv2AllowanceManager", () => {
 
       const amount = ethers.utils.parseEther("4.2");
       await token.mock.transferFrom
-        .withArgs(traders[0].address, deployer.address, amount)
+        .withArgs(traders[0].address, recipient.address, amount)
         .revertsWithReason("test error");
 
       await expect(
@@ -94,7 +100,7 @@ describe("GPv2AllowanceManager", () => {
 
       const amount = ethers.utils.parseEther("4.2");
       await token.mock.transferFrom
-        .withArgs(traders[0].address, deployer.address, amount)
+        .withArgs(traders[0].address, recipient.address, amount)
         .returns(false);
 
       await expect(

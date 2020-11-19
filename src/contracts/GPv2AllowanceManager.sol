@@ -18,27 +18,27 @@ contract GPv2AllowanceManager {
         uint256 amount;
     }
 
-    /// @dev The owner contract of the allowance manager. The owner is set at
-    /// creation time and cannot change.
-    address private immutable owner;
+    /// @dev The recipient of all transfers made by the allowance manager. The
+    /// recipient is set at creation time and cannot change.
+    address private immutable recipient;
 
     constructor() {
-        owner = msg.sender;
+        recipient = msg.sender;
     }
 
     /// @dev Modifier that ensures that a function can only be called by the
-    /// owner of this contract.
-    modifier onlyOwner {
-        require(msg.sender == owner, "GPv2: not allowance owner");
+    /// recipient of this contract.
+    modifier onlyRecipient {
+        require(msg.sender == recipient, "GPv2: not allowance recipient");
         _;
     }
 
     /// @dev Executes all transfers from the specified accounts into the caller.
     ///
     /// This function reverts if:
-    /// - The caller is not the owner of the allowance manager
+    /// - The caller is not the recipient of the allowance manager
     /// - Any ERC20 tranfer fails
-    function transferIn(Transfer[] calldata transfers) external onlyOwner {
+    function transferIn(Transfer[] calldata transfers) external onlyRecipient {
         for (uint256 i = 0; i < transfers.length; i++) {
             transfers[i].token.safeTransferFrom(
                 transfers[i].owner,
