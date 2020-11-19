@@ -4,8 +4,9 @@ import { ethers, waffle } from "hardhat";
 
 import {
   ORDER_TYPE_HASH,
-  OrderEncoder,
+  Order,
   OrderKind,
+  SettlementEncoder,
   SigningScheme,
   hashOrder,
 } from "../src/ts";
@@ -16,6 +17,37 @@ function fillBytes(count: number, byte: number): string {
 
 function fillUint(bits: number, byte: number): BigNumber {
   return BigNumber.from(fillBytes(bits / 8, byte));
+}
+
+interface Trade {
+  order: Order;
+  sellTokenIndex: number;
+  buyTokenIndex: number;
+  executedAmount: BigNumber;
+  digest: string;
+  owner: string;
+}
+
+function parseTrade(trade: unknown[]): Trade {
+  const order = trade[0] as unknown[];
+  return {
+    order: {
+      sellToken: order[1] as string,
+      buyToken: order[2] as string,
+      sellAmount: order[3] as BigNumber,
+      buyAmount: order[4] as BigNumber,
+      validTo: order[5] as number,
+      nonce: order[6] as number,
+      tip: order[7] as BigNumber,
+      kind: order[8] as OrderKind,
+      partiallyFillable: order[9] as boolean,
+    },
+    sellTokenIndex: trade[1] as number,
+    buyTokenIndex: trade[2] as number,
+    executedAmount: trade[3] as BigNumber,
+    digest: trade[4] as string,
+    owner: trade[5] as string,
+  };
 }
 
 describe("GPv2Encoding", () => {
@@ -58,8 +90,8 @@ describe("GPv2Encoding", () => {
     });
   });
 
-  describe("decodeSignedOrder", () => {
-    it("should round-trip encode executed order data", async () => {
+  describe("decodeTrade", () => {
+    it("should round-trip encode order data", async () => {
       // NOTE: Pay extra attention to use all bytes for each field, and that
       // they all have different values to make sure the are correctly
       // round-tripped.
@@ -76,93 +108,126 @@ describe("GPv2Encoding", () => {
       };
       const executedAmount = fillUint(256, 0x08);
 
-      const encoder = new OrderEncoder(testDomain);
-      await encoder.signEncodeOrder(
-        SigningScheme.TYPED_DATA,
-        traders[0],
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
         order,
         executedAmount,
+        traders[0],
+        SigningScheme.TYPED_DATA,
       );
 
-      const [decodedOrders] = await encoding.decodeSignedOrdersTest(
+      const [decodedTrades] = await encoding.decodeTradesTest(
         encoder.tokens,
-        encoder.orderCount,
-        encoder.encodedOrders,
+        encoder.tradeCount,
+        encoder.encodedTrades,
       );
 
       // NOTE: Ethers.js returns a tuple and not a struct with named fields for
       // `ABIEncoderV2` structs.
-      expect(decodedOrders.length).to.equal(1);
-      expect(decodedOrders[0]).to.deep.equal([
-        await traders[0].getAddress(),
-        order.sellToken,
-        order.buyToken,
-        order.sellAmount,
-        order.buyAmount,
-        order.validTo,
-        order.nonce,
-        order.tip,
-        order.kind,
-        order.partiallyFillable,
-        encoder.tokens.indexOf(order.sellToken),
-        encoder.tokens.indexOf(order.buyToken),
-        executedAmount,
-        hashOrder(order),
-      ]);
+      expect(decodedTrades.length).to.equal(1);
+
+      const {
+        order: decodedOrder,
+        executedAmount: decodedExecutedAmount,
+      } = parseTrade(decodedTrades[0]);
+      expect(decodedOrder).to.deep.equal(order);
+      expect(decodedExecutedAmount).to.deep.equal(executedAmount);
+    });
+
+    it("should return order token indices", async () => {
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
+        sampleOrder,
+        0,
+        traders[0],
+        SigningScheme.TYPED_DATA,
+      );
+
+      const [decodedTrades] = await encoding.decodeTradesTest(
+        encoder.tokens,
+        encoder.tradeCount,
+        encoder.encodedTrades,
+      );
+      const { sellTokenIndex, buyTokenIndex } = parseTrade(decodedTrades[0]);
+      expect(sellTokenIndex).to.equal(
+        encoder.tokens.indexOf(sampleOrder.sellToken),
+      );
+      expect(buyTokenIndex).to.equal(
+        encoder.tokens.indexOf(sampleOrder.buyToken),
+      );
+    });
+
+    it("should compute EIP-712 order struct hash", async () => {
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
+        sampleOrder,
+        0,
+        traders[0],
+        SigningScheme.TYPED_DATA,
+      );
+
+      const [decodedTrades] = await encoding.decodeTradesTest(
+        encoder.tokens,
+        encoder.tradeCount,
+        encoder.encodedTrades,
+      );
+      const { digest } = parseTrade(decodedTrades[0]);
+      expect(digest).to.equal(hashOrder(sampleOrder));
     });
 
     it("should recover signing address for all supported schemes", async () => {
-      const encoder = new OrderEncoder(testDomain);
+      const encoder = new SettlementEncoder(testDomain);
       for (const scheme of [SigningScheme.TYPED_DATA, SigningScheme.MESSAGE]) {
-        await encoder.signEncodeOrder(scheme, traders[0], sampleOrder, 0);
+        await encoder.signEncodeTrade(sampleOrder, 0, traders[0], scheme);
       }
 
-      const [decodedOrders] = await encoding.decodeSignedOrdersTest(
+      const [decodedTrades] = await encoding.decodeTradesTest(
         encoder.tokens,
-        encoder.orderCount,
-        encoder.encodedOrders,
+        encoder.tradeCount,
+        encoder.encodedTrades,
       );
 
       const traderAddress = await traders[0].getAddress();
-      for (const [owner] of decodedOrders) {
+      for (const decodedTrade of decodedTrades) {
+        const { owner } = parseTrade(decodedTrade);
         expect(owner).to.equal(traderAddress);
       }
     });
 
-    it("should revert if order bytes are too short.", async () => {
+    it("should revert if trade bytes are too short.", async () => {
       await expect(
-        encoding.decodeSignedOrdersTest([], 1, "0x1337"),
-      ).to.be.revertedWith("malformed order data");
+        encoding.decodeTradesTest([], 1, "0x1337"),
+      ).to.be.revertedWith("malformed trade data");
     });
 
-    it("should revert if order bytes are too long.", async () => {
+    it("should revert if trade bytes are too long.", async () => {
       await expect(
-        encoding.decodeSignedOrdersTest(
+        encoding.decodeTradesTest(
           [],
           1,
           ethers.utils.hexlify([...Array(205)].map(() => 42)),
         ),
-      ).to.be.revertedWith("malformed order data");
+      ).to.be.revertedWith("malformed trade data");
     });
 
     it("should revert for invalid order signatures", async () => {
-      const encoder = new OrderEncoder(testDomain);
-      await encoder.signEncodeOrder(
-        SigningScheme.TYPED_DATA,
-        traders[0],
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
         sampleOrder,
         sampleOrder.sellAmount,
+        traders[0],
+        SigningScheme.TYPED_DATA,
       );
 
       // NOTE: `v` must be either `27` or `28`, so just set it to something else
       // to generate an invalid signature.
-      const encodedOrderBytes = ethers.utils.arrayify(encoder.encodedOrders);
+      const encodedOrderBytes = ethers.utils.arrayify(encoder.encodedTrades);
       encodedOrderBytes[139] = 42;
 
       await expect(
-        encoding.decodeSignedOrdersTest(
+        encoding.decodeTradesTest(
           encoder.tokens,
-          encoder.orderCount,
+          encoder.tradeCount,
           encodedOrderBytes,
         ),
       ).to.be.revertedWith("invalid signature");
@@ -171,31 +236,31 @@ describe("GPv2Encoding", () => {
     it("should revert for invalid sell token indices", async () => {
       const lastToken = fillBytes(20, 0x03);
 
-      const encoder = new OrderEncoder(testDomain);
-      await encoder.signEncodeOrder(
-        SigningScheme.TYPED_DATA,
-        traders[0],
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
         sampleOrder,
         sampleOrder.sellAmount,
-      );
-      await encoder.signEncodeOrder(
+        traders[0],
         SigningScheme.TYPED_DATA,
-        traders[1],
+      );
+      await encoder.signEncodeTrade(
         {
           ...sampleOrder,
           sellToken: lastToken,
         },
         sampleOrder.sellAmount,
+        traders[1],
+        SigningScheme.TYPED_DATA,
       );
 
       // NOTE: Remove the last sell token (0x0303...0303).
       const tokens = encoder.tokens;
       expect(tokens.pop()).to.equal(lastToken);
       await expect(
-        encoding.decodeSignedOrdersTest(
+        encoding.decodeTradesTest(
           tokens,
-          encoder.orderCount,
-          encoder.encodedOrders,
+          encoder.tradeCount,
+          encoder.encodedTrades,
         ),
       ).to.be.reverted;
     });
@@ -203,31 +268,31 @@ describe("GPv2Encoding", () => {
     it("should revert for invalid sell token indices", async () => {
       const lastToken = fillBytes(20, 0x03);
 
-      const encoder = new OrderEncoder(testDomain);
-      await encoder.signEncodeOrder(
-        SigningScheme.TYPED_DATA,
-        traders[0],
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
         sampleOrder,
         sampleOrder.sellAmount,
-      );
-      await encoder.signEncodeOrder(
+        traders[0],
         SigningScheme.TYPED_DATA,
-        traders[1],
+      );
+      await encoder.signEncodeTrade(
         {
           ...sampleOrder,
           buyToken: lastToken,
         },
         sampleOrder.sellAmount,
+        traders[1],
+        SigningScheme.TYPED_DATA,
       );
 
       // NOTE: Remove the last buy token (0x0303...0303).
       const tokens = encoder.tokens;
       expect(tokens.pop()).to.equal(lastToken);
       await expect(
-        encoding.decodeSignedOrdersTest(
+        encoding.decodeTradesTest(
           tokens,
-          encoder.orderCount,
-          encoder.encodedOrders,
+          encoder.tradeCount,
+          encoder.encodedTrades,
         ),
       ).to.be.reverted;
     });
@@ -235,24 +300,24 @@ describe("GPv2Encoding", () => {
     it("should not allocate additional memory", async () => {
       // NOTE: We want to make sure that calls to `decodeOrder` does not require
       // additional memory allocations to save on memory per orders.
-      const encoder = new OrderEncoder(testDomain);
-      await encoder.signEncodeOrder(
-        SigningScheme.TYPED_DATA,
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
+        sampleOrder,
+        0,
         traders[0],
-        sampleOrder,
-        0,
+        SigningScheme.TYPED_DATA,
       );
-      await encoder.signEncodeOrder(
-        SigningScheme.MESSAGE,
-        traders[1],
+      await encoder.signEncodeTrade(
         sampleOrder,
         0,
+        traders[1],
+        SigningScheme.MESSAGE,
       );
 
-      const [, mem] = await encoding.decodeSignedOrdersTest(
+      const [, mem] = await encoding.decodeTradesTest(
         encoder.tokens,
-        encoder.orderCount,
-        encoder.encodedOrders,
+        encoder.tradeCount,
+        encoder.encodedTrades,
       );
       expect(mem.toNumber()).to.equal(0);
     });

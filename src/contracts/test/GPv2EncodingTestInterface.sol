@@ -17,52 +17,52 @@ contract GPv2EncodingTestInterface {
         return (GPv2Encoding.ORDER_TYPE_HASH);
     }
 
-    function decodeSignedOrdersTest(
+    function decodeTradesTest(
         IERC20[] calldata tokens,
-        uint256 orderCount,
-        bytes calldata encodedOrders
+        uint256 tradeCount,
+        bytes calldata encodedTrades
     )
         external
         view
         returns (
-            GPv2Encoding.Order[] memory orders,
+            GPv2Encoding.Trade[] memory trades,
             uint256 mem,
             uint256 gas_
         )
     {
         // solhint-disable no-inline-assembly
 
-        uint256 stride = GPv2Encoding.ORDER_STRIDE;
+        uint256 stride = GPv2Encoding.TRADE_STRIDE;
         bytes32 domainSeparator = DOMAIN_SEPARATOR;
 
-        orders = new GPv2Encoding.Order[](orderCount);
+        trades = new GPv2Encoding.Trade[](tradeCount);
 
         // NOTE: Solidity keeps a total memory count at address 0x40. Check
-        // before and after decoding an order to compute memory usage growth per
-        // call to `decodeSignedOrder`.
+        // before and after decoding a trade to compute memory usage growth per
+        // call to `decodeTrade`.
         assembly {
             mem := mload(0x40)
         }
         gas_ = gasleft();
 
         uint256 start;
-        bytes calldata encodedOrder;
-        for (uint256 i = 0; i < orderCount; i++) {
+        bytes calldata encodedTrade;
+        for (uint256 i = 0; i < tradeCount; i++) {
             start = i * stride;
-            if (i == orderCount - 1) {
-                // NOTE: Last order uses all remaining bytes. This allows the
-                // `decodeSignedOrder` method to be tested with short and long
-                // order bytes as well.
-                encodedOrder = encodedOrders[start:];
+            if (i == tradeCount - 1) {
+                // NOTE: Last trade uses all remaining bytes. This allows the
+                // `decodeTrade` method to be tested with short and long trade
+                // bytes as well.
+                encodedTrade = encodedTrades[start:];
             } else {
-                encodedOrder = encodedOrders[start:][:stride];
+                encodedTrade = encodedTrades[start:][:stride];
             }
 
-            GPv2Encoding.decodeSignedOrder(
+            GPv2Encoding.decodeTrade(
                 domainSeparator,
                 tokens,
-                encodedOrder,
-                orders[i]
+                encodedTrade,
+                trades[i]
             );
         }
 
