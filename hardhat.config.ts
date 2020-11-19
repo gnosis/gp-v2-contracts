@@ -49,7 +49,7 @@ export default {
   networks: {
     mainnet: {
       ...sharedNetworkConfig,
-      url: "https://mainnet.infura.io/v3/".concat(infuraKey),
+      url: `https://mainnet.infura.io/v3/${infuraKey}`,
     },
     rinkeby: {
       ...sharedNetworkConfig,
