@@ -53,7 +53,7 @@ export default {
     },
     rinkeby: {
       ...sharedNetworkConfig,
-      url: "https://rinkeby.infura.io/v3/".concat(infuraKey),
+      url: `https://rinkeby.infura.io/v3/${infuraKey}`,
     },
     xdai: {
       ...sharedNetworkConfig,
