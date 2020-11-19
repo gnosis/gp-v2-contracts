@@ -14,24 +14,21 @@ const argv = yargs
 
 // Load environment variables.
 dotenv.config();
+const { INFURA_KEY, MNEMONIC, PK } = process.env;
 
 const DEFAULT_MNEMONIC =
   "candy maple cake sugar pudding cream honey rich smooth crumble sweet treat";
 
 const sharedNetworkConfig: HttpNetworkUserConfig = {};
-if (process.env.PK) {
-  sharedNetworkConfig.accounts = [process.env.PK];
+if (PK) {
+  sharedNetworkConfig.accounts = [PK];
 } else {
   sharedNetworkConfig.accounts = {
-    mnemonic: process.env.MNEMONIC || DEFAULT_MNEMONIC,
+    mnemonic: MNEMONIC || DEFAULT_MNEMONIC,
   };
 }
 
-const infuraKey = process.env.INFURA_KEY || "";
-if (
-  ["rinkeby", "mainnet"].includes(argv.network) &&
-  process.env.INFURA_KEY === undefined
-) {
+if (["rinkeby", "mainnet"].includes(argv.network) && INFURA_KEY === undefined) {
   throw new Error(
     `Could not find Infura key in env, unable to connect to network ${argv.network}`,
   );
@@ -49,11 +46,11 @@ export default {
   networks: {
     mainnet: {
       ...sharedNetworkConfig,
-      url: `https://mainnet.infura.io/v3/${infuraKey}`,
+      url: `https://mainnet.infura.io/v3/${INFURA_KEY}`,
     },
     rinkeby: {
       ...sharedNetworkConfig,
-      url: `https://rinkeby.infura.io/v3/${infuraKey}`,
+      url: `https://rinkeby.infura.io/v3/${INFURA_KEY}`,
     },
     xdai: {
       ...sharedNetworkConfig,
