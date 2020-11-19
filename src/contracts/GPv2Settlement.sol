@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LGPL-3.0-or-newer
-pragma solidity ^0.6.12;
+pragma solidity ^0.7.5;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -13,7 +13,7 @@ contract GPv2Settlement {
     /// GPv2 contracts.
     bytes32 internal immutable domainSeparator;
 
-    constructor() public {
+    constructor() {
         uint256 chainId;
 
         // NOTE: Currently, the only way to get the chain ID in solidity is
