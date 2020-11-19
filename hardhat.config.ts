@@ -7,6 +7,6 @@ export default {
     sources: "src/contracts",
   },
   solidity: {
-    version: "0.6.12",
+    version: "0.7.5",
   },
 };
