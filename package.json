@@ -5,6 +5,7 @@
   "scripts": {
     "build": "hardhat compile",
     "test": "hardhat test",
+    "bench:decodeTrade": "hardhat run bench/decodeTrade.ts",
     "lint": "yarn lint:sol && yarn lint:ts",
     "lint:sol": "solhint 'src/contracts/**/*.sol'",
     "lint:ts": "eslint --max-warnings 0 .",

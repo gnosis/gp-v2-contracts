@@ -51,12 +51,6 @@ library GPv2Encoding {
     /// @dev The stride of an encoded trade.
     uint256 internal constant TRADE_STRIDE = 204;
 
-    /// @dev Bit position for the [`OrderKind`] encoded in the flags.
-    uint8 internal constant ORDER_KIND_BIT = 0;
-    /// @dev Bit position for the `partiallyFillable` value encoded in the
-    /// flags.
-    uint8 internal constant ORDER_PARTIALLY_FILLABLE_BIT = 1;
-
     /// @dev Decodes a trade with a signed order from calldata into memory.
     ///
     /// Trades are tightly packed and compress some data such as the order's buy
@@ -83,6 +77,25 @@ library GPv2Encoding {
     /// }
     /// ```
     ///
+    /// Order flags are used to encode additional order parameters such as the
+    /// kind of order, either a sell or a buy order, as well as whether the
+    /// order is partially fillable or if it is a "fill-or-kill" order. As the
+    /// most likely values are fill-or-kill sell orders, the flags are chosen
+    /// such that `0x00` represents this kind of order. The flags byte uses has
+    /// the following format:
+    /// ```
+    /// bit | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
+    /// ----+-----------------------+---+---+
+    ///     |        unsused        | * | * |
+    ///                               |   |
+    ///                               |   +---- order kind bit, 0 for a sell
+    ///                               |         order and 1 for a buy order
+    ///                               |
+    ///                               +-------- order fill bit, 0 for fill-or-
+    ///                                         kill and 1 for a partially
+    ///                                         fillable order
+    /// ```
+    ///
     /// Order signatures support two schemes:
     /// - EIP-712 for signing typed data, this is the default scheme that will
     ///   be used when recovering the signing address from the signature.
@@ -102,46 +115,66 @@ library GPv2Encoding {
         bytes calldata encodedTrade,
         Trade memory trade
     ) internal pure {
-        // NOTE: This is currently unnecessarily gas inefficient. Specifically,
-        // there is a potentially extraneous check to the encoded trade length
-        // (this can be verified once for the total encoded trades length).
-        // Additionally, Solidity generates bounds checks for each `abi.decode`
-        // and slice operation. Unfortunately using `assmebly { calldataload }`
-        // is quite ugly here since there is no mechanism to get calldata
-        // offsets (like there is for memory offsets) without manual
-        // computation, which is brittle as changes to the calling function
-        // signature would require manual adjustments to the computation. Once
-        // gas benchmarking is set up, we can evaluate if it is worth the extra
-        // effort.
-
+        // NOTE: It is slightly more efficient to check that the total encoded
+        // trades length is a multiple of `TRADE_STRIDE` instead of checking
+        // every encoded trade. Once that code is established, this check should
+        // move there.
         require(
             encodedTrade.length == TRADE_STRIDE,
             "GPv2: malformed trade data"
         );
 
-        uint8 sellTokenIndex = uint8(encodedTrade[0]);
-        uint8 buyTokenIndex = uint8(encodedTrade[1]);
-        trade.order.sellAmount = abi.decode(encodedTrade[2:], (uint256));
-        trade.order.buyAmount = abi.decode(encodedTrade[34:], (uint256));
-        trade.order.validTo = uint32(
-            abi.decode(encodedTrade[66:], (uint256)) >> (256 - 32)
-        );
-        trade.order.nonce = uint32(
-            abi.decode(encodedTrade[70:], (uint256)) >> (256 - 32)
-        );
-        trade.order.tip = abi.decode(encodedTrade[74:], (uint256));
-        uint8 flags = uint8(encodedTrade[106]);
-        trade.executedAmount = abi.decode(encodedTrade[107:], (uint256));
-        uint8 v = uint8(encodedTrade[139]);
-        bytes32 r = abi.decode(encodedTrade[140:], (bytes32));
-        bytes32 s = abi.decode(encodedTrade[172:], (bytes32));
+        uint8 sellTokenIndex;
+        uint8 buyTokenIndex;
+        uint8 flags;
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+
+        // NOTE: Use assembly to efficiently decode packed data. Memory structs
+        // in Solidity aren't packed, so the `Order` fields are in order at 32
+        // byte increments.
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            let order := add(mload(trade), 32)
+
+            // sellTokenIndex = uint8(encodedTrade[0])
+            sellTokenIndex := shr(248, calldataload(encodedTrade.offset))
+            // buyTokenIndex = uint8(encodedTrade[1])
+            buyTokenIndex := shr(248, calldataload(add(encodedTrade.offset, 1)))
+            // order.sellAmount = uint256(encodedTrade[2:34])
+            mstore(add(order, 64), calldataload(add(encodedTrade.offset, 2)))
+            // order.buyAmount = uint256(encodedTrade[34:66])
+            mstore(add(order, 96), calldataload(add(encodedTrade.offset, 34)))
+            // order.validTo = uint32(encodedTrade[66:70])
+            mstore(
+                add(order, 128),
+                shr(224, calldataload(add(encodedTrade.offset, 66)))
+            )
+            // order.nonce = uint32(encodedTrade[70:74])
+            mstore(
+                add(order, 160),
+                shr(224, calldataload(add(encodedTrade.offset, 70)))
+            )
+            // order.tip = uint256(encodedTrade[74:106])
+            mstore(add(order, 192), calldataload(add(encodedTrade.offset, 74)))
+            // flags = uint8(encodedTrade[106])
+            flags := shr(248, calldataload(add(encodedTrade.offset, 106)))
+            // trade.executedAmount = uint256(encodedTrade[107:139])
+            mstore(add(trade, 96), calldataload(add(encodedTrade.offset, 107)))
+            // v = uint8(encodedTrade[139])
+            v := shr(248, calldataload(add(encodedTrade.offset, 139)))
+            // r = uint256(encodedTrade[140:172])
+            r := calldataload(add(encodedTrade.offset, 140))
+            // s = uint256(encodedTrade[172:204])
+            s := calldataload(add(encodedTrade.offset, 172))
+        }
 
         trade.order.typeHash = ORDER_TYPE_HASH;
         trade.order.sellToken = tokens[sellTokenIndex];
         trade.order.buyToken = tokens[buyTokenIndex];
-        trade.order.kind = OrderKind((flags >> ORDER_KIND_BIT) & 0x1);
-        trade.order.partiallyFillable =
-            (flags >> ORDER_PARTIALLY_FILLABLE_BIT) & 0x01 == 0x01;
+        trade.order.kind = OrderKind(flags & 0x1);
+        trade.order.partiallyFillable = (flags >> 1) & 0x01 == 0x01;
 
         trade.sellTokenIndex = sellTokenIndex;
         trade.buyTokenIndex = buyTokenIndex;

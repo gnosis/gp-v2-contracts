@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { Contract } from "ethers";
-import { ethers, waffle } from "hardhat";
+import { ethers } from "hardhat";
 
 import { domain } from "../src/ts";
 
@@ -17,7 +17,7 @@ describe("GPv2Settlement", () => {
 
   describe("domainSeparator", () => {
     it("should have an EIP-712 domain separator", async () => {
-      const { chainId } = await waffle.provider.getNetwork();
+      const { chainId } = await ethers.provider.getNetwork();
 
       expect(chainId).to.not.equal(ethers.constants.Zero);
       expect(await settlement.domainSeparatorTest()).to.equal(
