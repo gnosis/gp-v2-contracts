@@ -25,6 +25,7 @@ contract GPv2Settlement {
 
         domainSeparator = keccak256(
             abi.encode(
+                // TODO(nlordell): Verify that these compile to constants.
                 keccak256(
                     "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
                 ),

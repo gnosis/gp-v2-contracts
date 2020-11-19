@@ -2,7 +2,13 @@ import { expect } from "chai";
 import { Contract, BigNumber } from "ethers";
 import { ethers, waffle } from "hardhat";
 
-import { OrderKind, OrderEncoder, hashOrder } from "../src/ts";
+import {
+  ORDER_TYPE_HASH,
+  OrderEncoder,
+  OrderKind,
+  SigningScheme,
+  hashOrder,
+} from "../src/ts";
 
 function fillBytes(count: number, byte: number): string {
   return ethers.utils.hexlify([...Array(count)].map(() => byte));
@@ -15,8 +21,20 @@ function fillUint(bits: number, byte: number): BigNumber {
 describe("GPv2Encoding", () => {
   const [, ...traders] = waffle.provider.getWallets();
 
+  const testDomain = { name: "test" };
+  const sampleOrder = {
+    sellToken: fillBytes(20, 0x01),
+    buyToken: fillBytes(20, 0x02),
+    sellAmount: ethers.utils.parseEther("42"),
+    buyAmount: ethers.utils.parseEther("13.37"),
+    validTo: 0xffffffff,
+    nonce: 0,
+    tip: ethers.constants.WeiPerEther,
+    kind: OrderKind.SELL,
+    partiallyFillable: false,
+  };
+
   let encoding: Contract;
-  let domainSeparator: string;
 
   beforeEach(async () => {
     const GPv2Encoding = await ethers.getContractFactory(
@@ -24,7 +42,20 @@ describe("GPv2Encoding", () => {
     );
 
     encoding = await GPv2Encoding.deploy();
-    domainSeparator = await encoding.DOMAIN_SEPARATOR();
+  });
+
+  describe("DOMAIN_SEPARATOR", () => {
+    it("should match the test domain hash", async () => {
+      expect(await encoding.DOMAIN_SEPARATOR()).to.equal(
+        ethers.utils._TypedDataEncoder.hashDomain(testDomain),
+      );
+    });
+  });
+
+  describe("ORDER_TYPE_HASH", () => {
+    it("should be match the EIP-712 order type hash", async () => {
+      expect(await encoding.orderTypeHashTest()).to.equal(ORDER_TYPE_HASH);
+    });
   });
 
   describe("decodeSignedOrder", () => {
@@ -45,8 +76,13 @@ describe("GPv2Encoding", () => {
       };
       const executedAmount = fillUint(256, 0x08);
 
-      const encoder = new OrderEncoder(domainSeparator);
-      await encoder.signEncodeOrder(traders[0], order, executedAmount);
+      const encoder = new OrderEncoder(testDomain);
+      await encoder.signEncodeOrder(
+        SigningScheme.TYPED_DATA,
+        traders[0],
+        order,
+        executedAmount,
+      );
 
       const [decodedOrders] = await encoding.decodeSignedOrdersTest(
         encoder.tokens,
@@ -58,6 +94,7 @@ describe("GPv2Encoding", () => {
       // `ABIEncoderV2` structs.
       expect(decodedOrders.length).to.equal(1);
       expect(decodedOrders[0]).to.deep.equal([
+        await traders[0].getAddress(),
         order.sellToken,
         order.buyToken,
         order.sellAmount,
@@ -71,43 +108,25 @@ describe("GPv2Encoding", () => {
         encoder.tokens.indexOf(order.buyToken),
         executedAmount,
         hashOrder(order),
-        await traders[0].getAddress(),
       ]);
     });
 
-    it("should allocate minimal memory", async () => {
-      // NOTE: We want to make sure that calls to `decodeOrder` does not require
-      // additional memory allocations to save on memory per orders.
-      //todo
-      const encoder = new OrderEncoder(domainSeparator);
-      await encoder.signEncodeOrder(
-        traders[0],
-        {
-          sellToken: ethers.constants.AddressZero,
-          buyToken: ethers.constants.AddressZero,
-          sellAmount: ethers.utils.parseEther("42"),
-          buyAmount: ethers.utils.parseEther("13.37"),
-          validTo: 0xffffffff,
-          nonce: 0,
-          tip: ethers.constants.WeiPerEther,
-          kind: OrderKind.SELL,
-          partiallyFillable: false,
-        },
-        0,
-      );
+    it("should recover signing address for all supported schemes", async () => {
+      const encoder = new OrderEncoder(testDomain);
+      for (const scheme of [SigningScheme.TYPED_DATA, SigningScheme.MESSAGE]) {
+        await encoder.signEncodeOrder(scheme, traders[0], sampleOrder, 0);
+      }
 
-      const [, mem] = await encoding.decodeSignedOrdersTest(
+      const [decodedOrders] = await encoding.decodeSignedOrdersTest(
         encoder.tokens,
         encoder.orderCount,
         encoder.encodedOrders,
       );
 
-      // NOTE: Currently, the `ecrecover` call requires 32 bytes of memory to
-      // be allocated per call. This is because `STATICCALL` writes the output
-      // to memory, and the compiler does not seem to optimize the extra memory
-      // copy away (despite the result being saved immediately to memory). In
-      // the future, we can optimize this away with some `assembly`.
-      expect(mem.toNumber()).to.equal(32);
+      const traderAddress = await traders[0].getAddress();
+      for (const [owner] of decodedOrders) {
+        expect(owner).to.equal(traderAddress);
+      }
     });
 
     it("should revert if order bytes are too short.", async () => {
@@ -126,21 +145,10 @@ describe("GPv2Encoding", () => {
       ).to.be.revertedWith("malformed order data");
     });
 
-    const sampleOrder = {
-      sellToken: fillBytes(20, 0x01),
-      buyToken: fillBytes(20, 0x02),
-      sellAmount: ethers.utils.parseEther("42"),
-      buyAmount: ethers.utils.parseEther("13.37"),
-      validTo: 0xffffffff,
-      nonce: 0,
-      tip: ethers.constants.WeiPerEther,
-      kind: OrderKind.SELL,
-      partiallyFillable: false,
-    };
-
     it("should revert for invalid order signatures", async () => {
-      const encoder = new OrderEncoder(domainSeparator);
+      const encoder = new OrderEncoder(testDomain);
       await encoder.signEncodeOrder(
+        SigningScheme.TYPED_DATA,
         traders[0],
         sampleOrder,
         sampleOrder.sellAmount,
@@ -163,13 +171,15 @@ describe("GPv2Encoding", () => {
     it("should revert for invalid sell token indices", async () => {
       const lastToken = fillBytes(20, 0x03);
 
-      const encoder = new OrderEncoder(domainSeparator);
+      const encoder = new OrderEncoder(testDomain);
       await encoder.signEncodeOrder(
+        SigningScheme.TYPED_DATA,
         traders[0],
         sampleOrder,
         sampleOrder.sellAmount,
       );
       await encoder.signEncodeOrder(
+        SigningScheme.TYPED_DATA,
         traders[1],
         {
           ...sampleOrder,
@@ -193,13 +203,15 @@ describe("GPv2Encoding", () => {
     it("should revert for invalid sell token indices", async () => {
       const lastToken = fillBytes(20, 0x03);
 
-      const encoder = new OrderEncoder(domainSeparator);
+      const encoder = new OrderEncoder(testDomain);
       await encoder.signEncodeOrder(
+        SigningScheme.TYPED_DATA,
         traders[0],
         sampleOrder,
         sampleOrder.sellAmount,
       );
       await encoder.signEncodeOrder(
+        SigningScheme.TYPED_DATA,
         traders[1],
         {
           ...sampleOrder,
@@ -218,6 +230,31 @@ describe("GPv2Encoding", () => {
           encoder.encodedOrders,
         ),
       ).to.be.reverted;
+    });
+
+    it("should not allocate additional memory", async () => {
+      // NOTE: We want to make sure that calls to `decodeOrder` does not require
+      // additional memory allocations to save on memory per orders.
+      const encoder = new OrderEncoder(testDomain);
+      await encoder.signEncodeOrder(
+        SigningScheme.TYPED_DATA,
+        traders[0],
+        sampleOrder,
+        0,
+      );
+      await encoder.signEncodeOrder(
+        SigningScheme.MESSAGE,
+        traders[1],
+        sampleOrder,
+        0,
+      );
+
+      const [, mem] = await encoding.decodeSignedOrdersTest(
+        encoder.tokens,
+        encoder.orderCount,
+        encoder.encodedOrders,
+      );
+      expect(mem.toNumber()).to.equal(0);
     });
   });
 });

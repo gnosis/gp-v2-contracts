@@ -1,30 +1,10 @@
-import { ethers, BigNumberish, SignatureLike, Signer } from "ethers";
-
-/**
- * EIP-712 domain data used by GPv2.
- *
- * Note, that EIP-712 allows for an extra `salt` to be added to the domain that
- * isn't used.
- * <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-712.md#definition-of-domainseparator>
- */
-export interface EIP712Domain {
-  /**
-   * The user readable name of signing domain.
-   */
-  name: string;
-  /**
-   * The current major version of the signing domain.
-   */
-  version: string;
-  /**
-   * The EIP-155 chain ID.
-   */
-  chainId: number;
-  /**
-   * The address of the contract that will verify the EIP-712 signature.
-   */
-  verifyingContract: string;
-}
+import {
+  ethers,
+  BigNumberish,
+  SignatureLike,
+  Signer,
+  TypedDataDomain,
+} from "ethers";
 
 /**
  * Return the Gnosis Protocol v2 domain used for signing.
@@ -36,7 +16,7 @@ export interface EIP712Domain {
 export function domain(
   chainId: number,
   verifyingContract: string,
-): EIP712Domain {
+): TypedDataDomain {
   return {
     name: "Gnosis Protocol",
     version: "v2",
@@ -130,7 +110,31 @@ export const enum OrderKind {
  */
 export const REPLAYABLE_NONCE = 0;
 
-const ORDER_STRIDE = 204;
+/**
+ * The EIP-712 type fields definition for a Gnosis Protocol v2 order.
+ */
+export const ORDER_TYPE_FIELDS = [
+  { name: "sellToken", type: "address" },
+  { name: "buyToken", type: "address" },
+  { name: "sellAmount", type: "uint256" },
+  { name: "buyAmount", type: "uint256" },
+  { name: "validTo", type: "uint32" },
+  { name: "nonce", type: "uint32" },
+  { name: "tip", type: "uint256" },
+  { name: "kind", type: "uint8" },
+  { name: "partiallyFillable", type: "bool" },
+];
+
+/**
+ * The EIP-712 type hash for a Gnosis Protocol v2 order.
+ */
+export const ORDER_TYPE_HASH = ethers.utils.keccak256(
+  ethers.utils.toUtf8Bytes(
+    `Order(${ORDER_TYPE_FIELDS.map(({ name, type }) => `${type} ${name}`).join(
+      ",",
+    )})`,
+  ),
+);
 
 function timestamp(time: number | Date): number {
   return typeof time === "number" ? time : ~~(time.getTime() / 1000);
@@ -140,6 +144,16 @@ function encodeOrderFlags(flags: OrderFlags): number {
   const kind = flags.kind === OrderKind.SELL ? 0x00 : 0x01;
   const partiallyFillable = flags.partiallyFillable ? 0x02 : 0x00;
   return kind | partiallyFillable;
+}
+
+function encodeSigningScheme(v: number, scheme: SigningScheme): number {
+  const ORDER_MESSAGE_SCHEME_FLAG = 0x80;
+  switch (scheme) {
+    case SigningScheme.TYPED_DATA:
+      return v;
+    case SigningScheme.MESSAGE:
+      return v | ORDER_MESSAGE_SCHEME_FLAG;
+  }
 }
 
 /**
@@ -155,10 +169,10 @@ export class OrderEncoder {
 
   /**
    * Creates a new order encoder instance.
-   * @param domainSeparator Domain separator used for signing orders to encode.
+   * @param domain Domain used for signing orders to encode.
    * See {@link signOrder} for more details.
    */
-  public constructor(public readonly domainSeparator: string) {}
+  public constructor(public readonly domain: TypedDataDomain) {}
 
   /**
    * Gets the array of token addresses used by the currently encoded orders.
@@ -186,6 +200,7 @@ export class OrderEncoder {
    * Gets the number of orders currently encoded.
    */
   public get orderCount(): number {
+    const ORDER_STRIDE = 204;
     // NOTE: `ORDER_STRIDE` multiplied by 2 as hex strings encode one byte in
     // 2 characters.
     return (this._encodedOrders.length - 2) / (ORDER_STRIDE * 2);
@@ -200,11 +215,14 @@ export class OrderEncoder {
    * @param order The order to encode.
    * @param executedAmount The executed trade amount for the order.
    * @param signature The signature for the order data.
+   * @param scheme The signing scheme to used to generate the specified
+   * signature. See {@link SigningScheme} for more details.
    */
   public encodeOrder(
     order: Order,
     executedAmount: BigNumberish,
     signature: SignatureLike,
+    scheme: SigningScheme,
   ): void {
     const sig = ethers.utils.splitSignature(signature);
     const encodedOrder = ethers.utils.solidityPack(
@@ -232,7 +250,7 @@ export class OrderEncoder {
         order.tip,
         encodeOrderFlags(order),
         executedAmount,
-        sig.v,
+        encodeSigningScheme(sig.v, scheme),
         sig.r,
         sig.s,
       ],
@@ -246,18 +264,18 @@ export class OrderEncoder {
    * @param owner The owner for the order used to sign.
    * @param order The order to compute the digest for.
    * @param executedAmount The executed trade amount for the order.
+   * @param scheme The signing scheme to use. See {@link SigningScheme} for more
+   * details.
    * @return Signature for the order.
    */
   public async signEncodeOrder(
+    scheme: SigningScheme,
     owner: Signer,
     order: Order,
     executedAmount: BigNumberish,
   ): Promise<void> {
-    if (!this.domainSeparator) {
-      throw new Error("domain separator not specified");
-    }
-    const signature = await signOrder(owner, this.domainSeparator, order);
-    this.encodeOrder(order, executedAmount, signature);
+    const signature = await signOrder(scheme, owner, this.domain, order);
+    this.encodeOrder(order, executedAmount, signature, scheme);
   }
 
   private tokenIndex(token: string): number {
@@ -283,52 +301,64 @@ export class OrderEncoder {
  * @return Hex-encoded 32-byte order digest.
  */
 export function hashOrder(order: Order): string {
-  return ethers.utils.keccak256(
-    ethers.utils.defaultAbiCoder.encode(
-      [
-        "address",
-        "address",
-        "uint256",
-        "uint256",
-        "uint32",
-        "uint32",
-        "uint256",
-        "uint8",
-        "bool",
-      ],
-      [
-        order.sellToken,
-        order.buyToken,
-        order.sellAmount,
-        order.buyAmount,
-        order.validTo,
-        order.nonce,
-        order.tip,
-        order.kind,
-        order.partiallyFillable,
-      ],
-    ),
+  return ethers.utils._TypedDataEncoder.hashStruct(
+    "Order",
+    { Order: ORDER_TYPE_FIELDS },
+    order,
   );
+}
+
+/**
+ * The signing scheme used to sign the order.
+ */
+export const enum SigningScheme {
+  /**
+   * The EIP-712 typed data signing scheme. This is the preferred scheme as it
+   * provides more infomation to wallets performing the signature on the data
+   * being signed.
+   *
+   * <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-712.md#definition-of-domainseparator>
+   */
+  TYPED_DATA,
+  /**
+   * The generic message signing scheme.
+   */
+  MESSAGE,
 }
 
 /**
  * Returns the signature for the specified order.
  * @param owner The owner for the order used to sign.
- * @param domainSeparator The domain separator to add to the digest. This is
- * used by the smart contract to ensure order's can't be replayed across
- * different applications (domains), but also different deployments (as the
- * contract chain ID and address is used to salt the domain separator value).
+ * @param domain The domain to sign the order for. This is used by the smart
+ * contract to ensure order's can't be replayed across different applications,
+ * but also different deployments (as the contract chain ID and address are
+ * mixed into to the domain value).
  * @param order The order to sign.
+ * @param scheme The signing scheme to use. See {@link SigningScheme} for more
+ * details.
  * @return Hex-encoded signature for the order.
  */
 export function signOrder(
+  scheme: SigningScheme,
   owner: Signer,
-  domainSeparator: string,
+  domain: TypedDataDomain,
   order: Order,
 ): Promise<string> {
-  return owner.signMessage(
-    ethers.utils.arrayify(
-      ethers.utils.hexConcat([domainSeparator, hashOrder(order)]),
-    ),
-  );
+  switch (scheme) {
+    case SigningScheme.TYPED_DATA:
+      if (!owner._signTypedData) {
+        throw new Error("signer does not support signing typed data");
+      }
+      return owner._signTypedData(domain, { Order: ORDER_TYPE_FIELDS }, order);
+
+    case SigningScheme.MESSAGE:
+      return owner.signMessage(
+        ethers.utils.arrayify(
+          ethers.utils.hexConcat([
+            ethers.utils._TypedDataEncoder.hashDomain(domain),
+            hashOrder(order),
+          ]),
+        ),
+      );
+  }
 }
