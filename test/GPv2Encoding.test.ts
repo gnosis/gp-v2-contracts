@@ -19,16 +19,16 @@ function fillUint(bits: number, byte: number): BigNumber {
   return BigNumber.from(fillBytes(bits / 8, byte));
 }
 
-function parseTrade(
-  trade: unknown[],
-): {
+interface Trade {
   order: Order;
   sellTokenIndex: number;
   buyTokenIndex: number;
   executedAmount: BigNumber;
   digest: string;
   owner: string;
-} {
+}
+
+function parseTrade(trade: unknown[]): Trade {
   const order = trade[0] as unknown[];
   return {
     order: {
