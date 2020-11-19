@@ -157,20 +157,21 @@ function encodeSigningScheme(v: number, scheme: SigningScheme): number {
 }
 
 /**
- * A class for building a buffer of encoded orders.
+ * A class for building calldata for a settlement.
  *
  * The encoder ensures that token addresses are kept track of and performs
- * necessary computation in order to map each token addresses to IDs.
+ * necessary computation in order to map each token addresses to IDs to
+ * properly encode order parameters for trades.
  */
-export class OrderEncoder {
+export class SettlementEncoder {
   private readonly _tokens: string[] = [];
   private readonly _tokenMap: Record<string, number | undefined> = {};
-  private _encodedOrders = "0x";
+  private _encodedTrades = "0x";
 
   /**
-   * Creates a new order encoder instance.
-   * @param domain Domain used for signing orders to encode.
-   * See {@link signOrder} for more details.
+   * Creates a new settlement encoder instance.
+   * @param domain Domain used for signing orders. See {@link signOrder} for
+   * more details.
    */
   public constructor(public readonly domain: TypedDataDomain) {}
 
@@ -190,42 +191,42 @@ export class OrderEncoder {
   }
 
   /**
-   * Gets the encoded orders as a hex-encoded string.
+   * Gets the encoded trades as a hex-encoded string.
    */
-  public get encodedOrders(): string {
-    return this._encodedOrders;
+  public get encodedTrades(): string {
+    return this._encodedTrades;
   }
 
   /**
-   * Gets the number of orders currently encoded.
+   * Gets the number of trades currently encoded.
    */
-  public get orderCount(): number {
-    const ORDER_STRIDE = 204;
-    // NOTE: `ORDER_STRIDE` multiplied by 2 as hex strings encode one byte in
+  public get tradeCount(): number {
+    const TRADE_STRIDE = 204;
+    // NOTE: `TRADE_STRIDE` multiplied by 2 as hex strings encode one byte in
     // 2 characters.
-    return (this._encodedOrders.length - 2) / (ORDER_STRIDE * 2);
+    return (this._encodedTrades.length - 2) / (TRADE_STRIDE * 2);
   }
 
   /**
-   * Encodes a signed order, appending it to the `calldata` bytes that are being
-   * built.
+   * Encodes a trade from a signed order and executed amount, appending it to
+   * the `calldata` bytes that are being built.
    *
    * Additionally, if the order references new tokens that the encoder has not
    * yet seen, they are added to the tokens array.
-   * @param order The order to encode.
-   * @param executedAmount The executed trade amount for the order.
+   * @param order The order of the trade to encode.
+   * @param executedAmount The executed trade amount.
    * @param signature The signature for the order data.
    * @param scheme The signing scheme to used to generate the specified
    * signature. See {@link SigningScheme} for more details.
    */
-  public encodeOrder(
+  public encodeTrade(
     order: Order,
     executedAmount: BigNumberish,
     signature: SignatureLike,
     scheme: SigningScheme,
   ): void {
     const sig = ethers.utils.splitSignature(signature);
-    const encodedOrder = ethers.utils.solidityPack(
+    const encodedTrade = ethers.utils.solidityPack(
       [
         "uint8",
         "uint8",
@@ -256,26 +257,28 @@ export class OrderEncoder {
       ],
     );
 
-    this._encodedOrders = `${this._encodedOrders}${encodedOrder.substr(2)}`;
+    this._encodedTrades = ethers.utils.hexConcat([
+      this._encodedTrades,
+      encodedTrade,
+    ]);
   }
 
   /**
-   * Signs and encodes an order.
-   * @param owner The owner for the order used to sign.
-   * @param order The order to compute the digest for.
+   * Signs an order and encodes a trade with that order.
+   * @param order The order to sign for the trade.
    * @param executedAmount The executed trade amount for the order.
+   * @param owner The owner for the order used to sign.
    * @param scheme The signing scheme to use. See {@link SigningScheme} for more
    * details.
-   * @return Signature for the order.
    */
-  public async signEncodeOrder(
-    scheme: SigningScheme,
-    owner: Signer,
+  public async signEncodeTrade(
     order: Order,
     executedAmount: BigNumberish,
+    owner: Signer,
+    scheme: SigningScheme,
   ): Promise<void> {
-    const signature = await signOrder(scheme, owner, this.domain, order);
-    this.encodeOrder(order, executedAmount, signature, scheme);
+    const signature = await signOrder(this.domain, order, owner, scheme);
+    this.encodeTrade(order, executedAmount, signature, scheme);
   }
 
   private tokenIndex(token: string): number {
@@ -328,21 +331,21 @@ export const enum SigningScheme {
 
 /**
  * Returns the signature for the specified order.
- * @param owner The owner for the order used to sign.
  * @param domain The domain to sign the order for. This is used by the smart
  * contract to ensure order's can't be replayed across different applications,
  * but also different deployments (as the contract chain ID and address are
  * mixed into to the domain value).
  * @param order The order to sign.
+ * @param owner The owner for the order used to sign.
  * @param scheme The signing scheme to use. See {@link SigningScheme} for more
  * details.
  * @return Hex-encoded signature for the order.
  */
 export function signOrder(
-  scheme: SigningScheme,
-  owner: Signer,
   domain: TypedDataDomain,
   order: Order,
+  owner: Signer,
+  scheme: SigningScheme,
 ): Promise<string> {
   switch (scheme) {
     case SigningScheme.TYPED_DATA:
