@@ -11,7 +11,7 @@
     "fmt:sol": "prettier 'src/contracts/**/*.sol' -w"
   },
   "dependencies": {
-    "ethers": "^5.0.19"
+    "ethers": "^5.0.20"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.0",
