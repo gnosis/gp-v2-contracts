@@ -54,7 +54,7 @@ describe("GPv2Settlement", () => {
 
     it("accepts transactions from solvers", async () => {
       await authenticator.addSolver(solver.address);
-      // TODO - this will have to be changed when other contraints become active
+      // TODO - this will have to be changed when other constraints become active
       // and when settle function no longer reverts.
       await expect(
         settlement.connect(solver.address).settle([], [], 0, [], [], []),
