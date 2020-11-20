@@ -5,18 +5,20 @@ import { ethers, waffle } from "hardhat";
 import { domain } from "../src/ts";
 
 describe("GPv2Settlement", () => {
-  const [owner, solver] = waffle.provider.getWallets();
+  const [deployer, owner, solver] = waffle.provider.getWallets();
   let settlement: Contract;
   let authenticator: Contract;
 
   beforeEach(async () => {
     const GPv2SimpleAuthentication = await ethers.getContractFactory(
       "GPv2SimpleAuthentication",
+      owner,
     );
     authenticator = await GPv2SimpleAuthentication.connect(owner).deploy();
 
     const GPv2Settlement = await ethers.getContractFactory(
       "GPv2SettlementTestInterface",
+      deployer,
     );
     settlement = await GPv2Settlement.deploy(authenticator.address);
   });

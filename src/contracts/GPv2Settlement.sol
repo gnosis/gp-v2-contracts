@@ -20,7 +20,7 @@ contract GPv2Settlement {
     /// modifier below.
     GPv2Authentication private immutable authenticator;
 
-    constructor(GPv2SimpleAuthentication _authenticator) public {
+    constructor(GPv2Authentication _authenticator) public {
         authenticator = _authenticator;
         uint256 chainId;
 
