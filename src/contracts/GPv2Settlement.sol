@@ -18,7 +18,7 @@ contract GPv2Settlement {
     /// That is, only authorised solvers have the ability to invoke settlements.
     /// Any valid authenticator implements an isSolver method called by the onlySolver
     /// modifier below.
-    GPv2SimpleAuthentication private authenticator;
+    GPv2Authentication private immutable authenticator;
 
     constructor(GPv2SimpleAuthentication _authenticator) public {
         authenticator = _authenticator;
