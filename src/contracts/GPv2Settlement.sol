@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LGPL-3.0-or-newer
-pragma solidity ^0.6.12;
+pragma solidity ^0.7.5;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./GPv2SimpleAuthentication.sol";
@@ -20,7 +20,7 @@ contract GPv2Settlement {
     /// modifier below.
     GPv2Authentication private immutable authenticator;
 
-    constructor(GPv2Authentication _authenticator) public {
+    constructor(GPv2Authentication _authenticator) {
         authenticator = _authenticator;
         uint256 chainId;
 
@@ -33,6 +33,7 @@ contract GPv2Settlement {
 
         domainSeparator = keccak256(
             abi.encode(
+                // TODO(nlordell): Verify that these compile to constants.
                 keccak256(
                     "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
                 ),

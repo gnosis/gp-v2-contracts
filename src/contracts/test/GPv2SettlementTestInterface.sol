@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
-pragma solidity ^0.6.12;
+pragma solidity ^0.7.5;
 
 import "../GPv2Settlement.sol";
 
 contract GPv2SettlementTestInterface is GPv2Settlement {
     constructor(GPv2SimpleAuthentication _controller)
-        public
         GPv2Settlement(_controller)
     // solhint-disable-next-line no-empty-blocks
     {

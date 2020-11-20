@@ -1,8 +1,7 @@
-[Optional] 
-Fixes #issue
+Closes #issue (optional)
 
-*<Context of what this change does, why it is needed and how it is accomplished>*
+_<Context of what this change does, why it is needed and how it is accomplished>_
 
 ### Test Plan
 
-*<Explain how you and a reviewer have/intend to test this change>*
+_<Explain how you and a reviewer have/intend to test this change>_

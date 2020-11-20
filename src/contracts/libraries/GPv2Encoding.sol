@@ -1,21 +1,19 @@
 // SPDX-License-Identifier: LGPL-3.0-or-newer
-pragma solidity ^0.6.12;
+pragma solidity ^0.7.5;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title Gnosis Protocol v2 Encoding Library.
 /// @author Gnosis Developers
 library GPv2Encoding {
-    /// @dev A struct representing an executed order that can be used for
-    /// settling a batch.
+    /// @dev A struct representing an order.
     ///
-    /// The memory layout for an order is very important for optimizations for
-    /// recovering the order address. Specifically, all the signed order
-    /// parameters appear in contiguous memory as the first 9 fields from
-    /// `sellToken` to `partiallyFillable`. This allows the memory reserved for
-    /// decoding an order to also be used for computing the order digest during
-    /// the decoding process for some added effeciency.
+    /// Note that this struct contains all order parameters that are signed by a
+    /// user for submitting to GP. Additionally, we use an extra field for the
+    /// order's type hash in order to allow for effecient in-place EIP-712
+    /// struct hashing.
     struct Order {
+        bytes32 typeHash;
         IERC20 sellToken;
         IERC20 buyToken;
         uint256 sellAmount;
@@ -25,6 +23,24 @@ library GPv2Encoding {
         uint256 tip;
         OrderKind kind;
         bool partiallyFillable;
+    }
+
+    /// @dev An enum describing an order kind, either a buy or a sell order.
+    enum OrderKind {Sell, Buy}
+
+    /// @dev The order EIP-712 type hash for the [`Order`] struct (excluding the
+    /// extra `typeHash` field).
+    bytes32 internal constant ORDER_TYPE_HASH =
+        // TODO: Replace this with the pre-computed value once the contract is
+        // ready to be deployed.
+        keccak256(
+            "Order(address sellToken,address buyToken,uint256 sellAmount,uint256 buyAmount,uint32 validTo,uint32 nonce,uint256 tip,uint8 kind,bool partiallyFillable)"
+        );
+
+    /// @dev A struct representing a trade to be executed as part a batch
+    /// settlement.
+    struct Trade {
+        Order order;
         uint8 sellTokenIndex;
         uint8 buyTokenIndex;
         uint256 executedAmount;
@@ -32,11 +48,8 @@ library GPv2Encoding {
         address owner;
     }
 
-    /// @dev An enum describing an order kind, either a buy or a sell order.
-    enum OrderKind {Sell, Buy}
-
-    /// @dev The stride of an encoded order.
-    uint256 internal constant ORDER_STRIDE = 204;
+    /// @dev The stride of an encoded trade.
+    uint256 internal constant TRADE_STRIDE = 204;
 
     /// @dev Bit position for the [`OrderKind`] encoded in the flags.
     uint8 internal constant ORDER_KIND_BIT = 0;
@@ -44,14 +57,15 @@ library GPv2Encoding {
     /// flags.
     uint8 internal constant ORDER_PARTIALLY_FILLABLE_BIT = 1;
 
-    /// @dev Decodes a signed order from calldata bytes into memory.
+    /// @dev Decodes a trade with a signed order from calldata into memory.
     ///
-    /// Orders are tightly packed and compress some data such as buy and sell
-    /// tokens in order to reduce calldata size and associated gas costs. As
-    /// such it is not identical to the decoded [`Order`] and contains the
+    /// Trades are tightly packed and compress some data such as the order's buy
+    /// and sell tokens to reduce calldata size and associated gas costs. As
+    /// such it is not identical to the decoded [`Trade`] and contains the
     /// following fields:
+    ///
     /// ```
-    /// struct EncodedOrder {
+    /// struct EncodedTrade {
     ///     uint8 sellTokenIndex;
     ///     uint8 buyTokenIndex;
     ///     uint256 sellAmount;
@@ -69,21 +83,28 @@ library GPv2Encoding {
     /// }
     /// ```
     ///
-    /// @param domainSeparator The domain separator used for hashing and signing
-    /// the order.
-    /// @param tokens The list of tokens included in the settlement. The encoded
-    /// token indices part of the order map to tokens in this array.
-    /// @param encodedOrder The order as encoded calldata bytes.
-    /// @param order The memory location to decode the order to.
-    function decodeSignedOrder(
+    /// Order signatures support two schemes:
+    /// - EIP-712 for signing typed data, this is the default scheme that will
+    ///   be used when recovering the signing address from the signature.
+    /// - Generic message signature, this scheme will be used **only** if the
+    ///   `v` signature parameter's most significant bit is set. This is done as
+    ///   there are only two possible values `v` can have: 27 or 28, which only
+    ///   take up the lower 5 bits of the `uint8`.
+    ///
+    /// @param domainSeparator The domain separator used for signing the order.
+    /// @param tokens The list of tokens included in the settlement. The token
+    /// indices in the encoded order parameters map to tokens in this array.
+    /// @param encodedTrade The trade as encoded calldata bytes.
+    /// @param trade The memory location to decode trade to.
+    function decodeTrade(
         bytes32 domainSeparator,
         IERC20[] calldata tokens,
-        bytes calldata encodedOrder,
-        Order memory order
+        bytes calldata encodedTrade,
+        Trade memory trade
     ) internal pure {
         // NOTE: This is currently unnecessarily gas inefficient. Specifically,
-        // there is a potentially extraneous check to the encoded order length
-        // (this can be verified once for the total encoded orders length).
+        // there is a potentially extraneous check to the encoded trade length
+        // (this can be verified once for the total encoded trades length).
         // Additionally, Solidity generates bounds checks for each `abi.decode`
         // and slice operation. Unfortunately using `assmebly { calldataload }`
         // is quite ugly here since there is no mechanism to get calldata
@@ -94,69 +115,97 @@ library GPv2Encoding {
         // effort.
 
         require(
-            encodedOrder.length == ORDER_STRIDE,
-            "GPv2: malformed order data"
+            encodedTrade.length == TRADE_STRIDE,
+            "GPv2: malformed trade data"
         );
 
-        order.sellTokenIndex = uint8(encodedOrder[0]);
-        order.buyTokenIndex = uint8(encodedOrder[1]);
-        order.sellAmount = abi.decode(encodedOrder[2:], (uint256));
-        order.buyAmount = abi.decode(encodedOrder[34:], (uint256));
-        order.validTo = uint32(
-            abi.decode(encodedOrder[66:], (uint256)) >> (256 - 32)
+        uint8 sellTokenIndex = uint8(encodedTrade[0]);
+        uint8 buyTokenIndex = uint8(encodedTrade[1]);
+        trade.order.sellAmount = abi.decode(encodedTrade[2:], (uint256));
+        trade.order.buyAmount = abi.decode(encodedTrade[34:], (uint256));
+        trade.order.validTo = uint32(
+            abi.decode(encodedTrade[66:], (uint256)) >> (256 - 32)
         );
-        order.nonce = uint32(
-            abi.decode(encodedOrder[70:], (uint256)) >> (256 - 32)
+        trade.order.nonce = uint32(
+            abi.decode(encodedTrade[70:], (uint256)) >> (256 - 32)
         );
-        order.tip = abi.decode(encodedOrder[74:], (uint256));
-        uint8 flags = uint8(encodedOrder[106]);
-        order.executedAmount = abi.decode(encodedOrder[107:], (uint256));
-        uint8 v = uint8(encodedOrder[139]);
-        bytes32 r = abi.decode(encodedOrder[140:], (bytes32));
-        bytes32 s = abi.decode(encodedOrder[172:], (bytes32));
+        trade.order.tip = abi.decode(encodedTrade[74:], (uint256));
+        uint8 flags = uint8(encodedTrade[106]);
+        trade.executedAmount = abi.decode(encodedTrade[107:], (uint256));
+        uint8 v = uint8(encodedTrade[139]);
+        bytes32 r = abi.decode(encodedTrade[140:], (bytes32));
+        bytes32 s = abi.decode(encodedTrade[172:], (bytes32));
 
-        order.sellToken = tokens[order.sellTokenIndex];
-        order.buyToken = tokens[order.buyTokenIndex];
-        order.kind = OrderKind((flags >> ORDER_KIND_BIT) & 0x1);
-        order.partiallyFillable =
+        trade.order.typeHash = ORDER_TYPE_HASH;
+        trade.order.sellToken = tokens[sellTokenIndex];
+        trade.order.buyToken = tokens[buyTokenIndex];
+        trade.order.kind = OrderKind((flags >> ORDER_KIND_BIT) & 0x1);
+        trade.order.partiallyFillable =
             (flags >> ORDER_PARTIALLY_FILLABLE_BIT) & 0x01 == 0x01;
 
+        trade.sellTokenIndex = sellTokenIndex;
+        trade.buyTokenIndex = buyTokenIndex;
+
+        // NOTE: In order to avoid memory allocation and copying of the order
+        // parameters, use the memory region reserved by the caller for the
+        // order result to effeciently compute the hash in place. Furthermore,
+        // structs are not packed in Solidity, and there are 10 [`Order`] fields
+        // to hash for a total of `10 * sizeof(uint) = 320` bytes. This digest
+        // is a EIP-712 struct hash for the [`Order`] parameters.
         bytes32 orderDigest;
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            let order := mload(trade)
+            orderDigest := keccak256(order, 320)
+        }
+
+        // NOTE: Solidity allocates, but does not free, memory when:
+        // - calling the ABI encoding methods
+        // - calling the `ecrecover` precompile.
+        // However, we can restore the free memory pointer to before we made
+        // allocations to effectively free the memory. This is safe as the
+        // memory used can be discarded, and the memory pointed to by the free
+        // memory pointer **does not have to point to zero-ed out memory**.
+        // <https://solidity.readthedocs.io/en/v0.6.12/internals/layout_in_memory.html>
+        uint256 freeMemoryPointer;
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            freeMemoryPointer := mload(0x40)
+        }
+
         bytes32 signingDigest;
-
-        // NOTE: In order to avoid a memory allocation per call by using the
-        // built-in `abi.encode`, we reuse the memory region reserved by the
-        // caller for the order result as input to compute the hash.
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            // NOTE: Structs are not packed in Solidity, and there are 9 order
-            // fields to hash for a total of `9 * sizeof(uint) = 288` bytes.
-            orderDigest := keccak256(order, 288)
+        if (v & 0x80 == 0) {
+            // NOTE: The most significant bit **is not set**, so the order is
+            // signed using the EIP-712 sheme, the signing hash is of:
+            // `"\x19\x01" || domainSeparator || orderDigest`.
+            signingDigest = keccak256(
+                abi.encodePacked("\x19\x01", domainSeparator, orderDigest)
+            );
+        } else {
+            // NOTE: The most significant bit **is set**, so the order is signed
+            // using generic message scheme, the signing hash is of:
+            // `"\x19Ethereum Signed Message:\n" || length || data` where the
+            // length is a constant 64 bytes and the data is defined as:
+            // `domainSeparator || orderDigest`.
+            signingDigest = keccak256(
+                abi.encodePacked(
+                    "\x19Ethereum Signed Message:\n64",
+                    domainSeparator,
+                    orderDigest
+                )
+            );
         }
 
-        // NOTE: Now compute the digest that was used for signing. This is not
-        // the same as the order digest as it includes a message signature
-        // prefix as well as the domain separator. This is done using a scratch
-        // region of Solidity memory past the last allocation (which is stored
-        // at `0x40` memory address).
+        address owner = ecrecover(signingDigest, v & 0x1f, r, s);
+        require(owner != address(0), "GPv2: invalid signature");
+
+        trade.digest = orderDigest;
+        trade.owner = owner;
+
+        // NOTE: Restore the free memory pointer to free temporary memory.
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            let scratch := mload(0x40)
-
-            // NOTE: Message prefix is right-padded with 0's so that the first
-            // byte of the message prefix is at `scratch` memory location. 4 0's
-            // are needed as the message prefix is exactly 28 bytes long.
-            // Consequently, the two hashes are stored at 28 and 60 bytes from
-            // the start of the message, and the total length is 92 bytes.
-            mstore(scratch, "\x19Ethereum Signed Message:\n64\x00\x00\x00\x00")
-            mstore(add(scratch, 28), domainSeparator)
-            mstore(add(scratch, 60), orderDigest)
-            signingDigest := keccak256(scratch, 92)
+            mstore(0x40, freeMemoryPointer)
         }
-
-        order.digest = orderDigest;
-        order.owner = ecrecover(signingDigest, v, r, s);
-
-        require(order.owner != address(0), "GPv2: invalid signature");
     }
 }

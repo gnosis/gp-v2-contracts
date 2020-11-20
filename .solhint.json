@@ -2,7 +2,8 @@
   "extends": "solhint:recommended",
   "plugins": ["prettier"],
   "rules": {
-    "compiler-version": ["error", "^0.6.12"],
+    "compiler-version": "off",
+    "func-visibility": ["warn", { "ignoreConstructors": true }],
     "prettier/prettier": "error"
   }
 }
