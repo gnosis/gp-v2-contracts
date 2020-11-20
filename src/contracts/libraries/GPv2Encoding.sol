@@ -6,14 +6,9 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 /// @title Gnosis Protocol v2 Encoding Library.
 /// @author Gnosis Developers
 library GPv2Encoding {
-    /// @dev A struct representing an order.
-    ///
-    /// Note that this struct contains all order parameters that are signed by a
-    /// user for submitting to GP. Additionally, we use an extra field for the
-    /// order's type hash in order to allow for effecient in-place EIP-712
-    /// struct hashing.
+    /// @dev A struct representing an order containing all order parameters that
+    /// are signed by a user for submitting to GP.
     struct Order {
-        bytes32 typeHash;
         IERC20 sellToken;
         IERC20 buyToken;
         uint256 sellAmount;
@@ -28,14 +23,26 @@ library GPv2Encoding {
     /// @dev An enum describing an order kind, either a buy or a sell order.
     enum OrderKind {Sell, Buy}
 
-    /// @dev The order EIP-712 type hash for the [`Order`] struct (excluding the
-    /// extra `typeHash` field).
+    /// @dev The order EIP-712 type hash for the [`Order`] struct.
+    ///
+    /// This value is pre-computed from the following expression:
+    /// ```
+    /// keccak256(
+    ///     "Order(" +
+    ///         "address sellToken," +
+    ///         "address buyToken," +
+    ///         "uint256 sellAmount," +
+    ///         "uint256 buyAmount," +
+    ///         "uint32 validTo," +
+    ///         "uint32 nonce," +
+    ///         "uint256 tip," +
+    ///         "uint8 kind," +
+    ///         "bool partiallyFillable" +
+    ///     ")"
+    /// );
+    /// ```
     bytes32 internal constant ORDER_TYPE_HASH =
-        // TODO: Replace this with the pre-computed value once the contract is
-        // ready to be deployed.
-        keccak256(
-            "Order(address sellToken,address buyToken,uint256 sellAmount,uint256 buyAmount,uint32 validTo,uint32 nonce,uint256 tip,uint8 kind,bool partiallyFillable)"
-        );
+        hex"70874c19b8f223ec3e4476223f761070db29e881be331cda28425f9079d3a76b";
 
     /// @dev A struct representing a trade to be executed as part a batch
     /// settlement.
@@ -126,7 +133,7 @@ library GPv2Encoding {
 
         uint8 sellTokenIndex;
         uint8 buyTokenIndex;
-        uint8 flags;
+        uint256 flags;
         uint8 v;
         bytes32 r;
         bytes32 s;
@@ -136,7 +143,7 @@ library GPv2Encoding {
         // byte increments.
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            let order := add(mload(trade), 32)
+            let order := mload(trade)
 
             // sellTokenIndex = uint8(encodedTrade[0])
             sellTokenIndex := shr(248, calldataload(encodedTrade.offset))
@@ -170,26 +177,29 @@ library GPv2Encoding {
             s := calldataload(add(encodedTrade.offset, 172))
         }
 
-        trade.order.typeHash = ORDER_TYPE_HASH;
         trade.order.sellToken = tokens[sellTokenIndex];
         trade.order.buyToken = tokens[buyTokenIndex];
-        trade.order.kind = OrderKind(flags & 0x1);
-        trade.order.partiallyFillable = (flags >> 1) & 0x01 == 0x01;
+        trade.order.kind = OrderKind(flags & 0x01);
+        trade.order.partiallyFillable = flags & 0x02 != 0;
 
         trade.sellTokenIndex = sellTokenIndex;
         trade.buyTokenIndex = buyTokenIndex;
 
-        // NOTE: In order to avoid memory allocation and copying of the order
-        // parameters, use the memory region reserved by the caller for the
-        // order result to effeciently compute the hash in place. Furthermore,
-        // structs are not packed in Solidity, and there are 10 [`Order`] fields
-        // to hash for a total of `10 * sizeof(uint) = 320` bytes. This digest
-        // is a EIP-712 struct hash for the [`Order`] parameters.
+        // NOTE: Compute the EIP-712 order struct hash in place. The hash is
+        // computed from the order type hash concatenated with the ABI encoded
+        // order fields for a total of `10 * sizeof(uint) = 320` bytes.
+        // Fortunately, since Solidity memory structs **are not** packed, they
+        // are already laid out in memory exactly as is needed to compute the
+        // struct hash, just requiring the order type hash to be temporarily
+        // writen to the memory slot coming right before the order data.
         bytes32 orderDigest;
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            let order := mload(trade)
-            orderDigest := keccak256(order, 320)
+            let dataStart := sub(mload(trade), 32)
+            let temp := mload(dataStart)
+            mstore(dataStart, ORDER_TYPE_HASH)
+            orderDigest := keccak256(dataStart, 320)
+            mstore(dataStart, temp)
         }
 
         // NOTE: Solidity allocates, but does not free, memory when:
