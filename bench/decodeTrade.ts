@@ -1,11 +1,11 @@
-import { ethers, waffle } from "hardhat";
+import { ethers } from "hardhat";
 
 import { SettlementEncoder, SigningScheme, OrderKind } from "../src/ts";
 
 const ORDER_COUNTS = [1, 5, 10, 25, 50, 100];
 
 async function main() {
-  const [deployer, ...traders] = waffle.provider.getWallets();
+  const [deployer, ...traders] = await ethers.getSigners();
 
   const GPv2Encoding = await ethers.getContractFactory(
     "GPv2EncodingTestInterface",
@@ -16,6 +16,7 @@ async function main() {
   for (const orderCount of ORDER_COUNTS) {
     const encoder = new SettlementEncoder({ name: "test" });
     for (let i = 0; i < orderCount; i++) {
+      const trader = traders[i % traders.length];
       await encoder.signEncodeTrade(
         {
           sellToken: `0x${"55".repeat(20)}`,
@@ -29,8 +30,10 @@ async function main() {
           partiallyFillable: false,
         },
         ethers.utils.parseEther("42"),
-        traders[i % traders.length],
-        SigningScheme.TYPED_DATA,
+        trader,
+        trader._signTypedData
+          ? SigningScheme.TYPED_DATA
+          : SigningScheme.MESSAGE,
       );
     }
 
