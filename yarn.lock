@@ -636,10 +636,10 @@
   resolved "https://registry.yarnpkg.com/@solidity-parser/parser/-/parser-0.8.2.tgz#a6a5e93ac8dca6884a99a532f133beba59b87b69"
   integrity sha512-8LySx3qrNXPgB5JiULfG10O3V7QTxI/TLzSw5hFQhXWSkVxZBAv4rZQ0sYgLEbc8g3L2lmnujj1hKul38Eu5NQ==
 
-"@solidity-parser/parser@^0.9.0":
-  version "0.9.0"
-  resolved "https://registry.yarnpkg.com/@solidity-parser/parser/-/parser-0.9.0.tgz#1f9aedd25bf87983a02d95458c673c017a8857af"
-  integrity sha512-u1WzZgzOBFsGAcUhyj8DN/kop1SvrsaRT2ZVvDpVYnFI86YwbLrXCTGxefJzYGnA5Vajbbhi4aRtlxxFh69dfA==
+"@solidity-parser/parser@^0.9.1":
+  version "0.9.1"
+  resolved "https://registry.yarnpkg.com/@solidity-parser/parser/-/parser-0.9.1.tgz#c63aaca2a07f2994d85b43afdbf90b454b62e16e"
+  integrity sha512-ewNo+ZEQX8mFUOlTK6+0IYvM++6+iEeRBIBg4Mh8ghgRX72bkXJh6AWLWe/SG5+3WPdDL84MSsAlrvWFsGRdFw==
   dependencies:
     antlr4 "^4.8.0"
 
@@ -3107,13 +3107,6 @@ espree@^7.3.0:
     acorn-jsx "^5.2.0"
     eslint-visitor-keys "^1.3.0"
 
-esprima-extract-comments@^1.1.0:
-  version "1.1.0"
-  resolved "https://registry.yarnpkg.com/esprima-extract-comments/-/esprima-extract-comments-1.1.0.tgz#0dacab567a5900240de6d344cf18c33617becbc9"
-  integrity sha512-sBQUnvJwpeE9QnPrxh7dpI/dp67erYG4WXEAreAMoelPRpMR7NWb4YtwRPn9b+H1uLQKl/qS8WYmyaljTpjIsw==
-  dependencies:
-    esprima "^4.0.0"
-
 esprima@^4.0.0:
   version "4.0.1"
   resolved "https://registry.yarnpkg.com/esprima/-/esprima-4.0.1.tgz#13b04cdb3e6c5d19df91ab6987a8695619b0aa71"
@@ -3707,14 +3700,6 @@ extglob@^2.0.4:
     regex-not "^1.0.0"
     snapdragon "^0.8.1"
     to-regex "^3.0.1"
-
-extract-comments@^1.1.0:
-  version "1.1.0"
-  resolved "https://registry.yarnpkg.com/extract-comments/-/extract-comments-1.1.0.tgz#b90bca033a056bd69b8ba1c6b6b120fc2ee95c18"
-  integrity sha512-dzbZV2AdSSVW/4E7Ti5hZdHWbA+Z80RJsJhr5uiL10oyjl/gy7/o+HI1HwK4/WSZhlq4SNKU3oUzXlM13Qx02Q==
-  dependencies:
-    esprima-extract-comments "^1.1.0"
-    parse-code-context "^1.0.0"
 
 extsprintf@1.3.0:
   version "1.3.0"
@@ -6047,11 +6032,6 @@ parse-asn1@^5.0.0, parse-asn1@^5.1.5:
     pbkdf2 "^3.0.3"
     safe-buffer "^5.1.1"
 
-parse-code-context@^1.0.0:
-  version "1.0.0"
-  resolved "https://registry.yarnpkg.com/parse-code-context/-/parse-code-context-1.0.0.tgz#718c295c593d0d19a37f898473268cc75e98de1e"
-  integrity sha512-OZQaqKaQnR21iqhlnPfVisFjBWjhnMl5J9MgbP8xC+EwoVqbXrq78lp+9Zb3ahmLzrIX5Us/qbvBnaS3hkH6OA==
-
 parse-headers@^2.0.0:
   version "2.0.3"
   resolved "https://registry.yarnpkg.com/parse-headers/-/parse-headers-2.0.3.tgz#5e8e7512383d140ba02f0c7aa9f49b4399c92515"
@@ -6260,18 +6240,18 @@ prettier-linter-helpers@^1.0.0:
   dependencies:
     fast-diff "^1.1.2"
 
-prettier-plugin-solidity@^1.0.0-alpha.60:
-  version "1.0.0-alpha.60"
-  resolved "https://registry.yarnpkg.com/prettier-plugin-solidity/-/prettier-plugin-solidity-1.0.0-alpha.60.tgz#310a3af7e47d24fa1ef9e174523ff1f7b4d56c42"
-  integrity sha512-Dd6T0dVfw0kJrlEnLDFFE3mKRSP7zpT6zcIWvnSW+z4NBl+gmwJ7UJRZHD0CNDD6N48c+zb28xs3oF0ylDaYyg==
+prettier-plugin-solidity@^1.0.0-beta.1:
+  version "1.0.0-beta.1"
+  resolved "https://registry.yarnpkg.com/prettier-plugin-solidity/-/prettier-plugin-solidity-1.0.0-beta.1.tgz#4efff3ea4ba449e5c88f4ada6aca889c676547a6"
+  integrity sha512-kfPkR+UscT/Cw+2O8RSh6gCnIY4qsJJtuE4xZpIq42EyNyTLBabDwjH1QocXHwmlgL6QffydDge76ERlyJRaAA==
   dependencies:
-    "@solidity-parser/parser" "^0.9.0"
+    "@solidity-parser/parser" "^0.9.1"
     dir-to-object "^2.0.0"
     emoji-regex "^9.0.0"
     escape-string-regexp "^4.0.0"
-    extract-comments "^1.1.0"
     prettier "^2.0.5"
     semver "^7.3.2"
+    solidity-comments-extractor "^0.0.4"
     string-width "^4.2.0"
 
 prettier@^1.14.3:
@@ -7147,6 +7127,11 @@ solhint@^3.3.2:
     semver "^6.3.0"
   optionalDependencies:
     prettier "^1.14.3"
+
+solidity-comments-extractor@^0.0.4:
+  version "0.0.4"
+  resolved "https://registry.yarnpkg.com/solidity-comments-extractor/-/solidity-comments-extractor-0.0.4.tgz#ce420aef23641ffd0131c7d80ba85b6e1e42147e"
+  integrity sha512-58glBODwXIKMaQ7rfcJOrWtFQMMOK28tJ0/LcB5Xhu7WtAxk4UX2fpgKPuaL41XjMp/y0gAa1MTLqk018wuSzA==
 
 source-map-resolve@^0.5.0:
   version "0.5.3"
