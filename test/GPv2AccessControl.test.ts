@@ -73,11 +73,6 @@ describe("GPv2SimpleAuthentication", () => {
         await authenticator.addSolver(solver.address);
         expect(await authenticator.getSolverAt(0)).to.equal(solver.address);
       });
-
-      it("returns expected address when called correctly", async () => {
-        await authenticator.addSolver(solver.address);
-        expect(await authenticator.getSolverAt(0)).to.equal(solver.address);
-      });
     });
 
     describe("numSolvers", () => {
