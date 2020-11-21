@@ -48,8 +48,8 @@ library GPv2Encoding {
     /// settlement.
     struct Trade {
         Order order;
-        uint8 sellTokenIndex;
-        uint8 buyTokenIndex;
+        uint256 sellTokenIndex;
+        uint256 buyTokenIndex;
         uint256 executedAmount;
         bytes32 digest;
         address owner;
@@ -163,25 +163,50 @@ library GPv2Encoding {
         bytes32 domainSeparator,
         IERC20[] calldata tokens,
         Trade memory trade
-    ) internal pure {
-        uint8 sellTokenIndex;
-        uint8 buyTokenIndex;
-        uint256 flags;
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-
-        // NOTE: Use assembly to efficiently decode packed data. Memory structs
-        // in Solidity aren't packed, so the `Order` fields are in order at 32
-        // byte increments.
+    ) internal view {
+        // NOTE: Use assembly to efficiently decode packed data and recover the
+        // signing address.
+        bool validIndices;
         // solhint-disable-next-line no-inline-assembly
         assembly {
             let order := mload(trade)
+            let freeMemoryPointer := mload(0x40)
 
-            // sellTokenIndex = uint8(encodedTrade[0])
-            sellTokenIndex := shr(248, calldataload(encodedTrade.offset))
-            // buyTokenIndex = uint8(encodedTrade[1])
-            buyTokenIndex := shr(248, calldataload(add(encodedTrade.offset, 1)))
+            {
+                // sellTokenIndex = uint256(encodedTrade[0])
+                let sellTokenIndex := shr(
+                    248,
+                    calldataload(encodedTrade.offset)
+                )
+                // order.sellToken = tokens[sellTokenIndex]
+                mstore(
+                    order,
+                    calldataload(add(tokens.offset, mul(sellTokenIndex, 32)))
+                )
+                // trade.sellTokenIndex = sellTokenIndex
+                mstore(add(trade, 32), sellTokenIndex)
+                // validIndices = sellTokenIndex < tokens.length
+                validIndices := lt(sellTokenIndex, tokens.length)
+            }
+            {
+                // buyTokenIndex = uint256(encodedTrade[1])
+                let buyTokenIndex := shr(
+                    248,
+                    calldataload(add(encodedTrade.offset, 1))
+                )
+                // order.buyToken = tokens[buyTokenIndex]
+                mstore(
+                    add(order, 32),
+                    calldataload(add(tokens.offset, mul(buyTokenIndex, 32)))
+                )
+                // trade.buyTokenIndex = buyTokenIndex
+                mstore(add(trade, 64), buyTokenIndex)
+                // validIndices = validIndices && buyTokenIndex < tokens.length
+                validIndices := and(
+                    validIndices,
+                    lt(buyTokenIndex, tokens.length)
+                )
+            }
             // order.sellAmount = uint256(encodedTrade[2:34])
             mstore(add(order, 64), calldataload(add(encodedTrade.offset, 2)))
             // order.buyAmount = uint256(encodedTrade[34:66])
@@ -198,90 +223,84 @@ library GPv2Encoding {
             )
             // order.feeAmount = uint256(encodedTrade[74:106])
             mstore(add(order, 192), calldataload(add(encodedTrade.offset, 74)))
-            // flags = uint8(encodedTrade[106])
-            flags := shr(248, calldataload(add(encodedTrade.offset, 106)))
+            {
+                // flags = uint8(encodedTrade[106])
+                let flags := shr(
+                    248,
+                    calldataload(add(encodedTrade.offset, 106))
+                )
+                // order.kind = OrderKind(flags & 0x01)
+                mstore(add(order, 224), and(flags, 0x01))
+                // order.partiallyFillable = flags & 0x02 != 0
+                mstore(add(order, 256), shr(1, and(flags, 0x02)))
+            }
             // trade.executedAmount = uint256(encodedTrade[107:139])
             mstore(add(trade, 96), calldataload(add(encodedTrade.offset, 107)))
+
+            // NOTE: Compute the EIP-712 order struct hash in place. The hash is
+            // computed from the order type hash concatenated with the ABI encoded
+            // order fields for a total of `10 * sizeof(uint) = 320` bytes.
+            // Fortunately, since Solidity memory structs **are not** packed, they
+            // are already laid out in memory exactly as is needed to compute the
+            // struct hash, just requiring the order type hash to be temporarily
+            // writen to the memory slot coming right before the order data.
+            let orderDigest
+            {
+                let dataStart := sub(order, 32)
+                let backup := mload(dataStart)
+                mstore(dataStart, ORDER_TYPE_HASH)
+                orderDigest := keccak256(dataStart, 320)
+                mstore(dataStart, backup)
+            }
+            // trade.digest = orderDigest
+            mstore(add(trade, 128), orderDigest)
+
             // v = uint8(encodedTrade[139])
-            v := shr(248, calldataload(add(encodedTrade.offset, 139)))
-            // r = uint256(encodedTrade[140:172])
-            r := calldataload(add(encodedTrade.offset, 140))
-            // s = uint256(encodedTrade[172:204])
-            s := calldataload(add(encodedTrade.offset, 172))
-        }
+            let v := shr(248, calldataload(add(encodedTrade.offset, 139)))
 
-        trade.order.sellToken = tokens[sellTokenIndex];
-        trade.order.buyToken = tokens[buyTokenIndex];
-        trade.order.kind = OrderKind(flags & 0x01);
-        trade.order.partiallyFillable = flags & 0x02 != 0;
-
-        trade.sellTokenIndex = sellTokenIndex;
-        trade.buyTokenIndex = buyTokenIndex;
-
-        // NOTE: Compute the EIP-712 order struct hash in place. The hash is
-        // computed from the order type hash concatenated with the ABI encoded
-        // order fields for a total of `10 * sizeof(uint) = 320` bytes.
-        // Fortunately, since Solidity memory structs **are not** packed, they
-        // are already laid out in memory exactly as is needed to compute the
-        // struct hash, just requiring the order type hash to be temporarily
-        // writen to the memory slot coming right before the order data.
-        bytes32 orderDigest;
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            let dataStart := sub(mload(trade), 32)
-            let temp := mload(dataStart)
-            mstore(dataStart, ORDER_TYPE_HASH)
-            orderDigest := keccak256(dataStart, 320)
-            mstore(dataStart, temp)
-        }
-
-        // NOTE: Solidity allocates, but does not free, memory when:
-        // - calling the ABI encoding methods
-        // - calling the `ecrecover` precompile.
-        // However, we can restore the free memory pointer to before we made
-        // allocations to effectively free the memory. This is safe as the
-        // memory used can be discarded, and the memory pointed to by the free
-        // memory pointer **does not have to point to zero-ed out memory**.
-        // <https://solidity.readthedocs.io/en/v0.7.5/internals/layout_in_memory.html>
-        uint256 freeMemoryPointer;
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            freeMemoryPointer := mload(0x40)
-        }
-
-        bytes32 signingDigest;
-        if (v & 0x80 == 0) {
-            // NOTE: The most significant bit **is not set**, so the order is
-            // signed using the EIP-712 sheme, the signing hash is of:
-            // `"\x19\x01" || domainSeparator || orderDigest`.
-            signingDigest = keccak256(
-                abi.encodePacked("\x19\x01", domainSeparator, orderDigest)
-            );
-        } else {
-            // NOTE: The most significant bit **is set**, so the order is signed
-            // using generic message scheme, the signing hash is of:
-            // `"\x19Ethereum Signed Message:\n" || length || data` where the
-            // length is a constant 64 bytes and the data is defined as:
-            // `domainSeparator || orderDigest`.
-            signingDigest = keccak256(
-                abi.encodePacked(
-                    "\x19Ethereum Signed Message:\n64",
-                    domainSeparator,
-                    orderDigest
+            switch and(v, 0x80)
+                case 0 {
+                    mstore(freeMemoryPointer, "\x19\x01")
+                    mstore(add(freeMemoryPointer, 2), domainSeparator)
+                    mstore(add(freeMemoryPointer, 34), orderDigest)
+                    mstore(freeMemoryPointer, keccak256(freeMemoryPointer, 66))
+                }
+                default {
+                    mstore(
+                        freeMemoryPointer,
+                        "\x19Ethereum Signed Message:\n64"
+                    )
+                    mstore(add(freeMemoryPointer, 28), domainSeparator)
+                    mstore(add(freeMemoryPointer, 60), orderDigest)
+                    mstore(freeMemoryPointer, keccak256(freeMemoryPointer, 92))
+                }
+            mstore(add(freeMemoryPointer, 32), and(v, 0x1f))
+            mstore(
+                add(freeMemoryPointer, 64),
+                calldataload(add(encodedTrade.offset, 140))
+            )
+            mstore(
+                add(freeMemoryPointer, 96),
+                calldataload(add(encodedTrade.offset, 172))
+            )
+            // trade.owner = ecrecover(signingDigest, v, r, s)
+            if iszero(
+                staticcall(
+                    gas(),
+                    0x01,
+                    freeMemoryPointer,
+                    128,
+                    add(trade, 160),
+                    32
                 )
-            );
+            ) {
+                // NOTE: This indicates there was something wrong calling the
+                // precompile and not that the signature recovery failed.
+                revert(0, 0)
+            }
         }
 
-        address owner = ecrecover(signingDigest, v & 0x1f, r, s);
-        require(owner != address(0), "GPv2: invalid signature");
-
-        trade.digest = orderDigest;
-        trade.owner = owner;
-
-        // NOTE: Restore the free memory pointer to free temporary memory.
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            mstore(0x40, freeMemoryPointer)
-        }
+        require(validIndices, "GPv2: invalid token index");
+        require(trade.owner != address(0), "GPv2: invalid signature");
     }
 }
