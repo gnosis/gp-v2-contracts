@@ -38,6 +38,7 @@ describe("GPv2Settlement", () => {
     it("should have a different replay protection for each deployment", async () => {
       const GPv2Settlement = await ethers.getContractFactory(
         "GPv2SettlementTestInterface",
+        deployer,
       );
       const settlement2 = await GPv2Settlement.deploy(authenticator.address);
 
