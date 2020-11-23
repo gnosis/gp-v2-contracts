@@ -2,6 +2,7 @@
 pragma solidity ^0.7.5;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./interfaces/GPv2Authentication.sol";
 
 /// @title Gnosis Protocol v2 Settlement Contract
 /// @author Gnosis Developers
@@ -13,7 +14,14 @@ contract GPv2Settlement {
     /// GPv2 contracts.
     bytes32 internal immutable domainSeparator;
 
-    constructor() {
+    /// @dev The authenticator is used to determine who can call the settle function.
+    /// That is, only authorised solvers have the ability to invoke settlements.
+    /// Any valid authenticator implements an isSolver method called by the onlySolver
+    /// modifier below.
+    GPv2Authentication private immutable authenticator;
+
+    constructor(GPv2Authentication authenticator_) {
+        authenticator = authenticator_;
         uint256 chainId;
 
         // NOTE: Currently, the only way to get the chain ID in solidity is
@@ -35,6 +43,13 @@ contract GPv2Settlement {
                 address(this)
             )
         );
+    }
+
+    /// @dev This modifier is called by settle function to block any non-listed
+    /// senders from settling batches.
+    modifier onlySolver {
+        require(authenticator.isSolver(msg.sender), "GPv2: not a solver");
+        _;
     }
 
     /// @dev Settle the specified orders at a clearing price. Note that it is
@@ -80,13 +95,13 @@ contract GPv2Settlement {
         bytes calldata encodedOrders,
         bytes calldata encodedInteractions,
         bytes calldata encodedOrderRefunds
-    ) external pure {
+    ) external view onlySolver {
         require(tokens.length == 0, "not yet implemented");
         require(clearingPrices.length == 0, "not yet implemented");
         require(feeFactor == 0, "not yet implemented");
         require(encodedOrders.length == 0, "not yet implemented");
         require(encodedInteractions.length == 0, "not yet implemented");
         require(encodedOrderRefunds.length == 0, "not yet implemented");
-        revert("not yet implemented");
+        revert("Final: not yet implemented");
     }
 }
