@@ -209,7 +209,7 @@ library GPv2Encoding {
         // allocations to effectively free the memory. This is safe as the
         // memory used can be discarded, and the memory pointed to by the free
         // memory pointer **does not have to point to zero-ed out memory**.
-        // <https://solidity.readthedocs.io/en/v0.6.12/internals/layout_in_memory.html>
+        // <https://solidity.readthedocs.io/en/v0.7.5/internals/layout_in_memory.html>
         uint256 freeMemoryPointer;
         // solhint-disable-next-line no-inline-assembly
         assembly {

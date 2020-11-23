@@ -11,7 +11,11 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
 
     }
 
-    function domainSeparatorTest() public view returns (bytes32) {
+    function domainSeparatorTest() external view returns (bytes32) {
         return domainSeparator;
+    }
+
+    function allowanceManagerTest() external view returns (address) {
+        return address(allowanceManager);
     }
 }
