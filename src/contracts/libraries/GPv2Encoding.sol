@@ -6,20 +6,15 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 /// @title Gnosis Protocol v2 Encoding Library.
 /// @author Gnosis Developers
 library GPv2Encoding {
-    /// @dev A struct representing an order.
-    ///
-    /// Note that this struct contains all order parameters that are signed by a
-    /// user for submitting to GP. Additionally, we use an extra field for the
-    /// order's type hash in order to allow for effecient in-place EIP-712
-    /// struct hashing.
+    /// @dev A struct representing an order containing all order parameters that
+    /// are signed by a user for submitting to GP.
     struct Order {
-        bytes32 typeHash;
         IERC20 sellToken;
         IERC20 buyToken;
         uint256 sellAmount;
         uint256 buyAmount;
         uint32 validTo;
-        uint32 nonce;
+        uint32 appData;
         uint256 tip;
         OrderKind kind;
         bool partiallyFillable;
@@ -28,14 +23,26 @@ library GPv2Encoding {
     /// @dev An enum describing an order kind, either a buy or a sell order.
     enum OrderKind {Sell, Buy}
 
-    /// @dev The order EIP-712 type hash for the [`Order`] struct (excluding the
-    /// extra `typeHash` field).
+    /// @dev The order EIP-712 type hash for the [`Order`] struct.
+    ///
+    /// This value is pre-computed from the following expression:
+    /// ```
+    /// keccak256(
+    ///     "Order(" +
+    ///         "address sellToken," +
+    ///         "address buyToken," +
+    ///         "uint256 sellAmount," +
+    ///         "uint256 buyAmount," +
+    ///         "uint32 validTo," +
+    ///         "uint32 appData," +
+    ///         "uint256 tip," +
+    ///         "uint8 kind," +
+    ///         "bool partiallyFillable" +
+    ///     ")"
+    /// );
+    /// ```
     bytes32 internal constant ORDER_TYPE_HASH =
-        // TODO: Replace this with the pre-computed value once the contract is
-        // ready to be deployed.
-        keccak256(
-            "Order(address sellToken,address buyToken,uint256 sellAmount,uint256 buyAmount,uint32 validTo,uint32 nonce,uint256 tip,uint8 kind,bool partiallyFillable)"
-        );
+        hex"23428e7b8eed4e2df6f66591da9a09de9a88ce5b69f7ae818818afffb53da045";
 
     /// @dev A struct representing a trade to be executed as part a batch
     /// settlement.
@@ -51,12 +58,6 @@ library GPv2Encoding {
     /// @dev The stride of an encoded trade.
     uint256 internal constant TRADE_STRIDE = 204;
 
-    /// @dev Bit position for the [`OrderKind`] encoded in the flags.
-    uint8 internal constant ORDER_KIND_BIT = 0;
-    /// @dev Bit position for the `partiallyFillable` value encoded in the
-    /// flags.
-    uint8 internal constant ORDER_PARTIALLY_FILLABLE_BIT = 1;
-
     /// @dev Decodes a trade with a signed order from calldata into memory.
     ///
     /// Trades are tightly packed and compress some data such as the order's buy
@@ -71,7 +72,7 @@ library GPv2Encoding {
     ///     uint256 sellAmount;
     ///     uint256 buyAmount;
     ///     uint32 validTo;
-    ///     uint32 nonce;
+    ///     uint32 appData;
     ///     uint256 tip;
     ///     uint8 flags;
     ///     uint256 executedAmount;
@@ -81,6 +82,25 @@ library GPv2Encoding {
     ///         bytes32 s;
     ///     } signature;
     /// }
+    /// ```
+    ///
+    /// Order flags are used to encode additional order parameters such as the
+    /// kind of order, either a sell or a buy order, as well as whether the
+    /// order is partially fillable or if it is a "fill-or-kill" order. As the
+    /// most likely values are fill-or-kill sell orders, the flags are chosen
+    /// such that `0x00` represents this kind of order. The flags byte uses has
+    /// the following format:
+    /// ```
+    /// bit | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
+    /// ----+-----------------------+---+---+
+    ///     |        unsused        | * | * |
+    ///                               |   |
+    ///                               |   +---- order kind bit, 0 for a sell
+    ///                               |         order and 1 for a buy order
+    ///                               |
+    ///                               +-------- order fill bit, 0 for fill-or-
+    ///                                         kill and 1 for a partially
+    ///                                         fillable order
     /// ```
     ///
     /// Order signatures support two schemes:
@@ -102,61 +122,84 @@ library GPv2Encoding {
         bytes calldata encodedTrade,
         Trade memory trade
     ) internal pure {
-        // NOTE: This is currently unnecessarily gas inefficient. Specifically,
-        // there is a potentially extraneous check to the encoded trade length
-        // (this can be verified once for the total encoded trades length).
-        // Additionally, Solidity generates bounds checks for each `abi.decode`
-        // and slice operation. Unfortunately using `assmebly { calldataload }`
-        // is quite ugly here since there is no mechanism to get calldata
-        // offsets (like there is for memory offsets) without manual
-        // computation, which is brittle as changes to the calling function
-        // signature would require manual adjustments to the computation. Once
-        // gas benchmarking is set up, we can evaluate if it is worth the extra
-        // effort.
-
+        // NOTE: It is slightly more efficient to check that the total encoded
+        // trades length is a multiple of `TRADE_STRIDE` instead of checking
+        // every encoded trade. Once that code is established, this check should
+        // move there.
         require(
             encodedTrade.length == TRADE_STRIDE,
             "GPv2: malformed trade data"
         );
 
-        uint8 sellTokenIndex = uint8(encodedTrade[0]);
-        uint8 buyTokenIndex = uint8(encodedTrade[1]);
-        trade.order.sellAmount = abi.decode(encodedTrade[2:], (uint256));
-        trade.order.buyAmount = abi.decode(encodedTrade[34:], (uint256));
-        trade.order.validTo = uint32(
-            abi.decode(encodedTrade[66:], (uint256)) >> (256 - 32)
-        );
-        trade.order.nonce = uint32(
-            abi.decode(encodedTrade[70:], (uint256)) >> (256 - 32)
-        );
-        trade.order.tip = abi.decode(encodedTrade[74:], (uint256));
-        uint8 flags = uint8(encodedTrade[106]);
-        trade.executedAmount = abi.decode(encodedTrade[107:], (uint256));
-        uint8 v = uint8(encodedTrade[139]);
-        bytes32 r = abi.decode(encodedTrade[140:], (bytes32));
-        bytes32 s = abi.decode(encodedTrade[172:], (bytes32));
+        uint8 sellTokenIndex;
+        uint8 buyTokenIndex;
+        uint256 flags;
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
 
-        trade.order.typeHash = ORDER_TYPE_HASH;
+        // NOTE: Use assembly to efficiently decode packed data. Memory structs
+        // in Solidity aren't packed, so the `Order` fields are in order at 32
+        // byte increments.
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            let order := mload(trade)
+
+            // sellTokenIndex = uint8(encodedTrade[0])
+            sellTokenIndex := shr(248, calldataload(encodedTrade.offset))
+            // buyTokenIndex = uint8(encodedTrade[1])
+            buyTokenIndex := shr(248, calldataload(add(encodedTrade.offset, 1)))
+            // order.sellAmount = uint256(encodedTrade[2:34])
+            mstore(add(order, 64), calldataload(add(encodedTrade.offset, 2)))
+            // order.buyAmount = uint256(encodedTrade[34:66])
+            mstore(add(order, 96), calldataload(add(encodedTrade.offset, 34)))
+            // order.validTo = uint32(encodedTrade[66:70])
+            mstore(
+                add(order, 128),
+                shr(224, calldataload(add(encodedTrade.offset, 66)))
+            )
+            // order.appData = uint32(encodedTrade[70:74])
+            mstore(
+                add(order, 160),
+                shr(224, calldataload(add(encodedTrade.offset, 70)))
+            )
+            // order.tip = uint256(encodedTrade[74:106])
+            mstore(add(order, 192), calldataload(add(encodedTrade.offset, 74)))
+            // flags = uint8(encodedTrade[106])
+            flags := shr(248, calldataload(add(encodedTrade.offset, 106)))
+            // trade.executedAmount = uint256(encodedTrade[107:139])
+            mstore(add(trade, 96), calldataload(add(encodedTrade.offset, 107)))
+            // v = uint8(encodedTrade[139])
+            v := shr(248, calldataload(add(encodedTrade.offset, 139)))
+            // r = uint256(encodedTrade[140:172])
+            r := calldataload(add(encodedTrade.offset, 140))
+            // s = uint256(encodedTrade[172:204])
+            s := calldataload(add(encodedTrade.offset, 172))
+        }
+
         trade.order.sellToken = tokens[sellTokenIndex];
         trade.order.buyToken = tokens[buyTokenIndex];
-        trade.order.kind = OrderKind((flags >> ORDER_KIND_BIT) & 0x1);
-        trade.order.partiallyFillable =
-            (flags >> ORDER_PARTIALLY_FILLABLE_BIT) & 0x01 == 0x01;
+        trade.order.kind = OrderKind(flags & 0x01);
+        trade.order.partiallyFillable = flags & 0x02 != 0;
 
         trade.sellTokenIndex = sellTokenIndex;
         trade.buyTokenIndex = buyTokenIndex;
 
-        // NOTE: In order to avoid memory allocation and copying of the order
-        // parameters, use the memory region reserved by the caller for the
-        // order result to effeciently compute the hash in place. Furthermore,
-        // structs are not packed in Solidity, and there are 10 [`Order`] fields
-        // to hash for a total of `10 * sizeof(uint) = 320` bytes. This digest
-        // is a EIP-712 struct hash for the [`Order`] parameters.
+        // NOTE: Compute the EIP-712 order struct hash in place. The hash is
+        // computed from the order type hash concatenated with the ABI encoded
+        // order fields for a total of `10 * sizeof(uint) = 320` bytes.
+        // Fortunately, since Solidity memory structs **are not** packed, they
+        // are already laid out in memory exactly as is needed to compute the
+        // struct hash, just requiring the order type hash to be temporarily
+        // writen to the memory slot coming right before the order data.
         bytes32 orderDigest;
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            let order := mload(trade)
-            orderDigest := keccak256(order, 320)
+            let dataStart := sub(mload(trade), 32)
+            let temp := mload(dataStart)
+            mstore(dataStart, ORDER_TYPE_HASH)
+            orderDigest := keccak256(dataStart, 320)
+            mstore(dataStart, temp)
         }
 
         // NOTE: Solidity allocates, but does not free, memory when:

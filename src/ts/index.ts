@@ -60,13 +60,11 @@ export interface Order {
    */
   validTo: number | Date;
   /**
-   * A nonce to ensure orders aren't replayable.
-   *
-   * Specifying a value of {@link REPLAYABLE_NONCE} indicates that this order
-   * can be replayed in any batch. This can be used for setting up passive
-   * trading strategies where orders are valid forever.
+   * Arbitrary application specific data that can be added to an order. This can
+   * also be used to ensure uniqueness between two orders with otherwise the
+   * exact same parameters.
    */
-  nonce: number;
+  appData: number;
   /**
    * Additional fee to give to the protocol.
    *
@@ -105,12 +103,6 @@ export const enum OrderKind {
 }
 
 /**
- * Reserved nonce value used to indicate that an order can be replayed in any
- * batch.
- */
-export const REPLAYABLE_NONCE = 0;
-
-/**
  * The EIP-712 type fields definition for a Gnosis Protocol v2 order.
  */
 export const ORDER_TYPE_FIELDS = [
@@ -119,7 +111,7 @@ export const ORDER_TYPE_FIELDS = [
   { name: "sellAmount", type: "uint256" },
   { name: "buyAmount", type: "uint256" },
   { name: "validTo", type: "uint32" },
-  { name: "nonce", type: "uint32" },
+  { name: "appData", type: "uint32" },
   { name: "tip", type: "uint256" },
   { name: "kind", type: "uint8" },
   { name: "partiallyFillable", type: "bool" },
@@ -247,7 +239,7 @@ export class SettlementEncoder {
         order.sellAmount,
         order.buyAmount,
         timestamp(order.validTo),
-        order.nonce,
+        order.appData,
         order.tip,
         encodeOrderFlags(order),
         executedAmount,
