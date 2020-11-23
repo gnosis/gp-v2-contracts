@@ -2,10 +2,24 @@
 pragma solidity ^0.7.5;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./interfaces/GPv2Authentication.sol";
 
 /// @title Gnosis Protocol v2 Settlement Contract
 /// @author Gnosis Developers
 contract GPv2Settlement {
+    /// @dev The EIP-712 domain type hash used for computing the domain
+    /// separator.
+    bytes32 private constant DOMAIN_TYPE_HASH =
+        keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+        );
+
+    /// @dev The EIP-712 domain name used for computing the domain separator.
+    bytes32 private constant DOMAIN_NAME = keccak256("Gnosis Protocol");
+
+    /// @dev The EIP-712 domain version used for computing the domain separator.
+    bytes32 private constant DOMAIN_VERSION = keccak256("v2");
+
     /// @dev The domain separator used for signing orders that gets mixed in
     /// making signatures for different domains incompatible. This domain
     /// separator is computed following the EIP-712 standard and has replay
@@ -13,11 +27,18 @@ contract GPv2Settlement {
     /// GPv2 contracts.
     bytes32 internal immutable domainSeparator;
 
-    constructor() {
-        uint256 chainId;
+    /// @dev The authenticator is used to determine who can call the settle function.
+    /// That is, only authorised solvers have the ability to invoke settlements.
+    /// Any valid authenticator implements an isSolver method called by the onlySolver
+    /// modifier below.
+    GPv2Authentication private immutable authenticator;
+
+    constructor(GPv2Authentication authenticator_) {
+        authenticator = authenticator_;
 
         // NOTE: Currently, the only way to get the chain ID in solidity is
         // using assembly.
+        uint256 chainId;
         // solhint-disable-next-line no-inline-assembly
         assembly {
             chainId := chainid()
@@ -25,16 +46,20 @@ contract GPv2Settlement {
 
         domainSeparator = keccak256(
             abi.encode(
-                // TODO(nlordell): Verify that these compile to constants.
-                keccak256(
-                    "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-                ),
-                keccak256("Gnosis Protocol"),
-                keccak256("v2"),
+                DOMAIN_TYPE_HASH,
+                DOMAIN_NAME,
+                DOMAIN_VERSION,
                 chainId,
                 address(this)
             )
         );
+    }
+
+    /// @dev This modifier is called by settle function to block any non-listed
+    /// senders from settling batches.
+    modifier onlySolver {
+        require(authenticator.isSolver(msg.sender), "GPv2: not a solver");
+        _;
     }
 
     /// @dev Settle the specified orders at a clearing price. Note that it is
@@ -80,13 +105,13 @@ contract GPv2Settlement {
         bytes calldata encodedOrders,
         bytes calldata encodedInteractions,
         bytes calldata encodedOrderRefunds
-    ) external pure {
+    ) external view onlySolver {
         require(tokens.length == 0, "not yet implemented");
         require(clearingPrices.length == 0, "not yet implemented");
         require(feeFactor == 0, "not yet implemented");
         require(encodedOrders.length == 0, "not yet implemented");
         require(encodedInteractions.length == 0, "not yet implemented");
         require(encodedOrderRefunds.length == 0, "not yet implemented");
-        revert("not yet implemented");
+        revert("Final: not yet implemented");
     }
 }
