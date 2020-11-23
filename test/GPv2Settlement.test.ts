@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { Contract } from "ethers";
-import { ethers } from "hardhat";
+import { ethers, waffle } from "hardhat";
 
 import { domain } from "../src/ts";
 
