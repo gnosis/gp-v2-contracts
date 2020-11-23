@@ -20,8 +20,8 @@ contract GPv2Settlement {
     /// modifier below.
     GPv2Authentication private immutable authenticator;
 
-    constructor(GPv2Authentication _authenticator) {
-        authenticator = _authenticator;
+    constructor(GPv2Authentication authenticator_) {
+        authenticator = authenticator_;
         uint256 chainId;
 
         // NOTE: Currently, the only way to get the chain ID in solidity is
