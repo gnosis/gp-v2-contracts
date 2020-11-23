@@ -14,7 +14,7 @@ library GPv2Encoding {
         uint256 sellAmount;
         uint256 buyAmount;
         uint32 validTo;
-        uint32 nonce;
+        uint32 appData;
         uint256 tip;
         OrderKind kind;
         bool partiallyFillable;
@@ -34,7 +34,7 @@ library GPv2Encoding {
     ///         "uint256 sellAmount," +
     ///         "uint256 buyAmount," +
     ///         "uint32 validTo," +
-    ///         "uint32 nonce," +
+    ///         "uint32 appData," +
     ///         "uint256 tip," +
     ///         "uint8 kind," +
     ///         "bool partiallyFillable" +
@@ -42,7 +42,7 @@ library GPv2Encoding {
     /// );
     /// ```
     bytes32 internal constant ORDER_TYPE_HASH =
-        hex"70874c19b8f223ec3e4476223f761070db29e881be331cda28425f9079d3a76b";
+        hex"23428e7b8eed4e2df6f66591da9a09de9a88ce5b69f7ae818818afffb53da045";
 
     /// @dev A struct representing a trade to be executed as part a batch
     /// settlement.
@@ -72,7 +72,7 @@ library GPv2Encoding {
     ///     uint256 sellAmount;
     ///     uint256 buyAmount;
     ///     uint32 validTo;
-    ///     uint32 nonce;
+    ///     uint32 appData;
     ///     uint256 tip;
     ///     uint8 flags;
     ///     uint256 executedAmount;
@@ -158,7 +158,7 @@ library GPv2Encoding {
                 add(order, 128),
                 shr(224, calldataload(add(encodedTrade.offset, 66)))
             )
-            // order.nonce = uint32(encodedTrade[70:74])
+            // order.appData = uint32(encodedTrade[70:74])
             mstore(
                 add(order, 160),
                 shr(224, calldataload(add(encodedTrade.offset, 70)))
