@@ -2,17 +2,17 @@ import { expect } from "chai";
 import { Contract } from "ethers";
 import { ethers, waffle } from "hardhat";
 
-describe("GPv2SimpleAuthentication", () => {
+describe("GPv2AllowListAuthentication", () => {
   const [owner, nonOwner, solver] = waffle.provider.getWallets();
   let authenticator: Contract;
 
   beforeEach(async () => {
-    const GPv2SimpleAuthentication = await ethers.getContractFactory(
-      "GPv2SimpleAuthentication",
+    const GPv2AllowListAuthentication = await ethers.getContractFactory(
+      "GPv2AllowListAuthentication",
     );
 
     // Owner will default to admin account declared above.
-    authenticator = await GPv2SimpleAuthentication.deploy();
+    authenticator = await GPv2AllowListAuthentication.deploy();
   });
 
   describe("constructor", () => {

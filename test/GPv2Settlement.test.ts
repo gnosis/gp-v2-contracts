@@ -10,11 +10,11 @@ describe("GPv2Settlement", () => {
   let authenticator: Contract;
 
   beforeEach(async () => {
-    const GPv2SimpleAuthentication = await ethers.getContractFactory(
-      "GPv2SimpleAuthentication",
+    const GPv2AllowListAuthentication = await ethers.getContractFactory(
+      "GPv2AllowListAuthentication",
       owner,
     );
-    authenticator = await GPv2SimpleAuthentication.connect(owner).deploy();
+    authenticator = await GPv2AllowListAuthentication.connect(owner).deploy();
 
     const GPv2Settlement = await ethers.getContractFactory(
       "GPv2SettlementTestInterface",

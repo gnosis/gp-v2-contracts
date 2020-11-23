@@ -7,7 +7,7 @@ import "./interfaces/GPv2Authentication.sol";
 
 /// @title Gnosis Protocol v2 Access Control Contract
 /// @author Gnosis Developers
-contract GPv2SimpleAuthentication is Ownable, GPv2Authentication {
+contract GPv2AllowListAuthentication is Ownable, GPv2Authentication {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     EnumerableSet.AddressSet private solvers;
