@@ -7,6 +7,19 @@ import "./interfaces/GPv2Authentication.sol";
 /// @title Gnosis Protocol v2 Settlement Contract
 /// @author Gnosis Developers
 contract GPv2Settlement {
+    /// @dev The EIP-712 domain type hash used for computing the domain
+    /// separator.
+    bytes32 private constant DOMAIN_TYPE_HASH =
+        keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+        );
+
+    /// @dev The EIP-712 domain name used for computing the domain separator.
+    bytes32 private constant DOMAIN_NAME = keccak256("Gnosis Protocol");
+
+    /// @dev The EIP-712 domain version used for computing the domain separator.
+    bytes32 private constant DOMAIN_VERSION = keccak256("v2");
+
     /// @dev The domain separator used for signing orders that gets mixed in
     /// making signatures for different domains incompatible. This domain
     /// separator is computed following the EIP-712 standard and has replay
@@ -22,10 +35,10 @@ contract GPv2Settlement {
 
     constructor(GPv2Authentication authenticator_) {
         authenticator = authenticator_;
-        uint256 chainId;
 
         // NOTE: Currently, the only way to get the chain ID in solidity is
         // using assembly.
+        uint256 chainId;
         // solhint-disable-next-line no-inline-assembly
         assembly {
             chainId := chainid()
@@ -33,12 +46,9 @@ contract GPv2Settlement {
 
         domainSeparator = keccak256(
             abi.encode(
-                // TODO(nlordell): Verify that these compile to constants.
-                keccak256(
-                    "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-                ),
-                keccak256("Gnosis Protocol"),
-                keccak256("v2"),
+                DOMAIN_TYPE_HASH,
+                DOMAIN_NAME,
+                DOMAIN_VERSION,
                 chainId,
                 address(this)
             )
