@@ -35,7 +35,7 @@ describe("GPv2AllowanceManager", () => {
   });
 
   describe("transferIn", () => {
-    it("should revert if not called by the owner", async () => {
+    it("should revert if not called by the recipient", async () => {
       await expect(
         allowanceManager.connect(nonRecipient).transferIn([]),
       ).to.be.revertedWith("not allowance recipient");

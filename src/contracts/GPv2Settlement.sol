@@ -2,6 +2,7 @@
 pragma solidity ^0.7.5;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./GPv2AllowanceManager.sol";
 import "./interfaces/GPv2Authentication.sol";
 
 /// @title Gnosis Protocol v2 Settlement Contract
@@ -33,6 +34,10 @@ contract GPv2Settlement {
     /// modifier below.
     GPv2Authentication private immutable authenticator;
 
+    /// @dev The allowance manager which has access to EOA order funds. This
+    /// contract is created during deployment
+    GPv2AllowanceManager internal immutable allowanceManager;
+
     constructor(GPv2Authentication authenticator_) {
         authenticator = authenticator_;
 
@@ -53,6 +58,7 @@ contract GPv2Settlement {
                 address(this)
             )
         );
+        allowanceManager = new GPv2AllowanceManager();
     }
 
     /// @dev This modifier is called by settle function to block any non-listed
