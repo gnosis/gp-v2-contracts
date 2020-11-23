@@ -70,6 +70,41 @@ describe("GPv2Settlement", () => {
         metadata(GPv2AllowanceManager.deployedBytecode),
       );
     });
+
+    it("should have the settlement contract as the recipient", async () => {
+      const ADDRESS_BYTE_LENGTH = 20;
+
+      // NOTE: In order to avoid having the allowance manager add a public
+      // accessor for its recipient just for testing, which would add minor
+      // costs at both deployment time and runtime, just read the contract code
+      // to get the immutable value.
+      const buildInfo = await artifacts.getBuildInfo(
+        "src/contracts/GPv2AllowanceManager.sol:GPv2AllowanceManager",
+      );
+      if (buildInfo === undefined) {
+        throw new Error("missing GPv2AllowanceManager build info");
+      }
+
+      const [[recipientImmutableReference]] = Object.values(
+        buildInfo.output.contracts["src/contracts/GPv2AllowanceManager.sol"]
+          .GPv2AllowanceManager.evm.deployedBytecode.immutableReferences || {},
+      );
+
+      const deployedAllowanceManager = await settlement.allowanceManagerTest();
+      const code = await ethers.provider.send("eth_getCode", [
+        deployedAllowanceManager,
+        "latest",
+      ]);
+      const recipient = ethers.utils.hexlify(
+        ethers.utils
+          .arrayify(code)
+          .subarray(recipientImmutableReference.start)
+          .subarray(recipientImmutableReference.length - ADDRESS_BYTE_LENGTH)
+          .slice(0, ADDRESS_BYTE_LENGTH),
+      );
+
+      expect(ethers.utils.getAddress(recipient)).to.equal(settlement.address);
+    });
   });
 
   describe("settle", () => {
