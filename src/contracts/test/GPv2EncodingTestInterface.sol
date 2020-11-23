@@ -39,9 +39,11 @@ contract GPv2EncodingTestInterface {
 
         // NOTE: Solidity keeps a total memory count at address 0x40. Check
         // before and after decoding a trade to compute memory usage growth per
-        // call to `decodeTrade`.
+        // call to `decodeTrade`. Additionally, write 0 past the free memory
+        // pointer so the size of `trades` does not affect the gas measurement.
         assembly {
             mem := mload(0x40)
+            mstore(mem, 0)
         }
         gas_ = gasleft();
 
