@@ -21,7 +21,7 @@ contract GPv2SimpleAuthentication is Ownable, GPv2Authentication {
     }
 
     function isSolver(address prospectiveSolver)
-        public
+        external
         view
         override
         returns (bool)
