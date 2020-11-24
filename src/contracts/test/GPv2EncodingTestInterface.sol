@@ -5,6 +5,8 @@ pragma abicoder v2;
 import "../libraries/GPv2Encoding.sol";
 
 contract GPv2EncodingTestInterface {
+    using GPv2Encoding for bytes;
+
     bytes32 public constant DOMAIN_SEPARATOR =
         keccak256(
             abi.encode(
@@ -17,9 +19,16 @@ contract GPv2EncodingTestInterface {
         return (GPv2Encoding.ORDER_TYPE_HASH);
     }
 
+    function tradeCountTest(bytes calldata encodedTrades)
+        external
+        pure
+        returns (uint256 count)
+    {
+        count = encodedTrades.tradeCount();
+    }
+
     function decodeTradesTest(
         IERC20[] calldata tokens,
-        uint256 tradeCount,
         bytes calldata encodedTrades
     )
         external
@@ -32,9 +41,9 @@ contract GPv2EncodingTestInterface {
     {
         // solhint-disable no-inline-assembly
 
-        uint256 stride = GPv2Encoding.TRADE_STRIDE;
         bytes32 domainSeparator = DOMAIN_SEPARATOR;
 
+        uint256 tradeCount = encodedTrades.tradeCount();
         trades = new GPv2Encoding.Trade[](tradeCount);
 
         // NOTE: Solidity keeps a total memory count at address 0x40. Check
@@ -47,23 +56,10 @@ contract GPv2EncodingTestInterface {
         }
         gas_ = gasleft();
 
-        uint256 start;
-        bytes calldata encodedTrade;
         for (uint256 i = 0; i < tradeCount; i++) {
-            start = i * stride;
-            if (i == tradeCount - 1) {
-                // NOTE: Last trade uses all remaining bytes. This allows the
-                // `decodeTrade` method to be tested with short and long trade
-                // bytes as well.
-                encodedTrade = encodedTrades[start:];
-            } else {
-                encodedTrade = encodedTrades[start:][:stride];
-            }
-
-            GPv2Encoding.decodeTrade(
+            encodedTrades.tradeAtIndex(i).decodeTrade(
                 domainSeparator,
                 tokens,
-                encodedTrade,
                 trades[i]
             );
         }
