@@ -90,6 +90,52 @@ describe("GPv2Encoding", () => {
     });
   });
 
+  describe("tradeCount", () => {
+    it("should compute the number of encoded trades", async () => {
+      const tradeCount = 10;
+      const order = {
+        sellToken: ethers.constants.AddressZero,
+        buyToken: ethers.constants.AddressZero,
+        sellAmount: 0,
+        buyAmount: 0,
+        validTo: 0,
+        appData: 0,
+        tip: 0,
+        kind: OrderKind.SELL,
+        partiallyFillable: false,
+      };
+
+      const encoder = new SettlementEncoder(testDomain);
+      for (let i = 0; i < tradeCount; i++) {
+        await encoder.signEncodeTrade(
+          order,
+          0,
+          traders[0],
+          SigningScheme.TYPED_DATA,
+        );
+      }
+
+      expect(encoder.tradeCount).to.equal(tradeCount);
+      expect(await encoding.tradeCountTest(encoder.encodedTrades)).to.equal(
+        tradeCount,
+      );
+    });
+
+    it("should revert if trade bytes are too short.", async () => {
+      await expect(encoding.tradeCountTest("0x1337")).to.be.revertedWith(
+        "malformed trade data",
+      );
+    });
+
+    it("should revert if trade bytes are too long.", async () => {
+      await expect(
+        encoding.tradeCountTest(
+          ethers.utils.hexlify([...Array(205)].map(() => 42)),
+        ),
+      ).to.be.revertedWith("malformed trade data");
+    });
+  });
+
   describe("decodeTrade", () => {
     it("should round-trip encode order data", async () => {
       // NOTE: Pay extra attention to use all bytes for each field, and that
@@ -118,7 +164,6 @@ describe("GPv2Encoding", () => {
 
       const [decodedTrades] = await encoding.decodeTradesTest(
         encoder.tokens,
-        encoder.tradeCount,
         encoder.encodedTrades,
       );
 
@@ -145,7 +190,6 @@ describe("GPv2Encoding", () => {
 
       const [decodedTrades] = await encoding.decodeTradesTest(
         encoder.tokens,
-        encoder.tradeCount,
         encoder.encodedTrades,
       );
       const { sellTokenIndex, buyTokenIndex } = parseTrade(decodedTrades[0]);
@@ -168,7 +212,6 @@ describe("GPv2Encoding", () => {
 
       const [decodedTrades] = await encoding.decodeTradesTest(
         encoder.tokens,
-        encoder.tradeCount,
         encoder.encodedTrades,
       );
       const { digest } = parseTrade(decodedTrades[0]);
@@ -183,7 +226,6 @@ describe("GPv2Encoding", () => {
 
       const [decodedTrades] = await encoding.decodeTradesTest(
         encoder.tokens,
-        encoder.tradeCount,
         encoder.encodedTrades,
       );
 
@@ -192,22 +234,6 @@ describe("GPv2Encoding", () => {
         const { owner } = parseTrade(decodedTrade);
         expect(owner).to.equal(traderAddress);
       }
-    });
-
-    it("should revert if trade bytes are too short.", async () => {
-      await expect(
-        encoding.decodeTradesTest([], 1, "0x1337"),
-      ).to.be.revertedWith("malformed trade data");
-    });
-
-    it("should revert if trade bytes are too long.", async () => {
-      await expect(
-        encoding.decodeTradesTest(
-          [],
-          1,
-          ethers.utils.hexlify([...Array(205)].map(() => 42)),
-        ),
-      ).to.be.revertedWith("malformed trade data");
     });
 
     it("should revert for invalid order signatures", async () => {
@@ -221,15 +247,11 @@ describe("GPv2Encoding", () => {
 
       // NOTE: `v` must be either `27` or `28`, so just set it to something else
       // to generate an invalid signature.
-      const encodedOrderBytes = ethers.utils.arrayify(encoder.encodedTrades);
-      encodedOrderBytes[139] = 42;
+      const encodedTradeBytes = ethers.utils.arrayify(encoder.encodedTrades);
+      encodedTradeBytes[139] = 42;
 
       await expect(
-        encoding.decodeTradesTest(
-          encoder.tokens,
-          encoder.tradeCount,
-          encodedOrderBytes,
-        ),
+        encoding.decodeTradesTest(encoder.tokens, encodedTradeBytes),
       ).to.be.revertedWith("invalid signature");
     });
 
@@ -256,13 +278,8 @@ describe("GPv2Encoding", () => {
       // NOTE: Remove the last sell token (0x0303...0303).
       const tokens = encoder.tokens;
       expect(tokens.pop()).to.equal(lastToken);
-      await expect(
-        encoding.decodeTradesTest(
-          tokens,
-          encoder.tradeCount,
-          encoder.encodedTrades,
-        ),
-      ).to.be.reverted;
+      await expect(encoding.decodeTradesTest(tokens, encoder.encodedTrades)).to
+        .be.reverted;
     });
 
     it("should revert for invalid sell token indices", async () => {
@@ -288,13 +305,8 @@ describe("GPv2Encoding", () => {
       // NOTE: Remove the last buy token (0x0303...0303).
       const tokens = encoder.tokens;
       expect(tokens.pop()).to.equal(lastToken);
-      await expect(
-        encoding.decodeTradesTest(
-          tokens,
-          encoder.tradeCount,
-          encoder.encodedTrades,
-        ),
-      ).to.be.reverted;
+      await expect(encoding.decodeTradesTest(tokens, encoder.encodedTrades)).to
+        .be.reverted;
     });
 
     it("should not allocate additional memory", async () => {
@@ -316,7 +328,6 @@ describe("GPv2Encoding", () => {
 
       const [, mem] = await encoding.decodeTradesTest(
         encoder.tokens,
-        encoder.tradeCount,
         encoder.encodedTrades,
       );
       expect(mem.toNumber()).to.equal(0);

@@ -39,7 +39,6 @@ async function main() {
 
     const [, , gas] = await encoding.decodeTradesTest(
       encoder.tokens,
-      encoder.tradeCount,
       encoder.encodedTrades,
     );
     console.log(`${gas} gas used for decoding ${orderCount} orders`);

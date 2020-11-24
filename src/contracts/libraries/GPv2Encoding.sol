@@ -56,7 +56,49 @@ library GPv2Encoding {
     }
 
     /// @dev The stride of an encoded trade.
-    uint256 internal constant TRADE_STRIDE = 204;
+    uint256 private constant TRADE_STRIDE = 204;
+
+    /// @dev Returns the number of trades encoded in a calldata byte array.
+    ///
+    /// This method reverts if the encoded trades are malformed, i.e. the total
+    /// length is not a multiple of the stride of a single trade.
+    /// @param encodedTrades The encoded trades.
+    /// @return count The total number of trades encoded in the specified bytes.
+    function tradeCount(bytes calldata encodedTrades)
+        internal
+        pure
+        returns (uint256 count)
+    {
+        require(
+            encodedTrades.length % TRADE_STRIDE == 0,
+            "GPv2: malformed trade data"
+        );
+        count = encodedTrades.length / TRADE_STRIDE;
+    }
+
+    /// @dev Returns a calldata slice to an encoded trade at the specified
+    /// index.
+    ///
+    /// Note that this method does not check that the index is within the bounds
+    /// of the specified encoded trades, as reading calldata out of bounds just
+    /// produces 0's and will just decode to an invalid trade that will either
+    /// fail to recover an address or recover a bogus one.
+    function tradeAtIndex(bytes calldata encodedTrades, uint256 index)
+        internal
+        pure
+        returns (bytes calldata encodedTrade)
+    {
+        // NOTE: Use assembly to slice the calldata bytes without generating
+        // code for bounds checking.
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            encodedTrade.offset := add(
+                encodedTrades.offset,
+                mul(index, TRADE_STRIDE)
+            )
+            encodedTrade.length := TRADE_STRIDE
+        }
+    }
 
     /// @dev Decodes a trade with a signed order from calldata into memory.
     ///
@@ -117,20 +159,11 @@ library GPv2Encoding {
     /// @param encodedTrade The trade as encoded calldata bytes.
     /// @param trade The memory location to decode trade to.
     function decodeTrade(
+        bytes calldata encodedTrade,
         bytes32 domainSeparator,
         IERC20[] calldata tokens,
-        bytes calldata encodedTrade,
         Trade memory trade
     ) internal pure {
-        // NOTE: It is slightly more efficient to check that the total encoded
-        // trades length is a multiple of `TRADE_STRIDE` instead of checking
-        // every encoded trade. Once that code is established, this check should
-        // move there.
-        require(
-            encodedTrade.length == TRADE_STRIDE,
-            "GPv2: malformed trade data"
-        );
-
         uint8 sellTokenIndex;
         uint8 buyTokenIndex;
         uint256 flags;
