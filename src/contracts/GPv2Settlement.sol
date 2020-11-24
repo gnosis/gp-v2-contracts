@@ -117,14 +117,13 @@ contract GPv2Settlement {
         bytes calldata encodedTrades,
         bytes calldata encodedInteractions,
         bytes calldata encodedOrderRefunds
-    ) external onlySolver {
+    ) external view onlySolver {
         require(tokens.length == 0, "not yet implemented");
         require(clearingPrices.length == 0, "not yet implemented");
         require(feeFactor == 0, "not yet implemented");
         require(encodedTrades.length == 0, "not yet implemented");
         require(encodedInteractions.length == 0, "not yet implemented");
         require(encodedOrderRefunds.length == 0, "not yet implemented");
-
         revert("Final: not yet implemented");
     }
 
@@ -144,6 +143,7 @@ contract GPv2Settlement {
         bytes calldata encodedTrades
     )
         internal
+        view
         returns (
             GPv2AllowanceManager.Transfer[] memory inTransfers,
             GPv2AllowanceManager.Transfer[] memory outTransfers
@@ -184,9 +184,8 @@ contract GPv2Settlement {
         uint256 buyPrice,
         GPv2AllowanceManager.Transfer memory inTransfer,
         GPv2AllowanceManager.Transfer memory outTransfer
-    ) private {
+    ) internal pure {
         GPv2Encoding.Order memory order = trade.order;
-
         // NOTE: Currently, the above instanciation allocates an unitialized
         // `Order` that gets never used. Adjust the free memory pointer to free
         // the unused memory by subtracting `sizeof(Order) == 288` bytes.
@@ -212,9 +211,9 @@ contract GPv2Settlement {
             }
 
             inTransfer.amount = executedSellAmount;
-            outTransfer.amount = executedSellAmount.mul(buyPrice).div(
-                sellPrice
-            );
+            // NOTE: Don't use `SafeMath.div` here as it allocates a string even
+            // if it does not revert.
+            outTransfer.amount = executedSellAmount.mul(buyPrice) / sellPrice;
         } else {
             uint256 executedBuyAmount;
             if (order.partiallyFillable) {
@@ -223,8 +222,12 @@ contract GPv2Settlement {
                 executedBuyAmount = order.buyAmount;
             }
 
-            inTransfer.amount = executedBuyAmount.mul(sellPrice).div(buyPrice);
+            // NOTE: Don't use `SafeMath.div` here as it allocates a string even
+            // if it does not revert.
+            inTransfer.amount = executedBuyAmount.mul(sellPrice) / buyPrice;
             outTransfer.amount = executedBuyAmount;
         }
+
+        inTransfer.amount = inTransfer.amount.add(order.tip);
     }
 }

@@ -39,8 +39,6 @@ contract GPv2EncodingTestInterface {
             uint256 gas_
         )
     {
-        // solhint-disable no-inline-assembly
-
         bytes32 domainSeparator = DOMAIN_SEPARATOR;
 
         uint256 tradeCount = encodedTrades.tradeCount();
@@ -50,6 +48,7 @@ contract GPv2EncodingTestInterface {
         // before and after decoding a trade to compute memory usage growth per
         // call to `decodeTrade`. Additionally, write 0 past the free memory
         // pointer so the size of `trades` does not affect the gas measurement.
+        // solhint-disable-next-line no-inline-assembly
         assembly {
             mem := mload(0x40)
             mstore(mem, 0)
@@ -64,11 +63,10 @@ contract GPv2EncodingTestInterface {
             );
         }
 
+        // solhint-disable-next-line no-inline-assembly
         assembly {
             mem := sub(mload(0x40), mem)
         }
         gas_ = gas_ - gasleft();
-
-        // solhint-enable
     }
 }
