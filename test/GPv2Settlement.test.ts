@@ -125,7 +125,7 @@ describe("GPv2Settlement", () => {
       // TODO - this will have to be changed when other constraints become active
       // and when settle function no longer reverts.
       await expect(
-        settlement.connect(solver.address).settle([], [], 0, [], [], []),
+        settlement.connect(solver).settle([], [], 0, [], [], []),
       ).revertedWith("Final: not yet implemented");
     });
   });
