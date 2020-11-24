@@ -159,7 +159,8 @@ contract GPv2Settlement {
 
         GPv2Encoding.Trade memory trade;
         for (uint256 i = 0; i < tradeCount; i++) {
-            encodedTrades.tradeAtIndex(i).decodeTrade(
+            GPv2Encoding.decodeTrade(
+                encodedTrades.tradeAtIndex(i),
                 domainSeparator,
                 tokens,
                 trade

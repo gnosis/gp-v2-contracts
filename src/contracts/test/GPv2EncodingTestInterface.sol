@@ -56,7 +56,8 @@ contract GPv2EncodingTestInterface {
         gas_ = gasleft();
 
         for (uint256 i = 0; i < tradeCount; i++) {
-            encodedTrades.tradeAtIndex(i).decodeTrade(
+            GPv2Encoding.decodeTrade(
+                encodedTrades.tradeAtIndex(i),
                 domainSeparator,
                 tokens,
                 trades[i]
