@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { Contract } from "ethers";
 import { artifacts, ethers, waffle } from "hardhat";
 
-import { domain } from "../src/ts";
+import { allowanceManagerAddress, domain } from "../src/ts";
 
 describe("GPv2Settlement", () => {
   const [deployer, owner, solver] = waffle.provider.getWallets();
@@ -68,6 +68,12 @@ describe("GPv2Settlement", () => {
 
       expect(metadata(code)).to.equal(
         metadata(GPv2AllowanceManager.deployedBytecode),
+      );
+    });
+
+    it("should result in a deterministic address", async () => {
+      expect(await settlement.allowanceManagerTest()).to.equal(
+        allowanceManagerAddress(settlement.address),
       );
     });
 
