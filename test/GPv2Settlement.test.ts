@@ -1,13 +1,37 @@
 import { expect } from "chai";
-import { Contract } from "ethers";
+import { BigNumber, Contract, TypedDataDomain } from "ethers";
 import { artifacts, ethers, waffle } from "hardhat";
 
-import { allowanceManagerAddress, domain } from "../src/ts";
+import {
+  OrderKind,
+  SettlementEncoder,
+  SigningScheme,
+  allowanceManagerAddress,
+  domain,
+} from "../src/ts";
+
+interface Transfer {
+  owner: string;
+  token: string;
+  amount: BigNumber;
+}
+
+function parseTransfers(transfers: unknown[][][]): [Transfer[], Transfer[]] {
+  const parseTransfer = (transfer: unknown[]) => ({
+    owner: transfer[0] as string,
+    token: transfer[1] as string,
+    amount: transfer[2] as BigNumber,
+  });
+
+  return [transfers[0].map(parseTransfer), transfers[1].map(parseTransfer)];
+}
 
 describe("GPv2Settlement", () => {
-  const [deployer, owner, solver] = waffle.provider.getWallets();
-  let settlement: Contract;
+  const [deployer, owner, solver, ...traders] = waffle.provider.getWallets();
+
   let authenticator: Contract;
+  let settlement: Contract;
+  let testDomain: TypedDataDomain;
 
   beforeEach(async () => {
     const GPv2AllowListAuthentication = await ethers.getContractFactory(
@@ -21,17 +45,15 @@ describe("GPv2Settlement", () => {
       deployer,
     );
     settlement = await GPv2Settlement.deploy(authenticator.address);
+
+    const { chainId } = await ethers.provider.getNetwork();
+    testDomain = domain(chainId, settlement.address);
   });
 
   describe("domainSeparator", () => {
     it("should have an EIP-712 domain separator", async () => {
-      const { chainId } = await ethers.provider.getNetwork();
-
-      expect(chainId).to.not.equal(ethers.constants.Zero);
       expect(await settlement.domainSeparatorTest()).to.equal(
-        ethers.utils._TypedDataEncoder.hashDomain(
-          domain(chainId, settlement.address),
-        ),
+        ethers.utils._TypedDataEncoder.hashDomain(testDomain),
       );
     });
 
@@ -125,8 +147,217 @@ describe("GPv2Settlement", () => {
       // TODO - this will have to be changed when other constraints become active
       // and when settle function no longer reverts.
       await expect(
-        settlement.connect(solver.address).settle([], [], 0, [], [], []),
+        settlement.connect(solver).settle([], [], 0, [], [], []),
       ).revertedWith("Final: not yet implemented");
+    });
+  });
+
+  describe("processTrades", () => {
+    const tokens = [`0x${"11".repeat(20)}`, `0x${"22".repeat(20)}`];
+    const prices = {
+      [tokens[0]]: 1,
+      [tokens[1]]: 2,
+    };
+    const partialOrder = {
+      sellToken: tokens[0],
+      buyToken: tokens[1],
+      sellAmount: ethers.utils.parseEther("42"),
+      buyAmount: ethers.utils.parseEther("13.37"),
+      validTo: 0xffffffff,
+      appData: 0,
+      tip: ethers.constants.Zero,
+    };
+
+    it("should compute in/out transfers for multiple trades", async () => {
+      const tradeCount = 10;
+      const encoder = new SettlementEncoder(testDomain);
+      for (let i = 0; i < tradeCount; i++) {
+        await encoder.signEncodeTrade(
+          {
+            ...partialOrder,
+            kind: OrderKind.BUY,
+            partiallyFillable: true,
+          },
+          ethers.utils.parseEther("0.7734"),
+          traders[0],
+          SigningScheme.TYPED_DATA,
+        );
+      }
+
+      const [inTransfers, outTransfers] = parseTransfers(
+        await settlement.processTradesTest(
+          encoder.tokens,
+          encoder.clearingPrices(prices),
+          encoder.encodedTrades,
+        ),
+      );
+
+      expect(inTransfers.length).to.equal(tradeCount);
+      expect(outTransfers.length).to.equal(tradeCount);
+    });
+
+    describe("Order Variations", async () => {
+      const { sellAmount, buyAmount } = partialOrder;
+      const executedAmount = ethers.utils.parseEther("10.0");
+      const processTradeVariant = async (
+        kind: OrderKind,
+        partiallyFillable: boolean,
+      ) => {
+        const encoder = new SettlementEncoder(testDomain);
+        await encoder.signEncodeTrade(
+          {
+            ...partialOrder,
+            kind,
+            partiallyFillable,
+          },
+          executedAmount,
+          traders[0],
+          SigningScheme.TYPED_DATA,
+        );
+
+        const [
+          [{ amount: executedSellAmount }],
+          [{ amount: executedBuyAmount }],
+        ] = parseTransfers(
+          await settlement.processTradesTest(
+            encoder.tokens,
+            encoder.clearingPrices(prices),
+            encoder.encodedTrades,
+          ),
+        );
+
+        const [sellPrice, buyPrice] = [
+          prices[partialOrder.sellToken],
+          prices[partialOrder.buyToken],
+        ];
+
+        return { executedSellAmount, sellPrice, executedBuyAmount, buyPrice };
+      };
+
+      it("should compute amounts for fill-or-kill sell orders", async () => {
+        const {
+          executedSellAmount,
+          sellPrice,
+          executedBuyAmount,
+          buyPrice,
+        } = await processTradeVariant(OrderKind.SELL, false);
+
+        expect(executedSellAmount).to.deep.equal(sellAmount);
+        expect(executedBuyAmount).to.deep.equal(
+          sellAmount.mul(buyPrice).div(sellPrice),
+        );
+      });
+
+      it("should compute amounts for fill-or-kill buy orders", async () => {
+        const {
+          executedSellAmount,
+          sellPrice,
+          executedBuyAmount,
+          buyPrice,
+        } = await processTradeVariant(OrderKind.BUY, false);
+
+        expect(executedSellAmount).to.deep.equal(
+          buyAmount.mul(sellPrice).div(buyPrice),
+        );
+        expect(executedBuyAmount).to.deep.equal(buyAmount);
+      });
+
+      it("should compute amounts for partially fillable sell orders", async () => {
+        const {
+          executedSellAmount,
+          sellPrice,
+          executedBuyAmount,
+          buyPrice,
+        } = await processTradeVariant(OrderKind.SELL, true);
+
+        expect(executedSellAmount).to.deep.equal(executedAmount);
+        expect(executedBuyAmount).to.deep.equal(
+          executedAmount.mul(buyPrice).div(sellPrice),
+        );
+      });
+
+      it("should compute amounts for partially fillable buy orders", async () => {
+        const {
+          executedSellAmount,
+          sellPrice,
+          executedBuyAmount,
+          buyPrice,
+        } = await processTradeVariant(OrderKind.BUY, true);
+
+        expect(executedSellAmount).to.deep.equal(
+          executedAmount.mul(sellPrice).div(buyPrice),
+        );
+        expect(executedBuyAmount).to.deep.equal(executedAmount);
+      });
+    });
+
+    it("should ignore the executed trade amount for fill-or-kill orders", async () => {
+      const order = {
+        ...partialOrder,
+        kind: OrderKind.BUY,
+        partiallyFillable: false,
+      };
+
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
+        order,
+        0,
+        traders[0],
+        SigningScheme.TYPED_DATA,
+      );
+      await encoder.signEncodeTrade(
+        order,
+        ethers.utils.parseEther("1.0"),
+        traders[0],
+        SigningScheme.TYPED_DATA,
+      );
+
+      const [inTransfers, outTransfers] = parseTransfers(
+        await settlement.processTradesTest(
+          encoder.tokens,
+          encoder.clearingPrices(prices),
+          encoder.encodedTrades,
+        ),
+      );
+
+      expect(inTransfers[0]).to.deep.equal(inTransfers[1]);
+      expect(outTransfers[0]).to.deep.equal(outTransfers[1]);
+    });
+
+    it("should add the tip to the in transfer", async () => {
+      const tip = ethers.utils.parseEther("10");
+      const order = {
+        ...partialOrder,
+        tip,
+        kind: OrderKind.SELL,
+        partiallyFillable: false,
+      };
+
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
+        order,
+        0,
+        traders[0],
+        SigningScheme.TYPED_DATA,
+      );
+
+      const [[inTransfer]] = parseTransfers(
+        await settlement.processTradesTest(
+          encoder.tokens,
+          encoder.clearingPrices(prices),
+          encoder.encodedTrades,
+        ),
+      );
+
+      expect(inTransfer.amount).to.deep.equal(order.sellAmount.add(tip));
+    });
+  });
+
+  describe("processTrade", () => {
+    it("should not allocate additional memory", async () => {
+      expect(await settlement.processTradeMemoryTest()).to.deep.equal(
+        ethers.constants.Zero,
+      );
     });
   });
 });

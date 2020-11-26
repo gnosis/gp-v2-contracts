@@ -93,22 +93,10 @@ describe("GPv2Encoding", () => {
   describe("tradeCount", () => {
     it("should compute the number of encoded trades", async () => {
       const tradeCount = 10;
-      const order = {
-        sellToken: ethers.constants.AddressZero,
-        buyToken: ethers.constants.AddressZero,
-        sellAmount: 0,
-        buyAmount: 0,
-        validTo: 0,
-        appData: 0,
-        tip: 0,
-        kind: OrderKind.SELL,
-        partiallyFillable: false,
-      };
-
       const encoder = new SettlementEncoder(testDomain);
       for (let i = 0; i < tradeCount; i++) {
         await encoder.signEncodeTrade(
-          order,
+          { ...sampleOrder, appData: i },
           0,
           traders[0],
           SigningScheme.TYPED_DATA,

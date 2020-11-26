@@ -218,6 +218,24 @@ export class SettlementEncoder {
   }
 
   /**
+   * Returns a clearing price vector for the current settlement tokens from the
+   * provided price map.
+   * @param prices The price map from token address to price.
+   * @return The price vector.
+   */
+  public clearingPrices(
+    prices: Record<string, BigNumberish | undefined>,
+  ): BigNumberish[] {
+    return this.tokens.map((token) => {
+      const price = prices[token];
+      if (price === undefined) {
+        throw new Error(`missing price for token ${token}`);
+      }
+      return price;
+    });
+  }
+
+  /**
    * Encodes a trade from a signed order and executed amount, appending it to
    * the `calldata` bytes that are being built.
    *
