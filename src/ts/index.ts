@@ -229,7 +229,7 @@ export class SettlementEncoder {
     return this.tokens.map((token) => {
       const price = prices[token];
       if (price === undefined) {
-        throw new Error(`"missing price for token ${token}`);
+        throw new Error(`missing price for token ${token}`);
       }
       return price;
     });
