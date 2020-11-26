@@ -22,7 +22,7 @@ describe("GPv2AllowListAuthentication", () => {
   });
 
   describe("addSolver", () => {
-    it("should allow to add solver", async () => {
+    it("should add a solver", async () => {
       await expect(authenticator.connect(owner).addSolver(solver.address)).to
         .not.be.reverted;
     });
