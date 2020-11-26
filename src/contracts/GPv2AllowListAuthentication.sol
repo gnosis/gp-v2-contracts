@@ -1,14 +1,20 @@
 // SPDX-License-Identifier: LGPL-3.0-or-newer
 pragma solidity ^0.7.5;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "./interfaces/GPv2Authentication.sol";
+import "./ownership/CustomInitiallyOwnable.sol";
 
 /// @title Gnosis Protocol v2 Access Control Contract
 /// @author Gnosis Developers
-contract GPv2AllowListAuthentication is Ownable, GPv2Authentication {
+contract GPv2AllowListAuthentication is
+    CustomInitiallyOwnable,
+    GPv2Authentication
+{
     using EnumerableSet for EnumerableSet.AddressSet;
+
+    // solhint-disable-next-line no-empty-blocks
+    constructor(address initialOwner) CustomInitiallyOwnable(initialOwner) {}
 
     EnumerableSet.AddressSet private solvers;
 

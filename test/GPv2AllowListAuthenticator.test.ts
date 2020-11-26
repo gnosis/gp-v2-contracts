@@ -3,27 +3,31 @@ import { Contract } from "ethers";
 import { ethers, waffle } from "hardhat";
 
 describe("GPv2AllowListAuthentication", () => {
-  const [owner, nonOwner, solver] = waffle.provider.getWallets();
+  const [deployer, owner, nonOwner, solver] = waffle.provider.getWallets();
   let authenticator: Contract;
 
   beforeEach(async () => {
     const GPv2AllowListAuthentication = await ethers.getContractFactory(
       "GPv2AllowListAuthentication",
+      deployer,
     );
 
-    // Owner will default to admin account declared above.
-    authenticator = await GPv2AllowListAuthentication.deploy();
+    authenticator = await GPv2AllowListAuthentication.deploy(owner.address);
   });
 
   describe("constructor", () => {
-    it("should set deployer as owner", async () => {
+    it("should set the owner", async () => {
       expect(await authenticator.owner()).to.equal(owner.address);
+    });
+    it("deployer is not the owner", async () => {
+      expect(await authenticator.owner()).not.to.be.equal(deployer.address);
     });
   });
 
   describe("addSolver", () => {
-    it("should allow to add solver", async () => {
-      await expect(authenticator.addSolver(solver.address)).to.not.be.reverted;
+    it("should add a solver", async () => {
+      await expect(authenticator.connect(owner).addSolver(solver.address)).to
+        .not.be.reverted;
     });
 
     it("should not allow non-owner to add solver", async () => {
@@ -49,7 +53,7 @@ describe("GPv2AllowListAuthentication", () => {
   describe("View Methods", () => {
     describe("isSolver", () => {
       it("returns true when given address is a recognized solver", async () => {
-        await authenticator.addSolver(solver.address);
+        await authenticator.connect(owner).addSolver(solver.address);
         expect(await authenticator.isSolver(solver.address)).to.equal(true);
       });
 
@@ -63,14 +67,14 @@ describe("GPv2AllowListAuthentication", () => {
         await expect(authenticator.getSolverAt(0)).to.be.revertedWith(
           "EnumerableSet: index out of bounds",
         );
-        await authenticator.addSolver(solver.address);
+        await authenticator.connect(owner).addSolver(solver.address);
         await expect(authenticator.getSolverAt(1)).to.be.revertedWith(
           "EnumerableSet: index out of bounds",
         );
       });
 
       it("returns expected address when called correctly", async () => {
-        await authenticator.addSolver(solver.address);
+        await authenticator.connect(owner).addSolver(solver.address);
         expect(await authenticator.getSolverAt(0)).to.equal(solver.address);
       });
     });
@@ -81,7 +85,7 @@ describe("GPv2AllowListAuthentication", () => {
       });
 
       it("returns 1 when there is one solver", async () => {
-        await authenticator.addSolver(solver.address);
+        await authenticator.connect(owner).addSolver(solver.address);
         expect(await authenticator.numSolvers()).to.equal(1);
       });
     });
