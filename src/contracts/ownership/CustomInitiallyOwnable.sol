@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  * specify the initial owner in the contructor instead of using the message
  * sender.
  */
-abstract contract InitializedOwnable is Ownable {
+abstract contract CustomInitiallyOwnable is Ownable {
     /**
      * @dev Initializes the contract setting the input address as the initial
      * owner.

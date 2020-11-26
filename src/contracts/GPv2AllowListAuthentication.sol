@@ -3,15 +3,18 @@ pragma solidity ^0.7.5;
 
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "./interfaces/GPv2Authentication.sol";
-import "./ownership/InitializedOwnable.sol";
+import "./ownership/CustomInitiallyOwnable.sol";
 
 /// @title Gnosis Protocol v2 Access Control Contract
 /// @author Gnosis Developers
-contract GPv2AllowListAuthentication is InitializedOwnable, GPv2Authentication {
+contract GPv2AllowListAuthentication is
+    CustomInitiallyOwnable,
+    GPv2Authentication
+{
     using EnumerableSet for EnumerableSet.AddressSet;
 
     // solhint-disable-next-line no-empty-blocks
-    constructor(address initialOwner) InitializedOwnable(initialOwner) {}
+    constructor(address initialOwner) CustomInitiallyOwnable(initialOwner) {}
 
     EnumerableSet.AddressSet private solvers;
 
