@@ -12,9 +12,9 @@ describe("GPv2Settlement", () => {
   beforeEach(async () => {
     const GPv2AllowListAuthentication = await ethers.getContractFactory(
       "GPv2AllowListAuthentication",
-      owner,
+      deployer,
     );
-    authenticator = await GPv2AllowListAuthentication.deploy();
+    authenticator = await GPv2AllowListAuthentication.deploy(owner.address);
 
     const GPv2Settlement = await ethers.getContractFactory(
       "GPv2SettlementTestInterface",
@@ -121,7 +121,7 @@ describe("GPv2Settlement", () => {
     });
 
     it("accepts transactions from solvers", async () => {
-      await authenticator.addSolver(solver.address);
+      await authenticator.connect(owner).addSolver(solver.address);
       // TODO - this will have to be changed when other constraints become active
       // and when settle function no longer reverts.
       await expect(
