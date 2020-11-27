@@ -10,7 +10,7 @@ export const contractNames = {
 /**
  * The salt used when deterministically deploying smart contracts.
  */
-export const salt = utils.formatBytes32String("dev");
+export const SALT = utils.formatBytes32String("dev");
 
 /**
  * The contract used to deploy contracts deterministically with CREATE2.
@@ -40,7 +40,7 @@ export async function deterministicDeploymentAddress(
 
   return utils.getCreate2Address(
     DEPLOYER_CONTRACT,
-    salt,
+    SALT,
     utils.keccak256(deployTransaction.data || "0x"),
   );
 }

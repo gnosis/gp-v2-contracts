@@ -1,7 +1,7 @@
 import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
-import { salt, logResult, contractNames } from "../ts/deploy";
+import { SALT, logResult, contractNames } from "../ts/deploy";
 
 const deploySettlement: DeployFunction = async function ({
   deployments,
@@ -19,7 +19,7 @@ const deploySettlement: DeployFunction = async function ({
     from: deployer,
     gasLimit: 2000000,
     args: [authenticatorAddress],
-    deterministicDeployment: salt,
+    deterministicDeployment: SALT,
   });
 
   await logResult(deployResult, settlement, network.name, log);
