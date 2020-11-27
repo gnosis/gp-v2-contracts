@@ -72,7 +72,7 @@ export async function logResult(
     log(` - Transaction hash: ${deployResult.transactionHash}`);
     log(
       ` - Gas used: ${receipt.gasUsed} @ ${
-        transaction.gasPrice.toNumber() / 10 ** 9
+        transaction.gasPrice.toNumber() / 1e9
       } GWei`,
     );
     log(
