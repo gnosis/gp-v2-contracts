@@ -3,10 +3,11 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 import { salt, logResult, contractNames } from "../ts/deploy";
 
-const deployAuthenticator: DeployFunction = async function (
-  hre: HardhatRuntimeEnvironment,
-) {
-  const { deployments, getNamedAccounts, network } = hre;
+const deployAuthenticator: DeployFunction = async function ({
+  deployments,
+  getNamedAccounts,
+  network,
+}: HardhatRuntimeEnvironment) {
   const { deployer, owner } = await getNamedAccounts();
   const { deploy, log } = deployments;
 
