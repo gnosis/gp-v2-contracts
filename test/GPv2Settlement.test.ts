@@ -8,7 +8,10 @@ import {
   SigningScheme,
   allowanceManagerAddress,
   domain,
+  computeOrderId,
 } from "../src/ts";
+
+const MAX_UINT_256 = BigNumber.from(2).pow(256).sub(1);
 
 interface Transfer {
   owner: string;
@@ -125,6 +128,15 @@ describe("GPv2Settlement", () => {
     });
   });
 
+  describe("filledAmount", () => {
+    it("is zero for an uninitialized order", async () => {
+      const orderId = "0x".padEnd(66, "0");
+      expect(await settlement.filledAmount(orderId)).to.equal(
+        ethers.constants.Zero,
+      );
+    });
+  });
+
   describe("settle", () => {
     it("rejects transactions from non-solvers", async () => {
       await expect(settlement.settle([], [], 0, [], [], [])).to.be.revertedWith(
@@ -139,6 +151,16 @@ describe("GPv2Settlement", () => {
       await expect(
         settlement.connect(solver).settle([], [], 0, [], [], []),
       ).revertedWith("Final: not yet implemented");
+    });
+  });
+
+  describe("deleteOrder", () => {
+    it("sets filled amount of the caller's order to max uint256", async () => {
+      const orderDigest = "0x".padEnd(66, "1");
+      const orderId = computeOrderId(orderDigest, traders[0].address);
+
+      await settlement.connect(traders[0]).deleteOrder(orderDigest);
+      expect(await settlement.filledAmount(orderId)).to.equal(MAX_UINT_256);
     });
   });
 
