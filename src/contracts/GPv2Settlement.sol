@@ -212,7 +212,9 @@ contract GPv2Settlement {
 
             inTransfer.amount = executedSellAmount;
             // NOTE: Don't use `SafeMath.div` here as it allocates a string even
-            // if it does not revert.
+            // if it does not revert. The method only checks that the divisor is
+            // non-zero and `revert`s in that case instead of consuming all of
+            // the remaining transaction gas when dividing by zero.
             outTransfer.amount = executedSellAmount.mul(buyPrice) / sellPrice;
         } else {
             uint256 executedBuyAmount;
@@ -222,8 +224,7 @@ contract GPv2Settlement {
                 executedBuyAmount = order.buyAmount;
             }
 
-            // NOTE: Don't use `SafeMath.div` here as it allocates a string even
-            // if it does not revert.
+            // NOTE: Don't use `SafeMath.div` for same reason as above.
             inTransfer.amount = executedBuyAmount.mul(sellPrice) / buyPrice;
             outTransfer.amount = executedBuyAmount;
         }
