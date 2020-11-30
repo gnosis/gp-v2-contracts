@@ -26,6 +26,8 @@ function parseTransfers(transfers: unknown[][][]): [Transfer[], Transfer[]] {
   return [transfers[0].map(parseTransfer), transfers[1].map(parseTransfer)];
 }
 
+import { builtAndDeployedMetadataCoincide } from "./bytecode";
+
 describe("GPv2Settlement", () => {
   const [deployer, owner, solver, ...traders] = waffle.provider.getWallets();
 
@@ -72,25 +74,13 @@ describe("GPv2Settlement", () => {
 
   describe("allowanceManager", () => {
     it("should deploy an allowance manager", async () => {
-      const GPv2AllowanceManager = await artifacts.readArtifact(
-        "GPv2AllowanceManager",
-      );
-
       const deployedAllowanceManager = await settlement.allowanceManagerTest();
-      const code = await ethers.provider.send("eth_getCode", [
-        deployedAllowanceManager,
-        "latest",
-      ]);
-
-      // NOTE: The last 53 bytes in a deployed contract's bytecode contains the
-      // contract metadata. Compare the deployed contract's metadata with the
-      // compiled contract's metadata.
-      // <https://docs.soliditylang.org/en/v0.7.5/metadata.html>
-      const metadata = (bytecode: string) => bytecode.slice(-106);
-
-      expect(metadata(code)).to.equal(
-        metadata(GPv2AllowanceManager.deployedBytecode),
-      );
+      expect(
+        await builtAndDeployedMetadataCoincide(
+          deployedAllowanceManager,
+          "GPv2AllowanceManager",
+        ),
+      ).to.be.true;
     });
 
     it("should result in a deterministic address", async () => {

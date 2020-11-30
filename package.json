@@ -4,6 +4,7 @@
   "license": "LGPL-3.0-or-later",
   "scripts": {
     "build": "hardhat compile",
+    "deploy": "hardhat deploy",
     "test": "hardhat test",
     "bench:decodeTrade": "hardhat run bench/decodeTrade.ts",
     "lint": "yarn lint:sol && yarn lint:ts",
@@ -34,6 +35,7 @@
     "eslint-plugin-prettier": "^3.1.4",
     "ethereum-waffle": "^3.2.1",
     "hardhat": "^2.0.4",
+    "hardhat-deploy": "^0.7.0-beta.32",
     "prettier": "^2.2.1",
     "prettier-plugin-solidity": "^1.0.0-beta.1",
     "solhint": "^3.3.2",

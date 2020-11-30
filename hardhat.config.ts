@@ -1,4 +1,5 @@
 import "@nomiclabs/hardhat-waffle";
+import "hardhat-deploy";
 
 import dotenv from "dotenv";
 import type { HttpNetworkUserConfig } from "hardhat/types";
@@ -38,6 +39,7 @@ export default {
   paths: {
     artifacts: "build/artifacts",
     cache: "build/cache",
+    deploy: "src/deploy",
     sources: "src/contracts",
   },
   solidity: {
@@ -61,6 +63,17 @@ export default {
     xdai: {
       ...sharedNetworkConfig,
       url: "https://xdai.poanetwork.dev",
+    },
+  },
+  namedAccounts: {
+    // Note: accounts defined by a number refer to the the accounts as configured
+    // by the current network.
+    deployer: 0,
+    owner: {
+      // The contract deployment addresses depend on the owner address.
+      // To have the same addresses on all networks, the owner must be the same.
+      default: "0x" + "1".padStart(40, "0"),
+      hardhat: 1,
     },
   },
 };
