@@ -1,6 +1,5 @@
 import { utils } from "ethers";
 import { ethers } from "hardhat";
-import { DeployResult, DeploymentsExtension } from "hardhat-deploy/types";
 
 export const contractNames = {
   authenticator: "GPv2AllowListAuthentication",
@@ -43,46 +42,4 @@ export async function deterministicDeploymentAddress(
     SALT,
     utils.keccak256(deployTransaction.data || "0x"),
   );
-}
-
-/**
- * Print to screen the result of a successful contract deployment.
- *
- * @param deployResult Result of the deployment.
- * @param contractName Name of the deployed contract.
- * @param networkName Name of the network to which the contract is deployed.
- * @param log The logging function.
- */
-export async function logResult(
-  deployResult: DeployResult,
-  contractName: string,
-  networkName: string,
-  log: DeploymentsExtension["log"],
-): Promise<void> {
-  if (deployResult.newlyDeployed) {
-    // the transaction exists since the contract was just deployed
-    /* eslint-disable @typescript-eslint/no-non-null-assertion */
-    const transaction = await ethers.provider.getTransaction(
-      deployResult.transactionHash!,
-    );
-    const receipt = deployResult.receipt!;
-    /* eslint-enable @typescript-eslint/no-non-null-assertion */
-    log(`Deployed contract ${contractName} on network ${networkName}.`);
-    log(` - Address: ${deployResult.address}`);
-    log(` - Transaction hash: ${deployResult.transactionHash}`);
-    log(
-      ` - Gas used: ${receipt.gasUsed} @ ${
-        transaction.gasPrice.toNumber() / 1e9
-      } GWei`,
-    );
-    log(
-      ` - Deployment cost: ${ethers.utils.formatEther(
-        transaction.gasPrice.mul(receipt.gasUsed),
-      )} ETH`,
-    );
-  } else {
-    log(
-      `Contract ${contractName} was already deployed on network ${networkName}, skipping.`,
-    );
-  }
 }
