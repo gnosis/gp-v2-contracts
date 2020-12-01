@@ -8,7 +8,7 @@ import {
   SigningScheme,
   allowanceManagerAddress,
   domain,
-  computeOrderId,
+  computeOrderUid,
 } from "../src/ts";
 
 interface Transfer {
@@ -128,8 +128,8 @@ describe("GPv2Settlement", () => {
 
   describe("filledAmount", () => {
     it("is zero for an uninitialized order", async () => {
-      const orderId = "0x".padEnd(66, "0");
-      expect(await settlement.filledAmount(orderId)).to.equal(
+      const orderUid = "0x".padEnd(66, "0");
+      expect(await settlement.filledAmount(orderUid)).to.equal(
         ethers.constants.Zero,
       );
     });
@@ -155,10 +155,10 @@ describe("GPv2Settlement", () => {
   describe("invalidateOrder", () => {
     it("sets filled amount of the caller's order to max uint256", async () => {
       const orderDigest = "0x".padEnd(66, "1");
-      const orderId = computeOrderId(orderDigest, traders[0].address);
+      const orderUid = computeOrderUid(orderDigest, traders[0].address);
 
       await settlement.connect(traders[0]).invalidateOrder(orderDigest);
-      expect(await settlement.filledAmount(orderId)).to.equal(
+      expect(await settlement.filledAmount(orderUid)).to.equal(
         ethers.constants.MaxUint256,
       );
     });

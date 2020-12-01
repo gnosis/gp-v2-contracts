@@ -50,7 +50,7 @@ contract GPv2Settlement {
     /// order cannot be traded anymore. If the order is fill or kill, then this
     /// value is only used to determine whether the order has already been
     /// executed.
-    /// See [`orderId`] for how to represent an order with a single bytes32.
+    /// See [`orderUid`] for how to represent an order with a single bytes32.
     mapping(bytes32 => uint256) public filledAmount;
 
     constructor(GPv2Authentication authenticator_) {
@@ -138,9 +138,9 @@ contract GPv2Settlement {
 
     /// @dev Invalidate onchain an order that has been signed offline.
     /// @param orderDigest The unique digest associated to the parameters of an
-    /// order. See [`orderId`] for details.
+    /// order. See [`orderUid`] for details.
     function invalidateOrder(bytes32 orderDigest) public {
-        filledAmount[orderId(orderDigest, msg.sender)] = uint256(-1);
+        filledAmount[orderUid(orderDigest, msg.sender)] = uint256(-1);
     }
 
     /// @dev Process all trades for EOA orders one at a time returning the
@@ -254,7 +254,7 @@ contract GPv2Settlement {
     /// The order digest is the (unpacked) hash of all entries in the order in
     /// which they appear.
     /// @param owner The address of the user to assign to the order.
-    function orderId(bytes32 orderDigest, address owner)
+    function orderUid(bytes32 orderDigest, address owner)
         private
         pure
         returns (bytes32)

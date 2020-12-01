@@ -402,7 +402,7 @@ export function signOrder(
  * @param userAddress The address of the user who owns the order.
  * @returns A string that unequivocally identifies the order of the user.
  */
-export function computeOrderId(
+export function computeOrderUid(
   orderDigest: string,
   userAddress: string,
 ): string {
