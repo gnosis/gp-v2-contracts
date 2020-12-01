@@ -35,7 +35,7 @@
     "eslint-plugin-prettier": "^3.1.4",
     "ethereum-waffle": "^3.2.1",
     "hardhat": "^2.0.4",
-    "hardhat-deploy": "^0.7.0-beta.32",
+    "hardhat-deploy": "^0.7.0-beta.33",
     "prettier": "^2.2.1",
     "prettier-plugin-solidity": "^1.0.0-beta.1",
     "solhint": "^3.3.2",
