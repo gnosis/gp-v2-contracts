@@ -139,7 +139,7 @@ contract GPv2Settlement {
     /// @dev Invalidate onchain an order that has been signed offline.
     /// @param orderDigest The unique digest associated to the parameters of an
     /// order. See [`orderId`] for details.
-    function deleteOrder(bytes32 orderDigest) public {
+    function invalidateOrder(bytes32 orderDigest) public {
         filledAmount[orderId(orderDigest, msg.sender)] = uint256(-1);
     }
 

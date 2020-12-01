@@ -154,12 +154,12 @@ describe("GPv2Settlement", () => {
     });
   });
 
-  describe("deleteOrder", () => {
+  describe("invalidateOrder", () => {
     it("sets filled amount of the caller's order to max uint256", async () => {
       const orderDigest = "0x".padEnd(66, "1");
       const orderId = computeOrderId(orderDigest, traders[0].address);
 
-      await settlement.connect(traders[0]).deleteOrder(orderDigest);
+      await settlement.connect(traders[0]).invalidateOrder(orderDigest);
       expect(await settlement.filledAmount(orderId)).to.equal(MAX_UINT_256);
     });
   });
