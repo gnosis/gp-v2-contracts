@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-newer
 pragma solidity ^0.6.12;
 
+import "@gnosis.pm/util-contracts/contracts/StorageAccessible.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "./interfaces/GPv2Authentication.sol";
 import "./ownership/CustomInitiallyOwnable.sol";
@@ -9,7 +10,8 @@ import "./ownership/CustomInitiallyOwnable.sol";
 /// @author Gnosis Developers
 contract GPv2AllowListAuthentication is
     CustomInitiallyOwnable,
-    GPv2Authentication
+    GPv2Authentication,
+    StorageAccessible
 {
     using EnumerableSet for EnumerableSet.AddressSet;
 
