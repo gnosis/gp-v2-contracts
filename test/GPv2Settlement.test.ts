@@ -11,8 +11,6 @@ import {
   computeOrderId,
 } from "../src/ts";
 
-const MAX_UINT_256 = BigNumber.from(2).pow(256).sub(1);
-
 interface Transfer {
   owner: string;
   token: string;
@@ -160,7 +158,9 @@ describe("GPv2Settlement", () => {
       const orderId = computeOrderId(orderDigest, traders[0].address);
 
       await settlement.connect(traders[0]).invalidateOrder(orderDigest);
-      expect(await settlement.filledAmount(orderId)).to.equal(MAX_UINT_256);
+      expect(await settlement.filledAmount(orderId)).to.equal(
+        ethers.constants.MaxUint256,
+      );
     });
   });
 
