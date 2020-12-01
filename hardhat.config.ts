@@ -43,13 +43,20 @@ export default {
     sources: "src/contracts",
   },
   solidity: {
-    version: "0.7.5",
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 1000000,
+    compilers: [
+      {
+        version: "0.7.5",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 1000000,
+          },
+        },
       },
-    },
+      {
+        version: "0.6.12",
+      },
+    ],
   },
   networks: {
     mainnet: {

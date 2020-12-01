@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LGPL-3.0-or-newer
-pragma solidity ^0.7.5;
+pragma solidity ^0.6.12;
 
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "./interfaces/GPv2Authentication.sol";
@@ -14,7 +14,7 @@ contract GPv2AllowListAuthentication is
     using EnumerableSet for EnumerableSet.AddressSet;
 
     // solhint-disable-next-line no-empty-blocks
-    constructor(address initialOwner) CustomInitiallyOwnable(initialOwner) {}
+    constructor(address initialOwner) public CustomInitiallyOwnable(initialOwner) {}
 
     EnumerableSet.AddressSet private solvers;
 
