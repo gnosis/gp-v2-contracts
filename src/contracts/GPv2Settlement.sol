@@ -137,7 +137,7 @@ contract GPv2Settlement {
     /// @param encodedTrades Encoded trades for signed EOA orders.
     /// @return inTransfers Array of transfers into the settlement contract.
     /// @return outTransfers Array of transfers to pay out to EOAs.
-    function processTrades(
+    function computeTradeExecutions(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
         bytes calldata encodedTrades
@@ -160,7 +160,7 @@ contract GPv2Settlement {
                 tokens,
                 trade
             );
-            processTrade(
+            computeTradeExecution(
                 trade,
                 clearingPrices[trade.sellTokenIndex],
                 clearingPrices[trade.buyTokenIndex],
@@ -178,7 +178,7 @@ contract GPv2Settlement {
     /// settlement contract to execute trade.
     /// @param outTransfer Memory location to set computed transfer out to order
     /// owner to execute trade.
-    function processTrade(
+    function computeTradeExecution(
         GPv2Encoding.Trade memory trade,
         uint256 sellPrice,
         uint256 buyPrice,

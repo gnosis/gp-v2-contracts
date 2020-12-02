@@ -142,7 +142,7 @@ describe("GPv2Settlement", () => {
     });
   });
 
-  describe("processTrades", () => {
+  describe("computeTradeExecutions", () => {
     const tokens = [`0x${"11".repeat(20)}`, `0x${"22".repeat(20)}`];
     const prices = {
       [tokens[0]]: 1,
@@ -175,7 +175,7 @@ describe("GPv2Settlement", () => {
       }
 
       const [inTransfers, outTransfers] = parseTransfers(
-        await settlement.processTradesTest(
+        await settlement.computeTradeExecutionsTest(
           encoder.tokens,
           encoder.clearingPrices(prices),
           encoder.encodedTrades,
@@ -189,7 +189,7 @@ describe("GPv2Settlement", () => {
     describe("Order Variations", async () => {
       const { sellAmount, buyAmount } = partialOrder;
       const executedAmount = ethers.utils.parseEther("10.0");
-      const processTradeVariant = async (
+      const computeTradeExecutionVariant = async (
         kind: OrderKind,
         partiallyFillable: boolean,
       ) => {
@@ -209,7 +209,7 @@ describe("GPv2Settlement", () => {
           [{ amount: executedSellAmount }],
           [{ amount: executedBuyAmount }],
         ] = parseTransfers(
-          await settlement.processTradesTest(
+          await settlement.computeTradeExecutionsTest(
             encoder.tokens,
             encoder.clearingPrices(prices),
             encoder.encodedTrades,
@@ -230,7 +230,7 @@ describe("GPv2Settlement", () => {
           sellPrice,
           executedBuyAmount,
           buyPrice,
-        } = await processTradeVariant(OrderKind.SELL, false);
+        } = await computeTradeExecutionVariant(OrderKind.SELL, false);
 
         expect(executedSellAmount).to.deep.equal(sellAmount);
         expect(executedBuyAmount).to.deep.equal(
@@ -244,7 +244,7 @@ describe("GPv2Settlement", () => {
           sellPrice,
           executedBuyAmount,
           buyPrice,
-        } = await processTradeVariant(OrderKind.BUY, false);
+        } = await computeTradeExecutionVariant(OrderKind.BUY, false);
 
         expect(executedSellAmount).to.deep.equal(
           buyAmount.mul(sellPrice).div(buyPrice),
@@ -258,7 +258,7 @@ describe("GPv2Settlement", () => {
           sellPrice,
           executedBuyAmount,
           buyPrice,
-        } = await processTradeVariant(OrderKind.SELL, true);
+        } = await computeTradeExecutionVariant(OrderKind.SELL, true);
 
         expect(executedSellAmount).to.deep.equal(executedAmount);
         expect(executedBuyAmount).to.deep.equal(
@@ -272,7 +272,7 @@ describe("GPv2Settlement", () => {
           sellPrice,
           executedBuyAmount,
           buyPrice,
-        } = await processTradeVariant(OrderKind.BUY, true);
+        } = await computeTradeExecutionVariant(OrderKind.BUY, true);
 
         expect(executedSellAmount).to.deep.equal(
           executedAmount.mul(sellPrice).div(buyPrice),
@@ -303,7 +303,7 @@ describe("GPv2Settlement", () => {
       );
 
       const [inTransfers, outTransfers] = parseTransfers(
-        await settlement.processTradesTest(
+        await settlement.computeTradeExecutionsTest(
           encoder.tokens,
           encoder.clearingPrices(prices),
           encoder.encodedTrades,
@@ -332,7 +332,7 @@ describe("GPv2Settlement", () => {
       );
 
       const [[inTransfer]] = parseTransfers(
-        await settlement.processTradesTest(
+        await settlement.computeTradeExecutionsTest(
           encoder.tokens,
           encoder.clearingPrices(prices),
           encoder.encodedTrades,
@@ -343,9 +343,9 @@ describe("GPv2Settlement", () => {
     });
   });
 
-  describe("processTrade", () => {
+  describe("computeTradeExecution", () => {
     it("should not allocate additional memory", async () => {
-      expect(await settlement.processTradeMemoryTest()).to.deep.equal(
+      expect(await settlement.computeTradeExecutionMemoryTest()).to.deep.equal(
         ethers.constants.Zero,
       );
     });

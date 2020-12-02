@@ -21,7 +21,7 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
         return address(allowanceManager);
     }
 
-    function processTradesTest(
+    function computeTradeExecutionsTest(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
         bytes calldata encodedTrades
@@ -33,14 +33,18 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
             GPv2AllowanceManager.Transfer[] memory outTransfers
         )
     {
-        (inTransfers, outTransfers) = processTrades(
+        (inTransfers, outTransfers) = computeTradeExecutions(
             tokens,
             clearingPrices,
             encodedTrades
         );
     }
 
-    function processTradeMemoryTest() external pure returns (uint256 mem) {
+    function computeTradeExecutionMemoryTest()
+        external
+        pure
+        returns (uint256 mem)
+    {
         GPv2Encoding.Trade memory trade;
         GPv2AllowanceManager.Transfer memory inTransfer;
         GPv2AllowanceManager.Transfer memory outTransfer;
@@ -53,7 +57,7 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
             mem := mload(0x40)
         }
 
-        processTrade(trade, 1, 1, inTransfer, outTransfer);
+        computeTradeExecution(trade, 1, 1, inTransfer, outTransfer);
 
         // solhint-disable-next-line no-inline-assembly
         assembly {
