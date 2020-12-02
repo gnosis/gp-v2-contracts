@@ -234,8 +234,17 @@ describe("GPv2Settlement", () => {
 
         expect(executedSellAmount).to.deep.equal(sellAmount);
         expect(executedBuyAmount).to.deep.equal(
-          sellAmount.mul(buyPrice).div(sellPrice),
+          sellAmount.mul(sellPrice).div(buyPrice),
         );
+      });
+
+      it("should respect the limit price for fill-or-kill sell orders", async () => {
+        const { executedBuyAmount } = await computeTradeExecutionVariant(
+          OrderKind.SELL,
+          false,
+        );
+
+        expect(executedBuyAmount.gt(buyAmount)).to.be.true;
       });
 
       it("should compute amounts for fill-or-kill buy orders", async () => {
@@ -247,9 +256,18 @@ describe("GPv2Settlement", () => {
         } = await computeTradeExecutionVariant(OrderKind.BUY, false);
 
         expect(executedSellAmount).to.deep.equal(
-          buyAmount.mul(sellPrice).div(buyPrice),
+          buyAmount.mul(buyPrice).div(sellPrice),
         );
         expect(executedBuyAmount).to.deep.equal(buyAmount);
+      });
+
+      it("should respect the limit price for fill-or-kill buy orders", async () => {
+        const { executedSellAmount } = await computeTradeExecutionVariant(
+          OrderKind.BUY,
+          false,
+        );
+
+        expect(executedSellAmount.lt(sellAmount)).to.be.true;
       });
 
       it("should compute amounts for partially fillable sell orders", async () => {
@@ -262,8 +280,21 @@ describe("GPv2Settlement", () => {
 
         expect(executedSellAmount).to.deep.equal(executedAmount);
         expect(executedBuyAmount).to.deep.equal(
-          executedAmount.mul(buyPrice).div(sellPrice),
+          executedAmount.mul(sellPrice).div(buyPrice),
         );
+      });
+
+      it("should respect the limit price for partially fillable sell orders", async () => {
+        const {
+          executedSellAmount,
+          executedBuyAmount,
+        } = await computeTradeExecutionVariant(OrderKind.SELL, true);
+
+        expect(
+          executedBuyAmount
+            .mul(sellAmount)
+            .gt(executedSellAmount.mul(buyAmount)),
+        ).to.be.true;
       });
 
       it("should compute amounts for partially fillable buy orders", async () => {
@@ -275,9 +306,22 @@ describe("GPv2Settlement", () => {
         } = await computeTradeExecutionVariant(OrderKind.BUY, true);
 
         expect(executedSellAmount).to.deep.equal(
-          executedAmount.mul(sellPrice).div(buyPrice),
+          executedAmount.mul(buyPrice).div(sellPrice),
         );
         expect(executedBuyAmount).to.deep.equal(executedAmount);
+      });
+
+      it("should respect the limit price for partially fillable buy orders", async () => {
+        const {
+          executedSellAmount,
+          executedBuyAmount,
+        } = await computeTradeExecutionVariant(OrderKind.BUY, true);
+
+        expect(
+          executedBuyAmount
+            .mul(sellAmount)
+            .gt(executedSellAmount.mul(buyAmount)),
+        ).to.be.true;
       });
     });
 

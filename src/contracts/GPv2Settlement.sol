@@ -202,6 +202,17 @@ contract GPv2Settlement {
         outTransfer.owner = trade.owner;
         outTransfer.token = order.buyToken;
 
+        // NOTE: The following computation is derived from the equation:
+        // ```
+        // amount_x * price_x = amount_y * price_y
+        // ```
+        // Intuitively, if a chocolate bar is 0,50€ and a beer is 4€, 1 beer
+        // is roughly worth 8 chocolate bars (`1 * 4 = 8 * 0.5`). This means
+        // that for computing the amount of token `y` equivalent to some amount
+        // of token `x` given the clearing prices, the equation is:
+        // ```
+        // amount_y = amount_x * price_x / price_y
+        // ```
         if (order.kind == GPv2Encoding.OrderKind.Sell) {
             uint256 executedSellAmount;
             if (order.partiallyFillable) {
@@ -215,7 +226,7 @@ contract GPv2Settlement {
             // if it does not revert. The method only checks that the divisor is
             // non-zero and `revert`s in that case instead of consuming all of
             // the remaining transaction gas when dividing by zero.
-            outTransfer.amount = executedSellAmount.mul(buyPrice) / sellPrice;
+            outTransfer.amount = executedSellAmount.mul(sellPrice) / buyPrice;
         } else {
             uint256 executedBuyAmount;
             if (order.partiallyFillable) {
@@ -225,7 +236,7 @@ contract GPv2Settlement {
             }
 
             // NOTE: Don't use `SafeMath.div` for same reason as above.
-            inTransfer.amount = executedBuyAmount.mul(sellPrice) / buyPrice;
+            inTransfer.amount = executedBuyAmount.mul(buyPrice) / sellPrice;
             outTransfer.amount = executedBuyAmount;
         }
 
