@@ -315,7 +315,7 @@ describe("GPv2Settlement", () => {
         const {
           executedSellAmount,
           executedBuyAmount,
-        } = await computeTradeExecutionVariant(OrderKind.SELL, true);
+        } = await computeTradeExecutionVariant(OrderKind.BUY, true);
 
         expect(
           executedBuyAmount
