@@ -207,7 +207,7 @@ contract GPv2Settlement {
         // amount_x * price_x = amount_y * price_y
         // ```
         // Intuitively, if a chocolate bar is 0,50€ and a beer is 4€, 1 beer
-        // is roughtly worth 8 chocolate bars (`1 * 4 = 8 * 0.5`). This means
+        // is roughly worth 8 chocolate bars (`1 * 4 = 8 * 0.5`). This means
         // that for computing the amount of token `y` equivalent to some amount
         // of token `x` given the clearing prices, the equation is:
         // ```
