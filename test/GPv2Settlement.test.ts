@@ -143,14 +143,15 @@ describe("GPv2Settlement", () => {
   });
 
   describe("computeTradeExecutions", () => {
-    const tokens = [`0x${"11".repeat(20)}`, `0x${"22".repeat(20)}`];
+    const sellToken = `0x${"11".repeat(20)}`;
+    const buyToken = `0x${"22".repeat(20)}`;
     const prices = {
-      [tokens[0]]: 1,
-      [tokens[1]]: 2,
+      [sellToken]: 1,
+      [buyToken]: 2,
     };
     const partialOrder = {
-      sellToken: tokens[0],
-      buyToken: tokens[1],
+      sellToken,
+      buyToken,
       sellAmount: ethers.utils.parseEther("42"),
       buyAmount: ethers.utils.parseEther("13.37"),
       validTo: 0xffffffff,
@@ -203,9 +204,9 @@ describe("GPv2Settlement", () => {
         settlement.computeTradeExecutionsTest(
           encoder.tokens,
           encoder.clearingPrices({
-            [tokens[0]]: 1,
-            // NOTE: The price of the buy token is too high!
-            [tokens[1]]: 1000,
+            [sellToken]: 1,
+            // NOTE: The price of the buy token is way too high!
+            [buyToken]: 1000,
           }),
           encoder.encodedTrades,
         ),
@@ -229,8 +230,8 @@ describe("GPv2Settlement", () => {
       const executions = settlement.computeTradeExecutionsTest(
         encoder.tokens,
         encoder.clearingPrices({
-          [tokens[0]]: buyAmount,
-          [tokens[1]]: sellAmount,
+          [sellToken]: buyAmount,
+          [buyToken]: sellAmount,
         }),
         encoder.encodedTrades,
       );
