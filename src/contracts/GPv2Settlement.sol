@@ -159,7 +159,10 @@ contract GPv2Settlement {
         }
     }
 
-    /// @dev Process trades for a single EOA order.
+    /// @dev Compute the in and out transfer amounts for a single EOA order
+    /// trade. This function reverts if:
+    /// - The order's limit price is not respected.
+    ///
     /// @param trade The trade to process.
     /// @param sellPrice The price of the order's sell token.
     /// @param buyPrice The price of the order's buy token.
@@ -196,12 +199,23 @@ contract GPv2Settlement {
         // amount_x * price_x = amount_y * price_y
         // ```
         // Intuitively, if a chocolate bar is 0,50€ and a beer is 4€, 1 beer
-        // is roughly worth 8 chocolate bars (`1 * 4 = 8 * 0.5`). This means
-        // that for computing the amount of token `y` equivalent to some amount
-        // of token `x` given the clearing prices, the equation is:
+        // is roughly worth 8 chocolate bars (`1 * 4 = 8 * 0.5`). From this
+        // equation, we can derive:
+        // - The limit price for selling `x` and buying `y` is respected iff
+        // ```
+        // limit_x * price_x >= limit_y * price_y
+        // ```
+        // - The executed amount of token `y` given some amount of `x` and
+        //   clearing prices is:
         // ```
         // amount_y = amount_x * price_x / price_y
         // ```
+
+        require(
+            order.sellAmount.mul(sellPrice) >= order.buyAmount.mul(buyPrice),
+            "GPv2: limit price not respected"
+        );
+
         if (order.kind == GPv2Encoding.OrderKind.Sell) {
             uint256 executedSellAmount;
             if (order.partiallyFillable) {
