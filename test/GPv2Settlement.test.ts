@@ -10,6 +10,8 @@ import {
   domain,
 } from "../src/ts";
 
+import { builtAndDeployedMetadataCoincide } from "./bytecode";
+
 interface Transfer {
   owner: string;
   token: string;
@@ -26,7 +28,12 @@ function parseTransfers(transfers: unknown[][][]): [Transfer[], Transfer[]] {
   return [transfers[0].map(parseTransfer), transfers[1].map(parseTransfer)];
 }
 
-import { builtAndDeployedMetadataCoincide } from "./bytecode";
+function toNumberLossy(value: BigNumber): number {
+  // NOTE: BigNumber throws an exception when if is outside the range of
+  // representable integers for JavaScript's double precision floating point
+  // numbers. For some tests, that is OK, so perform a lossy conversion.
+  return parseInt(value.toString());
+}
 
 describe("GPv2Settlement", () => {
   const [deployer, owner, solver, ...traders] = waffle.provider.getWallets();
@@ -188,10 +195,17 @@ describe("GPv2Settlement", () => {
     });
 
     it("should revert if the limit price is not respected", async () => {
+      const sellAmount = ethers.utils.parseEther("100.0");
+      const sellPrice = 1;
+      const buyAmount = ethers.utils.parseEther("1.0");
+      const buyPrice = 1000;
+
       const encoder = new SettlementEncoder(testDomain);
       await encoder.signEncodeTrade(
         {
           ...partialOrder,
+          sellAmount,
+          buyAmount,
           kind: OrderKind.SELL,
           partiallyFillable: false,
         },
@@ -200,13 +214,15 @@ describe("GPv2Settlement", () => {
         SigningScheme.TYPED_DATA,
       );
 
+      expect(toNumberLossy(sellAmount.mul(sellPrice))).to.be.lessThan(
+        toNumberLossy(buyAmount.mul(buyPrice)),
+      );
       await expect(
         settlement.computeTradeExecutionsTest(
           encoder.tokens,
           encoder.clearingPrices({
-            [sellToken]: 1,
-            // NOTE: The price of the buy token is way too high!
-            [buyToken]: 1000,
+            [sellToken]: sellPrice,
+            [buyToken]: buyPrice,
           }),
           encoder.encodedTrades,
         ),

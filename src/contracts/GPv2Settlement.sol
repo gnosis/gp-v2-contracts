@@ -212,7 +212,7 @@ contract GPv2Settlement {
         // ```
 
         require(
-            order.sellAmount * sellPrice >= order.buyAmount * buyPrice,
+            order.sellAmount.mul(sellPrice) >= order.buyAmount.mul(buyPrice),
             "GPv2: limit price not respected"
         );
 
