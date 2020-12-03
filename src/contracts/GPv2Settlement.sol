@@ -89,14 +89,6 @@ contract GPv2Settlement {
     ///     settlement
     ///   - Critically, user orders are entirely protected
     ///
-    /// Note that settlements can specify fees encoded as a fee factor.  The fee
-    /// factor to use for the trade. The actual fee is computed as
-    /// `1 / feeFactor`. This means that the received amount is expected to be
-    /// `executedBuyAmount * (feeFactor - 1) / feeFactor`. Note that a value of
-    /// `0` is reserved to mean no fees. This is useful for example when
-    /// settling directly with Uniswap where we don't want users to incur
-    /// additional fees.
-    ///
     /// Note that some parameters are encoded as packed bytes in order to save
     /// calldata gas. For more information on encoding format consult the
     /// [`GPv2Encoding`] library.
@@ -105,7 +97,6 @@ contract GPv2Settlement {
     /// Orders and interactions encode tokens as indices into this array.
     /// @param clearingPrices An array of clearing prices where the `i`-th price
     /// is for the `i`-th token in the [`tokens`] array.
-    /// @param feeFactor The fee factor to use for the trade.
     /// @param encodedTrades Encoded trades for signed EOA orders.
     /// @param encodedInteractions Encoded smart contract interactions.
     /// @param encodedOrderRefunds Encoded order refunds for clearing storage
@@ -113,14 +104,12 @@ contract GPv2Settlement {
     function settle(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
-        uint256 feeFactor,
         bytes calldata encodedTrades,
         bytes calldata encodedInteractions,
         bytes calldata encodedOrderRefunds
     ) external view onlySolver {
         require(tokens.length == 0, "not yet implemented");
         require(clearingPrices.length == 0, "not yet implemented");
-        require(feeFactor == 0, "not yet implemented");
         require(encodedTrades.length == 0, "not yet implemented");
         require(encodedInteractions.length == 0, "not yet implemented");
         require(encodedOrderRefunds.length == 0, "not yet implemented");
@@ -240,6 +229,6 @@ contract GPv2Settlement {
             outTransfer.amount = executedBuyAmount;
         }
 
-        inTransfer.amount = inTransfer.amount.add(order.tip);
+        inTransfer.amount = inTransfer.amount.add(order.feeAmount);
     }
 }
