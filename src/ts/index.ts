@@ -84,13 +84,9 @@ export interface Order {
    */
   appData: number;
   /**
-   * Additional fee to give to the protocol.
-   *
-   * This tip is used to offset solution submission gas costs so orders that
-   * aren't economically viable (i.e. small orders that do not generate enough
-   * fees) still get executed.
+   * Fee to give to the protocol.
    */
-  tip: BigNumberish;
+  feeAmount: BigNumberish;
   /**
    * The order kind.
    */
@@ -130,7 +126,7 @@ export const ORDER_TYPE_FIELDS = [
   { name: "buyAmount", type: "uint256" },
   { name: "validTo", type: "uint32" },
   { name: "appData", type: "uint32" },
-  { name: "tip", type: "uint256" },
+  { name: "feeAmount", type: "uint256" },
   { name: "kind", type: "uint8" },
   { name: "partiallyFillable", type: "bool" },
 ];
@@ -276,7 +272,7 @@ export class SettlementEncoder {
         order.buyAmount,
         timestamp(order.validTo),
         order.appData,
-        order.tip,
+        order.feeAmount,
         encodeOrderFlags(order),
         executedAmount,
         encodeSigningScheme(sig.v, scheme),

@@ -127,7 +127,7 @@ describe("GPv2Settlement", () => {
 
   describe("settle", () => {
     it("rejects transactions from non-solvers", async () => {
-      await expect(settlement.settle([], [], 0, [], [], [])).to.be.revertedWith(
+      await expect(settlement.settle([], [], [], [], [])).to.be.revertedWith(
         "GPv2: not a solver",
       );
     });
@@ -137,7 +137,7 @@ describe("GPv2Settlement", () => {
       // TODO - this will have to be changed when other constraints become active
       // and when settle function no longer reverts.
       await expect(
-        settlement.connect(solver).settle([], [], 0, [], [], []),
+        settlement.connect(solver).settle([], [], [], [], []),
       ).revertedWith("Final: not yet implemented");
     });
   });
@@ -155,7 +155,7 @@ describe("GPv2Settlement", () => {
       buyAmount: ethers.utils.parseEther("13.37"),
       validTo: 0xffffffff,
       appData: 0,
-      tip: ethers.constants.Zero,
+      feeAmount: ethers.constants.Zero,
     };
 
     it("should compute in/out transfers for multiple trades", async () => {
@@ -358,11 +358,11 @@ describe("GPv2Settlement", () => {
       expect(outTransfers[0]).to.deep.equal(outTransfers[1]);
     });
 
-    it("should add the tip to the in transfer", async () => {
-      const tip = ethers.utils.parseEther("10");
+    it("should add the fee to the in transfer", async () => {
+      const feeAmount = ethers.utils.parseEther("10");
       const order = {
         ...partialOrder,
-        tip,
+        feeAmount,
         kind: OrderKind.SELL,
         partiallyFillable: false,
       };
@@ -383,7 +383,7 @@ describe("GPv2Settlement", () => {
         ),
       );
 
-      expect(inTransfer.amount).to.deep.equal(order.sellAmount.add(tip));
+      expect(inTransfer.amount).to.deep.equal(order.sellAmount.add(feeAmount));
     });
   });
 
