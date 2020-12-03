@@ -186,6 +186,62 @@ describe("GPv2Settlement", () => {
       expect(outTransfers.length).to.equal(tradeCount);
     });
 
+    it("should revert if the limit price is not respected", async () => {
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
+        {
+          ...partialOrder,
+          kind: OrderKind.SELL,
+          partiallyFillable: false,
+        },
+        0,
+        traders[0],
+        SigningScheme.TYPED_DATA,
+      );
+
+      await expect(
+        settlement.computeTradeExecutionsTest(
+          encoder.tokens,
+          encoder.clearingPrices({
+            [tokens[0]]: 1,
+            // NOTE: The price of the buy token is too high!
+            [tokens[1]]: 1000,
+          }),
+          encoder.encodedTrades,
+        ),
+      ).to.be.revertedWith("limit price not respected");
+    });
+
+    it("should not revert if the clearing price is exactly at the limit price", async () => {
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
+        {
+          ...partialOrder,
+          kind: OrderKind.SELL,
+          partiallyFillable: false,
+        },
+        0,
+        traders[0],
+        SigningScheme.TYPED_DATA,
+      );
+
+      const { sellAmount, buyAmount } = partialOrder;
+      const executions = settlement.computeTradeExecutionsTest(
+        encoder.tokens,
+        encoder.clearingPrices({
+          [tokens[0]]: buyAmount,
+          [tokens[1]]: sellAmount,
+        }),
+        encoder.encodedTrades,
+      );
+      await expect(executions).to.not.be.reverted;
+
+      const [, [{ amount: executedBuyAmount }]] = parseTransfers(
+        await executions,
+      );
+      expect(executedBuyAmount).to.deep.equal(buyAmount);
+    });
+
     describe("Order Variations", async () => {
       const { sellAmount, buyAmount } = partialOrder;
       const executedAmount = ethers.utils.parseEther("10.0");
