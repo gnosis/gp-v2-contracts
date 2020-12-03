@@ -214,7 +214,7 @@ describe("GPv2Settlement", () => {
         SigningScheme.TYPED_DATA,
       );
 
-      expect(toNumberLossy(sellAmount.mul(sellPrice))).to.be.lessThan(
+      expect(toNumberLossy(sellAmount.mul(sellPrice))).not.to.be.gte(
         toNumberLossy(buyAmount.mul(buyPrice)),
       );
       await expect(
