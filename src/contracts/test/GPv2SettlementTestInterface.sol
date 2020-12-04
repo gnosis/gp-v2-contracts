@@ -42,7 +42,7 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
 
     function computeTradeExecutionMemoryTest()
         external
-        pure
+        view
         returns (uint256 mem)
     {
         GPv2Encoding.Trade memory trade;
@@ -57,6 +57,7 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
             mem := mload(0x40)
         }
 
+        trade.order.validTo = uint32(block.timestamp);
         computeTradeExecution(trade, 1, 1, inTransfer, outTransfer);
 
         // solhint-disable-next-line no-inline-assembly
