@@ -70,8 +70,8 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
         pure
         returns (
             bytes32 orderDigest,
-            uint32 validTo,
-            address owner
+            address owner,
+            uint32 validTo
         )
     {
         return extractOrderUidParams(orderUid);

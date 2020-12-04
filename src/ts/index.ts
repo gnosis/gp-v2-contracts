@@ -395,18 +395,18 @@ export function signOrder(
  * contract.
  *
  * @param orderDigest The digest representing the parameters of the user order.
- * @param validTo Time until which the order is valid.
  * @param userAddress The address of the user who owns the order.
+ * @param validTo Time until which the order is valid.
  * @returns A string that unequivocally identifies the order of the user.
  */
 export function computeOrderUid(
   orderDigest: string,
-  validTo: number | Date,
   userAddress: string,
+  validTo: number | Date,
 ): string {
   return (
     orderDigest +
-    timestamp(validTo).toString(16).padStart(4, "0") +
-    userAddress.slice(2)
+    userAddress.slice(2) +
+    timestamp(validTo).toString(16).padStart(4, "0")
   ).toLowerCase();
 }

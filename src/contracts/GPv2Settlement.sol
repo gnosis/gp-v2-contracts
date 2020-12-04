@@ -131,10 +131,10 @@ contract GPv2Settlement {
     /// must be the the sender of this message. See [`extractOrderUidParams`]
     /// for details on orderUid.
     function invalidateOrder(bytes calldata orderUid) external {
-        (bytes32 orderDigest, uint32 validTo, address owner) =
+        (bytes32 orderDigest, address owner, uint32 validTo) =
             extractOrderUidParams(orderUid);
         require(owner == msg.sender, "GPv2: caller does not own order");
-        filledAmount[orderUidKey(orderDigest, validTo, msg.sender)] = uint256(
+        filledAmount[orderUidKey(orderDigest, msg.sender, validTo)] = uint256(
             -1
         );
     }
@@ -149,9 +149,9 @@ contract GPv2Settlement {
         view
         returns (uint256 amount)
     {
-        (bytes32 orderDigest, uint32 validTo, address owner) =
+        (bytes32 orderDigest, address owner, uint32 validTo) =
             extractOrderUidParams(orderUid);
-        amount = filledAmount[orderUidKey(orderDigest, validTo, owner)];
+        amount = filledAmount[orderUidKey(orderDigest, owner, validTo)];
     }
 
     /// @dev Process all trades for EOA orders one at a time returning the
@@ -293,23 +293,23 @@ contract GPv2Settlement {
     /// and not by calls that are triggered by the solvers.
     /// @return orderDigest The unique digest associated to the parameters of an
     /// order. See [`orderUidKey`] for details.
-    /// @return validTo The epoch time at which the order will stop being valid.
     /// @return owner The address of the user who owns this order.
+    /// @return validTo The epoch time at which the order will stop being valid.
     function extractOrderUidParams(bytes calldata orderUid)
         internal
         pure
         returns (
             bytes32 orderDigest,
-            uint32 validTo,
-            address owner
+            address owner,
+            uint32 validTo
         )
     {
         require(orderUid.length == 32 + 4 + 20, "GPv2: invalid uid");
         // solhint-disable-next-line no-inline-assembly
         assembly {
             orderDigest := calldataload(orderUid.offset)
-            validTo := shr(224, calldataload(add(orderUid.offset, 32)))
-            owner := shr(96, calldataload(add(orderUid.offset, 36)))
+            owner := shr(96, calldataload(add(orderUid.offset, 32)))
+            validTo := shr(224, calldataload(add(orderUid.offset, 52)))
         }
     }
 
@@ -320,12 +320,13 @@ contract GPv2Settlement {
     /// The order digest is the (unpacked) hash of all entries in the order in
     /// which they appear.
     /// @param owner The address of the user that is assigned to the order.
+    /// @param validTo The epoch time at which the order will stop being valid.
     /// @return Key of the given order in the [`filledAmount`] mapping.
     function orderUidKey(
         bytes32 orderDigest,
-        uint32 validTo,
-        address owner
+        address owner,
+        uint32 validTo
     ) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(orderDigest, validTo, owner));
+        return keccak256(abi.encodePacked(orderDigest, owner, validTo));
     }
 }

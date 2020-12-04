@@ -145,12 +145,12 @@ describe("GPv2Settlement", () => {
   describe("getFilledAmount", () => {
     it("is zero for an untouched order", async () => {
       const orderUid = "0x".padEnd(66, "0");
-      const validTo = 2 ** 32 - 1;
       const owner = "0x".padEnd(42, "0");
+      const validTo = 2 ** 32 - 1;
 
       expect(
         await settlement.getFilledAmount(
-          computeOrderUid(orderUid, validTo, owner),
+          computeOrderUid(orderUid, owner, validTo),
         ),
       ).to.equal(ethers.constants.Zero);
     });
@@ -179,8 +179,8 @@ describe("GPv2Settlement", () => {
       const validTo = 2 ** 32 - 1;
       const orderUid = computeOrderUid(
         orderDigest,
-        validTo,
         traders[0].address,
+        validTo,
       );
 
       await settlement.connect(traders[0]).invalidateOrder(orderUid);
@@ -193,8 +193,8 @@ describe("GPv2Settlement", () => {
       const validTo = 2 ** 32 - 1;
       const orderUid = computeOrderUid(
         orderDigest,
-        validTo,
         traders[0].address,
+        validTo,
       );
 
       await expect(settlement.invalidateOrder(orderUid)).to.be.revertedWith(
@@ -532,17 +532,17 @@ describe("GPv2Settlement", () => {
     it("round trip encode/decode", async () => {
       // Start from 17 (0x11) so that the first byte has no zeroes.
       const orderDigest = "0x" + fillDistinctBytes(32, 17);
-      const validTo = parseInt(fillDistinctBytes(4, 17 + 32), 16);
       const address = ethers.utils.getAddress(
-        "0x" + fillDistinctBytes(20, 17 + 32 + 4),
+        "0x" + fillDistinctBytes(20, 17 + 32),
       );
-      const orderUid = computeOrderUid(orderDigest, validTo, address);
-      expect(orderUid).to.equal("0x" + fillDistinctBytes(32 + 4 + 20, 17));
+      const validTo = parseInt(fillDistinctBytes(4, 17 + 32 + 20), 16);
+      const orderUid = computeOrderUid(orderDigest, address, validTo);
+      expect(orderUid).to.equal("0x" + fillDistinctBytes(32 + 20 + 4, 17));
 
       const {
         orderDigest: extractedOrderDigest,
-        validTo: extractedValidTo,
         owner: extractedAddress,
+        validTo: extractedValidTo,
       } = await settlement.extractOrderUidParamsTest(orderUid);
       expect(extractedOrderDigest).to.equal(orderDigest);
       expect(extractedValidTo).to.equal(validTo);
