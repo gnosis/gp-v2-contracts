@@ -232,34 +232,42 @@ contract GPv2Settlement {
             "GPv2: limit price not respected"
         );
 
+        uint256 executedSellAmount;
+        uint256 executedBuyAmount;
+        uint256 executedFeeAmount;
+
+        // NOTE: Don't use `SafeMath.div` anywhere here as it allocates a string
+        // even if it does not revert. The method only checks that the divisor
+        // is non-zero and `revert`s in that case instead of consuming all of
+        // the remaining transaction gas when dividing by zero.
         if (order.kind == GPv2Encoding.OrderKind.Sell) {
-            uint256 executedSellAmount;
             if (order.partiallyFillable) {
                 executedSellAmount = trade.executedAmount;
+                executedFeeAmount =
+                    order.feeAmount.mul(executedSellAmount) /
+                    order.sellAmount;
             } else {
                 executedSellAmount = order.sellAmount;
+                executedFeeAmount = order.feeAmount;
             }
 
-            inTransfer.amount = executedSellAmount;
-            // NOTE: Don't use `SafeMath.div` here as it allocates a string even
-            // if it does not revert. The method only checks that the divisor is
-            // non-zero and `revert`s in that case instead of consuming all of
-            // the remaining transaction gas when dividing by zero.
-            outTransfer.amount = executedSellAmount.mul(sellPrice) / buyPrice;
+            executedBuyAmount = executedSellAmount.mul(sellPrice) / buyPrice;
         } else {
-            uint256 executedBuyAmount;
             if (order.partiallyFillable) {
                 executedBuyAmount = trade.executedAmount;
+                executedFeeAmount =
+                    order.feeAmount.mul(executedBuyAmount) /
+                    order.buyAmount;
             } else {
                 executedBuyAmount = order.buyAmount;
+                executedFeeAmount = order.feeAmount;
             }
 
-            // NOTE: Don't use `SafeMath.div` for same reason as above.
-            inTransfer.amount = executedBuyAmount.mul(buyPrice) / sellPrice;
-            outTransfer.amount = executedBuyAmount;
+            executedSellAmount = executedBuyAmount.mul(buyPrice) / sellPrice;
         }
 
-        inTransfer.amount = inTransfer.amount.add(order.feeAmount);
+        inTransfer.amount = executedSellAmount.add(executedFeeAmount);
+        outTransfer.amount = executedBuyAmount;
     }
 
     /// @dev Compute a unique identifier that represents a user order.
