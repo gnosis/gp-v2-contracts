@@ -47,6 +47,7 @@
   },
   "main": "lib/ts/index.js",
   "files": [
+    "/bench",
     "/build",
     "/deployments",
     "/lib",
