@@ -50,7 +50,7 @@ contract GPv2Settlement {
     /// order cannot be traded anymore. If the order is fill or kill, then this
     /// value is only used to determine whether the order has already been
     /// executed.
-    /// See [`orderUid`] for how to represent an order with a single bytes32.
+    /// See [`orderUidKey`] for how an order key is defined.
     mapping(bytes32 => uint256) public filledAmount;
 
     constructor(GPv2Authentication authenticator_) {
@@ -126,10 +126,32 @@ contract GPv2Settlement {
     }
 
     /// @dev Invalidate onchain an order that has been signed offline.
-    /// @param orderDigest The unique digest associated to the parameters of an
-    /// order. See [`orderUid`] for details.
-    function invalidateOrder(bytes32 orderDigest) public {
-        filledAmount[orderUid(orderDigest, msg.sender)] = uint256(-1);
+    /// @param orderUid The unique identifier of the order that is to be made
+    /// invalid after calling this function. The user that created the order
+    /// must be the the sender of this message. See [`extractOrderUidParams`]
+    /// for details on orderUid.
+    function invalidateOrder(bytes calldata orderUid) external {
+        (bytes32 orderDigest, uint32 validTo, address owner) =
+            extractOrderUidParams(orderUid);
+        require(owner == msg.sender, "GPv2: caller does not own order");
+        filledAmount[orderUidKey(orderDigest, validTo, msg.sender)] = uint256(
+            -1
+        );
+    }
+
+    /// @dev Return how much of the input order has been filled so far. See
+    /// [`filledAmount`] to know how this value depends on the order type.
+    /// @param orderUid The unique identifier associated to the order for which
+    /// to recover the filled amount. See [`extractOrderUidParams`] for details.
+    /// @return amount How much the order has been filled in absolute amount.
+    function getFilledAmount(bytes calldata orderUid)
+        external
+        view
+        returns (uint256 amount)
+    {
+        (bytes32 orderDigest, uint32 validTo, address owner) =
+            extractOrderUidParams(orderUid);
+        amount = filledAmount[orderUidKey(orderDigest, validTo, owner)];
     }
 
     /// @dev Process all trades for EOA orders one at a time returning the
@@ -262,17 +284,48 @@ contract GPv2Settlement {
         inTransfer.amount = inTransfer.amount.add(order.feeAmount);
     }
 
-    /// @dev Compute a unique identifier that represents a user order.
+    /// @dev Extracts specific order information from the standardized unique
+    /// order id of the protocol.
+    /// @param orderUid The unique identifier used to represent an order in
+    /// the protocol. This uid is the packed concatenation of the order digest,
+    /// the validTo order parameter and the address of the user who created the
+    /// order. It is used by the user to interface with the contract directly,
+    /// and not by calls that are triggered by the solvers.
+    /// @return orderDigest The unique digest associated to the parameters of an
+    /// order. See [`orderUidKey`] for details.
+    /// @return validTo The epoch time at which the order will stop being valid.
+    /// @return owner The address of the user who owns this order.
+    function extractOrderUidParams(bytes calldata orderUid)
+        internal
+        pure
+        returns (
+            bytes32 orderDigest,
+            uint32 validTo,
+            address owner
+        )
+    {
+        require(orderUid.length == 32 + 4 + 20, "GPv2: invalid uid");
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            orderDigest := calldataload(orderUid.offset)
+            validTo := shr(224, calldataload(add(orderUid.offset, 32)))
+            owner := shr(96, calldataload(add(orderUid.offset, 36)))
+        }
+    }
+
+    /// @dev Compute the key used to access, in the mapping of filled amounts,
+    /// the user order described by the input parameters.
     /// @param orderDigest The unique digest associated to the parameters of an
     /// order (an instance of the Order struct in the [`GPv2Encoding`] library).
     /// The order digest is the (unpacked) hash of all entries in the order in
     /// which they appear.
-    /// @param owner The address of the user to assign to the order.
-    function orderUid(bytes32 orderDigest, address owner)
-        private
-        pure
-        returns (bytes32)
-    {
-        return keccak256(abi.encodePacked(orderDigest, owner));
+    /// @param owner The address of the user that is assigned to the order.
+    /// @return Key of the given order in the [`filledAmount`] mapping.
+    function orderUidKey(
+        bytes32 orderDigest,
+        uint32 validTo,
+        address owner
+    ) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(orderDigest, validTo, owner));
     }
 }

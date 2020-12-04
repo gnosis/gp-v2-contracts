@@ -64,4 +64,16 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
             mem := sub(mload(0x40), mem)
         }
     }
+
+    function extractOrderUidParamsTest(bytes calldata orderUid)
+        public
+        pure
+        returns (
+            bytes32 orderDigest,
+            uint32 validTo,
+            address owner
+        )
+    {
+        return extractOrderUidParams(orderUid);
+    }
 }
