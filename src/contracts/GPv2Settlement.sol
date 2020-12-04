@@ -304,7 +304,7 @@ contract GPv2Settlement {
             uint32 validTo
         )
     {
-        require(orderUid.length == 32 + 4 + 20, "GPv2: invalid uid");
+        require(orderUid.length == 32 + 20 + 4, "GPv2: invalid uid");
         // Use assembly to efficiently decode packed calldata.
         // solhint-disable-next-line no-inline-assembly
         assembly {
