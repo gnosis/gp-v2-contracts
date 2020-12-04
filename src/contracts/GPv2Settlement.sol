@@ -305,6 +305,7 @@ contract GPv2Settlement {
         )
     {
         require(orderUid.length == 32 + 4 + 20, "GPv2: invalid uid");
+        // Use assembly to efficiently decode packed calldata.
         // solhint-disable-next-line no-inline-assembly
         assembly {
             orderDigest := calldataload(orderUid.offset)
