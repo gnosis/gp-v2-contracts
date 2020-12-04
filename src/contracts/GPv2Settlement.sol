@@ -301,10 +301,10 @@ contract GPv2Settlement {
         pure
         returns (bytes32 uid)
     {
-        // NOTE: Use the 64 bytes of scratch space for computing this hash
-        // instead of allocating. We hash a total of 52 bytes and write to
-        // memory in **reverse order** as memory operations write 32-bytes at a
-        // time but we want to use a packed encoding:
+        // NOTE: Use the 64 bytes of scratch space starting at memory address 0
+        // for computing this hash instead of allocating. We hash a total of 52
+        // bytes and write to memory in **reverse order** as memory operations
+        // write 32-bytes at a time and we want to use a packed encoding:
         //
         //       |           111111111122222222223333333333444444444455
         // byte  | 0123456789012345678901234567890123456789012345678901

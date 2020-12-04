@@ -10,6 +10,7 @@ import {
   allowanceManagerAddress,
   domain,
   computeOrderUid,
+  hashOrder,
 } from "../src/ts";
 
 import { builtAndDeployedMetadataCoincide } from "./bytecode";
@@ -547,6 +548,76 @@ describe("GPv2Settlement", () => {
         expect(transferAmount).to.deep.equal(
           executedSellAmount.add(executedFee),
         );
+      });
+    });
+
+    describe("Order Filled Amounts", () => {
+      const { sellAmount, buyAmount } = partialOrder;
+      const readOrderFilledAmountAfterProcessing = async (
+        { kind, partiallyFillable }: Pick<Order, "kind" | "partiallyFillable">,
+        executedAmount?: BigNumber,
+      ) => {
+        const order = {
+          ...partialOrder,
+          kind,
+          partiallyFillable,
+        };
+        const encoder = new SettlementEncoder(testDomain);
+        await encoder.signEncodeTrade(
+          order,
+          executedAmount || 0,
+          traders[0],
+          SigningScheme.TYPED_DATA,
+        );
+
+        await settlement.computeTradeExecutionsTest(
+          encoder.tokens,
+          encoder.clearingPrices(prices),
+          encoder.encodedTrades,
+        );
+
+        const orderUid = computeOrderUid(hashOrder(order), traders[0].address);
+        const filledAmount = await settlement.filledAmount(orderUid);
+
+        return filledAmount;
+      };
+
+      it("should fill the full sell amount for fill-or-kill sell orders", async () => {
+        const filledAmount = await readOrderFilledAmountAfterProcessing({
+          kind: OrderKind.SELL,
+          partiallyFillable: false,
+        });
+
+        expect(filledAmount).to.deep.equal(sellAmount);
+      });
+
+      it("should fill the full buy amount for fill-or-kill buy orders", async () => {
+        const filledAmount = await readOrderFilledAmountAfterProcessing({
+          kind: OrderKind.BUY,
+          partiallyFillable: false,
+        });
+
+        expect(filledAmount).to.deep.equal(buyAmount);
+      });
+
+      it("should fill the executed amount for partially filled sell orders", async () => {
+        const executedSellAmount = sellAmount.div(3);
+        const filledAmount = await readOrderFilledAmountAfterProcessing(
+          { kind: OrderKind.SELL, partiallyFillable: true },
+          executedSellAmount,
+        );
+
+        expect(filledAmount).to.deep.equal(executedSellAmount);
+      });
+
+      it("should fill the executed amount for partially filled buy orders", async () => {
+        const executedBuyAmount = buyAmount.div(4);
+        const filledAmount = await readOrderFilledAmountAfterProcessing(
+          { kind: OrderKind.BUY, partiallyFillable: true },
+          executedBuyAmount,
+        );
+
+        expect(filledAmount).to.deep.equal(executedBuyAmount);
       });
     });
 
