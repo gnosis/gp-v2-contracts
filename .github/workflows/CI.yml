@@ -26,6 +26,7 @@ jobs:
           restore-keys: |
             ${{ matrix.os }}-yarn-
       - run: yarn --frozen-lockfile
+      - run: yarn tsc
       - run: yarn build
       - run: yarn lint
       - run: yarn test

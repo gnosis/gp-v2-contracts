@@ -25,7 +25,7 @@ async function main() {
           buyAmount: ethers.utils.parseEther("13.37"),
           validTo: 0xffffffff,
           appData: i,
-          tip: ethers.constants.WeiPerEther,
+          feeAmount: ethers.constants.WeiPerEther,
           kind: OrderKind.SELL,
           partiallyFillable: false,
         },
