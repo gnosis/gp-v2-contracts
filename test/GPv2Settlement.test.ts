@@ -9,6 +9,7 @@ import {
   SigningScheme,
   allowanceManagerAddress,
   domain,
+  computeOrderUid,
 } from "../src/ts";
 
 import { builtAndDeployedMetadataCoincide } from "./bytecode";
@@ -133,6 +134,15 @@ describe("GPv2Settlement", () => {
     });
   });
 
+  describe("filledAmount", () => {
+    it("is zero for an uninitialized order", async () => {
+      const orderUid = "0x".padEnd(66, "0");
+      expect(await settlement.filledAmount(orderUid)).to.equal(
+        ethers.constants.Zero,
+      );
+    });
+  });
+
   describe("settle", () => {
     it("rejects transactions from non-solvers", async () => {
       await expect(settlement.settle([], [], [], [], [])).to.be.revertedWith(
@@ -147,6 +157,18 @@ describe("GPv2Settlement", () => {
       await expect(
         settlement.connect(solver).settle([], [], [], [], []),
       ).revertedWith("Final: not yet implemented");
+    });
+  });
+
+  describe("invalidateOrder", () => {
+    it("sets filled amount of the caller's order to max uint256", async () => {
+      const orderDigest = "0x".padEnd(66, "1");
+      const orderUid = computeOrderUid(orderDigest, traders[0].address);
+
+      await settlement.connect(traders[0]).invalidateOrder(orderDigest);
+      expect(await settlement.filledAmount(orderUid)).to.equal(
+        ethers.constants.MaxUint256,
+      );
     });
   });
 
