@@ -389,3 +389,21 @@ export function signOrder(
       );
   }
 }
+
+/**
+ * Compute the unique identifier describing a user order in the settlement
+ * contract.
+ *
+ * @param orderDigest The digest representing the parameters of the user order.
+ * @param userAddress The address of the user who owns the order.
+ * @returns A string that unequivocally identifies the order of the user.
+ */
+export function computeOrderUid(
+  orderDigest: string,
+  userAddress: string,
+): string {
+  return ethers.utils.solidityKeccak256(
+    ["bytes32", "address"],
+    [orderDigest, userAddress],
+  );
+}

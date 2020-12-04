@@ -44,6 +44,15 @@ contract GPv2Settlement {
     /// contract is created during deployment
     GPv2AllowanceManager internal immutable allowanceManager;
 
+    /// @dev Map each user order to the amount that has been filled so far. If
+    /// this amount is larger than or equal to the amount traded in the order
+    /// (amount sold for sell orders, amount bought for buy orders) then the
+    /// order cannot be traded anymore. If the order is fill or kill, then this
+    /// value is only used to determine whether the order has already been
+    /// executed.
+    /// See [`orderUid`] for how to represent an order with a single bytes32.
+    mapping(bytes32 => uint256) public filledAmount;
+
     constructor(GPv2Authentication authenticator_) {
         authenticator = authenticator_;
 
@@ -114,6 +123,13 @@ contract GPv2Settlement {
         require(encodedInteractions.length == 0, "not yet implemented");
         require(encodedOrderRefunds.length == 0, "not yet implemented");
         revert("Final: not yet implemented");
+    }
+
+    /// @dev Invalidate onchain an order that has been signed offline.
+    /// @param orderDigest The unique digest associated to the parameters of an
+    /// order. See [`orderUid`] for details.
+    function invalidateOrder(bytes32 orderDigest) public {
+        filledAmount[orderUid(orderDigest, msg.sender)] = uint256(-1);
     }
 
     /// @dev Process all trades for EOA orders one at a time returning the
@@ -220,33 +236,55 @@ contract GPv2Settlement {
             "GPv2: limit price not respected"
         );
 
+        uint256 executedSellAmount;
+        uint256 executedBuyAmount;
+        uint256 executedFeeAmount;
+
+        // NOTE: Don't use `SafeMath.div` anywhere here as it allocates a string
+        // even if it does not revert. The method only checks that the divisor
+        // is non-zero and `revert`s in that case instead of consuming all of
+        // the remaining transaction gas when dividing by zero.
         if (order.kind == GPv2Encoding.OrderKind.Sell) {
-            uint256 executedSellAmount;
             if (order.partiallyFillable) {
                 executedSellAmount = trade.executedAmount;
+                executedFeeAmount =
+                    order.feeAmount.mul(executedSellAmount) /
+                    order.sellAmount;
             } else {
                 executedSellAmount = order.sellAmount;
+                executedFeeAmount = order.feeAmount;
             }
 
-            inTransfer.amount = executedSellAmount;
-            // NOTE: Don't use `SafeMath.div` here as it allocates a string even
-            // if it does not revert. The method only checks that the divisor is
-            // non-zero and `revert`s in that case instead of consuming all of
-            // the remaining transaction gas when dividing by zero.
-            outTransfer.amount = executedSellAmount.mul(sellPrice) / buyPrice;
+            executedBuyAmount = executedSellAmount.mul(sellPrice) / buyPrice;
         } else {
-            uint256 executedBuyAmount;
             if (order.partiallyFillable) {
                 executedBuyAmount = trade.executedAmount;
+                executedFeeAmount =
+                    order.feeAmount.mul(executedBuyAmount) /
+                    order.buyAmount;
             } else {
                 executedBuyAmount = order.buyAmount;
+                executedFeeAmount = order.feeAmount;
             }
 
-            // NOTE: Don't use `SafeMath.div` for same reason as above.
-            inTransfer.amount = executedBuyAmount.mul(buyPrice) / sellPrice;
-            outTransfer.amount = executedBuyAmount;
+            executedSellAmount = executedBuyAmount.mul(buyPrice) / sellPrice;
         }
 
-        inTransfer.amount = inTransfer.amount.add(order.feeAmount);
+        inTransfer.amount = executedSellAmount.add(executedFeeAmount);
+        outTransfer.amount = executedBuyAmount;
+    }
+
+    /// @dev Compute a unique identifier that represents a user order.
+    /// @param orderDigest The unique digest associated to the parameters of an
+    /// order (an instance of the Order struct in the [`GPv2Encoding`] library).
+    /// The order digest is the (unpacked) hash of all entries in the order in
+    /// which they appear.
+    /// @param owner The address of the user to assign to the order.
+    function orderUid(bytes32 orderDigest, address owner)
+        private
+        pure
+        returns (bytes32)
+    {
+        return keccak256(abi.encodePacked(orderDigest, owner));
     }
 }
