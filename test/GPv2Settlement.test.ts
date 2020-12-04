@@ -217,6 +217,30 @@ describe("GPv2Settlement", () => {
       expect(outTransfers.length).to.equal(tradeCount);
     });
 
+    it("should revert if the order expired", async () => {
+      const { timestamp } = await ethers.provider.getBlock("latest");
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
+        {
+          ...partialOrder,
+          validTo: timestamp - 1,
+          kind: OrderKind.SELL,
+          partiallyFillable: false,
+        },
+        0,
+        traders[0],
+        SigningScheme.TYPED_DATA,
+      );
+
+      await expect(
+        settlement.computeTradeExecutionsTest(
+          encoder.tokens,
+          encoder.clearingPrices(prices),
+          encoder.encodedTrades,
+        ),
+      ).to.be.revertedWith("order expired");
+    });
+
     it("should revert if the limit price is not respected", async () => {
       const sellAmount = ethers.utils.parseEther("100.0");
       const sellPrice = 1;
