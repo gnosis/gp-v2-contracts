@@ -1,16 +1,17 @@
 {
-  "name": "@gnosis.pm/oba-contracts",
-  "version": "0.0.1",
+  "name": "@gnosis.pm/gp-v2-contracts",
+  "version": "0.0.1-alpha.1",
   "license": "LGPL-3.0-or-later",
   "scripts": {
-    "build": "hardhat compile",
+    "build": "tsc && hardhat compile",
     "deploy": "hardhat deploy",
     "test": "hardhat test",
     "bench:decodeTrade": "hardhat run bench/decodeTrade.ts",
     "lint": "yarn lint:sol && yarn lint:ts",
     "lint:sol": "solhint 'src/contracts/**/*.sol'",
     "lint:ts": "eslint --max-warnings 0 .",
-    "fmt:sol": "prettier 'src/contracts/**/*.sol' -w"
+    "fmt:sol": "prettier 'src/contracts/**/*.sol' -w",
+    "prepack": "yarn build && yarn deploy --network rinkeby"
   },
   "dependencies": {
     "ethers": "^5.0.23"
@@ -43,5 +44,14 @@
     "ts-node": "^9.1.0",
     "typescript": "^4.1.2",
     "yargs": "^16.1.1"
-  }
+  },
+  "main": "lib/ts/index.js",
+  "files": [
+    "/bench",
+    "/build",
+    "/deployments",
+    "/lib",
+    "/src"
+  ],
+  "types": "lib/ts/index.d.ts"
 }

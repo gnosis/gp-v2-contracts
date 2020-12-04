@@ -1,3 +1,5 @@
 build/
+deployments/
 node_modules/
+lib/
 yarn-error.log
