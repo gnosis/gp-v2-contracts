@@ -148,7 +148,6 @@ contract GPv2Settlement {
         bytes calldata encodedTrades
     )
         internal
-        view
         returns (
             GPv2AllowanceManager.Transfer[] memory inTransfers,
             GPv2AllowanceManager.Transfer[] memory outTransfers
@@ -193,7 +192,7 @@ contract GPv2Settlement {
         uint256 buyPrice,
         GPv2AllowanceManager.Transfer memory inTransfer,
         GPv2AllowanceManager.Transfer memory outTransfer
-    ) internal view {
+    ) internal {
         GPv2Encoding.Order memory order = trade.order;
         // NOTE: Currently, the above instanciation allocates an unitialized
         // `Order` that gets never used. Adjust the free memory pointer to free
@@ -240,6 +239,9 @@ contract GPv2Settlement {
         uint256 executedBuyAmount;
         uint256 executedFeeAmount;
 
+        bytes32 uid = orderUid(trade.digest, trade.owner);
+        uint256 currentFilledAmount = filledAmount[uid];
+
         // NOTE: Don't use `SafeMath.div` anywhere here as it allocates a string
         // even if it does not revert. The method only checks that the divisor
         // is non-zero and `revert`s in that case instead of consuming all of
@@ -256,6 +258,12 @@ contract GPv2Settlement {
             }
 
             executedBuyAmount = executedSellAmount.mul(sellPrice) / buyPrice;
+
+            currentFilledAmount = currentFilledAmount.add(executedSellAmount);
+            require(
+                currentFilledAmount <= order.sellAmount,
+                "GPv2: order filled"
+            );
         } else {
             if (order.partiallyFillable) {
                 executedBuyAmount = trade.executedAmount;
@@ -268,10 +276,18 @@ contract GPv2Settlement {
             }
 
             executedSellAmount = executedBuyAmount.mul(buyPrice) / sellPrice;
+
+            currentFilledAmount = currentFilledAmount.add(executedBuyAmount);
+            require(
+                currentFilledAmount <= order.buyAmount,
+                "GPv2: order filled"
+            );
         }
 
         inTransfer.amount = executedSellAmount.add(executedFeeAmount);
         outTransfer.amount = executedBuyAmount;
+
+        filledAmount[uid] = currentFilledAmount;
     }
 
     /// @dev Compute a unique identifier that represents a user order.
@@ -283,8 +299,31 @@ contract GPv2Settlement {
     function orderUid(bytes32 orderDigest, address owner)
         private
         pure
-        returns (bytes32)
+        returns (bytes32 uid)
     {
-        return keccak256(abi.encodePacked(orderDigest, owner));
+        // NOTE: Use the 64 bytes of scratch space starting at memory address 0
+        // for computing this hash instead of allocating. We hash a total of 52
+        // bytes and write to memory in **reverse order** as memory operations
+        // write 32-bytes at a time and we want to use a packed encoding. This
+        // means, for example, that after writing the value of `owner` to bytes
+        // `20:52`, writing the `orderDigest` to bytes `0:32` will **overwrite**
+        // bytes `20:32`. This is desireable as addresses are only 20 bytes and
+        // `20:32` should be `0`s:
+        //
+        //        |           111111111122222222223333333333444444444455
+        //   byte | 0123456789012345678901234567890123456789012345678901
+        // -------+-----------------------------------------------------
+        //  field | [.........orderDigest..........][......owner.......]
+        // -------+-----------------------------------------------------
+        // mstore |                     [00000000000.......owner.......]
+        //        | [.........orderDigest..........]
+        //
+        // <https://docs.soliditylang.org/en/v0.7.5/internals/layout_in_memory.html>
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            mstore(20, owner)
+            mstore(0, orderDigest)
+            uid := keccak256(0, 52)
+        }
     }
 }
