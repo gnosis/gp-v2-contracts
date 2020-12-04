@@ -190,6 +190,7 @@ contract GPv2Settlement {
             mstore(0x40, sub(mload(0x40), 288))
         }
 
+        // solhint-disable-next-line not-rely-on-time
         require(order.validTo >= block.timestamp, "GPv2: order expired");
 
         inTransfer.owner = trade.owner;

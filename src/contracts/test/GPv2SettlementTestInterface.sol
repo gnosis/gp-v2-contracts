@@ -57,6 +57,7 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
             mem := mload(0x40)
         }
 
+        // solhint-disable-next-line not-rely-on-time
         trade.order.validTo = uint32(block.timestamp);
         computeTradeExecution(trade, 1, 1, inTransfer, outTransfer);
 
