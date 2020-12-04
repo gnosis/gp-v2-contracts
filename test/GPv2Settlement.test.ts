@@ -206,7 +206,7 @@ describe("GPv2Settlement", () => {
       }
 
       const [inTransfers, outTransfers] = parseTransfers(
-        await settlement.computeTradeExecutionsTest(
+        await settlement.callStatic.computeTradeExecutionsTest(
           encoder.tokens,
           encoder.clearingPrices(prices),
           encoder.encodedTrades,
@@ -265,7 +265,7 @@ describe("GPv2Settlement", () => {
         toNumberLossy(buyAmount.mul(buyPrice)),
       );
       await expect(
-        settlement.computeTradeExecutionsTest(
+        settlement.callStatic.computeTradeExecutionsTest(
           encoder.tokens,
           encoder.clearingPrices({
             [sellToken]: sellPrice,
@@ -290,7 +290,7 @@ describe("GPv2Settlement", () => {
       );
 
       const { sellAmount, buyAmount } = partialOrder;
-      const executions = settlement.computeTradeExecutionsTest(
+      const executions = settlement.callStatic.computeTradeExecutionsTest(
         encoder.tokens,
         encoder.clearingPrices({
           [sellToken]: buyAmount,
@@ -329,7 +329,7 @@ describe("GPv2Settlement", () => {
           [{ amount: executedSellAmount }],
           [{ amount: executedBuyAmount }],
         ] = parseTransfers(
-          await settlement.computeTradeExecutionsTest(
+          await settlement.callStatic.computeTradeExecutionsTest(
             encoder.tokens,
             encoder.clearingPrices(prices),
             encoder.encodedTrades,
@@ -489,7 +489,7 @@ describe("GPv2Settlement", () => {
         );
 
         const [[inTransfer]] = parseTransfers(
-          await settlement.computeTradeExecutionsTest(
+          await settlement.callStatic.computeTradeExecutionsTest(
             encoder.tokens,
             encoder.clearingPrices(prices),
             encoder.encodedTrades,
@@ -559,20 +559,20 @@ describe("GPv2Settlement", () => {
 
       const encoder = new SettlementEncoder(testDomain);
       await encoder.signEncodeTrade(
-        order,
+        { ...order, appData: 0 },
         0,
         traders[0],
         SigningScheme.TYPED_DATA,
       );
       await encoder.signEncodeTrade(
-        order,
+        { ...order, appData: 1 },
         ethers.utils.parseEther("1.0"),
         traders[0],
         SigningScheme.TYPED_DATA,
       );
 
       const [inTransfers, outTransfers] = parseTransfers(
-        await settlement.computeTradeExecutionsTest(
+        await settlement.callStatic.computeTradeExecutionsTest(
           encoder.tokens,
           encoder.clearingPrices(prices),
           encoder.encodedTrades,
@@ -586,9 +586,9 @@ describe("GPv2Settlement", () => {
 
   describe("computeTradeExecution", () => {
     it("should not allocate additional memory", async () => {
-      expect(await settlement.computeTradeExecutionMemoryTest()).to.deep.equal(
-        ethers.constants.Zero,
-      );
+      expect(
+        await settlement.callStatic.computeTradeExecutionMemoryTest(),
+      ).to.deep.equal(ethers.constants.Zero);
     });
   });
 });

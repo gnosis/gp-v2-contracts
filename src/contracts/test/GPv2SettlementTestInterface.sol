@@ -27,7 +27,6 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
         bytes calldata encodedTrades
     )
         external
-        view
         returns (
             GPv2AllowanceManager.Transfer[] memory inTransfers,
             GPv2AllowanceManager.Transfer[] memory outTransfers
@@ -40,11 +39,7 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
         );
     }
 
-    function computeTradeExecutionMemoryTest()
-        external
-        view
-        returns (uint256 mem)
-    {
+    function computeTradeExecutionMemoryTest() external returns (uint256 mem) {
         GPv2Encoding.Trade memory trade;
         GPv2AllowanceManager.Transfer memory inTransfer;
         GPv2AllowanceManager.Transfer memory outTransfer;
