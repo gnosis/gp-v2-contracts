@@ -1,3 +1,5 @@
+import "@nomiclabs/hardhat-waffle"
+
 import { utils } from "ethers";
 import { ethers } from "hardhat";
 

@@ -1,5 +1,7 @@
+import "hardhat-deploy"
+
 import { DeployFunction } from "hardhat-deploy/types";
-import { HardhatRuntimeEnvironment } from "hardhat/types";
+import { HardhatRuntimeEnvironment } from "hardhat/types/runtime";
 
 import { SALT, contractNames } from "../ts/deploy";
 

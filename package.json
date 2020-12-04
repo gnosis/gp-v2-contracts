@@ -1,9 +1,9 @@
 {
   "name": "@gnosis.pm/gp-v2-contracts",
-  "version": "0.0.1-alpha.0",
+  "version": "0.0.1-alpha.1",
   "license": "LGPL-3.0-or-later",
   "scripts": {
-    "build": "hardhat compile",
+    "build": "tsc && hardhat compile",
     "deploy": "hardhat deploy",
     "test": "hardhat test",
     "bench:decodeTrade": "hardhat run bench/decodeTrade.ts",
@@ -45,10 +45,12 @@
     "typescript": "^4.1.2",
     "yargs": "^16.1.1"
   },
+  "main": "lib/ts/index.js",
   "files": [
     "/build",
     "/deployments",
     "/lib",
     "/src"
-  ]
+  ],
+  "types": "lib/ts/index.d.ts"
 }
