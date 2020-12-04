@@ -98,14 +98,6 @@ contract GPv2Settlement {
     ///     settlement
     ///   - Critically, user orders are entirely protected
     ///
-    /// Note that settlements can specify fees encoded as a fee factor.  The fee
-    /// factor to use for the trade. The actual fee is computed as
-    /// `1 / feeFactor`. This means that the received amount is expected to be
-    /// `executedBuyAmount * (feeFactor - 1) / feeFactor`. Note that a value of
-    /// `0` is reserved to mean no fees. This is useful for example when
-    /// settling directly with Uniswap where we don't want users to incur
-    /// additional fees.
-    ///
     /// Note that some parameters are encoded as packed bytes in order to save
     /// calldata gas. For more information on encoding format consult the
     /// [`GPv2Encoding`] library.
@@ -114,7 +106,6 @@ contract GPv2Settlement {
     /// Orders and interactions encode tokens as indices into this array.
     /// @param clearingPrices An array of clearing prices where the `i`-th price
     /// is for the `i`-th token in the [`tokens`] array.
-    /// @param feeFactor The fee factor to use for the trade.
     /// @param encodedTrades Encoded trades for signed EOA orders.
     /// @param encodedInteractions Encoded smart contract interactions.
     /// @param encodedOrderRefunds Encoded order refunds for clearing storage
@@ -122,14 +113,12 @@ contract GPv2Settlement {
     function settle(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
-        uint256 feeFactor,
         bytes calldata encodedTrades,
         bytes calldata encodedInteractions,
         bytes calldata encodedOrderRefunds
     ) external view onlySolver {
         require(tokens.length == 0, "not yet implemented");
         require(clearingPrices.length == 0, "not yet implemented");
-        require(feeFactor == 0, "not yet implemented");
         require(encodedTrades.length == 0, "not yet implemented");
         require(encodedInteractions.length == 0, "not yet implemented");
         require(encodedOrderRefunds.length == 0, "not yet implemented");
@@ -153,7 +142,7 @@ contract GPv2Settlement {
     /// @param encodedTrades Encoded trades for signed EOA orders.
     /// @return inTransfers Array of transfers into the settlement contract.
     /// @return outTransfers Array of transfers to pay out to EOAs.
-    function processTrades(
+    function computeTradeExecutions(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
         bytes calldata encodedTrades
@@ -176,7 +165,7 @@ contract GPv2Settlement {
                 tokens,
                 trade
             );
-            processTrade(
+            computeTradeExecution(
                 trade,
                 clearingPrices[trade.sellTokenIndex],
                 clearingPrices[trade.buyTokenIndex],
@@ -186,7 +175,10 @@ contract GPv2Settlement {
         }
     }
 
-    /// @dev Process trades for a single EOA order.
+    /// @dev Compute the in and out transfer amounts for a single EOA order
+    /// trade. This function reverts if:
+    /// - The order's limit price is not respected.
+    ///
     /// @param trade The trade to process.
     /// @param sellPrice The price of the order's sell token.
     /// @param buyPrice The price of the order's buy token.
@@ -194,7 +186,7 @@ contract GPv2Settlement {
     /// settlement contract to execute trade.
     /// @param outTransfer Memory location to set computed transfer out to order
     /// owner to execute trade.
-    function processTrade(
+    function computeTradeExecution(
         GPv2Encoding.Trade memory trade,
         uint256 sellPrice,
         uint256 buyPrice,
@@ -218,6 +210,28 @@ contract GPv2Settlement {
         outTransfer.owner = trade.owner;
         outTransfer.token = order.buyToken;
 
+        // NOTE: The following computation is derived from the equation:
+        // ```
+        // amount_x * price_x = amount_y * price_y
+        // ```
+        // Intuitively, if a chocolate bar is 0,50€ and a beer is 4€, 1 beer
+        // is roughly worth 8 chocolate bars (`1 * 4 = 8 * 0.5`). From this
+        // equation, we can derive:
+        // - The limit price for selling `x` and buying `y` is respected iff
+        // ```
+        // limit_x * price_x >= limit_y * price_y
+        // ```
+        // - The executed amount of token `y` given some amount of `x` and
+        //   clearing prices is:
+        // ```
+        // amount_y = amount_x * price_x / price_y
+        // ```
+
+        require(
+            order.sellAmount.mul(sellPrice) >= order.buyAmount.mul(buyPrice),
+            "GPv2: limit price not respected"
+        );
+
         if (order.kind == GPv2Encoding.OrderKind.Sell) {
             uint256 executedSellAmount;
             if (order.partiallyFillable) {
@@ -231,7 +245,7 @@ contract GPv2Settlement {
             // if it does not revert. The method only checks that the divisor is
             // non-zero and `revert`s in that case instead of consuming all of
             // the remaining transaction gas when dividing by zero.
-            outTransfer.amount = executedSellAmount.mul(buyPrice) / sellPrice;
+            outTransfer.amount = executedSellAmount.mul(sellPrice) / buyPrice;
         } else {
             uint256 executedBuyAmount;
             if (order.partiallyFillable) {
@@ -241,11 +255,11 @@ contract GPv2Settlement {
             }
 
             // NOTE: Don't use `SafeMath.div` for same reason as above.
-            inTransfer.amount = executedBuyAmount.mul(sellPrice) / buyPrice;
+            inTransfer.amount = executedBuyAmount.mul(buyPrice) / sellPrice;
             outTransfer.amount = executedBuyAmount;
         }
 
-        inTransfer.amount = inTransfer.amount.add(order.tip);
+        inTransfer.amount = inTransfer.amount.add(order.feeAmount);
     }
 
     /// @dev Compute a unique identifier that represents a user order.

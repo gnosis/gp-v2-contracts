@@ -11,6 +11,8 @@ import {
   computeOrderUid,
 } from "../src/ts";
 
+import { builtAndDeployedMetadataCoincide } from "./bytecode";
+
 interface Transfer {
   owner: string;
   token: string;
@@ -27,7 +29,12 @@ function parseTransfers(transfers: unknown[][][]): [Transfer[], Transfer[]] {
   return [transfers[0].map(parseTransfer), transfers[1].map(parseTransfer)];
 }
 
-import { builtAndDeployedMetadataCoincide } from "./bytecode";
+function toNumberLossy(value: BigNumber): number {
+  // NOTE: BigNumber throws an exception when if is outside the range of
+  // representable integers for JavaScript's double precision floating point
+  // numbers. For some tests, that is OK, so perform a lossy conversion.
+  return parseInt(value.toString());
+}
 
 describe("GPv2Settlement", () => {
   const [deployer, owner, solver, ...traders] = waffle.provider.getWallets();
@@ -137,7 +144,7 @@ describe("GPv2Settlement", () => {
 
   describe("settle", () => {
     it("rejects transactions from non-solvers", async () => {
-      await expect(settlement.settle([], [], 0, [], [], [])).to.be.revertedWith(
+      await expect(settlement.settle([], [], [], [], [])).to.be.revertedWith(
         "GPv2: not a solver",
       );
     });
@@ -147,7 +154,7 @@ describe("GPv2Settlement", () => {
       // TODO - this will have to be changed when other constraints become active
       // and when settle function no longer reverts.
       await expect(
-        settlement.connect(solver).settle([], [], 0, [], [], []),
+        settlement.connect(solver).settle([], [], [], [], []),
       ).revertedWith("Final: not yet implemented");
     });
   });
@@ -164,20 +171,21 @@ describe("GPv2Settlement", () => {
     });
   });
 
-  describe("processTrades", () => {
-    const tokens = [`0x${"11".repeat(20)}`, `0x${"22".repeat(20)}`];
+  describe("computeTradeExecutions", () => {
+    const sellToken = `0x${"11".repeat(20)}`;
+    const buyToken = `0x${"22".repeat(20)}`;
     const prices = {
-      [tokens[0]]: 1,
-      [tokens[1]]: 2,
+      [sellToken]: 1,
+      [buyToken]: 2,
     };
     const partialOrder = {
-      sellToken: tokens[0],
-      buyToken: tokens[1],
+      sellToken,
+      buyToken,
       sellAmount: ethers.utils.parseEther("42"),
       buyAmount: ethers.utils.parseEther("13.37"),
       validTo: 0xffffffff,
       appData: 0,
-      tip: ethers.constants.Zero,
+      feeAmount: ethers.constants.Zero,
     };
 
     it("should compute in/out transfers for multiple trades", async () => {
@@ -197,7 +205,7 @@ describe("GPv2Settlement", () => {
       }
 
       const [inTransfers, outTransfers] = parseTransfers(
-        await settlement.processTradesTest(
+        await settlement.computeTradeExecutionsTest(
           encoder.tokens,
           encoder.clearingPrices(prices),
           encoder.encodedTrades,
@@ -208,10 +216,75 @@ describe("GPv2Settlement", () => {
       expect(outTransfers.length).to.equal(tradeCount);
     });
 
+    it("should revert if the limit price is not respected", async () => {
+      const sellAmount = ethers.utils.parseEther("100.0");
+      const sellPrice = 1;
+      const buyAmount = ethers.utils.parseEther("1.0");
+      const buyPrice = 1000;
+
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
+        {
+          ...partialOrder,
+          sellAmount,
+          buyAmount,
+          kind: OrderKind.SELL,
+          partiallyFillable: false,
+        },
+        0,
+        traders[0],
+        SigningScheme.TYPED_DATA,
+      );
+
+      expect(toNumberLossy(sellAmount.mul(sellPrice))).not.to.be.gte(
+        toNumberLossy(buyAmount.mul(buyPrice)),
+      );
+      await expect(
+        settlement.computeTradeExecutionsTest(
+          encoder.tokens,
+          encoder.clearingPrices({
+            [sellToken]: sellPrice,
+            [buyToken]: buyPrice,
+          }),
+          encoder.encodedTrades,
+        ),
+      ).to.be.revertedWith("limit price not respected");
+    });
+
+    it("should not revert if the clearing price is exactly at the limit price", async () => {
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
+        {
+          ...partialOrder,
+          kind: OrderKind.SELL,
+          partiallyFillable: false,
+        },
+        0,
+        traders[0],
+        SigningScheme.TYPED_DATA,
+      );
+
+      const { sellAmount, buyAmount } = partialOrder;
+      const executions = settlement.computeTradeExecutionsTest(
+        encoder.tokens,
+        encoder.clearingPrices({
+          [sellToken]: buyAmount,
+          [buyToken]: sellAmount,
+        }),
+        encoder.encodedTrades,
+      );
+      await expect(executions).to.not.be.reverted;
+
+      const [, [{ amount: executedBuyAmount }]] = parseTransfers(
+        await executions,
+      );
+      expect(executedBuyAmount).to.deep.equal(buyAmount);
+    });
+
     describe("Order Variations", async () => {
       const { sellAmount, buyAmount } = partialOrder;
       const executedAmount = ethers.utils.parseEther("10.0");
-      const processTradeVariant = async (
+      const computeTradeExecutionVariant = async (
         kind: OrderKind,
         partiallyFillable: boolean,
       ) => {
@@ -231,7 +304,7 @@ describe("GPv2Settlement", () => {
           [{ amount: executedSellAmount }],
           [{ amount: executedBuyAmount }],
         ] = parseTransfers(
-          await settlement.processTradesTest(
+          await settlement.computeTradeExecutionsTest(
             encoder.tokens,
             encoder.clearingPrices(prices),
             encoder.encodedTrades,
@@ -252,12 +325,21 @@ describe("GPv2Settlement", () => {
           sellPrice,
           executedBuyAmount,
           buyPrice,
-        } = await processTradeVariant(OrderKind.SELL, false);
+        } = await computeTradeExecutionVariant(OrderKind.SELL, false);
 
         expect(executedSellAmount).to.deep.equal(sellAmount);
         expect(executedBuyAmount).to.deep.equal(
-          sellAmount.mul(buyPrice).div(sellPrice),
+          sellAmount.mul(sellPrice).div(buyPrice),
         );
+      });
+
+      it("should respect the limit price for fill-or-kill sell orders", async () => {
+        const { executedBuyAmount } = await computeTradeExecutionVariant(
+          OrderKind.SELL,
+          false,
+        );
+
+        expect(executedBuyAmount.gt(buyAmount)).to.be.true;
       });
 
       it("should compute amounts for fill-or-kill buy orders", async () => {
@@ -266,12 +348,21 @@ describe("GPv2Settlement", () => {
           sellPrice,
           executedBuyAmount,
           buyPrice,
-        } = await processTradeVariant(OrderKind.BUY, false);
+        } = await computeTradeExecutionVariant(OrderKind.BUY, false);
 
         expect(executedSellAmount).to.deep.equal(
-          buyAmount.mul(sellPrice).div(buyPrice),
+          buyAmount.mul(buyPrice).div(sellPrice),
         );
         expect(executedBuyAmount).to.deep.equal(buyAmount);
+      });
+
+      it("should respect the limit price for fill-or-kill buy orders", async () => {
+        const { executedSellAmount } = await computeTradeExecutionVariant(
+          OrderKind.BUY,
+          false,
+        );
+
+        expect(executedSellAmount.lt(sellAmount)).to.be.true;
       });
 
       it("should compute amounts for partially fillable sell orders", async () => {
@@ -280,12 +371,25 @@ describe("GPv2Settlement", () => {
           sellPrice,
           executedBuyAmount,
           buyPrice,
-        } = await processTradeVariant(OrderKind.SELL, true);
+        } = await computeTradeExecutionVariant(OrderKind.SELL, true);
 
         expect(executedSellAmount).to.deep.equal(executedAmount);
         expect(executedBuyAmount).to.deep.equal(
-          executedAmount.mul(buyPrice).div(sellPrice),
+          executedAmount.mul(sellPrice).div(buyPrice),
         );
+      });
+
+      it("should respect the limit price for partially fillable sell orders", async () => {
+        const {
+          executedSellAmount,
+          executedBuyAmount,
+        } = await computeTradeExecutionVariant(OrderKind.SELL, true);
+
+        expect(
+          executedBuyAmount
+            .mul(sellAmount)
+            .gt(executedSellAmount.mul(buyAmount)),
+        ).to.be.true;
       });
 
       it("should compute amounts for partially fillable buy orders", async () => {
@@ -294,12 +398,25 @@ describe("GPv2Settlement", () => {
           sellPrice,
           executedBuyAmount,
           buyPrice,
-        } = await processTradeVariant(OrderKind.BUY, true);
+        } = await computeTradeExecutionVariant(OrderKind.BUY, true);
 
         expect(executedSellAmount).to.deep.equal(
-          executedAmount.mul(sellPrice).div(buyPrice),
+          executedAmount.mul(buyPrice).div(sellPrice),
         );
         expect(executedBuyAmount).to.deep.equal(executedAmount);
+      });
+
+      it("should respect the limit price for partially fillable buy orders", async () => {
+        const {
+          executedSellAmount,
+          executedBuyAmount,
+        } = await computeTradeExecutionVariant(OrderKind.BUY, true);
+
+        expect(
+          executedBuyAmount
+            .mul(sellAmount)
+            .gt(executedSellAmount.mul(buyAmount)),
+        ).to.be.true;
       });
     });
 
@@ -325,7 +442,7 @@ describe("GPv2Settlement", () => {
       );
 
       const [inTransfers, outTransfers] = parseTransfers(
-        await settlement.processTradesTest(
+        await settlement.computeTradeExecutionsTest(
           encoder.tokens,
           encoder.clearingPrices(prices),
           encoder.encodedTrades,
@@ -336,11 +453,11 @@ describe("GPv2Settlement", () => {
       expect(outTransfers[0]).to.deep.equal(outTransfers[1]);
     });
 
-    it("should add the tip to the in transfer", async () => {
-      const tip = ethers.utils.parseEther("10");
+    it("should add the fee to the in transfer", async () => {
+      const feeAmount = ethers.utils.parseEther("10");
       const order = {
         ...partialOrder,
-        tip,
+        feeAmount,
         kind: OrderKind.SELL,
         partiallyFillable: false,
       };
@@ -354,20 +471,20 @@ describe("GPv2Settlement", () => {
       );
 
       const [[inTransfer]] = parseTransfers(
-        await settlement.processTradesTest(
+        await settlement.computeTradeExecutionsTest(
           encoder.tokens,
           encoder.clearingPrices(prices),
           encoder.encodedTrades,
         ),
       );
 
-      expect(inTransfer.amount).to.deep.equal(order.sellAmount.add(tip));
+      expect(inTransfer.amount).to.deep.equal(order.sellAmount.add(feeAmount));
     });
   });
 
-  describe("processTrade", () => {
+  describe("computeTradeExecution", () => {
     it("should not allocate additional memory", async () => {
-      expect(await settlement.processTradeMemoryTest()).to.deep.equal(
+      expect(await settlement.computeTradeExecutionMemoryTest()).to.deep.equal(
         ethers.constants.Zero,
       );
     });
