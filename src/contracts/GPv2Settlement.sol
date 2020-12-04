@@ -304,15 +304,19 @@ contract GPv2Settlement {
         // NOTE: Use the 64 bytes of scratch space starting at memory address 0
         // for computing this hash instead of allocating. We hash a total of 52
         // bytes and write to memory in **reverse order** as memory operations
-        // write 32-bytes at a time and we want to use a packed encoding:
+        // write 32-bytes at a time and we want to use a packed encoding. This
+        // means, for example, that after writing the value of `owner` to bytes
+        // `20:52`, writing the `orderDigest` to bytes `0:32` will **overwrite**
+        // bytes `20:32`. This is desireable as addresses are only 20 bytes and
+        // `20:32` should be `0`s:
         //
-        //       |           111111111122222222223333333333444444444455
-        // byte  | 0123456789012345678901234567890123456789012345678901
-        // ------+-----------------------------------------------------
-        // field | [..........orderDigest.........][.......owner......]
-        // ------+-----------------------------------------------------
-        // write |                     [.............owner............]
-        //       | [..........orderDigest.........]
+        //        |           111111111122222222223333333333444444444455
+        //   byte | 0123456789012345678901234567890123456789012345678901
+        // -------+-----------------------------------------------------
+        //  field | [.........orderDigest..........][......owner.......]
+        // -------+-----------------------------------------------------
+        // mstore |                     [00000000000.......owner.......]
+        //        | [.........orderDigest..........]
         //
         // <https://docs.soliditylang.org/en/v0.7.5/internals/layout_in_memory.html>
         // solhint-disable-next-line no-inline-assembly
