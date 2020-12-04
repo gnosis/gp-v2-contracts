@@ -1,5 +1,3 @@
-import "hardhat-deploy"
-
 import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types/runtime";
 

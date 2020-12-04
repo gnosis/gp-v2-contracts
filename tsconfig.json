@@ -11,5 +11,4 @@
     "target": "es2020",
     "typeRoots": ["node_modules/@types", "typings"]
   },
-  "include": ["src", "bench"],
 }
