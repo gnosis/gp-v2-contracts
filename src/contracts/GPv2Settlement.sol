@@ -177,6 +177,7 @@ contract GPv2Settlement {
 
     /// @dev Compute the in and out transfer amounts for a single EOA order
     /// trade. This function reverts if:
+    /// - The order has expired
     /// - The order's limit price is not respected.
     ///
     /// @param trade The trade to process.
@@ -192,7 +193,7 @@ contract GPv2Settlement {
         uint256 buyPrice,
         GPv2AllowanceManager.Transfer memory inTransfer,
         GPv2AllowanceManager.Transfer memory outTransfer
-    ) internal pure {
+    ) internal view {
         GPv2Encoding.Order memory order = trade.order;
         // NOTE: Currently, the above instanciation allocates an unitialized
         // `Order` that gets never used. Adjust the free memory pointer to free
@@ -204,6 +205,9 @@ contract GPv2Settlement {
         assembly {
             mstore(0x40, sub(mload(0x40), 288))
         }
+
+        // solhint-disable-next-line not-rely-on-time
+        require(order.validTo >= block.timestamp, "GPv2: order expired");
 
         inTransfer.owner = trade.owner;
         inTransfer.token = order.sellToken;
