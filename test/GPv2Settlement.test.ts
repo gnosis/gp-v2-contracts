@@ -1,3 +1,4 @@
+import IERC20 from "@openzeppelin/contracts/build/contracts/IERC20.json";
 import { expect } from "chai";
 import { BigNumber, Contract, TypedDataDomain } from "ethers";
 import { artifacts, ethers, waffle } from "hardhat";
@@ -13,7 +14,7 @@ import {
   hashOrder,
 } from "../src/ts";
 
-import { ExecutedTrade } from "./GPv2TradeExecution.test";
+import { ExecutedTrade, composeExecutedTrade } from "./GPv2TradeExecution.test";
 import { builtAndDeployedMetadataCoincide } from "./bytecode";
 
 function parseExecutedTrades(trades: unknown[][]): ExecutedTrade[] {
@@ -24,6 +25,18 @@ function parseExecutedTrades(trades: unknown[][]): ExecutedTrade[] {
     sellAmount: trade[3] as BigNumber,
     buyAmount: trade[4] as BigNumber,
   }));
+}
+
+function composeTransfers(
+  trades: Pick<ExecutedTrade, "owner" | "buyToken" | "buyAmount">[],
+): ReturnType<typeof composeExecutedTrade>[] {
+  return trades.map((partialTrade) =>
+    composeExecutedTrade({
+      ...partialTrade,
+      sellToken: ethers.constants.AddressZero,
+      sellAmount: ethers.constants.Zero,
+    }),
+  );
 }
 
 function toNumberLossy(value: BigNumber): number {
@@ -733,6 +746,41 @@ describe("GPv2Settlement", () => {
           "GPv2: invalid uid",
         );
       });
+    });
+  });
+
+  describe("transferOut", () => {
+    it("should execute ERC20 transfers", async () => {
+      const NonStandardERC20 = await artifacts.readArtifact("NonStandardERC20");
+      const tokens = [
+        await waffle.deployMockContract(deployer, IERC20.abi),
+        await waffle.deployMockContract(deployer, NonStandardERC20.abi),
+      ];
+
+      const amount = ethers.utils.parseEther("13.37");
+      await tokens[0].mock.transfer
+        .withArgs(traders[0].address, amount)
+        .returns(true);
+      await tokens[1].mock.transfer
+        .withArgs(traders[1].address, amount)
+        .returns();
+
+      await expect(
+        settlement.transferOutTest(
+          composeTransfers([
+            {
+              owner: traders[0].address,
+              buyToken: tokens[0].address,
+              buyAmount: amount,
+            },
+            {
+              owner: traders[1].address,
+              buyToken: tokens[1].address,
+              buyAmount: amount,
+            },
+          ]),
+        ),
+      ).to.not.be.reverted;
     });
   });
 });

@@ -3,6 +3,7 @@ pragma solidity ^0.7.5;
 pragma abicoder v2;
 
 import "../GPv2Settlement.sol";
+import "../libraries/GPv2Encoding.sol";
 import "../libraries/GPv2TradeExecution.sol";
 
 contract GPv2SettlementTestInterface is GPv2Settlement {
@@ -56,7 +57,7 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
     }
 
     function extractOrderUidParamsTest(bytes calldata orderUid)
-        public
+        external
         pure
         returns (
             bytes32 orderDigest,
@@ -65,5 +66,9 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
         )
     {
         return extractOrderUidParams(orderUid);
+    }
+
+    function transferOutTest(GPv2TradeExecution.Data[] memory trades) external {
+        transferOut(trades);
     }
 }
