@@ -170,7 +170,6 @@ contract GPv2Settlement {
         bytes calldata encodedTrades
     )
         internal
-        view
         returns (
             GPv2AllowanceManager.Transfer[] memory inTransfers,
             GPv2AllowanceManager.Transfer[] memory outTransfers
@@ -199,6 +198,7 @@ contract GPv2Settlement {
 
     /// @dev Compute the in and out transfer amounts for a single EOA order
     /// trade. This function reverts if:
+    /// - The order has expired
     /// - The order's limit price is not respected.
     ///
     /// @param trade The trade to process.
@@ -214,7 +214,7 @@ contract GPv2Settlement {
         uint256 buyPrice,
         GPv2AllowanceManager.Transfer memory inTransfer,
         GPv2AllowanceManager.Transfer memory outTransfer
-    ) internal pure {
+    ) internal {
         GPv2Encoding.Order memory order = trade.order;
         // NOTE: Currently, the above instanciation allocates an unitialized
         // `Order` that gets never used. Adjust the free memory pointer to free
@@ -226,6 +226,9 @@ contract GPv2Settlement {
         assembly {
             mstore(0x40, sub(mload(0x40), 288))
         }
+
+        // solhint-disable-next-line not-rely-on-time
+        require(order.validTo >= block.timestamp, "GPv2: order expired");
 
         inTransfer.owner = trade.owner;
         inTransfer.token = order.sellToken;
@@ -254,34 +257,59 @@ contract GPv2Settlement {
             "GPv2: limit price not respected"
         );
 
+        uint256 executedSellAmount;
+        uint256 executedBuyAmount;
+        uint256 executedFeeAmount;
+
+        bytes32 uidKey = orderUidKey(trade.digest, trade.owner, order.validTo);
+        uint256 currentFilledAmount = filledAmount[uidKey];
+
+        // NOTE: Don't use `SafeMath.div` anywhere here as it allocates a string
+        // even if it does not revert. The method only checks that the divisor
+        // is non-zero and `revert`s in that case instead of consuming all of
+        // the remaining transaction gas when dividing by zero.
         if (order.kind == GPv2Encoding.OrderKind.Sell) {
-            uint256 executedSellAmount;
             if (order.partiallyFillable) {
                 executedSellAmount = trade.executedAmount;
+                executedFeeAmount =
+                    order.feeAmount.mul(executedSellAmount) /
+                    order.sellAmount;
             } else {
                 executedSellAmount = order.sellAmount;
+                executedFeeAmount = order.feeAmount;
             }
 
-            inTransfer.amount = executedSellAmount;
-            // NOTE: Don't use `SafeMath.div` here as it allocates a string even
-            // if it does not revert. The method only checks that the divisor is
-            // non-zero and `revert`s in that case instead of consuming all of
-            // the remaining transaction gas when dividing by zero.
-            outTransfer.amount = executedSellAmount.mul(sellPrice) / buyPrice;
+            executedBuyAmount = executedSellAmount.mul(sellPrice) / buyPrice;
+
+            currentFilledAmount = currentFilledAmount.add(executedSellAmount);
+            require(
+                currentFilledAmount <= order.sellAmount,
+                "GPv2: order filled"
+            );
         } else {
-            uint256 executedBuyAmount;
             if (order.partiallyFillable) {
                 executedBuyAmount = trade.executedAmount;
+                executedFeeAmount =
+                    order.feeAmount.mul(executedBuyAmount) /
+                    order.buyAmount;
             } else {
                 executedBuyAmount = order.buyAmount;
+                executedFeeAmount = order.feeAmount;
             }
 
-            // NOTE: Don't use `SafeMath.div` for same reason as above.
-            inTransfer.amount = executedBuyAmount.mul(buyPrice) / sellPrice;
-            outTransfer.amount = executedBuyAmount;
+            executedSellAmount = executedBuyAmount.mul(buyPrice) / sellPrice;
+
+            currentFilledAmount = currentFilledAmount.add(executedBuyAmount);
+            require(
+                currentFilledAmount <= order.buyAmount,
+                "GPv2: order filled"
+            );
         }
 
-        inTransfer.amount = inTransfer.amount.add(order.feeAmount);
+        inTransfer.amount = executedSellAmount.add(executedFeeAmount);
+        outTransfer.amount = executedBuyAmount;
+
+        filledAmount[uidKey] = currentFilledAmount;
     }
 
     /// @dev Extracts specific order information from the standardized unique

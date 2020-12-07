@@ -27,7 +27,6 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
         bytes calldata encodedTrades
     )
         external
-        view
         returns (
             GPv2AllowanceManager.Transfer[] memory inTransfers,
             GPv2AllowanceManager.Transfer[] memory outTransfers
@@ -40,11 +39,7 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
         );
     }
 
-    function computeTradeExecutionMemoryTest()
-        external
-        pure
-        returns (uint256 mem)
-    {
+    function computeTradeExecutionMemoryTest() external returns (uint256 mem) {
         GPv2Encoding.Trade memory trade;
         GPv2AllowanceManager.Transfer memory inTransfer;
         GPv2AllowanceManager.Transfer memory outTransfer;
@@ -57,6 +52,8 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
             mem := mload(0x40)
         }
 
+        // solhint-disable-next-line not-rely-on-time
+        trade.order.validTo = uint32(block.timestamp);
         computeTradeExecution(trade, 1, 1, inTransfer, outTransfer);
 
         // solhint-disable-next-line no-inline-assembly
