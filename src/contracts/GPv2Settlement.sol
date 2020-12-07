@@ -350,12 +350,37 @@ contract GPv2Settlement {
     /// which they appear.
     /// @param owner The address of the user that is assigned to the order.
     /// @param validTo The epoch time at which the order will stop being valid.
-    /// @return Key of the given order in the [`filledAmount`] mapping.
+    /// @return uid Key of the given order in the [`filledAmount`] mapping.
     function orderUidKey(
         bytes32 orderDigest,
         address owner,
         uint32 validTo
-    ) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(orderDigest, owner, validTo));
+    ) internal pure returns (bytes32 uid) {
+        // NOTE: Use the 64 bytes of scratch space starting at memory address 0
+        // for computing this hash instead of allocating. We hash a total of 56
+        // bytes and write to memory in **reverse order** as memory operations
+        // write 32-bytes at a time and we want to use a packed encoding. This
+        // means, for example, that after writing the value of `owner` to bytes
+        // `20:52`, writing the `orderDigest` to bytes `0:32` will **overwrite**
+        // bytes `20:32`. This is desirable as addresses are only 20 bytes and
+        // `20:32` should be `0`s:
+        //
+        //        |           1111111111222222222233333333334444444444555555
+        //   byte | 01234567890123456789012345678901234567890123456789012345
+        // -------+---------------------------------------------------------
+        //  field | [.........orderDigest..........][......owner.......][vT]
+        // -------+---------------------------------------------------------
+        // mstore |                         [000000000000000000000000000.vT]
+        //        |                     [00000000000.......owner.......]
+        //        | [.........orderDigest..........]
+        //
+        // <https://docs.soliditylang.org/en/v0.7.5/internals/layout_in_memory.html>
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            mstore(24, validTo)
+            mstore(20, owner)
+            mstore(0, orderDigest)
+            uid := keccak256(0, 56)
+        }
     }
 }
