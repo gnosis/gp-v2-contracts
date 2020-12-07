@@ -44,6 +44,15 @@ contract GPv2Settlement {
     /// contract is created during deployment
     GPv2AllowanceManager internal immutable allowanceManager;
 
+    /// @dev Map each user order to the amount that has been filled so far. If
+    /// this amount is larger than or equal to the amount traded in the order
+    /// (amount sold for sell orders, amount bought for buy orders) then the
+    /// order cannot be traded anymore. If the order is fill or kill, then this
+    /// value is only used to determine whether the order has already been
+    /// executed.
+    /// See [`orderUid`] for how to represent an order with a single bytes32.
+    mapping(bytes32 => uint256) public filledAmount;
+
     constructor(GPv2Authentication authenticator_) {
         authenticator = authenticator_;
 
@@ -89,14 +98,6 @@ contract GPv2Settlement {
     ///     settlement
     ///   - Critically, user orders are entirely protected
     ///
-    /// Note that settlements can specify fees encoded as a fee factor.  The fee
-    /// factor to use for the trade. The actual fee is computed as
-    /// `1 / feeFactor`. This means that the received amount is expected to be
-    /// `executedBuyAmount * (feeFactor - 1) / feeFactor`. Note that a value of
-    /// `0` is reserved to mean no fees. This is useful for example when
-    /// settling directly with Uniswap where we don't want users to incur
-    /// additional fees.
-    ///
     /// Note that some parameters are encoded as packed bytes in order to save
     /// calldata gas. For more information on encoding format consult the
     /// [`GPv2Encoding`] library.
@@ -105,7 +106,6 @@ contract GPv2Settlement {
     /// Orders and interactions encode tokens as indices into this array.
     /// @param clearingPrices An array of clearing prices where the `i`-th price
     /// is for the `i`-th token in the [`tokens`] array.
-    /// @param feeFactor The fee factor to use for the trade.
     /// @param encodedTrades Encoded trades for signed EOA orders.
     /// @param encodedInteractions Encoded smart contract interactions.
     /// @param encodedOrderRefunds Encoded order refunds for clearing storage
@@ -113,18 +113,23 @@ contract GPv2Settlement {
     function settle(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
-        uint256 feeFactor,
         bytes calldata encodedTrades,
         bytes calldata encodedInteractions,
         bytes calldata encodedOrderRefunds
     ) external view onlySolver {
         require(tokens.length == 0, "not yet implemented");
         require(clearingPrices.length == 0, "not yet implemented");
-        require(feeFactor == 0, "not yet implemented");
         require(encodedTrades.length == 0, "not yet implemented");
         require(encodedInteractions.length == 0, "not yet implemented");
         require(encodedOrderRefunds.length == 0, "not yet implemented");
         revert("Final: not yet implemented");
+    }
+
+    /// @dev Invalidate onchain an order that has been signed offline.
+    /// @param orderDigest The unique digest associated to the parameters of an
+    /// order. See [`orderUid`] for details.
+    function invalidateOrder(bytes32 orderDigest) public {
+        filledAmount[orderUid(orderDigest, msg.sender)] = uint256(-1);
     }
 
     /// @dev Process all trades for EOA orders one at a time returning the
@@ -137,13 +142,12 @@ contract GPv2Settlement {
     /// @param encodedTrades Encoded trades for signed EOA orders.
     /// @return inTransfers Array of transfers into the settlement contract.
     /// @return outTransfers Array of transfers to pay out to EOAs.
-    function processTrades(
+    function computeTradeExecutions(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
         bytes calldata encodedTrades
     )
         internal
-        view
         returns (
             GPv2AllowanceManager.Transfer[] memory inTransfers,
             GPv2AllowanceManager.Transfer[] memory outTransfers
@@ -160,7 +164,7 @@ contract GPv2Settlement {
                 tokens,
                 trade
             );
-            processTrade(
+            computeTradeExecution(
                 trade,
                 clearingPrices[trade.sellTokenIndex],
                 clearingPrices[trade.buyTokenIndex],
@@ -170,7 +174,11 @@ contract GPv2Settlement {
         }
     }
 
-    /// @dev Process trades for a single EOA order.
+    /// @dev Compute the in and out transfer amounts for a single EOA order
+    /// trade. This function reverts if:
+    /// - The order has expired
+    /// - The order's limit price is not respected.
+    ///
     /// @param trade The trade to process.
     /// @param sellPrice The price of the order's sell token.
     /// @param buyPrice The price of the order's buy token.
@@ -178,13 +186,13 @@ contract GPv2Settlement {
     /// settlement contract to execute trade.
     /// @param outTransfer Memory location to set computed transfer out to order
     /// owner to execute trade.
-    function processTrade(
+    function computeTradeExecution(
         GPv2Encoding.Trade memory trade,
         uint256 sellPrice,
         uint256 buyPrice,
         GPv2AllowanceManager.Transfer memory inTransfer,
         GPv2AllowanceManager.Transfer memory outTransfer
-    ) internal pure {
+    ) internal {
         GPv2Encoding.Order memory order = trade.order;
         // NOTE: Currently, the above instanciation allocates an unitialized
         // `Order` that gets never used. Adjust the free memory pointer to free
@@ -197,38 +205,125 @@ contract GPv2Settlement {
             mstore(0x40, sub(mload(0x40), 288))
         }
 
+        // solhint-disable-next-line not-rely-on-time
+        require(order.validTo >= block.timestamp, "GPv2: order expired");
+
         inTransfer.owner = trade.owner;
         inTransfer.token = order.sellToken;
         outTransfer.owner = trade.owner;
         outTransfer.token = order.buyToken;
 
+        // NOTE: The following computation is derived from the equation:
+        // ```
+        // amount_x * price_x = amount_y * price_y
+        // ```
+        // Intuitively, if a chocolate bar is 0,50€ and a beer is 4€, 1 beer
+        // is roughly worth 8 chocolate bars (`1 * 4 = 8 * 0.5`). From this
+        // equation, we can derive:
+        // - The limit price for selling `x` and buying `y` is respected iff
+        // ```
+        // limit_x * price_x >= limit_y * price_y
+        // ```
+        // - The executed amount of token `y` given some amount of `x` and
+        //   clearing prices is:
+        // ```
+        // amount_y = amount_x * price_x / price_y
+        // ```
+
+        require(
+            order.sellAmount.mul(sellPrice) >= order.buyAmount.mul(buyPrice),
+            "GPv2: limit price not respected"
+        );
+
+        uint256 executedSellAmount;
+        uint256 executedBuyAmount;
+        uint256 executedFeeAmount;
+
+        bytes32 uid = orderUid(trade.digest, trade.owner);
+        uint256 currentFilledAmount = filledAmount[uid];
+
+        // NOTE: Don't use `SafeMath.div` anywhere here as it allocates a string
+        // even if it does not revert. The method only checks that the divisor
+        // is non-zero and `revert`s in that case instead of consuming all of
+        // the remaining transaction gas when dividing by zero.
         if (order.kind == GPv2Encoding.OrderKind.Sell) {
-            uint256 executedSellAmount;
             if (order.partiallyFillable) {
                 executedSellAmount = trade.executedAmount;
+                executedFeeAmount =
+                    order.feeAmount.mul(executedSellAmount) /
+                    order.sellAmount;
             } else {
                 executedSellAmount = order.sellAmount;
+                executedFeeAmount = order.feeAmount;
             }
 
-            inTransfer.amount = executedSellAmount;
-            // NOTE: Don't use `SafeMath.div` here as it allocates a string even
-            // if it does not revert. The method only checks that the divisor is
-            // non-zero and `revert`s in that case instead of consuming all of
-            // the remaining transaction gas when dividing by zero.
-            outTransfer.amount = executedSellAmount.mul(buyPrice) / sellPrice;
+            executedBuyAmount = executedSellAmount.mul(sellPrice) / buyPrice;
+
+            currentFilledAmount = currentFilledAmount.add(executedSellAmount);
+            require(
+                currentFilledAmount <= order.sellAmount,
+                "GPv2: order filled"
+            );
         } else {
-            uint256 executedBuyAmount;
             if (order.partiallyFillable) {
                 executedBuyAmount = trade.executedAmount;
+                executedFeeAmount =
+                    order.feeAmount.mul(executedBuyAmount) /
+                    order.buyAmount;
             } else {
                 executedBuyAmount = order.buyAmount;
+                executedFeeAmount = order.feeAmount;
             }
 
-            // NOTE: Don't use `SafeMath.div` for same reason as above.
-            inTransfer.amount = executedBuyAmount.mul(sellPrice) / buyPrice;
-            outTransfer.amount = executedBuyAmount;
+            executedSellAmount = executedBuyAmount.mul(buyPrice) / sellPrice;
+
+            currentFilledAmount = currentFilledAmount.add(executedBuyAmount);
+            require(
+                currentFilledAmount <= order.buyAmount,
+                "GPv2: order filled"
+            );
         }
 
-        inTransfer.amount = inTransfer.amount.add(order.tip);
+        inTransfer.amount = executedSellAmount.add(executedFeeAmount);
+        outTransfer.amount = executedBuyAmount;
+
+        filledAmount[uid] = currentFilledAmount;
+    }
+
+    /// @dev Compute a unique identifier that represents a user order.
+    /// @param orderDigest The unique digest associated to the parameters of an
+    /// order (an instance of the Order struct in the [`GPv2Encoding`] library).
+    /// The order digest is the (unpacked) hash of all entries in the order in
+    /// which they appear.
+    /// @param owner The address of the user to assign to the order.
+    function orderUid(bytes32 orderDigest, address owner)
+        private
+        pure
+        returns (bytes32 uid)
+    {
+        // NOTE: Use the 64 bytes of scratch space starting at memory address 0
+        // for computing this hash instead of allocating. We hash a total of 52
+        // bytes and write to memory in **reverse order** as memory operations
+        // write 32-bytes at a time and we want to use a packed encoding. This
+        // means, for example, that after writing the value of `owner` to bytes
+        // `20:52`, writing the `orderDigest` to bytes `0:32` will **overwrite**
+        // bytes `20:32`. This is desireable as addresses are only 20 bytes and
+        // `20:32` should be `0`s:
+        //
+        //        |           111111111122222222223333333333444444444455
+        //   byte | 0123456789012345678901234567890123456789012345678901
+        // -------+-----------------------------------------------------
+        //  field | [.........orderDigest..........][......owner.......]
+        // -------+-----------------------------------------------------
+        // mstore |                     [00000000000.......owner.......]
+        //        | [.........orderDigest..........]
+        //
+        // <https://docs.soliditylang.org/en/v0.7.5/internals/layout_in_memory.html>
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            mstore(20, owner)
+            mstore(0, orderDigest)
+            uid := keccak256(0, 52)
+        }
     }
 }

@@ -3,12 +3,17 @@ import { BigNumber, Contract, TypedDataDomain } from "ethers";
 import { artifacts, ethers, waffle } from "hardhat";
 
 import {
+  Order,
   OrderKind,
   SettlementEncoder,
   SigningScheme,
   allowanceManagerAddress,
   domain,
+  computeOrderUid,
+  hashOrder,
 } from "../src/ts";
+
+import { builtAndDeployedMetadataCoincide } from "./bytecode";
 
 interface Transfer {
   owner: string;
@@ -26,7 +31,12 @@ function parseTransfers(transfers: unknown[][][]): [Transfer[], Transfer[]] {
   return [transfers[0].map(parseTransfer), transfers[1].map(parseTransfer)];
 }
 
-import { builtAndDeployedMetadataCoincide } from "./bytecode";
+function toNumberLossy(value: BigNumber): number {
+  // NOTE: BigNumber throws an exception when if is outside the range of
+  // representable integers for JavaScript's double precision floating point
+  // numbers. For some tests, that is OK, so perform a lossy conversion.
+  return parseInt(value.toString());
+}
 
 describe("GPv2Settlement", () => {
   const [deployer, owner, solver, ...traders] = waffle.provider.getWallets();
@@ -125,9 +135,18 @@ describe("GPv2Settlement", () => {
     });
   });
 
+  describe("filledAmount", () => {
+    it("is zero for an uninitialized order", async () => {
+      const orderUid = "0x".padEnd(66, "0");
+      expect(await settlement.filledAmount(orderUid)).to.equal(
+        ethers.constants.Zero,
+      );
+    });
+  });
+
   describe("settle", () => {
     it("rejects transactions from non-solvers", async () => {
-      await expect(settlement.settle([], [], 0, [], [], [])).to.be.revertedWith(
+      await expect(settlement.settle([], [], [], [], [])).to.be.revertedWith(
         "GPv2: not a solver",
       );
     });
@@ -137,25 +156,38 @@ describe("GPv2Settlement", () => {
       // TODO - this will have to be changed when other constraints become active
       // and when settle function no longer reverts.
       await expect(
-        settlement.connect(solver).settle([], [], 0, [], [], []),
+        settlement.connect(solver).settle([], [], [], [], []),
       ).revertedWith("Final: not yet implemented");
     });
   });
 
-  describe("processTrades", () => {
-    const tokens = [`0x${"11".repeat(20)}`, `0x${"22".repeat(20)}`];
+  describe("invalidateOrder", () => {
+    it("sets filled amount of the caller's order to max uint256", async () => {
+      const orderDigest = "0x".padEnd(66, "1");
+      const orderUid = computeOrderUid(orderDigest, traders[0].address);
+
+      await settlement.connect(traders[0]).invalidateOrder(orderDigest);
+      expect(await settlement.filledAmount(orderUid)).to.equal(
+        ethers.constants.MaxUint256,
+      );
+    });
+  });
+
+  describe("computeTradeExecutions", () => {
+    const sellToken = `0x${"11".repeat(20)}`;
+    const buyToken = `0x${"22".repeat(20)}`;
     const prices = {
-      [tokens[0]]: 1,
-      [tokens[1]]: 2,
+      [sellToken]: 1,
+      [buyToken]: 2,
     };
     const partialOrder = {
-      sellToken: tokens[0],
-      buyToken: tokens[1],
+      sellToken,
+      buyToken,
       sellAmount: ethers.utils.parseEther("42"),
       buyAmount: ethers.utils.parseEther("13.37"),
       validTo: 0xffffffff,
       appData: 0,
-      tip: ethers.constants.Zero,
+      feeAmount: ethers.constants.Zero,
     };
 
     it("should compute in/out transfers for multiple trades", async () => {
@@ -175,7 +207,7 @@ describe("GPv2Settlement", () => {
       }
 
       const [inTransfers, outTransfers] = parseTransfers(
-        await settlement.processTradesTest(
+        await settlement.callStatic.computeTradeExecutionsTest(
           encoder.tokens,
           encoder.clearingPrices(prices),
           encoder.encodedTrades,
@@ -186,13 +218,102 @@ describe("GPv2Settlement", () => {
       expect(outTransfers.length).to.equal(tradeCount);
     });
 
-    describe("Order Variations", async () => {
+    it("should revert if the order expired", async () => {
+      const { timestamp } = await ethers.provider.getBlock("latest");
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
+        {
+          ...partialOrder,
+          validTo: timestamp - 1,
+          kind: OrderKind.SELL,
+          partiallyFillable: false,
+        },
+        0,
+        traders[0],
+        SigningScheme.TYPED_DATA,
+      );
+
+      await expect(
+        settlement.computeTradeExecutionsTest(
+          encoder.tokens,
+          encoder.clearingPrices(prices),
+          encoder.encodedTrades,
+        ),
+      ).to.be.revertedWith("order expired");
+    });
+
+    it("should revert if the limit price is not respected", async () => {
+      const sellAmount = ethers.utils.parseEther("100.0");
+      const sellPrice = 1;
+      const buyAmount = ethers.utils.parseEther("1.0");
+      const buyPrice = 1000;
+
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
+        {
+          ...partialOrder,
+          sellAmount,
+          buyAmount,
+          kind: OrderKind.SELL,
+          partiallyFillable: false,
+        },
+        0,
+        traders[0],
+        SigningScheme.TYPED_DATA,
+      );
+
+      expect(toNumberLossy(sellAmount.mul(sellPrice))).not.to.be.gte(
+        toNumberLossy(buyAmount.mul(buyPrice)),
+      );
+      await expect(
+        settlement.callStatic.computeTradeExecutionsTest(
+          encoder.tokens,
+          encoder.clearingPrices({
+            [sellToken]: sellPrice,
+            [buyToken]: buyPrice,
+          }),
+          encoder.encodedTrades,
+        ),
+      ).to.be.revertedWith("limit price not respected");
+    });
+
+    it("should not revert if the clearing price is exactly at the limit price", async () => {
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
+        {
+          ...partialOrder,
+          kind: OrderKind.SELL,
+          partiallyFillable: false,
+        },
+        0,
+        traders[0],
+        SigningScheme.TYPED_DATA,
+      );
+
+      const { sellAmount, buyAmount } = partialOrder;
+      const executions = settlement.callStatic.computeTradeExecutionsTest(
+        encoder.tokens,
+        encoder.clearingPrices({
+          [sellToken]: buyAmount,
+          [buyToken]: sellAmount,
+        }),
+        encoder.encodedTrades,
+      );
+      await expect(executions).to.not.be.reverted;
+
+      const [, [{ amount: executedBuyAmount }]] = parseTransfers(
+        await executions,
+      );
+      expect(executedBuyAmount).to.deep.equal(buyAmount);
+    });
+
+    describe("Order Executed Amounts", () => {
       const { sellAmount, buyAmount } = partialOrder;
       const executedAmount = ethers.utils.parseEther("10.0");
-      const processTradeVariant = async (
-        kind: OrderKind,
-        partiallyFillable: boolean,
-      ) => {
+      const computeTradeExecutionForOrderVariant = async ({
+        kind,
+        partiallyFillable,
+      }: Pick<Order, "kind" | "partiallyFillable">) => {
         const encoder = new SettlementEncoder(testDomain);
         await encoder.signEncodeTrade(
           {
@@ -209,7 +330,7 @@ describe("GPv2Settlement", () => {
           [{ amount: executedSellAmount }],
           [{ amount: executedBuyAmount }],
         ] = parseTransfers(
-          await settlement.processTradesTest(
+          await settlement.callStatic.computeTradeExecutionsTest(
             encoder.tokens,
             encoder.clearingPrices(prices),
             encoder.encodedTrades,
@@ -230,12 +351,26 @@ describe("GPv2Settlement", () => {
           sellPrice,
           executedBuyAmount,
           buyPrice,
-        } = await processTradeVariant(OrderKind.SELL, false);
+        } = await computeTradeExecutionForOrderVariant({
+          kind: OrderKind.SELL,
+          partiallyFillable: false,
+        });
 
         expect(executedSellAmount).to.deep.equal(sellAmount);
         expect(executedBuyAmount).to.deep.equal(
-          sellAmount.mul(buyPrice).div(sellPrice),
+          sellAmount.mul(sellPrice).div(buyPrice),
         );
+      });
+
+      it("should respect the limit price for fill-or-kill sell orders", async () => {
+        const {
+          executedBuyAmount,
+        } = await computeTradeExecutionForOrderVariant({
+          kind: OrderKind.SELL,
+          partiallyFillable: false,
+        });
+
+        expect(executedBuyAmount.gt(buyAmount)).to.be.true;
       });
 
       it("should compute amounts for fill-or-kill buy orders", async () => {
@@ -244,12 +379,26 @@ describe("GPv2Settlement", () => {
           sellPrice,
           executedBuyAmount,
           buyPrice,
-        } = await processTradeVariant(OrderKind.BUY, false);
+        } = await computeTradeExecutionForOrderVariant({
+          kind: OrderKind.BUY,
+          partiallyFillable: false,
+        });
 
         expect(executedSellAmount).to.deep.equal(
-          buyAmount.mul(sellPrice).div(buyPrice),
+          buyAmount.mul(buyPrice).div(sellPrice),
         );
         expect(executedBuyAmount).to.deep.equal(buyAmount);
+      });
+
+      it("should respect the limit price for fill-or-kill buy orders", async () => {
+        const {
+          executedSellAmount,
+        } = await computeTradeExecutionForOrderVariant({
+          kind: OrderKind.BUY,
+          partiallyFillable: false,
+        });
+
+        expect(executedSellAmount.lt(sellAmount)).to.be.true;
       });
 
       it("should compute amounts for partially fillable sell orders", async () => {
@@ -258,12 +407,31 @@ describe("GPv2Settlement", () => {
           sellPrice,
           executedBuyAmount,
           buyPrice,
-        } = await processTradeVariant(OrderKind.SELL, true);
+        } = await computeTradeExecutionForOrderVariant({
+          kind: OrderKind.SELL,
+          partiallyFillable: true,
+        });
 
         expect(executedSellAmount).to.deep.equal(executedAmount);
         expect(executedBuyAmount).to.deep.equal(
-          executedAmount.mul(buyPrice).div(sellPrice),
+          executedAmount.mul(sellPrice).div(buyPrice),
         );
+      });
+
+      it("should respect the limit price for partially fillable sell orders", async () => {
+        const {
+          executedSellAmount,
+          executedBuyAmount,
+        } = await computeTradeExecutionForOrderVariant({
+          kind: OrderKind.SELL,
+          partiallyFillable: true,
+        });
+
+        expect(
+          executedBuyAmount
+            .mul(sellAmount)
+            .gt(executedSellAmount.mul(buyAmount)),
+        ).to.be.true;
       });
 
       it("should compute amounts for partially fillable buy orders", async () => {
@@ -272,12 +440,184 @@ describe("GPv2Settlement", () => {
           sellPrice,
           executedBuyAmount,
           buyPrice,
-        } = await processTradeVariant(OrderKind.BUY, true);
+        } = await computeTradeExecutionForOrderVariant({
+          kind: OrderKind.BUY,
+          partiallyFillable: true,
+        });
 
         expect(executedSellAmount).to.deep.equal(
-          executedAmount.mul(sellPrice).div(buyPrice),
+          executedAmount.mul(buyPrice).div(sellPrice),
         );
         expect(executedBuyAmount).to.deep.equal(executedAmount);
+      });
+
+      it("should respect the limit price for partially fillable buy orders", async () => {
+        const {
+          executedSellAmount,
+          executedBuyAmount,
+        } = await computeTradeExecutionForOrderVariant({
+          kind: OrderKind.BUY,
+          partiallyFillable: true,
+        });
+
+        expect(
+          executedBuyAmount
+            .mul(sellAmount)
+            .gt(executedSellAmount.mul(buyAmount)),
+        ).to.be.true;
+      });
+    });
+
+    describe("Order Executed Fees", () => {
+      const { sellAmount, buyAmount } = partialOrder;
+      const feeAmount = ethers.utils.parseEther("10");
+      const { [sellToken]: sellPrice, [buyToken]: buyPrice } = prices;
+      const computeInTransferForOrderVariant = async (
+        { kind, partiallyFillable }: Pick<Order, "kind" | "partiallyFillable">,
+        executedAmount?: BigNumber,
+      ) => {
+        const encoder = new SettlementEncoder(testDomain);
+        await encoder.signEncodeTrade(
+          {
+            ...partialOrder,
+            feeAmount,
+            kind,
+            partiallyFillable,
+          },
+          executedAmount || 0,
+          traders[0],
+          SigningScheme.TYPED_DATA,
+        );
+
+        const [[inTransfer]] = parseTransfers(
+          await settlement.callStatic.computeTradeExecutionsTest(
+            encoder.tokens,
+            encoder.clearingPrices(prices),
+            encoder.encodedTrades,
+          ),
+        );
+
+        return inTransfer.amount;
+      };
+
+      it("should add the full fee for fill-or-kill sell orders", async () => {
+        const transferAmount = await computeInTransferForOrderVariant({
+          kind: OrderKind.SELL,
+          partiallyFillable: false,
+        });
+
+        expect(transferAmount).to.deep.equal(sellAmount.add(feeAmount));
+      });
+
+      it("should add the full fee for fill-or-kill buy orders", async () => {
+        const transferAmount = await computeInTransferForOrderVariant({
+          kind: OrderKind.BUY,
+          partiallyFillable: false,
+        });
+
+        const executedSellAmount = buyAmount.mul(buyPrice).div(sellPrice);
+        expect(transferAmount).to.deep.equal(executedSellAmount.add(feeAmount));
+      });
+
+      it("should add portion of fees for partially filled sell orders", async () => {
+        const executedSellAmount = sellAmount.div(3);
+        const executedFee = feeAmount.div(3);
+
+        const transferAmount = await computeInTransferForOrderVariant(
+          { kind: OrderKind.SELL, partiallyFillable: true },
+          executedSellAmount,
+        );
+
+        expect(transferAmount).to.deep.equal(
+          executedSellAmount.add(executedFee),
+        );
+      });
+
+      it("should add portion of fees for partially filled buy orders", async () => {
+        const executedBuyAmount = buyAmount.div(4);
+        const executedFee = feeAmount.div(4);
+
+        const transferAmount = await computeInTransferForOrderVariant(
+          { kind: OrderKind.BUY, partiallyFillable: true },
+          executedBuyAmount,
+        );
+
+        const executedSellAmount = executedBuyAmount
+          .mul(buyPrice)
+          .div(sellPrice);
+        expect(transferAmount).to.deep.equal(
+          executedSellAmount.add(executedFee),
+        );
+      });
+    });
+
+    describe("Order Filled Amounts", () => {
+      const { sellAmount, buyAmount } = partialOrder;
+      const readOrderFilledAmountAfterProcessing = async (
+        { kind, partiallyFillable }: Pick<Order, "kind" | "partiallyFillable">,
+        executedAmount?: BigNumber,
+      ) => {
+        const order = {
+          ...partialOrder,
+          kind,
+          partiallyFillable,
+        };
+        const encoder = new SettlementEncoder(testDomain);
+        await encoder.signEncodeTrade(
+          order,
+          executedAmount || 0,
+          traders[0],
+          SigningScheme.TYPED_DATA,
+        );
+
+        await settlement.computeTradeExecutionsTest(
+          encoder.tokens,
+          encoder.clearingPrices(prices),
+          encoder.encodedTrades,
+        );
+
+        const orderUid = computeOrderUid(hashOrder(order), traders[0].address);
+        const filledAmount = await settlement.filledAmount(orderUid);
+
+        return filledAmount;
+      };
+
+      it("should fill the full sell amount for fill-or-kill sell orders", async () => {
+        const filledAmount = await readOrderFilledAmountAfterProcessing({
+          kind: OrderKind.SELL,
+          partiallyFillable: false,
+        });
+
+        expect(filledAmount).to.deep.equal(sellAmount);
+      });
+
+      it("should fill the full buy amount for fill-or-kill buy orders", async () => {
+        const filledAmount = await readOrderFilledAmountAfterProcessing({
+          kind: OrderKind.BUY,
+          partiallyFillable: false,
+        });
+
+        expect(filledAmount).to.deep.equal(buyAmount);
+      });
+
+      it("should fill the executed amount for partially filled sell orders", async () => {
+        const executedSellAmount = sellAmount.div(3);
+        const filledAmount = await readOrderFilledAmountAfterProcessing(
+          { kind: OrderKind.SELL, partiallyFillable: true },
+          executedSellAmount,
+        );
+
+        expect(filledAmount).to.deep.equal(executedSellAmount);
+      });
+
+      it("should fill the executed amount for partially filled buy orders", async () => {
+        const executedBuyAmount = buyAmount.div(4);
+        const filledAmount = await readOrderFilledAmountAfterProcessing(
+          { kind: OrderKind.BUY, partiallyFillable: true },
+          executedBuyAmount,
+        );
+
+        expect(filledAmount).to.deep.equal(executedBuyAmount);
       });
     });
 
@@ -290,20 +630,20 @@ describe("GPv2Settlement", () => {
 
       const encoder = new SettlementEncoder(testDomain);
       await encoder.signEncodeTrade(
-        order,
+        { ...order, appData: 0 },
         0,
         traders[0],
         SigningScheme.TYPED_DATA,
       );
       await encoder.signEncodeTrade(
-        order,
+        { ...order, appData: 1 },
         ethers.utils.parseEther("1.0"),
         traders[0],
         SigningScheme.TYPED_DATA,
       );
 
       const [inTransfers, outTransfers] = parseTransfers(
-        await settlement.processTradesTest(
+        await settlement.callStatic.computeTradeExecutionsTest(
           encoder.tokens,
           encoder.clearingPrices(prices),
           encoder.encodedTrades,
@@ -313,41 +653,13 @@ describe("GPv2Settlement", () => {
       expect(inTransfers[0]).to.deep.equal(inTransfers[1]);
       expect(outTransfers[0]).to.deep.equal(outTransfers[1]);
     });
-
-    it("should add the tip to the in transfer", async () => {
-      const tip = ethers.utils.parseEther("10");
-      const order = {
-        ...partialOrder,
-        tip,
-        kind: OrderKind.SELL,
-        partiallyFillable: false,
-      };
-
-      const encoder = new SettlementEncoder(testDomain);
-      await encoder.signEncodeTrade(
-        order,
-        0,
-        traders[0],
-        SigningScheme.TYPED_DATA,
-      );
-
-      const [[inTransfer]] = parseTransfers(
-        await settlement.processTradesTest(
-          encoder.tokens,
-          encoder.clearingPrices(prices),
-          encoder.encodedTrades,
-        ),
-      );
-
-      expect(inTransfer.amount).to.deep.equal(order.sellAmount.add(tip));
-    });
   });
 
-  describe("processTrade", () => {
+  describe("computeTradeExecution", () => {
     it("should not allocate additional memory", async () => {
-      expect(await settlement.processTradeMemoryTest()).to.deep.equal(
-        ethers.constants.Zero,
-      );
+      expect(
+        await settlement.callStatic.computeTradeExecutionMemoryTest(),
+      ).to.deep.equal(ethers.constants.Zero);
     });
   });
 });

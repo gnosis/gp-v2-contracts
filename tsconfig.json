@@ -4,7 +4,7 @@
     "esModuleInterop": true,
     "module": "commonjs",
     "moduleResolution": "node",
-    "noEmit": true,
+    "outDir": "lib",
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": true,

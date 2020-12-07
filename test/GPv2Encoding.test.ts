@@ -38,7 +38,7 @@ function parseTrade(trade: unknown[]): Trade {
       buyAmount: order[3] as BigNumber,
       validTo: order[4] as number,
       appData: order[5] as number,
-      tip: order[6] as BigNumber,
+      feeAmount: order[6] as BigNumber,
       kind: order[7] as OrderKind,
       partiallyFillable: order[8] as boolean,
     },
@@ -61,7 +61,7 @@ describe("GPv2Encoding", () => {
     buyAmount: ethers.utils.parseEther("13.37"),
     validTo: 0xffffffff,
     appData: 0,
-    tip: ethers.constants.WeiPerEther,
+    feeAmount: ethers.utils.parseEther("1.0"),
     kind: OrderKind.SELL,
     partiallyFillable: false,
   };
@@ -136,7 +136,7 @@ describe("GPv2Encoding", () => {
         buyAmount: fillUint(256, 0x04),
         validTo: fillUint(32, 0x05).toNumber(),
         appData: fillUint(32, 0x06).toNumber(),
-        tip: fillUint(256, 0x07),
+        feeAmount: fillUint(256, 0x07),
         kind: OrderKind.BUY,
         partiallyFillable: true,
       };

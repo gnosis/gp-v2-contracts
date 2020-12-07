@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LGPL-3.0-or-newer
-pragma solidity ^0.6.12;
+pragma solidity ^0.7.5;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -15,7 +15,7 @@ abstract contract CustomInitiallyOwnable is Ownable {
      * @dev Initializes the contract setting the input address as the initial
      * owner.
      */
-    constructor(address initialOwner) public {
+    constructor(address initialOwner) {
         transferOwnership(initialOwner);
     }
 }
