@@ -290,6 +290,21 @@ contract GPv2Settlement {
         filledAmount[uid] = currentFilledAmount;
     }
 
+    /// @dev Allows settlment function to make arbitrary contract executions.
+    /// @param interaction contains address and calldata of the contract interaction.
+    function executeInteraction(GPv2Encoding.Interaction memory interaction)
+        internal
+        returns (bytes memory response)
+    {
+        require(
+            interaction.target != address(allowanceManager),
+            "GPv2: forbidden interaction"
+        );
+        bool success;
+        // solhint-disable-next-line avoid-low-level-calls
+        (success, response) = (interaction.target).delegatecall(interaction.callData);
+    }
+
     /// @dev Compute a unique identifier that represents a user order.
     /// @param orderDigest The unique digest associated to the parameters of an
     /// order (an instance of the Order struct in the [`GPv2Encoding`] library).
