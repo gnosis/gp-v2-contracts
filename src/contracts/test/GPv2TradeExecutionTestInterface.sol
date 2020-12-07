@@ -13,10 +13,4 @@ contract GPv2TradeExecutionTestInterface {
     ) external {
         GPv2TradeExecution.transferSellAmountToRecipient(trade, recipient);
     }
-
-    function transferBuyAmountToOwnerTest(
-        GPv2TradeExecution.Data calldata trade
-    ) external {
-        trade.transferBuyAmountToOwner();
-    }
 }
