@@ -296,6 +296,8 @@ contract GPv2Settlement {
         internal
         returns (bytes memory response)
     {
+        // To prevent possible attack on user funds, we explicitly disable
+        // interactions with AllowanceManager contract.
         require(
             interaction.target != address(allowanceManager),
             "GPv2: forbidden interaction"
