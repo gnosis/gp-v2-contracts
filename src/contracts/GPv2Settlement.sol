@@ -50,7 +50,7 @@ contract GPv2Settlement {
     /// order cannot be traded anymore. If the order is fill or kill, then this
     /// value is only used to determine whether the order has already been
     /// executed.
-    /// See [`orderUid`] for how to represent an order with a single bytes32.
+    /// See [`orderUidKey`] for how an order key is defined.
     mapping(bytes32 => uint256) public filledAmount;
 
     constructor(GPv2Authentication authenticator_) {
@@ -126,10 +126,32 @@ contract GPv2Settlement {
     }
 
     /// @dev Invalidate onchain an order that has been signed offline.
-    /// @param orderDigest The unique digest associated to the parameters of an
-    /// order. See [`orderUid`] for details.
-    function invalidateOrder(bytes32 orderDigest) public {
-        filledAmount[orderUid(orderDigest, msg.sender)] = uint256(-1);
+    /// @param orderUid The unique identifier of the order that is to be made
+    /// invalid after calling this function. The user that created the order
+    /// must be the the sender of this message. See [`extractOrderUidParams`]
+    /// for details on orderUid.
+    function invalidateOrder(bytes calldata orderUid) external {
+        (bytes32 orderDigest, address owner, uint32 validTo) =
+            extractOrderUidParams(orderUid);
+        require(owner == msg.sender, "GPv2: caller does not own order");
+        filledAmount[orderUidKey(orderDigest, msg.sender, validTo)] = uint256(
+            -1
+        );
+    }
+
+    /// @dev Return how much of the input order has been filled so far. See
+    /// [`filledAmount`] to know how this value depends on the order type.
+    /// @param orderUid The unique identifier associated to the order for which
+    /// to recover the filled amount. See [`extractOrderUidParams`] for details.
+    /// @return amount How much the order has been filled in absolute amount.
+    function getFilledAmount(bytes calldata orderUid)
+        external
+        view
+        returns (uint256 amount)
+    {
+        (bytes32 orderDigest, address owner, uint32 validTo) =
+            extractOrderUidParams(orderUid);
+        amount = filledAmount[orderUidKey(orderDigest, owner, validTo)];
     }
 
     /// @dev Process all trades for EOA orders one at a time returning the
@@ -239,8 +261,8 @@ contract GPv2Settlement {
         uint256 executedBuyAmount;
         uint256 executedFeeAmount;
 
-        bytes32 uid = orderUid(trade.digest, trade.owner);
-        uint256 currentFilledAmount = filledAmount[uid];
+        bytes32 uidKey = orderUidKey(trade.digest, trade.owner, order.validTo);
+        uint256 currentFilledAmount = filledAmount[uidKey];
 
         // NOTE: Don't use `SafeMath.div` anywhere here as it allocates a string
         // even if it does not revert. The method only checks that the divisor
@@ -287,43 +309,78 @@ contract GPv2Settlement {
         inTransfer.amount = executedSellAmount.add(executedFeeAmount);
         outTransfer.amount = executedBuyAmount;
 
-        filledAmount[uid] = currentFilledAmount;
+        filledAmount[uidKey] = currentFilledAmount;
     }
 
-    /// @dev Compute a unique identifier that represents a user order.
+    /// @dev Extracts specific order information from the standardized unique
+    /// order id of the protocol.
+    /// @param orderUid The unique identifier used to represent an order in
+    /// the protocol. This uid is the packed concatenation of the order digest,
+    /// the validTo order parameter and the address of the user who created the
+    /// order. It is used by the user to interface with the contract directly,
+    /// and not by calls that are triggered by the solvers.
+    /// @return orderDigest The unique digest associated to the parameters of an
+    /// order. See [`orderUidKey`] for details.
+    /// @return owner The address of the user who owns this order.
+    /// @return validTo The epoch time at which the order will stop being valid.
+    function extractOrderUidParams(bytes calldata orderUid)
+        internal
+        pure
+        returns (
+            bytes32 orderDigest,
+            address owner,
+            uint32 validTo
+        )
+    {
+        require(orderUid.length == 32 + 20 + 4, "GPv2: invalid uid");
+        // Use assembly to efficiently decode packed calldata.
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            orderDigest := calldataload(orderUid.offset)
+            owner := shr(96, calldataload(add(orderUid.offset, 32)))
+            validTo := shr(224, calldataload(add(orderUid.offset, 52)))
+        }
+    }
+
+    /// @dev Compute the key used to access, in the mapping of filled amounts,
+    /// the user order described by the input parameters.
     /// @param orderDigest The unique digest associated to the parameters of an
     /// order (an instance of the Order struct in the [`GPv2Encoding`] library).
     /// The order digest is the (unpacked) hash of all entries in the order in
     /// which they appear.
-    /// @param owner The address of the user to assign to the order.
-    function orderUid(bytes32 orderDigest, address owner)
-        private
-        pure
-        returns (bytes32 uid)
-    {
+    /// @param owner The address of the user that is assigned to the order.
+    /// @param validTo The epoch time at which the order will stop being valid.
+    /// @return uid Key of the given order in the [`filledAmount`] mapping.
+    function orderUidKey(
+        bytes32 orderDigest,
+        address owner,
+        uint32 validTo
+    ) internal pure returns (bytes32 uid) {
         // NOTE: Use the 64 bytes of scratch space starting at memory address 0
-        // for computing this hash instead of allocating. We hash a total of 52
+        // for computing this hash instead of allocating. We hash a total of 56
         // bytes and write to memory in **reverse order** as memory operations
         // write 32-bytes at a time and we want to use a packed encoding. This
         // means, for example, that after writing the value of `owner` to bytes
         // `20:52`, writing the `orderDigest` to bytes `0:32` will **overwrite**
-        // bytes `20:32`. This is desireable as addresses are only 20 bytes and
+        // bytes `20:32`. This is desirable as addresses are only 20 bytes and
         // `20:32` should be `0`s:
         //
-        //        |           111111111122222222223333333333444444444455
-        //   byte | 0123456789012345678901234567890123456789012345678901
-        // -------+-----------------------------------------------------
-        //  field | [.........orderDigest..........][......owner.......]
-        // -------+-----------------------------------------------------
-        // mstore |                     [00000000000.......owner.......]
+        //        |           1111111111222222222233333333334444444444555555
+        //   byte | 01234567890123456789012345678901234567890123456789012345
+        // -------+---------------------------------------------------------
+        //  field | [.........orderDigest..........][......owner.......][vT]
+        // -------+---------------------------------------------------------
+        // mstore |                         [000000000000000000000000000.vT]
+        //        |                     [00000000000.......owner.......]
         //        | [.........orderDigest..........]
         //
         // <https://docs.soliditylang.org/en/v0.7.5/internals/layout_in_memory.html>
         // solhint-disable-next-line no-inline-assembly
         assembly {
+            mstore(24, validTo)
             mstore(20, owner)
             mstore(0, orderDigest)
-            uid := keccak256(0, 52)
+            uid := keccak256(0, 56)
         }
     }
 }
