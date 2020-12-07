@@ -304,7 +304,9 @@ contract GPv2Settlement {
         );
         bool success;
         // solhint-disable-next-line avoid-low-level-calls
-        (success, response) = (interaction.target).delegatecall(interaction.callData);
+        (success, response) = (interaction.target).delegatecall(
+            interaction.callData
+        );
     }
 
     /// @dev Compute a unique identifier that represents a user order.
