@@ -404,9 +404,8 @@ export function computeOrderUid(
   userAddress: string,
   validTo: number | Date,
 ): string {
-  return (
-    orderDigest +
-    userAddress.slice(2) +
-    timestamp(validTo).toString(16).padStart(4, "0")
-  ).toLowerCase();
+  return ethers.utils.solidityPack(
+    ["bytes32", "address", "uint32"],
+    [orderDigest, userAddress, timestamp(validTo)],
+  );
 }
