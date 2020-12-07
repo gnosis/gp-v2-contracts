@@ -3,21 +3,7 @@ import { expect } from "chai";
 import { Contract } from "ethers";
 import { artifacts, ethers, waffle } from "hardhat";
 
-import { ExecutedTrade, composeExecutedTrade } from "./GPv2TradeExecution.test";
-
-type InTransfer = Pick<ExecutedTrade, "owner" | "sellToken" | "sellAmount">;
-
-function composeTransfers(
-  trades: InTransfer[],
-): ReturnType<typeof composeExecutedTrade>[] {
-  return trades.map((partialTrade) =>
-    composeExecutedTrade({
-      ...partialTrade,
-      buyToken: ethers.constants.AddressZero,
-      buyAmount: ethers.constants.Zero,
-    }),
-  );
-}
+import { encodeInTransfers } from "./encoding";
 
 describe("GPv2AllowanceManager", () => {
   const [
@@ -62,7 +48,7 @@ describe("GPv2AllowanceManager", () => {
 
       await expect(
         allowanceManager.transferIn(
-          composeTransfers([
+          encodeInTransfers([
             {
               owner: traders[0].address,
               sellToken: tokens[0].address,
@@ -88,7 +74,7 @@ describe("GPv2AllowanceManager", () => {
 
       await expect(
         allowanceManager.transferIn(
-          composeTransfers([
+          encodeInTransfers([
             {
               owner: traders[0].address,
               sellToken: token.address,
