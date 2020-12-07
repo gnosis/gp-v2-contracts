@@ -85,7 +85,7 @@ describe("GPv2TradeExecution", () => {
       ).to.be.revertedWith("test error");
     });
 
-    it("should revert when transfering from an address without code", async () => {
+    it("should revert when transfering a token with no contract at its address", async () => {
       await expect(
         tradeExecution.transferSellAmountToRecipientTest(
           composeExecutedTrade({
