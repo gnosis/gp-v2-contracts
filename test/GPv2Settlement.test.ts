@@ -135,7 +135,7 @@ describe("GPv2Settlement", () => {
 
   describe("filledAmount", () => {
     it("is zero for an uninitialized order", async () => {
-      const zeroBytes = "0x".padEnd(66, "0");
+      const zeroBytes = ethers.constants.HashZero;
       expect(await settlement.filledAmount(zeroBytes)).to.equal(
         ethers.constants.Zero,
       );
@@ -144,8 +144,8 @@ describe("GPv2Settlement", () => {
 
   describe("getFilledAmount", () => {
     it("is zero for an untouched order", async () => {
-      const orderUid = "0x".padEnd(66, "0");
-      const owner = "0x".padEnd(42, "0");
+      const orderUid = ethers.constants.HashZero;
+      const owner = ethers.constants.AddressZero;
       const validTo = 2 ** 32 - 1;
 
       expect(
