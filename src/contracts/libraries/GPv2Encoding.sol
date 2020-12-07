@@ -21,7 +21,7 @@ library GPv2Encoding {
     }
 
     /// @dev A struct representing arbitrary contract interactions.
-    /// Submitted to GPv2Settlement.settle for code execution.
+    /// Submitted to [`GPv2Settlement.settle`] for code execution.
     struct Interaction {
         bytes callData;
         address target;
