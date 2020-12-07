@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-newer
 pragma solidity ^0.7.5;
+pragma abicoder v2;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
@@ -128,13 +129,16 @@ contract GPv2Settlement {
         bytes calldata encodedTrades,
         bytes calldata encodedInteractions,
         bytes calldata encodedOrderRefunds
-    ) external view onlySolver {
-        require(tokens.length == 0, "not yet implemented");
-        require(clearingPrices.length == 0, "not yet implemented");
-        require(encodedTrades.length == 0, "not yet implemented");
+    ) external onlySolver {
+        GPv2TradeExecution.Data[] memory executedTrades =
+            computeTradeExecutions(tokens, clearingPrices, encodedTrades);
+        allowanceManager.transferIn(executedTrades);
+
         require(encodedInteractions.length == 0, "not yet implemented");
+
+        transferOut(executedTrades);
+
         require(encodedOrderRefunds.length == 0, "not yet implemented");
-        revert("Final: not yet implemented");
     }
 
     /// @dev Invalidate onchain an order that has been signed offline.

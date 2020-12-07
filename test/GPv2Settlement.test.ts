@@ -141,11 +141,8 @@ describe("GPv2Settlement", () => {
 
     it("accepts transactions from solvers", async () => {
       await authenticator.connect(owner).addSolver(solver.address);
-      // TODO - this will have to be changed when other constraints become active
-      // and when settle function no longer reverts.
-      await expect(
-        settlement.connect(solver).settle([], [], [], [], []),
-      ).revertedWith("Final: not yet implemented");
+      await expect(settlement.connect(solver).settle([], [], [], [], [])).to.not
+        .be.reverted;
     });
   });
 
