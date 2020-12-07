@@ -53,9 +53,6 @@ export default {
           },
         },
       },
-      {
-        version: "0.6.12",
-      },
     ],
   },
   networks: {
