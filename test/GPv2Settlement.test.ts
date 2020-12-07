@@ -692,9 +692,7 @@ describe("GPv2Settlement", () => {
   });
 
   describe("computeTradeExecution", () => {
-    // Skipped. This test fails because the implementation of `orderUidKey`
-    // allocates memory. This test should be reenabled when it is updated.
-    it.skip("should not allocate additional memory", async () => {
+    it("should not allocate additional memory", async () => {
       expect(
         await settlement.callStatic.computeTradeExecutionMemoryTest(),
       ).to.deep.equal(ethers.constants.Zero);
