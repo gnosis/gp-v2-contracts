@@ -15,7 +15,11 @@ import {
 } from "../src/ts";
 
 import { builtAndDeployedMetadataCoincide } from "./bytecode";
-import { decodeExecutedTrades, encodeOutTransfers } from "./encoding";
+import {
+  decodeExecutedTrades,
+  encodeOutTransfers,
+  Interaction,
+} from "./encoding";
 
 function toNumberLossy(value: BigNumber): number {
   // NOTE: BigNumber throws an exception when if is outside the range of
@@ -676,6 +680,49 @@ describe("GPv2Settlement", () => {
       expect(
         await settlement.callStatic.computeTradeExecutionMemoryTest(),
       ).to.deep.equal(ethers.constants.Zero);
+    });
+  });
+
+  describe("executeInteraction", () => {
+    it("should fail when target is allowanceManager", async () => {
+      const invalidInteraction: Interaction = {
+        target: allowanceManagerAddress(settlement.address),
+        callData: [],
+      };
+
+      await expect(
+        settlement.callStatic.executeInteractionTest(invalidInteraction),
+      ).to.be.revertedWith("GPv2: forbidden interaction");
+    });
+
+    it("should fail when interaction reverts", async () => {
+      const addSolverCallData = authenticator.interface.encodeFunctionData(
+        "addSolver",
+        [solver.address],
+      );
+      const invalidInteraction: Interaction = {
+        target: authenticator.address,
+        callData: addSolverCallData,
+      };
+      // settlment contract shouldn't be able to add solver.
+      await expect(
+        settlement.callStatic.executeInteractionTest(invalidInteraction),
+      ).to.be.revertedWith("GPv2: failed interaction");
+    });
+
+    it("should pass on successfull execution", async () => {
+      await authenticator.connect(owner).addSolver(solver.address);
+      const isSolverCallData = authenticator.interface.encodeFunctionData(
+        "isSolver",
+        [solver.address],
+      );
+      const validInteraction: Interaction = {
+        target: authenticator.address,
+        callData: isSolverCallData,
+      };
+      await expect(
+        settlement.callStatic.executeInteractionTest(validInteraction),
+      ).to.not.be.reverted;
     });
   });
 
