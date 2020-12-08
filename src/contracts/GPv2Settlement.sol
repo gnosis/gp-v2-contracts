@@ -327,6 +327,7 @@ contract GPv2Settlement {
         bool success;
         // solhint-disable-next-line avoid-low-level-calls
         (success, response) = (interaction.target).call(interaction.callData);
+        require(success, "GPv2: failed interaction");
     }
 
     /// @dev Extracts specific order information from the standardized unique
