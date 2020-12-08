@@ -29,7 +29,13 @@ function toNumberLossy(value: BigNumber): number {
 }
 
 describe("GPv2Settlement", () => {
-  const [deployer, owner, solver, ...traders] = waffle.provider.getWallets();
+  const [
+    deployer,
+    owner,
+    solver,
+    dummyWallet,
+    ...traders
+  ] = waffle.provider.getWallets();
 
   let authenticator: Contract;
   let settlement: Contract;
@@ -696,30 +702,36 @@ describe("GPv2Settlement", () => {
     });
 
     it("should fail when interaction reverts", async () => {
-      const addSolverCallData = authenticator.interface.encodeFunctionData(
-        "addSolver",
-        [solver.address],
-      );
+      const mockToken = await waffle.deployMockContract(deployer, IERC20.abi);
+      await mockToken.mock.transfer.reverts();
+
       const invalidInteraction: Interaction = {
-        target: authenticator.address,
-        callData: addSolverCallData,
+        target: mockToken.address,
+        callData: mockToken.interface.encodeFunctionData("transfer", [
+          dummyWallet.address,
+          0,
+        ]),
       };
-      // settlment contract can't add solvers.
+
       await expect(
         settlement.callStatic.executeInteractionTest(invalidInteraction),
       ).to.be.revertedWith("GPv2: failed interaction");
     });
 
     it("should pass on successfull execution", async () => {
-      const isSolverCallData = authenticator.interface.encodeFunctionData(
-        "isSolver",
-        [solver.address],
-      );
-      // Note that calling a view method is a valid transaction.
+      const mockToken = await waffle.deployMockContract(deployer, IERC20.abi);
+      await mockToken.mock.transfer
+        .withArgs(dummyWallet.address, 0)
+        .returns(true);
+
       const validInteraction: Interaction = {
-        target: authenticator.address,
-        callData: isSolverCallData,
+        target: mockToken.address,
+        callData: mockToken.interface.encodeFunctionData("transfer", [
+          dummyWallet.address,
+          0,
+        ]),
       };
+
       await expect(
         settlement.callStatic.executeInteractionTest(validInteraction),
       ).to.not.be.reverted;
