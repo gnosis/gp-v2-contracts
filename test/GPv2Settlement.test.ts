@@ -704,18 +704,18 @@ describe("GPv2Settlement", () => {
         target: authenticator.address,
         callData: addSolverCallData,
       };
-      // settlment contract shouldn't be able to add solver.
+      // settlment contract can't add solvers.
       await expect(
         settlement.callStatic.executeInteractionTest(invalidInteraction),
       ).to.be.revertedWith("GPv2: failed interaction");
     });
 
-    it("should pass on successfull execution", async () => {
-      await authenticator.connect(owner).addSolver(solver.address);
+    it.only("should pass on successfull execution", async () => {
       const isSolverCallData = authenticator.interface.encodeFunctionData(
         "isSolver",
         [solver.address],
       );
+      // Note that calling a view method is a valid transaction.
       const validInteraction: Interaction = {
         target: authenticator.address,
         callData: isSolverCallData,
