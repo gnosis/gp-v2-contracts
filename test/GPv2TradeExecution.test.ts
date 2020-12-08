@@ -100,7 +100,7 @@ describe("GPv2TradeExecution", () => {
     });
 
     describe("Non-Standard ERC20 Tokens", () => {
-      it("should not revert when ERC20 trasnfer has no return data", async () => {
+      it("should not revert when ERC20 transfer has no return data", async () => {
         const amount = ethers.utils.parseEther("13.37");
 
         const { abi } = await artifacts.readArtifact("NonStandardERC20");
