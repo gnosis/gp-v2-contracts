@@ -708,7 +708,7 @@ describe("GPv2Settlement", () => {
       ).to.be.revertedWith("GPv2: failed interaction");
     });
 
-    it("should pass on successfull execution", async () => {
+    it("should pass on successful execution", async () => {
       const passingInteraction = Interaction.genericPassing();
 
       await expect(
