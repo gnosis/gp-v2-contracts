@@ -16,6 +16,7 @@ import {
 
 import { builtAndDeployedMetadataCoincide } from "./bytecode";
 import { decodeExecutedTrades, encodeOutTransfers } from "./encoding";
+import { NON_STANDARD_ERC20 } from "./mockAbis";
 
 function toNumberLossy(value: BigNumber): number {
   // NOTE: BigNumber throws an exception when if is outside the range of
@@ -729,10 +730,9 @@ describe("GPv2Settlement", () => {
 
   describe("transferOut", () => {
     it("should execute ERC20 transfers", async () => {
-      const NonStandardERC20 = await artifacts.readArtifact("NonStandardERC20");
       const tokens = [
         await waffle.deployMockContract(deployer, IERC20.abi),
-        await waffle.deployMockContract(deployer, NonStandardERC20.abi),
+        await waffle.deployMockContract(deployer, NON_STANDARD_ERC20),
       ];
 
       const amount = ethers.utils.parseEther("13.37");

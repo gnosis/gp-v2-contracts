@@ -1,9 +1,10 @@
 import IERC20 from "@openzeppelin/contracts/build/contracts/IERC20.json";
 import { expect } from "chai";
 import { Contract } from "ethers";
-import { artifacts, ethers, waffle } from "hardhat";
+import { ethers, waffle } from "hardhat";
 
 import { encodeInTransfers } from "./encoding";
+import { NON_STANDARD_ERC20 } from "./mockAbis";
 
 describe("GPv2AllowanceManager", () => {
   const [
@@ -32,10 +33,9 @@ describe("GPv2AllowanceManager", () => {
     });
 
     it("should execute ERC20 transfers", async () => {
-      const NonStandardERC20 = await artifacts.readArtifact("NonStandardERC20");
       const tokens = [
         await waffle.deployMockContract(deployer, IERC20.abi),
-        await waffle.deployMockContract(deployer, NonStandardERC20.abi),
+        await waffle.deployMockContract(deployer, NON_STANDARD_ERC20),
       ];
 
       const amount = ethers.utils.parseEther("13.37");

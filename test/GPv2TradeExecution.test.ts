@@ -1,9 +1,10 @@
 import IERC20 from "@openzeppelin/contracts/build/contracts/IERC20.json";
 import { expect } from "chai";
 import { Contract } from "ethers";
-import { artifacts, ethers, waffle } from "hardhat";
+import { ethers, waffle } from "hardhat";
 
 import { encodeExecutedTrade } from "./encoding";
+import { NON_STANDARD_ERC20 } from "./mockAbis";
 
 describe("GPv2TradeExecution", () => {
   const [deployer, recipient, ...traders] = waffle.provider.getWallets();
@@ -85,8 +86,10 @@ describe("GPv2TradeExecution", () => {
       it("should not revert when ERC20 transfer has no return data", async () => {
         const amount = ethers.utils.parseEther("13.37");
 
-        const { abi } = await artifacts.readArtifact("NonStandardERC20");
-        const sellToken = await waffle.deployMockContract(deployer, abi);
+        const sellToken = await waffle.deployMockContract(
+          deployer,
+          NON_STANDARD_ERC20,
+        );
         await sellToken.mock.transferFrom
           .withArgs(traders[0].address, recipient.address, amount)
           .returns();
@@ -190,8 +193,10 @@ describe("GPv2TradeExecution", () => {
       it("should not revert when ERC20 trasnfer has no return data", async () => {
         const amount = ethers.utils.parseEther("13.37");
 
-        const { abi } = await artifacts.readArtifact("NonStandardERC20");
-        const buyToken = await waffle.deployMockContract(deployer, abi);
+        const buyToken = await waffle.deployMockContract(
+          deployer,
+          NON_STANDARD_ERC20,
+        );
         await buyToken.mock.transfer
           .withArgs(traders[0].address, amount)
           .returns();
