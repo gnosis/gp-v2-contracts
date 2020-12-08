@@ -1,19 +1,9 @@
 import IERC20 from "@openzeppelin/contracts/build/contracts/IERC20.json";
 import { expect } from "chai";
-import { Contract, BigNumberish } from "ethers";
+import { Contract } from "ethers";
 import { artifacts, ethers, waffle } from "hardhat";
 
-interface Transfer {
-  owner: string;
-  token: string;
-  amount: BigNumberish;
-}
-
-function composeTransfers(
-  transfers: Transfer[],
-): [string, string, BigNumberish][] {
-  return transfers.map(({ owner, token, amount }) => [owner, token, amount]);
-}
+import { encodeInTransfers } from "./encoding";
 
 describe("GPv2AllowanceManager", () => {
   const [
@@ -58,16 +48,16 @@ describe("GPv2AllowanceManager", () => {
 
       await expect(
         allowanceManager.transferIn(
-          composeTransfers([
+          encodeInTransfers([
             {
               owner: traders[0].address,
-              token: tokens[0].address,
-              amount,
+              sellToken: tokens[0].address,
+              sellAmount: amount,
             },
             {
               owner: traders[1].address,
-              token: tokens[1].address,
-              amount,
+              sellToken: tokens[1].address,
+              sellAmount: amount,
             },
           ]),
         ),
@@ -84,50 +74,15 @@ describe("GPv2AllowanceManager", () => {
 
       await expect(
         allowanceManager.transferIn(
-          composeTransfers([
+          encodeInTransfers([
             {
               owner: traders[0].address,
-              token: token.address,
-              amount,
+              sellToken: token.address,
+              sellAmount: amount,
             },
           ]),
         ),
       ).to.be.revertedWith("test error");
-    });
-
-    it("should revert on failed non-standard ERC20 transfers", async () => {
-      const token = await waffle.deployMockContract(deployer, IERC20.abi);
-
-      const amount = ethers.utils.parseEther("4.2");
-      await token.mock.transferFrom
-        .withArgs(traders[0].address, recipient.address, amount)
-        .returns(false);
-
-      await expect(
-        allowanceManager.transferIn(
-          composeTransfers([
-            {
-              owner: traders[0].address,
-              token: token.address,
-              amount,
-            },
-          ]),
-        ),
-      ).to.be.revertedWith("ERC20 operation did not succeed");
-    });
-
-    it("should revert when transfering from an address without code", async () => {
-      await expect(
-        allowanceManager.transferIn(
-          composeTransfers([
-            {
-              owner: traders[0].address,
-              token: traders[1].address,
-              amount: ethers.constants.WeiPerEther,
-            },
-          ]),
-        ),
-      ).to.be.revertedWith("call to non-contract");
     });
   });
 });

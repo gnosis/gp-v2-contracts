@@ -2,6 +2,10 @@
 pragma solidity ^0.7.5;
 
 interface NonStandardERC20 {
+    /// @dev Non-standard ERC20 `transfer` that does not return a bool
+    /// indicating success.
+    function transfer(address recipient, uint256 amount) external;
+
     /// @dev Non-standard ERC20 `transferFrom` that does not return a bool
     /// indicating success.
     function transferFrom(

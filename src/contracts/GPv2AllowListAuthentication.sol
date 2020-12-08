@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-newer
 pragma solidity ^0.7.5;
 
+import "@gnosis.pm/util-contracts/contracts/StorageAccessible.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "./interfaces/GPv2Authentication.sol";
 import "./ownership/CustomInitiallyOwnable.sol";
@@ -9,7 +10,8 @@ import "./ownership/CustomInitiallyOwnable.sol";
 /// @author Gnosis Developers
 contract GPv2AllowListAuthentication is
     CustomInitiallyOwnable,
-    GPv2Authentication
+    GPv2Authentication,
+    StorageAccessible
 {
     using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -18,11 +20,11 @@ contract GPv2AllowListAuthentication is
 
     EnumerableSet.AddressSet private solvers;
 
-    function addSolver(address solver) public onlyOwner {
+    function addSolver(address solver) external onlyOwner {
         solvers.add(solver);
     }
 
-    function removeSolver(address solver) public onlyOwner {
+    function removeSolver(address solver) external onlyOwner {
         solvers.remove(solver);
     }
 
@@ -33,13 +35,5 @@ contract GPv2AllowListAuthentication is
         returns (bool)
     {
         return solvers.contains(prospectiveSolver);
-    }
-
-    function getSolverAt(uint256 index) public view returns (address) {
-        return solvers.at(index);
-    }
-
-    function numSolvers() public view returns (uint256) {
-        return solvers.length();
     }
 }
