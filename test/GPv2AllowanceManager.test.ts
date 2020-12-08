@@ -4,7 +4,6 @@ import { Contract } from "ethers";
 import { ethers, waffle } from "hardhat";
 
 import { encodeInTransfers } from "./encoding";
-import { NON_STANDARD_ERC20 } from "./mockAbis";
 
 describe("GPv2AllowanceManager", () => {
   const [
@@ -35,7 +34,7 @@ describe("GPv2AllowanceManager", () => {
     it("should execute ERC20 transfers", async () => {
       const tokens = [
         await waffle.deployMockContract(deployer, IERC20.abi),
-        await waffle.deployMockContract(deployer, NON_STANDARD_ERC20),
+        await waffle.deployMockContract(deployer, IERC20.abi),
       ];
 
       const amount = ethers.utils.parseEther("13.37");
@@ -44,7 +43,7 @@ describe("GPv2AllowanceManager", () => {
         .returns(true);
       await tokens[1].mock.transferFrom
         .withArgs(traders[1].address, recipient.address, amount)
-        .returns();
+        .returns(true);
 
       await expect(
         allowanceManager.transferIn(
