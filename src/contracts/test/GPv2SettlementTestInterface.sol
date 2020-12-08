@@ -71,4 +71,10 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
     function transferOutTest(GPv2TradeExecution.Data[] memory trades) external {
         transferOut(trades);
     }
+
+    function executeInteractionTest(GPv2Encoding.Interaction memory interaction)
+        external
+    {
+        executeInteraction(interaction);
+    }
 }
