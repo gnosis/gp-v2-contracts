@@ -5,8 +5,10 @@ import { artifacts, ethers, waffle } from "hardhat";
 
 import { ExecutedTrade, composeExecutedTrade } from "./GPv2TradeExecution.test";
 
+type InTransfer = Pick<ExecutedTrade, "owner" | "sellToken" | "sellAmount">;
+
 function composeTransfers(
-  trades: Pick<ExecutedTrade, "owner" | "sellToken" | "sellAmount">[],
+  trades: InTransfer[],
 ): ReturnType<typeof composeExecutedTrade>[] {
   return trades.map((partialTrade) =>
     composeExecutedTrade({

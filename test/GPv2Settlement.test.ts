@@ -3,7 +3,7 @@ import { BigNumber, Contract, TypedDataDomain } from "ethers";
 import { artifacts, ethers, waffle } from "hardhat";
 
 import {
-  Order,
+  OrderFlags,
   OrderKind,
   SettlementEncoder,
   SigningScheme,
@@ -306,7 +306,7 @@ describe("GPv2Settlement", () => {
       const computeSettlementForOrderVariant = async ({
         kind,
         partiallyFillable,
-      }: Pick<Order, "kind" | "partiallyFillable">) => {
+      }: OrderFlags) => {
         const encoder = new SettlementEncoder(testDomain);
         await encoder.signEncodeTrade(
           {
@@ -461,7 +461,7 @@ describe("GPv2Settlement", () => {
       const feeAmount = ethers.utils.parseEther("10");
       const { [sellToken]: sellPrice, [buyToken]: buyPrice } = prices;
       const computeExecutedTradeForOrderVariant = async (
-        { kind, partiallyFillable }: Pick<Order, "kind" | "partiallyFillable">,
+        { kind, partiallyFillable }: OrderFlags,
         executedAmount?: BigNumber,
       ) => {
         const encoder = new SettlementEncoder(testDomain);
@@ -544,7 +544,7 @@ describe("GPv2Settlement", () => {
     describe("Order Filled Amounts", () => {
       const { sellAmount, buyAmount } = partialOrder;
       const readOrderFilledAmountAfterProcessing = async (
-        { kind, partiallyFillable }: Pick<Order, "kind" | "partiallyFillable">,
+        { kind, partiallyFillable }: OrderFlags,
         executedAmount?: BigNumber,
       ) => {
         const order = {
