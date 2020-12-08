@@ -15,6 +15,30 @@ import {
   timestamp,
 } from "./order";
 
+/**
+ * Details representing how an order was executed.
+ */
+export interface TradeExecution {
+  /**
+   * The executed trade amount.
+   *
+   * How this amount is used by the settlement contract depends on the order
+   * flags:
+   * - Partially fillable sell orders: the amount of sell tokens to trade.
+   * - Partially fillable buy orders: the amount of buy tokens to trade.
+   * - Fill-or-kill orders: this value is ignored.
+   */
+  executedAmount: BigNumberish;
+  /**
+   * Optional fee discount to use in basis points (1/100th of 1%).
+   *
+   * If this value is `0`, then there is no discount and the full fee will be
+   * taken for the order. A value of `10000` is used to indicate a full
+   * discount, meaning no fees will be taken.
+   */
+  feeDiscount: number;
+}
+
 function encodeOrderFlags(flags: OrderFlags): number {
   const kind = flags.kind === OrderKind.SELL ? 0x00 : 0x01;
   const partiallyFillable = flags.partiallyFillable ? 0x02 : 0x00;
@@ -114,10 +138,15 @@ export class SettlementEncoder {
    */
   public encodeTrade(
     order: Order,
-    executedAmount: BigNumberish,
     signature: SignatureLike,
     scheme: SigningScheme,
+    tradeExecution?: Partial<TradeExecution>,
   ): void {
+    const { executedAmount, feeDiscount } = tradeExecution || {};
+    if (order.partiallyFillable && executedAmount === undefined) {
+      throw new Error("missing executed amount for partially fillable trade");
+    }
+
     const sig = ethers.utils.splitSignature(signature);
     const encodedTrade = ethers.utils.solidityPack(
       [
@@ -143,7 +172,8 @@ export class SettlementEncoder {
         order.appData,
         order.feeAmount,
         encodeOrderFlags(order),
-        executedAmount,
+        executedAmount || 0,
+        feeDiscount || 0,
         encodeSigningScheme(sig.v, scheme),
         sig.r,
         sig.s,
@@ -166,12 +196,12 @@ export class SettlementEncoder {
    */
   public async signEncodeTrade(
     order: Order,
-    executedAmount: BigNumberish,
     owner: Signer,
     scheme: SigningScheme,
+    tradeExecution?: Partial<TradeExecution>,
   ): Promise<void> {
     const signature = await signOrder(this.domain, order, owner, scheme);
-    this.encodeTrade(order, executedAmount, signature, scheme);
+    this.encodeTrade(order, signature, scheme, tradeExecution);
   }
 
   private tokenIndex(token: string): number {

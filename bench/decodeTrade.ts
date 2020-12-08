@@ -29,7 +29,7 @@ async function main() {
           kind: OrderKind.SELL,
           partiallyFillable: false,
         },
-        ethers.utils.parseEther("42"),
+        { executedAmount: ethers.utils.parseEther("42") },
         trader,
         trader._signTypedData
           ? SigningScheme.TYPED_DATA
