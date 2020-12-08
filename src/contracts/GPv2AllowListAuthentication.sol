@@ -36,12 +36,4 @@ contract GPv2AllowListAuthentication is
     {
         return solvers.contains(prospectiveSolver);
     }
-
-    function getSolverAt(uint256 index) public view returns (address) {
-        return solvers.at(index);
-    }
-
-    function numSolvers() public view returns (uint256) {
-        return solvers.length();
-    }
 }
