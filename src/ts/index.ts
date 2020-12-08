@@ -396,14 +396,16 @@ export function signOrder(
  *
  * @param orderDigest The digest representing the parameters of the user order.
  * @param userAddress The address of the user who owns the order.
+ * @param validTo Time until which the order is valid.
  * @returns A string that unequivocally identifies the order of the user.
  */
 export function computeOrderUid(
   orderDigest: string,
   userAddress: string,
+  validTo: number | Date,
 ): string {
-  return ethers.utils.solidityKeccak256(
-    ["bytes32", "address"],
-    [orderDigest, userAddress],
+  return ethers.utils.solidityPack(
+    ["bytes32", "address", "uint32"],
+    [orderDigest, userAddress, timestamp(validTo)],
   );
 }
