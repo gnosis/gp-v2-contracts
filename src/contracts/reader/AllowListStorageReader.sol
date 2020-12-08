@@ -13,11 +13,11 @@ contract AllowListStorageReader {
     address private _owner;
     EnumerableSet.AddressSet private solvers;
 
-    function getSolverAt(uint256 index) public view returns (address) {
+    function getSolverAt(uint256 index) external view returns (address) {
         return solvers.at(index);
     }
 
-    function numSolvers() public view returns (uint256) {
+    function numSolvers() external view returns (uint256) {
         return solvers.length();
     }
 }

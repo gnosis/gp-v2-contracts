@@ -20,11 +20,11 @@ contract GPv2AllowListAuthentication is
 
     EnumerableSet.AddressSet private solvers;
 
-    function addSolver(address solver) public onlyOwner {
+    function addSolver(address solver) external onlyOwner {
         solvers.add(solver);
     }
 
-    function removeSolver(address solver) public onlyOwner {
+    function removeSolver(address solver) external onlyOwner {
         solvers.remove(solver);
     }
 
