@@ -6,7 +6,7 @@ const readStorage = async (
   base: Contract,
   reader: Contract,
   method: string,
-  parameters?: any[],
+  parameters?: (string | number | BigNumber)[],
 ) => {
   const encodedCall = reader.interface.encodeFunctionData(
     method,
