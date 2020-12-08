@@ -137,10 +137,24 @@ describe("GPv2Settlement", () => {
 
   describe("filledAmount", () => {
     it("is zero for an uninitialized order", async () => {
-      const orderUid = "0x".padEnd(66, "0");
-      expect(await settlement.filledAmount(orderUid)).to.equal(
+      const zeroBytes = ethers.constants.HashZero;
+      expect(await settlement.filledAmount(zeroBytes)).to.equal(
         ethers.constants.Zero,
       );
+    });
+  });
+
+  describe("getFilledAmount", () => {
+    it("is zero for an untouched order", async () => {
+      const orderUid = ethers.constants.HashZero;
+      const owner = ethers.constants.AddressZero;
+      const validTo = 2 ** 32 - 1;
+
+      expect(
+        await settlement.getFilledAmount(
+          computeOrderUid(orderUid, owner, validTo),
+        ),
+      ).to.equal(ethers.constants.Zero);
     });
   });
 
@@ -163,12 +177,30 @@ describe("GPv2Settlement", () => {
 
   describe("invalidateOrder", () => {
     it("sets filled amount of the caller's order to max uint256", async () => {
-      const orderDigest = "0x".padEnd(66, "1");
-      const orderUid = computeOrderUid(orderDigest, traders[0].address);
+      const orderDigest = "0x" + "11".repeat(32);
+      const validTo = 2 ** 32 - 1;
+      const orderUid = computeOrderUid(
+        orderDigest,
+        traders[0].address,
+        validTo,
+      );
 
-      await settlement.connect(traders[0]).invalidateOrder(orderDigest);
-      expect(await settlement.filledAmount(orderUid)).to.equal(
+      await settlement.connect(traders[0]).invalidateOrder(orderUid);
+      expect(await settlement.getFilledAmount(orderUid)).to.equal(
         ethers.constants.MaxUint256,
+      );
+    });
+    it("fails to invalidate order that is not owned by the caller", async () => {
+      const orderDigest = "0x".padEnd(66, "1");
+      const validTo = 2 ** 32 - 1;
+      const orderUid = computeOrderUid(
+        orderDigest,
+        traders[0].address,
+        validTo,
+      );
+
+      await expect(settlement.invalidateOrder(orderUid)).to.be.revertedWith(
+        "GPv2: caller does not own order",
       );
     });
   });
@@ -576,8 +608,12 @@ describe("GPv2Settlement", () => {
           encoder.encodedTrades,
         );
 
-        const orderUid = computeOrderUid(hashOrder(order), traders[0].address);
-        const filledAmount = await settlement.filledAmount(orderUid);
+        const orderUid = computeOrderUid(
+          hashOrder(order),
+          traders[0].address,
+          order.validTo,
+        );
+        const filledAmount = await settlement.getFilledAmount(orderUid);
 
         return filledAmount;
       };
@@ -660,6 +696,54 @@ describe("GPv2Settlement", () => {
       expect(
         await settlement.callStatic.computeTradeExecutionMemoryTest(),
       ).to.deep.equal(ethers.constants.Zero);
+    });
+  });
+
+  describe("extractOrderUidParams", () => {
+    function fillDistinctBytes(count: number, start: number): string {
+      return [...Array(count)]
+        .map((_, i) => ((start + i) % 256).toString(16).padStart(2, "0"))
+        .join("");
+    }
+
+    it("round trip encode/decode", async () => {
+      // Start from 17 (0x11) so that the first byte has no zeroes.
+      const orderDigest = "0x" + fillDistinctBytes(32, 17);
+      const address = ethers.utils.getAddress(
+        "0x" + fillDistinctBytes(20, 17 + 32),
+      );
+      const validTo = parseInt(fillDistinctBytes(4, 17 + 32 + 20), 16);
+      const orderUid = computeOrderUid(orderDigest, address, validTo);
+      expect(orderUid).to.equal("0x" + fillDistinctBytes(32 + 20 + 4, 17));
+
+      const {
+        orderDigest: extractedOrderDigest,
+        owner: extractedAddress,
+        validTo: extractedValidTo,
+      } = await settlement.extractOrderUidParamsTest(orderUid);
+      expect(extractedOrderDigest).to.equal(orderDigest);
+      expect(extractedValidTo).to.equal(validTo);
+      expect(extractedAddress).to.equal(address);
+    });
+
+    describe("fails on uid", () => {
+      const uidStride = 32 + 20 + 4;
+
+      it("longer than expected", async () => {
+        const invalidUid = "0x" + "00".repeat(uidStride + 1);
+
+        await expect(settlement.getFilledAmount(invalidUid)).to.be.revertedWith(
+          "GPv2: invalid uid",
+        );
+      });
+
+      it("shorter than expected", async () => {
+        const invalidUid = "0x" + "00".repeat(uidStride - 1);
+
+        await expect(settlement.getFilledAmount(invalidUid)).to.be.revertedWith(
+          "GPv2: invalid uid",
+        );
+      });
     });
   });
 });
