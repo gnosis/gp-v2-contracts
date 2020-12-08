@@ -144,4 +144,107 @@ describe("GPv2TradeExecution", () => {
       });
     });
   });
+
+  describe("transferBuyAmountToOwner", () => {
+    const withoutSell = {
+      sellToken: ethers.constants.AddressZero,
+      sellAmount: ethers.constants.Zero,
+    };
+
+    it("should transfer buy amount to sender", async () => {
+      const amount = ethers.utils.parseEther("13.37");
+
+      const buyToken = await waffle.deployMockContract(deployer, IERC20.abi);
+      await buyToken.mock.transfer
+        .withArgs(traders[0].address, amount)
+        .returns(true);
+
+      await expect(
+        tradeExecution.transferBuyAmountToOwnerTest(
+          composeExecutedTrade({
+            owner: traders[0].address,
+            buyToken: buyToken.address,
+            buyAmount: amount,
+            ...withoutSell,
+          }),
+        ),
+      ).to.not.be.reverted;
+    });
+
+    it("should revert on failed ERC20 transfers", async () => {
+      const amount = ethers.utils.parseEther("4.2");
+
+      const buyToken = await waffle.deployMockContract(deployer, IERC20.abi);
+      await buyToken.mock.transfer
+        .withArgs(traders[0].address, amount)
+        .revertsWithReason("test error");
+
+      await expect(
+        tradeExecution.transferBuyAmountToOwnerTest(
+          composeExecutedTrade({
+            owner: traders[0].address,
+            buyToken: buyToken.address,
+            buyAmount: amount,
+            ...withoutSell,
+          }),
+        ),
+      ).to.be.revertedWith("test error");
+    });
+
+    it("should revert when transfering from an address without code", async () => {
+      await expect(
+        tradeExecution.transferBuyAmountToOwnerTest(
+          composeExecutedTrade({
+            owner: traders[0].address,
+            buyToken: traders[1].address,
+            buyAmount: ethers.utils.parseEther("1.0"),
+            ...withoutSell,
+          }),
+        ),
+      ).to.be.revertedWith("call to non-contract");
+    });
+
+    describe("Non-Standard ERC20 Tokens", () => {
+      it("should not revert when ERC20 trasnfer has no return data", async () => {
+        const amount = ethers.utils.parseEther("13.37");
+
+        const { abi } = await artifacts.readArtifact("NonStandardERC20");
+        const buyToken = await waffle.deployMockContract(deployer, abi);
+        await buyToken.mock.transfer
+          .withArgs(traders[0].address, amount)
+          .returns();
+
+        await expect(
+          tradeExecution.transferBuyAmountToOwnerTest(
+            composeExecutedTrade({
+              owner: traders[0].address,
+              buyToken: buyToken.address,
+              buyAmount: amount,
+              ...withoutSell,
+            }),
+          ),
+        ).to.not.be.reverted;
+      });
+
+      it("should revert when ERC20 transfer returns false", async () => {
+        const amount = ethers.utils.parseEther("4.2");
+
+        const buyToken = await waffle.deployMockContract(deployer, IERC20.abi);
+        await buyToken.mock.transfer
+          .withArgs(traders[0].address, amount)
+          .returns(false);
+
+        await expect(
+          tradeExecution.transferBuyAmountToOwnerTest(
+            composeExecutedTrade({
+              owner: traders[0].address,
+              buyToken: buyToken.address,
+              buyAmount: amount,
+              ...withoutSell,
+            }),
+          ),
+        ).to.be.revertedWith("ERC20 operation did not succeed");
+      });
+    });
+  });
 });

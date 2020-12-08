@@ -13,6 +13,7 @@ import "./libraries/GPv2TradeExecution.sol";
 /// @author Gnosis Developers
 contract GPv2Settlement {
     using GPv2Encoding for bytes;
+    using GPv2TradeExecution for GPv2TradeExecution.Data;
     using SafeMath for uint256;
 
     /// @dev The EIP-712 domain type hash used for computing the domain
@@ -326,6 +327,18 @@ contract GPv2Settlement {
             orderDigest := calldataload(orderUid.offset)
             owner := shr(96, calldataload(add(orderUid.offset, 32)))
             validTo := shr(224, calldataload(add(orderUid.offset, 52)))
+        }
+    }
+
+    /// @dev Transfers all buy amounts for the executed trades from the
+    /// settlement contract to the order owners. This function reverst if any of
+    /// the ERC20 operations fail.
+    ///
+    /// @param trades The executed trades whose buy amounts need to be
+    /// transferred out.
+    function transferOut(GPv2TradeExecution.Data[] memory trades) internal {
+        for (uint256 i = 0; i < trades.length; i++) {
+            trades[i].transferBuyAmountToOwner();
         }
     }
 

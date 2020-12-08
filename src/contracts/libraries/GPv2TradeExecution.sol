@@ -30,4 +30,10 @@ library GPv2TradeExecution {
             trade.sellAmount
         );
     }
+
+    /// @dev Executes the trade's buy amount, transferring it to the trade's
+    /// owner from the caller's address.
+    function transferBuyAmountToOwner(Data memory trade) internal {
+        trade.buyToken.safeTransfer(trade.owner, trade.buyAmount);
+    }
 }

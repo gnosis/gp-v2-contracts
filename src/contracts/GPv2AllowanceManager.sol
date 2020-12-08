@@ -24,12 +24,15 @@ contract GPv2AllowanceManager {
         _;
     }
 
-    /// @dev Transfer's all sell amounts for the executed trades from their
+    /// @dev Transfers all sell amounts for the executed trades from their
     /// owners to the caller.
     ///
     /// This function reverts if:
     /// - The caller is not the recipient of the allowance manager
     /// - Any ERC20 transfer fails
+    ///
+    /// @param trades The executed trades whose sell amounts need to be
+    /// transferred in.
     function transferIn(GPv2TradeExecution.Data[] calldata trades)
         external
         onlyRecipient
