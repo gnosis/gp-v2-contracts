@@ -43,6 +43,9 @@ contract GPv2EncodingTestInterface {
 
         uint256 tradeCount = encodedTrades.tradeCount();
         trades = new GPv2Encoding.Trade[](tradeCount);
+        for (uint256 i = 0; i < tradeCount; i++) {
+            trades[i].orderUid = new bytes(56);
+        }
 
         // NOTE: Solidity keeps a total memory count at address 0x40. Check
         // before and after decoding a trade to compute memory usage growth per
@@ -68,5 +71,17 @@ contract GPv2EncodingTestInterface {
             mem := sub(mload(0x40), mem)
         }
         gas_ = gas_ - gasleft();
+    }
+
+    function extractOrderUidParamsTest(bytes calldata orderUid)
+        external
+        pure
+        returns (
+            bytes32 orderDigest,
+            address owner,
+            uint32 validTo
+        )
+    {
+        return orderUid.extractOrderUidParams();
     }
 }

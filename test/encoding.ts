@@ -22,13 +22,8 @@ export interface Trade {
   sellTokenIndex: number;
   buyTokenIndex: number;
   executedAmount: BigNumber;
-  digest: string;
   owner: string;
-}
-
-export interface Interaction {
-  target: string;
-  callData: BytesLike;
+  orderUid: string;
 }
 
 export function decodeTrade(trade: AbiTrade): Trade {
@@ -47,9 +42,14 @@ export function decodeTrade(trade: AbiTrade): Trade {
     sellTokenIndex: trade[1],
     buyTokenIndex: trade[2],
     executedAmount: trade[3],
-    digest: trade[4],
-    owner: trade[5],
+    owner: trade[4],
+    orderUid: trade[5],
   };
+}
+
+export interface Interaction {
+  target: string;
+  callData: BytesLike;
 }
 
 export type AbiExecutedTrade = [string, string, string, BigNumber, BigNumber];

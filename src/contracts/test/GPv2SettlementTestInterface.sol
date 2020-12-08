@@ -52,18 +52,6 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
         }
     }
 
-    function extractOrderUidParamsTest(bytes calldata orderUid)
-        external
-        pure
-        returns (
-            bytes32 orderDigest,
-            address owner,
-            uint32 validTo
-        )
-    {
-        return extractOrderUidParams(orderUid);
-    }
-
     function transferOutTest(GPv2TradeExecution.Data[] memory trades) external {
         transferOut(trades);
     }
