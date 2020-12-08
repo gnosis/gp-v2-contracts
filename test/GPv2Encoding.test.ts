@@ -4,12 +4,13 @@ import { ethers, waffle } from "hardhat";
 
 import {
   ORDER_TYPE_HASH,
-  Order,
   OrderKind,
   SettlementEncoder,
   SigningScheme,
   hashOrder,
 } from "../src/ts";
+
+import { decodeTrade } from "./encoding";
 
 function fillBytes(count: number, byte: number): string {
   return ethers.utils.hexlify([...Array(count)].map(() => byte));
@@ -17,37 +18,6 @@ function fillBytes(count: number, byte: number): string {
 
 function fillUint(bits: number, byte: number): BigNumber {
   return BigNumber.from(fillBytes(bits / 8, byte));
-}
-
-interface Trade {
-  order: Order;
-  sellTokenIndex: number;
-  buyTokenIndex: number;
-  executedAmount: BigNumber;
-  digest: string;
-  owner: string;
-}
-
-function parseTrade(trade: unknown[]): Trade {
-  const order = trade[0] as unknown[];
-  return {
-    order: {
-      sellToken: order[0] as string,
-      buyToken: order[1] as string,
-      sellAmount: order[2] as BigNumber,
-      buyAmount: order[3] as BigNumber,
-      validTo: order[4] as number,
-      appData: order[5] as number,
-      feeAmount: order[6] as BigNumber,
-      kind: order[7] as OrderKind,
-      partiallyFillable: order[8] as boolean,
-    },
-    sellTokenIndex: trade[1] as number,
-    buyTokenIndex: trade[2] as number,
-    executedAmount: trade[3] as BigNumber,
-    digest: trade[4] as string,
-    owner: trade[5] as string,
-  };
 }
 
 describe("GPv2Encoding", () => {
@@ -162,7 +132,7 @@ describe("GPv2Encoding", () => {
       const {
         order: decodedOrder,
         executedAmount: decodedExecutedAmount,
-      } = parseTrade(decodedTrades[0]);
+      } = decodeTrade(decodedTrades[0]);
       expect(decodedOrder).to.deep.equal(order);
       expect(decodedExecutedAmount).to.deep.equal(executedAmount);
     });
@@ -180,7 +150,7 @@ describe("GPv2Encoding", () => {
         encoder.tokens,
         encoder.encodedTrades,
       );
-      const { sellTokenIndex, buyTokenIndex } = parseTrade(decodedTrades[0]);
+      const { sellTokenIndex, buyTokenIndex } = decodeTrade(decodedTrades[0]);
       expect(sellTokenIndex).to.equal(
         encoder.tokens.indexOf(sampleOrder.sellToken),
       );
@@ -202,7 +172,7 @@ describe("GPv2Encoding", () => {
         encoder.tokens,
         encoder.encodedTrades,
       );
-      const { digest } = parseTrade(decodedTrades[0]);
+      const { digest } = decodeTrade(decodedTrades[0]);
       expect(digest).to.equal(hashOrder(sampleOrder));
     });
 
@@ -219,7 +189,7 @@ describe("GPv2Encoding", () => {
 
       const traderAddress = await traders[0].getAddress();
       for (const decodedTrade of decodedTrades) {
-        const { owner } = parseTrade(decodedTrade);
+        const { owner } = decodeTrade(decodedTrade);
         expect(owner).to.equal(traderAddress);
       }
     });

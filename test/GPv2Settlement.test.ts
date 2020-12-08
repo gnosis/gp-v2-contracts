@@ -14,30 +14,8 @@ import {
   hashOrder,
 } from "../src/ts";
 
-import { ExecutedTrade, composeExecutedTrade } from "./GPv2TradeExecution.test";
 import { builtAndDeployedMetadataCoincide } from "./bytecode";
-
-function parseExecutedTrades(trades: unknown[][]): ExecutedTrade[] {
-  return trades.map((trade) => ({
-    owner: trade[0] as string,
-    sellToken: trade[1] as string,
-    buyToken: trade[2] as string,
-    sellAmount: trade[3] as BigNumber,
-    buyAmount: trade[4] as BigNumber,
-  }));
-}
-
-function composeTransfers(
-  trades: Pick<ExecutedTrade, "owner" | "buyToken" | "buyAmount">[],
-): ReturnType<typeof composeExecutedTrade>[] {
-  return trades.map((partialTrade) =>
-    composeExecutedTrade({
-      ...partialTrade,
-      sellToken: ethers.constants.AddressZero,
-      sellAmount: ethers.constants.Zero,
-    }),
-  );
-}
+import { decodeExecutedTrades, encodeOutTransfers } from "./encoding";
 
 function toNumberLossy(value: BigNumber): number {
   // NOTE: BigNumber throws an exception when if is outside the range of
@@ -246,7 +224,7 @@ describe("GPv2Settlement", () => {
         );
       }
 
-      const trades = parseExecutedTrades(
+      const trades = decodeExecutedTrades(
         await settlement.callStatic.computeTradeExecutionsTest(
           encoder.tokens,
           encoder.clearingPrices(prices),
@@ -339,7 +317,7 @@ describe("GPv2Settlement", () => {
       );
       await expect(executions).to.not.be.reverted;
 
-      const [{ buyAmount: executedBuyAmount }] = parseExecutedTrades(
+      const [{ buyAmount: executedBuyAmount }] = decodeExecutedTrades(
         await executions,
       );
       expect(executedBuyAmount).to.deep.equal(buyAmount);
@@ -366,7 +344,7 @@ describe("GPv2Settlement", () => {
 
         const [
           { sellAmount: executedSellAmount, buyAmount: executedBuyAmount },
-        ] = parseExecutedTrades(
+        ] = decodeExecutedTrades(
           await settlement.callStatic.computeTradeExecutionsTest(
             encoder.tokens,
             encoder.clearingPrices(prices),
@@ -522,7 +500,7 @@ describe("GPv2Settlement", () => {
           SigningScheme.TYPED_DATA,
         );
 
-        const [trade] = parseExecutedTrades(
+        const [trade] = decodeExecutedTrades(
           await settlement.callStatic.computeTradeExecutionsTest(
             encoder.tokens,
             encoder.clearingPrices(prices),
@@ -681,7 +659,7 @@ describe("GPv2Settlement", () => {
         SigningScheme.TYPED_DATA,
       );
 
-      const trades = parseExecutedTrades(
+      const trades = decodeExecutedTrades(
         await settlement.callStatic.computeTradeExecutionsTest(
           encoder.tokens,
           encoder.clearingPrices(prices),
@@ -767,7 +745,7 @@ describe("GPv2Settlement", () => {
 
       await expect(
         settlement.transferOutTest(
-          composeTransfers([
+          encodeOutTransfers([
             {
               owner: traders[0].address,
               buyToken: tokens[0].address,

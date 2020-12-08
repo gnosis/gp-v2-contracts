@@ -1,27 +1,9 @@
 import IERC20 from "@openzeppelin/contracts/build/contracts/IERC20.json";
 import { expect } from "chai";
-import { Contract, BigNumber } from "ethers";
+import { Contract } from "ethers";
 import { artifacts, ethers, waffle } from "hardhat";
 
-export interface ExecutedTrade {
-  owner: string;
-  sellToken: string;
-  buyToken: string;
-  sellAmount: BigNumber;
-  buyAmount: BigNumber;
-}
-
-export function composeExecutedTrade(
-  trade: ExecutedTrade,
-): [string, string, string, BigNumber, BigNumber] {
-  return [
-    trade.owner,
-    trade.sellToken,
-    trade.buyToken,
-    trade.sellAmount,
-    trade.buyAmount,
-  ];
-}
+import { encodeExecutedTrade } from "./encoding";
 
 describe("GPv2TradeExecution", () => {
   const [deployer, recipient, ...traders] = waffle.provider.getWallets();
@@ -53,7 +35,7 @@ describe("GPv2TradeExecution", () => {
 
       await expect(
         tradeExecution.transferSellAmountToRecipientTest(
-          composeExecutedTrade({
+          encodeExecutedTrade({
             owner: traders[0].address,
             sellToken: sellToken.address,
             sellAmount: amount,
@@ -74,7 +56,7 @@ describe("GPv2TradeExecution", () => {
 
       await expect(
         tradeExecution.transferSellAmountToRecipientTest(
-          composeExecutedTrade({
+          encodeExecutedTrade({
             owner: traders[0].address,
             sellToken: sellToken.address,
             sellAmount: amount,
@@ -88,7 +70,7 @@ describe("GPv2TradeExecution", () => {
     it("should revert when transfering a token with no contract at its address", async () => {
       await expect(
         tradeExecution.transferSellAmountToRecipientTest(
-          composeExecutedTrade({
+          encodeExecutedTrade({
             owner: traders[0].address,
             sellToken: traders[1].address,
             sellAmount: ethers.utils.parseEther("1.0"),
@@ -111,7 +93,7 @@ describe("GPv2TradeExecution", () => {
 
         await expect(
           tradeExecution.transferSellAmountToRecipientTest(
-            composeExecutedTrade({
+            encodeExecutedTrade({
               owner: traders[0].address,
               sellToken: sellToken.address,
               sellAmount: amount,
@@ -132,7 +114,7 @@ describe("GPv2TradeExecution", () => {
 
         await expect(
           tradeExecution.transferSellAmountToRecipientTest(
-            composeExecutedTrade({
+            encodeExecutedTrade({
               owner: traders[0].address,
               sellToken: sellToken.address,
               sellAmount: amount,
@@ -161,7 +143,7 @@ describe("GPv2TradeExecution", () => {
 
       await expect(
         tradeExecution.transferBuyAmountToOwnerTest(
-          composeExecutedTrade({
+          encodeExecutedTrade({
             owner: traders[0].address,
             buyToken: buyToken.address,
             buyAmount: amount,
@@ -181,7 +163,7 @@ describe("GPv2TradeExecution", () => {
 
       await expect(
         tradeExecution.transferBuyAmountToOwnerTest(
-          composeExecutedTrade({
+          encodeExecutedTrade({
             owner: traders[0].address,
             buyToken: buyToken.address,
             buyAmount: amount,
@@ -191,10 +173,10 @@ describe("GPv2TradeExecution", () => {
       ).to.be.revertedWith("test error");
     });
 
-    it("should revert when transfering from an address without code", async () => {
+    it("should revert when transfering from a token with no contract at its address", async () => {
       await expect(
         tradeExecution.transferBuyAmountToOwnerTest(
-          composeExecutedTrade({
+          encodeExecutedTrade({
             owner: traders[0].address,
             buyToken: traders[1].address,
             buyAmount: ethers.utils.parseEther("1.0"),
@@ -216,7 +198,7 @@ describe("GPv2TradeExecution", () => {
 
         await expect(
           tradeExecution.transferBuyAmountToOwnerTest(
-            composeExecutedTrade({
+            encodeExecutedTrade({
               owner: traders[0].address,
               buyToken: buyToken.address,
               buyAmount: amount,
@@ -236,7 +218,7 @@ describe("GPv2TradeExecution", () => {
 
         await expect(
           tradeExecution.transferBuyAmountToOwnerTest(
-            composeExecutedTrade({
+            encodeExecutedTrade({
               owner: traders[0].address,
               buyToken: buyToken.address,
               buyAmount: amount,

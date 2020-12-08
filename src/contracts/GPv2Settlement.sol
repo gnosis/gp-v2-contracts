@@ -331,7 +331,7 @@ contract GPv2Settlement {
     }
 
     /// @dev Transfers all buy amounts for the executed trades from the
-    /// settlement contract to the order owners. This function reverst if any of
+    /// settlement contract to the order owners. This function reverts if any of
     /// the ERC20 operations fail.
     ///
     /// @param trades The executed trades whose buy amounts need to be
