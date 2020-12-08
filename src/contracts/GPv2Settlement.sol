@@ -229,7 +229,7 @@ contract GPv2Settlement {
         uint256 executedSellAmount;
         uint256 executedBuyAmount;
         uint256 executedFeeAmount;
-        uint256 currentFilledAmount = filledAmount[trade.orderUid];
+        uint256 currentFilledAmount;
 
         // NOTE: Don't use `SafeMath.div` anywhere here as it allocates a string
         // even if it does not revert. The method only checks that the divisor
@@ -248,7 +248,9 @@ contract GPv2Settlement {
 
             executedBuyAmount = executedSellAmount.mul(sellPrice) / buyPrice;
 
-            currentFilledAmount = currentFilledAmount.add(executedSellAmount);
+            currentFilledAmount = filledAmount[trade.orderUid].add(
+                executedSellAmount
+            );
             require(
                 currentFilledAmount <= order.sellAmount,
                 "GPv2: order filled"
@@ -266,7 +268,9 @@ contract GPv2Settlement {
 
             executedSellAmount = executedBuyAmount.mul(buyPrice) / sellPrice;
 
-            currentFilledAmount = currentFilledAmount.add(executedBuyAmount);
+            currentFilledAmount = filledAmount[trade.orderUid].add(
+                executedBuyAmount
+            );
             require(
                 currentFilledAmount <= order.buyAmount,
                 "GPv2: order filled"

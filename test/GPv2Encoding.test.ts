@@ -187,6 +187,30 @@ describe("GPv2Encoding", () => {
       expect(orderDigest).to.equal(hashOrder(sampleOrder));
     });
 
+    it("should compute order unique identifier", async () => {
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
+        sampleOrder,
+        0,
+        traders[0],
+        SigningScheme.TYPED_DATA,
+      );
+
+      const [decodedTrades] = await encoding.decodeTradesTest(
+        encoder.tokens,
+        encoder.encodedTrades,
+      );
+
+      const { orderUid } = decodeTrade(decodedTrades[0]);
+      expect(orderUid).to.equal(
+        computeOrderUid({
+          orderDigest: hashOrder(sampleOrder),
+          owner: traders[0].address,
+          validTo: sampleOrder.validTo,
+        }),
+      );
+    });
+
     it("should recover signing address for all supported schemes", async () => {
       const encoder = new SettlementEncoder(testDomain);
       for (const scheme of [SigningScheme.TYPED_DATA, SigningScheme.MESSAGE]) {
