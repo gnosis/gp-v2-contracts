@@ -316,7 +316,6 @@ contract GPv2Settlement {
     /// @param interaction contains address and calldata of the contract interaction.
     function executeInteraction(GPv2Encoding.Interaction memory interaction)
         internal
-        returns (bytes memory response)
     {
         // To prevent possible attack on user funds, we explicitly disable
         // interactions with AllowanceManager contract.
@@ -324,9 +323,8 @@ contract GPv2Settlement {
             interaction.target != address(allowanceManager),
             "GPv2: forbidden interaction"
         );
-        bool success;
         // solhint-disable-next-line avoid-low-level-calls
-        (success, response) = (interaction.target).call(interaction.callData);
+        (bool success, ) = (interaction.target).call(interaction.callData);
         require(success, "GPv2: failed interaction");
     }
 
