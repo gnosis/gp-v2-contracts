@@ -1,4 +1,4 @@
-import { BigNumber, Bytes } from "ethers";
+import { BigNumber, Bytes, Contract } from "ethers";
 import { ethers } from "hardhat";
 
 import { Order } from "../src/ts";
@@ -26,9 +26,14 @@ export interface Trade {
   owner: string;
 }
 
-export interface Interaction {
-  target: string;
-  callData: string | Bytes;
+export class Interaction {
+  constructor(
+    public readonly target: string,
+    public readonly callData: string | Bytes,
+  ) {}
+  static genericPassing(): Interaction {
+    return new Interaction("0x0000000000000000000000000000000000000000", "0x");
+  }
 }
 
 export function decodeTrade(trade: AbiTrade): Trade {

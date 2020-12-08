@@ -702,38 +702,23 @@ describe("GPv2Settlement", () => {
     });
 
     it("should fail when interaction reverts", async () => {
-      const mockToken = await waffle.deployMockContract(deployer, IERC20.abi);
-      await mockToken.mock.transfer.reverts();
-
-      const invalidInteraction: Interaction = {
-        target: mockToken.address,
-        callData: mockToken.interface.encodeFunctionData("transfer", [
-          dummyWallet.address,
-          0,
-        ]),
-      };
+      const RevertingContract = await ethers.getContractFactory(
+        "RevertingContract",
+        deployer,
+      );
+      const alwaysReverts = await RevertingContract.deploy();
+      const failingInteraction = new Interaction(alwaysReverts.address, "0x");
 
       await expect(
-        settlement.callStatic.executeInteractionTest(invalidInteraction),
+        settlement.callStatic.executeInteractionTest(failingInteraction),
       ).to.be.revertedWith("GPv2: failed interaction");
     });
 
     it("should pass on successfull execution", async () => {
-      const mockToken = await waffle.deployMockContract(deployer, IERC20.abi);
-      await mockToken.mock.transfer
-        .withArgs(dummyWallet.address, 0)
-        .returns(true);
-
-      const validInteraction: Interaction = {
-        target: mockToken.address,
-        callData: mockToken.interface.encodeFunctionData("transfer", [
-          dummyWallet.address,
-          0,
-        ]),
-      };
+      const passingInteraction = Interaction.genericPassing();
 
       await expect(
-        settlement.callStatic.executeInteractionTest(validInteraction),
+        settlement.callStatic.executeInteractionTest(passingInteraction),
       ).to.not.be.reverted;
     });
   });
