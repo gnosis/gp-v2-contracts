@@ -657,6 +657,51 @@ describe("GPv2Settlement", () => {
 
       expect(trades[0]).to.deep.equal(trades[1]);
     });
+
+    it("should emit a trade event", async () => {
+      const order = {
+        ...partialOrder,
+        kind: OrderKind.SELL,
+        partiallyFillable: false,
+      };
+
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
+        order,
+        0,
+        traders[0],
+        SigningScheme.TYPED_DATA,
+      );
+
+      const executedSellAmount = order.sellAmount.add(order.feeAmount);
+      const executedBuyAmount = order.sellAmount
+        .mul(prices[sellToken])
+        .div(prices[buyToken]);
+
+      const tx = settlement.computeTradeExecutionsTest(
+        encoder.tokens,
+        encoder.clearingPrices(prices),
+        encoder.encodedTrades,
+      );
+      await expect(tx)
+        .to.emit(settlement, "Trade")
+        .withArgs(
+          traders[0].address,
+          order.sellToken,
+          order.buyToken,
+          executedSellAmount,
+          executedBuyAmount,
+          order.feeAmount,
+          computeOrderUid({
+            orderDigest: hashOrder(order),
+            owner: traders[0].address,
+            validTo: order.validTo,
+          }),
+        );
+
+      const { logs } = await (await tx).wait();
+      expect(logs.length).to.equal(1);
+    });
   });
 
   describe("computeTradeExecution", () => {
