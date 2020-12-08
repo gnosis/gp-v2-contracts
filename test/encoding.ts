@@ -3,7 +3,7 @@ import { ethers } from "hardhat";
 
 import { Order } from "../src/ts";
 
-export type RawOrder = [
+export type AbiOrder = [
   string,
   string,
   BigNumber,
@@ -15,7 +15,7 @@ export type RawOrder = [
   boolean,
 ];
 
-export type RawTrade = [RawOrder, number, number, BigNumber, string, string];
+export type AbiTrade = [AbiOrder, number, number, BigNumber, string, string];
 
 export interface Trade {
   order: Order;
@@ -26,7 +26,7 @@ export interface Trade {
   owner: string;
 }
 
-export function decodeTrade(trade: RawTrade): Trade {
+export function decodeTrade(trade: AbiTrade): Trade {
   return {
     order: {
       sellToken: trade[0][0],
@@ -47,7 +47,7 @@ export function decodeTrade(trade: RawTrade): Trade {
   };
 }
 
-export type RawExecutedTrade = [string, string, string, BigNumber, BigNumber];
+export type AbiExecutedTrade = [string, string, string, BigNumber, BigNumber];
 
 export interface ExecutedTrade {
   owner: string;
@@ -57,7 +57,7 @@ export interface ExecutedTrade {
   buyAmount: BigNumber;
 }
 
-export function encodeExecutedTrade(trade: ExecutedTrade): RawExecutedTrade {
+export function encodeExecutedTrade(trade: ExecutedTrade): AbiExecutedTrade {
   return [
     trade.owner,
     trade.sellToken,
@@ -68,7 +68,7 @@ export function encodeExecutedTrade(trade: ExecutedTrade): RawExecutedTrade {
 }
 
 export function decodeExecutedTrades(
-  trades: RawExecutedTrade[],
+  trades: AbiExecutedTrade[],
 ): ExecutedTrade[] {
   return trades.map((trade) => ({
     owner: trade[0],
@@ -84,7 +84,7 @@ export type InTransfer = Pick<
   "owner" | "sellToken" | "sellAmount"
 >;
 
-export function encodeInTransfers(transfers: InTransfer[]): RawExecutedTrade[] {
+export function encodeInTransfers(transfers: InTransfer[]): AbiExecutedTrade[] {
   return transfers.map((transfer) =>
     encodeExecutedTrade({
       ...transfer,
@@ -101,7 +101,7 @@ export type OutTransfer = Pick<
 
 export function encodeOutTransfers(
   transfers: OutTransfer[],
-): RawExecutedTrade[] {
+): AbiExecutedTrade[] {
   return transfers.map((transfer) =>
     encodeExecutedTrade({
       ...transfer,
