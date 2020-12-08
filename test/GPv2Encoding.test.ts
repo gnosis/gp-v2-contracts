@@ -118,12 +118,15 @@ describe("GPv2Encoding", () => {
         kind: OrderKind.BUY,
         partiallyFillable: true,
       };
-      const executedAmount = fillUint(256, 0x08);
+      const tradeExecution = {
+        executedAmount: fillUint(256, 0x08),
+        feeDiscount: fillUint(16, 0x09).toNumber(),
+      };
 
       const encoder = new SettlementEncoder(testDomain);
       await encoder.signEncodeTrade(
         order,
-        { executedAmount },
+        tradeExecution,
         traders[0],
         SigningScheme.TYPED_DATA,
       );
@@ -137,12 +140,11 @@ describe("GPv2Encoding", () => {
       // `abicoder v2` structs.
       expect(decodedTrades.length).to.equal(1);
 
-      const {
-        order: decodedOrder,
-        executedAmount: decodedExecutedAmount,
-      } = decodeTrade(decodedTrades[0]);
+      const { order: decodedOrder, executedAmount, feeDiscount } = decodeTrade(
+        decodedTrades[0],
+      );
       expect(decodedOrder).to.deep.equal(order);
-      expect(decodedExecutedAmount).to.deep.equal(executedAmount);
+      expect({ executedAmount, feeDiscount }).to.deep.equal(tradeExecution);
     });
 
     it("should return order token indices", async () => {
