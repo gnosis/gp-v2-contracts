@@ -710,7 +710,7 @@ describe("GPv2Settlement", () => {
       ).to.be.revertedWith("GPv2: failed interaction");
     });
 
-    it.only("should pass on successfull execution", async () => {
+    it("should pass on successfull execution", async () => {
       const isSolverCallData = authenticator.interface.encodeFunctionData(
         "isSolver",
         [solver.address],
