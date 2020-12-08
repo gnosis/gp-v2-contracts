@@ -29,13 +29,7 @@ function toNumberLossy(value: BigNumber): number {
 }
 
 describe("GPv2Settlement", () => {
-  const [
-    deployer,
-    owner,
-    solver,
-    dummyWallet,
-    ...traders
-  ] = waffle.provider.getWallets();
+  const [deployer, owner, solver, ...traders] = waffle.provider.getWallets();
 
   let authenticator: Contract;
   let settlement: Contract;

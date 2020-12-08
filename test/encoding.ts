@@ -1,4 +1,4 @@
-import { BigNumber, Bytes, Contract } from "ethers";
+import { BigNumber, Bytes } from "ethers";
 import { ethers } from "hardhat";
 
 import { Order } from "../src/ts";
