@@ -2,21 +2,12 @@
 pragma solidity ^0.7.5;
 pragma abicoder v2;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "./libraries/GPv2TradeExecution.sol";
 
 /// @title Gnosis Protocol v2 Allowance Manager Contract
 /// @author Gnosis Developers
 contract GPv2AllowanceManager {
-    using SafeERC20 for IERC20;
-
-    /// @dev A struct representing transfers to be executed as part of a batch
-    /// settlement.
-    struct Transfer {
-        address owner;
-        IERC20 token;
-        uint256 amount;
-    }
+    using GPv2TradeExecution for GPv2TradeExecution.Data;
 
     /// @dev The recipient of all transfers made by the allowance manager. The
     /// recipient is set at creation time and cannot change.
@@ -33,17 +24,20 @@ contract GPv2AllowanceManager {
         _;
     }
 
-    /// @dev Executes all transfers from the specified accounts into the caller.
+    /// @dev Transfer's all sell amounts for the executed trades from their
+    /// owners to the caller.
     ///
     /// This function reverts if:
     /// - The caller is not the recipient of the allowance manager
-    /// - Any ERC20 tranfer fails
-    function transferIn(Transfer[] calldata transfers) external onlyRecipient {
-        for (uint256 i = 0; i < transfers.length; i++) {
-            transfers[i].token.safeTransferFrom(
-                transfers[i].owner,
-                msg.sender,
-                transfers[i].amount
+    /// - Any ERC20 transfer fails
+    function transferIn(GPv2TradeExecution.Data[] calldata trades)
+        external
+        onlyRecipient
+    {
+        for (uint256 i = 0; i < trades.length; i++) {
+            GPv2TradeExecution.transferSellAmountToRecipient(
+                trades[i],
+                msg.sender
             );
         }
     }

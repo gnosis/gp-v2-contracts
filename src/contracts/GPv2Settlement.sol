@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./GPv2AllowanceManager.sol";
 import "./interfaces/GPv2Authentication.sol";
 import "./libraries/GPv2Encoding.sol";
+import "./libraries/GPv2TradeExecution.sol";
 
 /// @title Gnosis Protocol v2 Settlement Contract
 /// @author Gnosis Developers
@@ -162,22 +163,14 @@ contract GPv2Settlement {
     /// @param tokens An array of ERC20 tokens to be traded in the settlement.
     /// @param clearingPrices An array of token clearing prices.
     /// @param encodedTrades Encoded trades for signed EOA orders.
-    /// @return inTransfers Array of transfers into the settlement contract.
-    /// @return outTransfers Array of transfers to pay out to EOAs.
+    /// @return executedTrades Array of executed trades.
     function computeTradeExecutions(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
         bytes calldata encodedTrades
-    )
-        internal
-        returns (
-            GPv2AllowanceManager.Transfer[] memory inTransfers,
-            GPv2AllowanceManager.Transfer[] memory outTransfers
-        )
-    {
+    ) internal returns (GPv2TradeExecution.Data[] memory executedTrades) {
         uint256 tradeCount = encodedTrades.tradeCount();
-        inTransfers = new GPv2AllowanceManager.Transfer[](tradeCount);
-        outTransfers = new GPv2AllowanceManager.Transfer[](tradeCount);
+        executedTrades = new GPv2TradeExecution.Data[](tradeCount);
 
         GPv2Encoding.Trade memory trade;
         for (uint256 i = 0; i < tradeCount; i++) {
@@ -190,8 +183,7 @@ contract GPv2Settlement {
                 trade,
                 clearingPrices[trade.sellTokenIndex],
                 clearingPrices[trade.buyTokenIndex],
-                inTransfers[i],
-                outTransfers[i]
+                executedTrades[i]
             );
         }
     }
@@ -204,16 +196,12 @@ contract GPv2Settlement {
     /// @param trade The trade to process.
     /// @param sellPrice The price of the order's sell token.
     /// @param buyPrice The price of the order's buy token.
-    /// @param inTransfer Memory location to set computed tranfer into the
-    /// settlement contract to execute trade.
-    /// @param outTransfer Memory location to set computed transfer out to order
-    /// owner to execute trade.
+    /// @param executedTrade Memory location for computed executed trade data.
     function computeTradeExecution(
         GPv2Encoding.Trade memory trade,
         uint256 sellPrice,
         uint256 buyPrice,
-        GPv2AllowanceManager.Transfer memory inTransfer,
-        GPv2AllowanceManager.Transfer memory outTransfer
+        GPv2TradeExecution.Data memory executedTrade
     ) internal {
         GPv2Encoding.Order memory order = trade.order;
         // NOTE: Currently, the above instanciation allocates an unitialized
@@ -230,10 +218,9 @@ contract GPv2Settlement {
         // solhint-disable-next-line not-rely-on-time
         require(order.validTo >= block.timestamp, "GPv2: order expired");
 
-        inTransfer.owner = trade.owner;
-        inTransfer.token = order.sellToken;
-        outTransfer.owner = trade.owner;
-        outTransfer.token = order.buyToken;
+        executedTrade.owner = trade.owner;
+        executedTrade.sellToken = order.sellToken;
+        executedTrade.buyToken = order.buyToken;
 
         // NOTE: The following computation is derived from the equation:
         // ```
@@ -306,8 +293,8 @@ contract GPv2Settlement {
             );
         }
 
-        inTransfer.amount = executedSellAmount.add(executedFeeAmount);
-        outTransfer.amount = executedBuyAmount;
+        executedTrade.sellAmount = executedSellAmount.add(executedFeeAmount);
+        executedTrade.buyAmount = executedBuyAmount;
 
         filledAmount[uidKey] = currentFilledAmount;
     }
