@@ -312,8 +312,9 @@ contract GPv2Settlement {
             "GPv2: forbidden interaction"
         );
         // solhint-disable-next-line avoid-low-level-calls
-        (bool success, ) = (interaction.target).call(interaction.callData);
-        require(success, "GPv2: failed interaction");
+        (bool success, bytes memory response) =
+            (interaction.target).call(interaction.callData);
+        require(success, string(response));
     }
 
     /// @dev Extracts specific order information from the standardized unique

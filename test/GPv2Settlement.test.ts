@@ -705,7 +705,7 @@ describe("GPv2Settlement", () => {
 
       await expect(
         settlement.callStatic.executeInteractionTest(failingInteraction),
-      ).to.be.revertedWith("GPv2: failed interaction");
+      ).to.be.revertedWith("I always revert!");
     });
 
     it("should pass on successfull execution", async () => {
