@@ -26,14 +26,9 @@ export interface Trade {
   owner: string;
 }
 
-export class Interaction {
-  constructor(
-    public readonly target: string,
-    public readonly callData: string | Bytes,
-  ) {}
-  static genericPassing(): Interaction {
-    return new Interaction("0x0000000000000000000000000000000000000000", "0x");
-  }
+export interface Interaction {
+  target: string;
+  callData: string | Bytes;
 }
 
 export function decodeTrade(trade: AbiTrade): Trade {

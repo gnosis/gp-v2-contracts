@@ -696,20 +696,29 @@ describe("GPv2Settlement", () => {
     });
 
     it("should fail when interaction reverts", async () => {
-      const RevertingContract = await ethers.getContractFactory(
-        "RevertingContract",
-        deployer,
+      const reverter = await waffle.deployMockContract(deployer, [
+        "function alwaysReverts()",
+      ]);
+      await reverter.mock.alwaysReverts.revertsWithReason("test error");
+      const revertingCallData = reverter.interface.encodeFunctionData(
+        "alwaysReverts",
+        [],
       );
-      const alwaysReverts = await RevertingContract.deploy();
-      const failingInteraction = new Interaction(alwaysReverts.address, "0x");
+      const failingInteraction: Interaction = {
+        target: reverter.address,
+        callData: revertingCallData,
+      };
 
       await expect(
         settlement.callStatic.executeInteractionTest(failingInteraction),
-      ).to.be.revertedWith("I always revert!");
+      ).to.be.revertedWith("test error");
     });
 
     it("should pass on successful execution", async () => {
-      const passingInteraction = Interaction.genericPassing();
+      const passingInteraction: Interaction = {
+        target: ethers.constants.AddressZero,
+        callData: "0x",
+      };
 
       await expect(
         settlement.callStatic.executeInteractionTest(passingInteraction),
