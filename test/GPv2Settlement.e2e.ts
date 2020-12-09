@@ -8,49 +8,56 @@ import {
   OrderKind,
   SettlementEncoder,
   SigningScheme,
-  allowanceManagerAddress,
   domain,
 } from "../src/ts";
 
+import { deployTestContracts } from "./fixture";
+
 describe("GPv2Settlement: End to End Tests", () => {
-  const [deployer, owner, solver, ...traders] = waffle.provider.getWallets();
+  let deployer: Wallet;
+  let solver: Wallet;
+  let traders: Wallet[];
 
   let settlement: Contract;
   let allowanceManager: Contract;
   let domainSeparator: TypedDataDomain;
 
   beforeEach(async () => {
-    const GPv2AllowListAuthentication = await ethers.getContractFactory(
-      "GPv2AllowListAuthentication",
-      deployer,
-    );
-    const authenticator = await GPv2AllowListAuthentication.deploy(
-      owner.address,
-    );
-    await authenticator.connect(owner).addSolver(solver.address);
+    const deployment = await deployTestContracts();
 
-    const GPv2Settlement = await ethers.getContractFactory(
-      "GPv2Settlement",
+    ({
       deployer,
-    );
-    settlement = await GPv2Settlement.deploy(authenticator.address);
-    allowanceManager = await ethers.getContractAt(
-      "GPv2AllowanceManager",
-      allowanceManagerAddress(settlement.address),
-    );
+      settlement,
+      allowanceManager,
+      wallets: [solver, ...traders],
+    } = deployment);
+
+    const { authenticator, owner } = deployment;
+    await authenticator.connect(owner).addSolver(solver.address);
 
     const { chainId } = await ethers.provider.getNetwork();
     domainSeparator = domain(chainId, settlement.address);
   });
 
   it("should settle red wine and olive oil market", async () => {
+    // Settlement for the RetrETH wine and olive oil market:
+    //
+    //  /---(6. BUY 10 🍷 with 💶 if p(🍷) <= 13)--> [🍷]
+    //  |                                             |
+    //  |                                             |
+    // [💶]                        (1. SELL 12 🍷 for 🫒 if p(🍷) >= p(🫒))
+    //  |^                                            |
+    //  ||                                            |
+    //  |\--(4. SELL 15 🫒 for 💶 if p(🫒) >= 12)--\  v
+    //  \---(5. BUY 4 🫒 with 💶 if p(🫒) <= 13)---> [🫒]
+
     const STARTING_BALANCE = ethers.utils.parseEther("1000.0");
     const erc20 = (symbol: string) =>
       waffle.deployContract(deployer, ERC20, [symbol, 18]);
 
-    const eur = await erc20("EUR");
-    const oil = await erc20("OIL");
-    const wine = await erc20("RED");
+    const eur = await erc20("💶");
+    const oil = await erc20("🫒");
+    const wine = await erc20("🍷");
 
     const orderDefaults = {
       validTo: 0xffffffff,
