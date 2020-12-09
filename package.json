@@ -14,7 +14,7 @@
     "prepack": "yarn build && yarn deploy --network rinkeby"
   },
   "dependencies": {
-    "ethers": "^5.0.23"
+    "ethers": "^5.0.24"
   },
   "devDependencies": {
     "@gnosis.pm/util-contracts": "3.0.1-solc-7",
