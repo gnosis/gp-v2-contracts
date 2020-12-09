@@ -30,6 +30,9 @@ contract GPv2Settlement {
     /// @dev The EIP-712 domain version used for computing the domain separator.
     bytes32 private constant DOMAIN_VERSION = keccak256("v2");
 
+    /// @dev The number of basis points to make up 100%.
+    uint256 private constant BPS_BASE = 10000;
+
     /// @dev The domain separator used for signing orders that gets mixed in
     /// making signatures for different domains incompatible. This domain
     /// separator is computed following the EIP-712 standard and has replay
@@ -246,10 +249,12 @@ contract GPv2Settlement {
         uint256 executedFeeAmount;
         uint256 currentFilledAmount;
 
-        // NOTE: Don't use `SafeMath.div` anywhere here as it allocates a string
-        // even if it does not revert. The method only checks that the divisor
-        // is non-zero and `revert`s in that case instead of consuming all of
-        // the remaining transaction gas when dividing by zero.
+        // NOTE: Don't use `SafeMath.div` or `SafeMath.sub` anywhere here as it
+        // allocates a string even if it does not revert. Additionally, `div`
+        // only checks that the divisor is non-zero and `revert`s in that case
+        // instead of consuming all of the remaining transaction gas when
+        // dividing by zero, so no extra checks are needed for those operations.
+
         if (order.kind == GPv2Encoding.OrderKind.Sell) {
             if (order.partiallyFillable) {
                 executedSellAmount = trade.executedAmount;
@@ -291,6 +296,11 @@ contract GPv2Settlement {
                 "GPv2: order filled"
             );
         }
+
+        require(trade.feeDiscount <= BPS_BASE, "GPv2: invalid fee discount");
+        executedFeeAmount =
+            executedFeeAmount.mul(BPS_BASE - trade.feeDiscount) /
+            BPS_BASE;
 
         executedTrade.sellAmount = executedSellAmount.add(executedFeeAmount);
         executedTrade.buyAmount = executedBuyAmount;
