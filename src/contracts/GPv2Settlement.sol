@@ -54,6 +54,17 @@ contract GPv2Settlement {
     /// executed.
     mapping(bytes => uint256) public filledAmount;
 
+    /// @dev Event emitted for each executed trade.
+    event Trade(
+        address indexed owner,
+        IERC20 sellToken,
+        IERC20 buyToken,
+        uint256 sellAmount,
+        uint256 buyAmount,
+        uint256 feeAmount,
+        bytes orderUid
+    );
+
     constructor(GPv2Authentication authenticator_) {
         authenticator = authenticator_;
 
@@ -281,6 +292,15 @@ contract GPv2Settlement {
         executedTrade.buyAmount = executedBuyAmount;
 
         filledAmount[trade.orderUid] = currentFilledAmount;
+        emit Trade(
+            executedTrade.owner,
+            executedTrade.sellToken,
+            executedTrade.buyToken,
+            executedTrade.sellAmount,
+            executedTrade.buyAmount,
+            executedFeeAmount,
+            trade.orderUid
+        );
     }
 
     /// @dev Allows settlment function to make arbitrary contract executions.
