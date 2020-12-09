@@ -15,7 +15,11 @@ import {
 } from "../src/ts";
 
 import { builtAndDeployedMetadataCoincide } from "./bytecode";
-import { decodeExecutedTrades, encodeOutTransfers } from "./encoding";
+import {
+  decodeExecutedTrades,
+  encodeOutTransfers,
+  Interaction,
+} from "./encoding";
 
 function toNumberLossy(value: BigNumber): number {
   // NOTE: BigNumber throws an exception when if is outside the range of
@@ -676,6 +680,50 @@ describe("GPv2Settlement", () => {
       expect(
         await settlement.callStatic.computeTradeExecutionMemoryTest(),
       ).to.deep.equal(ethers.constants.Zero);
+    });
+  });
+
+  describe("executeInteraction", () => {
+    it("should fail when target is allowanceManager", async () => {
+      const invalidInteraction: Interaction = {
+        target: allowanceManagerAddress(settlement.address),
+        callData: [],
+      };
+
+      await expect(
+        settlement.callStatic.executeInteractionTest(invalidInteraction),
+      ).to.be.revertedWith("GPv2: forbidden interaction");
+    });
+
+    it("should fail when interaction reverts", async () => {
+      const reverter = await waffle.deployMockContract(deployer, [
+        "function alwaysReverts()",
+      ]);
+      await reverter.mock.alwaysReverts.revertsWithReason("test error");
+      const revertingCallData = reverter.interface.encodeFunctionData(
+        "alwaysReverts",
+        [],
+      );
+      const failingInteraction: Interaction = {
+        target: reverter.address,
+        callData: revertingCallData,
+      };
+
+      // TODO - update this error with concatenated version "GPv2 Interaction: test error"
+      await expect(
+        settlement.callStatic.executeInteractionTest(failingInteraction),
+      ).to.be.revertedWith("test error");
+    });
+
+    it("should pass on successful execution", async () => {
+      const passingInteraction: Interaction = {
+        target: ethers.constants.AddressZero,
+        callData: "0x",
+      };
+
+      await expect(
+        settlement.callStatic.executeInteractionTest(passingInteraction),
+      ).to.not.be.reverted;
     });
   });
 

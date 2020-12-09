@@ -300,6 +300,34 @@ contract GPv2Settlement {
         filledAmount[uidKey] = currentFilledAmount;
     }
 
+    /// @dev Allows settlment function to make arbitrary contract executions.
+    /// @param interaction contains address and calldata of the contract interaction.
+    function executeInteraction(GPv2Encoding.Interaction memory interaction)
+        internal
+    {
+        // To prevent possible attack on user funds, we explicitly disable
+        // interactions with AllowanceManager contract.
+        require(
+            interaction.target != address(allowanceManager),
+            "GPv2: forbidden interaction"
+        );
+        // solhint-disable avoid-low-level-calls
+        (bool success, bytes memory response) =
+            (interaction.target).call(interaction.callData);
+        // solhint-enable avoid-low-level-calls
+
+        // TODO - concatenate the following reponse "GPv2: Failed Interaction"
+        // This is the topic of https://github.com/gnosis/gp-v2-contracts/issues/240
+        if (!success) {
+            // Assembly used to revert with correctly encoded error message.
+            // solhint-disable no-inline-assembly
+            assembly {
+                revert(add(response, 0x20), mload(response))
+            }
+            // solhint-enable no-inline-assembly
+        }
+    }
+
     /// @dev Extracts specific order information from the standardized unique
     /// order id of the protocol.
     /// @param orderUid The unique identifier used to represent an order in

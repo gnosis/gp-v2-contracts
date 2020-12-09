@@ -20,6 +20,13 @@ library GPv2Encoding {
         bool partiallyFillable;
     }
 
+    /// @dev A struct representing arbitrary contract interactions.
+    /// Submitted to [`GPv2Settlement.settle`] for code execution.
+    struct Interaction {
+        bytes callData;
+        address target;
+    }
+
     /// @dev An enum describing an order kind, either a buy or a sell order.
     enum OrderKind {Sell, Buy}
 

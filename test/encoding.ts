@@ -1,4 +1,4 @@
-import { BigNumber } from "ethers";
+import { BigNumber, Bytes } from "ethers";
 import { ethers } from "hardhat";
 
 import { Order } from "../src/ts";
@@ -24,6 +24,11 @@ export interface Trade {
   executedAmount: BigNumber;
   digest: string;
   owner: string;
+}
+
+export interface Interaction {
+  target: string;
+  callData: string | Bytes;
 }
 
 export function decodeTrade(trade: AbiTrade): Trade {
