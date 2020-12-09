@@ -7,7 +7,6 @@ import {
   getUnnamedAccounts,
 } from "hardhat";
 
-import { allowanceManagerAddress } from "../src/ts";
 import { deterministicDeploymentAddress } from "../src/ts/deploy";
 
 import { builtAndDeployedMetadataCoincide } from "./bytecode";
@@ -45,7 +44,7 @@ describe("Deployment", () => {
 
     allowanceManager = await ethers.getContractAt(
       "GPv2AllowanceManager",
-      await allowanceManagerAddress(settlement.address),
+      await settlement.allowanceManager(),
     );
     allowanceManager.connect(user);
   });

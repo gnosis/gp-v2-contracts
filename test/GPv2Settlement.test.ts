@@ -8,7 +8,6 @@ import {
   OrderKind,
   SettlementEncoder,
   SigningScheme,
-  allowanceManagerAddress,
   domain,
   computeOrderUid,
   hashOrder,
@@ -74,19 +73,13 @@ describe("GPv2Settlement", () => {
 
   describe("allowanceManager", () => {
     it("should deploy an allowance manager", async () => {
-      const deployedAllowanceManager = await settlement.allowanceManagerTest();
+      const deployedAllowanceManager = await settlement.allowanceManager();
       expect(
         await builtAndDeployedMetadataCoincide(
           deployedAllowanceManager,
           "GPv2AllowanceManager",
         ),
       ).to.be.true;
-    });
-
-    it("should result in a deterministic address", async () => {
-      expect(await settlement.allowanceManagerTest()).to.equal(
-        allowanceManagerAddress(settlement.address),
-      );
     });
 
     it("should have the settlement contract as the recipient", async () => {
@@ -108,7 +101,7 @@ describe("GPv2Settlement", () => {
           .GPv2AllowanceManager.evm.deployedBytecode.immutableReferences || {},
       );
 
-      const deployedAllowanceManager = await settlement.allowanceManagerTest();
+      const deployedAllowanceManager = await settlement.allowanceManager();
       const code = await ethers.provider.send("eth_getCode", [
         deployedAllowanceManager,
         "latest",
@@ -686,7 +679,7 @@ describe("GPv2Settlement", () => {
   describe("executeInteraction", () => {
     it("should fail when target is allowanceManager", async () => {
       const invalidInteraction: Interaction = {
-        target: allowanceManagerAddress(settlement.address),
+        target: await settlement.allowanceManager(),
         callData: [],
       };
 

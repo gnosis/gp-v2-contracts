@@ -26,24 +26,6 @@ export function domain(
 }
 
 /**
- * Computes the address of the allowance manager contract for the specified
- * settlement contract address.
- * @param settlementAddress The address of the settlement contract.
- * @return The address of the allowance manager contract.
- */
-export function allowanceManagerAddress(settlementAddress: string): string {
-  // NOTE: `CREATE` opcode deploys a contract to a deterministic address based
-  // on the calling contract address and the nonce, which for the settlement
-  // contract is always 1 (as per EIP-161).
-  const ADDRESS_STRING_OFFSET = 2 /* 0x */ + 2 * (32 - 20);
-  return ethers.utils.getAddress(
-    `0x${ethers.utils
-      .keccak256(ethers.utils.RLP.encode([settlementAddress, "0x01"]))
-      .substr(ADDRESS_STRING_OFFSET)}`,
-  );
-}
-
-/**
  * Gnosis Protocol v2 order data.
  */
 export interface Order {

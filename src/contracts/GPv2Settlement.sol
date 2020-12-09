@@ -44,7 +44,7 @@ contract GPv2Settlement {
 
     /// @dev The allowance manager which has access to EOA order funds. This
     /// contract is created during deployment
-    GPv2AllowanceManager internal immutable allowanceManager;
+    GPv2AllowanceManager public immutable allowanceManager;
 
     /// @dev Map each user order to the amount that has been filled so far. If
     /// this amount is larger than or equal to the amount traded in the order
