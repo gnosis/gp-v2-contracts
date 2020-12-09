@@ -413,7 +413,7 @@ export function computeOrderUid({
  * Extracts the order unique identifier parameters from the specified bytes.
  *
  * @param orderUid The order UID encoded as a hexadecimal string.
- * @returns The extracted order UID prameters.
+ * @returns The extracted order UID parameters.
  */
 export function extractOrderUidParams(orderUid: string): OrderUidParams {
   const bytes = ethers.utils.arrayify(orderUid);
