@@ -1,6 +1,6 @@
 import IERC20 from "@openzeppelin/contracts/build/contracts/IERC20.json";
 import { expect } from "chai";
-import { BigNumber, Contract, TypedDataDomain } from "ethers";
+import { BigNumber, Contract, Event, TypedDataDomain } from "ethers";
 import { artifacts, ethers, waffle } from "hardhat";
 
 import {
@@ -699,8 +699,11 @@ describe("GPv2Settlement", () => {
           }),
         );
 
-      const { logs } = await (await tx).wait();
-      expect(logs.length).to.equal(1);
+      const { events } = await (await tx).wait();
+      const tradeEvents = events.filter(
+        ({ event }: Event) => event === "Trade",
+      );
+      expect(tradeEvents.length).to.equal(1);
     });
   });
 
