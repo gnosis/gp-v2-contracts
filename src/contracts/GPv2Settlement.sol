@@ -315,8 +315,16 @@ contract GPv2Settlement {
         (bool success, bytes memory response) =
             (interaction.target).call(interaction.callData);
         // solhint-enable avoid-low-level-calls
+
+        // TODO - concatenate the following reponse "GPv2: Failed Interaction"
+        // This is the topic of https://github.com/gnosis/gp-v2-contracts/issues/240
         if (!success) {
-            revert(string(abi.encodePacked("GPv2 Interaction: ", response)));
+            // Assembly used to revert with correctly encoded error message.
+            // solhint-disable no-inline-assembly
+            assembly {
+                revert(add(response, 0x20), mload(response))
+            }
+            // solhint-enable no-inline-assembly
         }
     }
 

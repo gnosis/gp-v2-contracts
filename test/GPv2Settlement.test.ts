@@ -709,6 +709,7 @@ describe("GPv2Settlement", () => {
         callData: revertingCallData,
       };
 
+      // TODO - update this error with concatenated version "GPv2 Interaction: test error"
       await expect(
         settlement.callStatic.executeInteractionTest(failingInteraction),
       ).to.be.revertedWith("test error");
