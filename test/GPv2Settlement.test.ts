@@ -777,10 +777,9 @@ describe("GPv2Settlement", () => {
 
   describe("transferOut", () => {
     it("should execute ERC20 transfers", async () => {
-      const NonStandardERC20 = await artifacts.readArtifact("NonStandardERC20");
       const tokens = [
         await waffle.deployMockContract(deployer, IERC20.abi),
-        await waffle.deployMockContract(deployer, NonStandardERC20.abi),
+        await waffle.deployMockContract(deployer, IERC20.abi),
       ];
 
       const amount = ethers.utils.parseEther("13.37");
@@ -789,7 +788,7 @@ describe("GPv2Settlement", () => {
         .returns(true);
       await tokens[1].mock.transfer
         .withArgs(traders[1].address, amount)
-        .returns();
+        .returns(true);
 
       await expect(
         settlement.transferOutTest(
