@@ -18,10 +18,6 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
         return domainSeparator;
     }
 
-    function allowanceManagerTest() external view returns (address) {
-        return address(allowanceManager);
-    }
-
     function computeTradeExecutionsTest(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
