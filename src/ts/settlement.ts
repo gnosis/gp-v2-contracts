@@ -100,7 +100,7 @@ export class SettlementEncoder {
    * Gets the number of trades currently encoded.
    */
   public get tradeCount(): number {
-    const TRADE_STRIDE = 204;
+    const TRADE_STRIDE = 206;
     // NOTE: `TRADE_STRIDE` multiplied by 2 as hex strings encode one byte in
     // 2 characters.
     return (this._encodedTrades.length - 2) / (TRADE_STRIDE * 2);
@@ -131,10 +131,10 @@ export class SettlementEncoder {
    * Additionally, if the order references new tokens that the encoder has not
    * yet seen, they are added to the tokens array.
    * @param order The order of the trade to encode.
-   * @param executedAmount The executed trade amount.
    * @param signature The signature for the order data.
    * @param scheme The signing scheme to used to generate the specified
    * signature. See {@link SigningScheme} for more details.
+   * @param tradeExecution The execution details for the trade.
    */
   public encodeTrade(
     order: Order,
@@ -159,6 +159,7 @@ export class SettlementEncoder {
         "uint256",
         "uint8",
         "uint256",
+        "uint16",
         "uint8",
         "bytes32",
         "bytes32",
@@ -189,10 +190,10 @@ export class SettlementEncoder {
   /**
    * Signs an order and encodes a trade with that order.
    * @param order The order to sign for the trade.
-   * @param executedAmount The executed trade amount for the order.
    * @param owner The owner for the order used to sign.
    * @param scheme The signing scheme to use. See {@link SigningScheme} for more
    * details.
+   * @param tradeExecution The execution details for the trade.
    */
   public async signEncodeTrade(
     order: Order,

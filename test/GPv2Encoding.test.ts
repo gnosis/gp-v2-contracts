@@ -75,7 +75,6 @@ describe("GPv2Encoding", () => {
       for (let i = 0; i < tradeCount; i++) {
         await encoder.signEncodeTrade(
           { ...sampleOrder, appData: i },
-          {},
           traders[0],
           SigningScheme.TYPED_DATA,
         );
@@ -126,9 +125,9 @@ describe("GPv2Encoding", () => {
       const encoder = new SettlementEncoder(testDomain);
       await encoder.signEncodeTrade(
         order,
-        tradeExecution,
         traders[0],
         SigningScheme.TYPED_DATA,
+        tradeExecution,
       );
 
       const [decodedTrades] = await encoding.decodeTradesTest(
@@ -151,7 +150,6 @@ describe("GPv2Encoding", () => {
       const encoder = new SettlementEncoder(testDomain);
       await encoder.signEncodeTrade(
         sampleOrder,
-        {},
         traders[0],
         SigningScheme.TYPED_DATA,
       );
@@ -173,7 +171,6 @@ describe("GPv2Encoding", () => {
       const encoder = new SettlementEncoder(testDomain);
       await encoder.signEncodeTrade(
         sampleOrder,
-        {},
         traders[0],
         SigningScheme.TYPED_DATA,
       );
@@ -193,7 +190,6 @@ describe("GPv2Encoding", () => {
       const encoder = new SettlementEncoder(testDomain);
       await encoder.signEncodeTrade(
         sampleOrder,
-        {},
         traders[0],
         SigningScheme.TYPED_DATA,
       );
@@ -216,7 +212,7 @@ describe("GPv2Encoding", () => {
     it("should recover signing address for all supported schemes", async () => {
       const encoder = new SettlementEncoder(testDomain);
       for (const scheme of [SigningScheme.TYPED_DATA, SigningScheme.MESSAGE]) {
-        await encoder.signEncodeTrade(sampleOrder, {}, traders[0], scheme);
+        await encoder.signEncodeTrade(sampleOrder, traders[0], scheme);
       }
 
       const [decodedTrades] = await encoding.decodeTradesTest(
@@ -235,7 +231,6 @@ describe("GPv2Encoding", () => {
       const encoder = new SettlementEncoder(testDomain);
       await encoder.signEncodeTrade(
         sampleOrder,
-        {},
         traders[0],
         SigningScheme.TYPED_DATA,
       );
@@ -256,7 +251,6 @@ describe("GPv2Encoding", () => {
       const encoder = new SettlementEncoder(testDomain);
       await encoder.signEncodeTrade(
         sampleOrder,
-        {},
         traders[0],
         SigningScheme.TYPED_DATA,
       );
@@ -265,7 +259,6 @@ describe("GPv2Encoding", () => {
           ...sampleOrder,
           sellToken: lastToken,
         },
-        {},
         traders[1],
         SigningScheme.TYPED_DATA,
       );
@@ -283,7 +276,6 @@ describe("GPv2Encoding", () => {
       const encoder = new SettlementEncoder(testDomain);
       await encoder.signEncodeTrade(
         sampleOrder,
-        {},
         traders[0],
         SigningScheme.TYPED_DATA,
       );
@@ -292,7 +284,6 @@ describe("GPv2Encoding", () => {
           ...sampleOrder,
           buyToken: lastToken,
         },
-        {},
         traders[1],
         SigningScheme.TYPED_DATA,
       );
@@ -310,13 +301,11 @@ describe("GPv2Encoding", () => {
       const encoder = new SettlementEncoder(testDomain);
       await encoder.signEncodeTrade(
         sampleOrder,
-        {},
         traders[0],
         SigningScheme.TYPED_DATA,
       );
       await encoder.signEncodeTrade(
         sampleOrder,
-        {},
         traders[1],
         SigningScheme.MESSAGE,
       );

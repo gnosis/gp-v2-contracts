@@ -68,7 +68,7 @@ describe("E2E: RetrETH Red Wind and Olive Oil Market", () => {
     const addOrder = async (
       trader: Wallet,
       order: Order,
-      executedAmount: BigNumber,
+      executedAmount?: BigNumber,
     ) => {
       const sellToken = await ethers.getContractAt(
         ERC20.abi,
@@ -80,43 +80,32 @@ describe("E2E: RetrETH Red Wind and Olive Oil Market", () => {
         .connect(trader)
         .approve(allowanceManager.address, ethers.constants.MaxUint256);
 
-      await encoder.signEncodeTrade(
-        order,
+      await encoder.signEncodeTrade(order, trader, SigningScheme.TYPED_DATA, {
         executedAmount,
-        trader,
-        SigningScheme.TYPED_DATA,
-      );
+      });
     };
 
-    await addOrder(
-      traders[0],
-      {
-        ...orderDefaults,
-        kind: OrderKind.SELL,
-        partiallyFillable: false,
-        sellToken: wine.address,
-        buyToken: oil.address,
-        sellAmount: ethers.utils.parseEther("12.0"),
-        buyAmount: ethers.utils.parseEther("12.0"),
-        appData: 1,
-      },
-      ethers.constants.Zero,
-    );
+    await addOrder(traders[0], {
+      ...orderDefaults,
+      kind: OrderKind.SELL,
+      partiallyFillable: false,
+      sellToken: wine.address,
+      buyToken: oil.address,
+      sellAmount: ethers.utils.parseEther("12.0"),
+      buyAmount: ethers.utils.parseEther("12.0"),
+      appData: 1,
+    });
 
-    await addOrder(
-      traders[1],
-      {
-        ...orderDefaults,
-        kind: OrderKind.SELL,
-        partiallyFillable: false,
-        sellToken: oil.address,
-        buyToken: eur.address,
-        sellAmount: ethers.utils.parseEther("15.0"),
-        buyAmount: ethers.utils.parseEther("180.0"),
-        appData: 4,
-      },
-      ethers.constants.Zero,
-    );
+    await addOrder(traders[1], {
+      ...orderDefaults,
+      kind: OrderKind.SELL,
+      partiallyFillable: false,
+      sellToken: oil.address,
+      buyToken: eur.address,
+      sellAmount: ethers.utils.parseEther("15.0"),
+      buyAmount: ethers.utils.parseEther("180.0"),
+      appData: 4,
+    });
 
     await addOrder(
       traders[2],

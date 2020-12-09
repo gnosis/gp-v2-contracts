@@ -204,9 +204,9 @@ describe("GPv2Settlement", () => {
             kind: OrderKind.BUY,
             partiallyFillable: true,
           },
-          { executedAmount: ethers.utils.parseEther("0.7734") },
           traders[0],
           SigningScheme.TYPED_DATA,
+          { executedAmount: ethers.utils.parseEther("0.7734") },
         );
       }
 
@@ -230,7 +230,6 @@ describe("GPv2Settlement", () => {
           kind: OrderKind.SELL,
           partiallyFillable: false,
         },
-        {},
         traders[0],
         SigningScheme.TYPED_DATA,
       );
@@ -259,7 +258,6 @@ describe("GPv2Settlement", () => {
           kind: OrderKind.SELL,
           partiallyFillable: false,
         },
-        {},
         traders[0],
         SigningScheme.TYPED_DATA,
       );
@@ -287,7 +285,6 @@ describe("GPv2Settlement", () => {
           kind: OrderKind.SELL,
           partiallyFillable: false,
         },
-        {},
         traders[0],
         SigningScheme.TYPED_DATA,
       );
@@ -323,9 +320,9 @@ describe("GPv2Settlement", () => {
             kind,
             partiallyFillable,
           },
-          { executedAmount },
           traders[0],
           SigningScheme.TYPED_DATA,
+          { executedAmount },
         );
 
         const [
@@ -481,9 +478,9 @@ describe("GPv2Settlement", () => {
             kind,
             partiallyFillable,
           },
-          tradeExecution || {},
           traders[0],
           SigningScheme.TYPED_DATA,
+          tradeExecution,
         );
 
         const [trade] = decodeExecutedTrades(
@@ -564,9 +561,9 @@ describe("GPv2Settlement", () => {
         const encoder = new SettlementEncoder(testDomain);
         await encoder.signEncodeTrade(
           order,
-          tradeExecution || {},
           traders[0],
           SigningScheme.TYPED_DATA,
+          tradeExecution,
         );
 
         await settlement.computeTradeExecutionsTest(
@@ -634,15 +631,14 @@ describe("GPv2Settlement", () => {
       const encoder = new SettlementEncoder(testDomain);
       await encoder.signEncodeTrade(
         { ...order, appData: 0 },
-        {},
         traders[0],
         SigningScheme.TYPED_DATA,
       );
       await encoder.signEncodeTrade(
         { ...order, appData: 1 },
-        { executedAmount: ethers.utils.parseEther("1.0") },
         traders[0],
         SigningScheme.TYPED_DATA,
+        { executedAmount: ethers.utils.parseEther("1.0") },
       );
 
       const trades = decodeExecutedTrades(
@@ -666,7 +662,6 @@ describe("GPv2Settlement", () => {
       const encoder = new SettlementEncoder(testDomain);
       await encoder.signEncodeTrade(
         order,
-        {},
         traders[0],
         SigningScheme.TYPED_DATA,
       );
