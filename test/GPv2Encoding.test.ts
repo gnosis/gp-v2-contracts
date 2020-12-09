@@ -7,6 +7,8 @@ import {
   OrderKind,
   SettlementEncoder,
   SigningScheme,
+  computeOrderUid,
+  extractOrderUidParams,
   hashOrder,
 } from "../src/ts";
 
@@ -14,6 +16,12 @@ import { decodeTrade } from "./encoding";
 
 function fillBytes(count: number, byte: number): string {
   return ethers.utils.hexlify([...Array(count)].map(() => byte));
+}
+
+function fillDistinctBytes(count: number, start: number): string {
+  return ethers.utils.hexlify(
+    [...Array(count)].map((_, i) => (start + i) % 256),
+  );
 }
 
 function fillUint(bits: number, byte: number): BigNumber {
@@ -126,7 +134,7 @@ describe("GPv2Encoding", () => {
       );
 
       // NOTE: Ethers.js returns a tuple and not a struct with named fields for
-      // `ABIEncoderV2` structs.
+      // `abicoder v2` structs.
       expect(decodedTrades.length).to.equal(1);
 
       const {
@@ -172,8 +180,35 @@ describe("GPv2Encoding", () => {
         encoder.tokens,
         encoder.encodedTrades,
       );
-      const { digest } = decodeTrade(decodedTrades[0]);
-      expect(digest).to.equal(hashOrder(sampleOrder));
+
+      const { orderDigest } = extractOrderUidParams(
+        decodeTrade(decodedTrades[0]).orderUid,
+      );
+      expect(orderDigest).to.equal(hashOrder(sampleOrder));
+    });
+
+    it("should compute order unique identifier", async () => {
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
+        sampleOrder,
+        0,
+        traders[0],
+        SigningScheme.TYPED_DATA,
+      );
+
+      const [decodedTrades] = await encoding.decodeTradesTest(
+        encoder.tokens,
+        encoder.encodedTrades,
+      );
+
+      const { orderUid } = decodeTrade(decodedTrades[0]);
+      expect(orderUid).to.equal(
+        computeOrderUid({
+          orderDigest: hashOrder(sampleOrder),
+          owner: traders[0].address,
+          validTo: sampleOrder.validTo,
+        }),
+      );
     });
 
     it("should recover signing address for all supported schemes", async () => {
@@ -289,6 +324,51 @@ describe("GPv2Encoding", () => {
         encoder.encodedTrades,
       );
       expect(mem.toNumber()).to.equal(0);
+    });
+  });
+
+  describe("extractOrderUidParams", () => {
+    it("round trip encode/decode", async () => {
+      // Start from 17 (0x11) so that the first byte has no zeroes.
+      const orderDigest = fillDistinctBytes(32, 17);
+      const address = ethers.utils.getAddress(fillDistinctBytes(20, 17 + 32));
+      const validTo = BigNumber.from(fillDistinctBytes(4, 17 + 32 + 20));
+
+      const orderUid = computeOrderUid({
+        orderDigest,
+        owner: address,
+        validTo: validTo.toNumber(),
+      });
+      expect(orderUid).to.equal(fillDistinctBytes(32 + 20 + 4, 17));
+
+      const {
+        orderDigest: extractedOrderDigest,
+        owner: extractedAddress,
+        validTo: extractedValidTo,
+      } = await encoding.extractOrderUidParamsTest(orderUid);
+      expect(extractedOrderDigest).to.equal(orderDigest);
+      expect(extractedValidTo).to.equal(validTo);
+      expect(extractedAddress).to.equal(address);
+    });
+
+    describe("fails on uid", () => {
+      const uidStride = 32 + 20 + 4;
+
+      it("longer than expected", async () => {
+        const invalidUid = "0x" + "00".repeat(uidStride + 1);
+
+        await expect(
+          encoding.extractOrderUidParamsTest(invalidUid),
+        ).to.be.revertedWith("GPv2: invalid uid");
+      });
+
+      it("shorter than expected", async () => {
+        const invalidUid = "0x" + "00".repeat(uidStride - 1);
+
+        await expect(
+          encoding.extractOrderUidParamsTest(invalidUid),
+        ).to.be.revertedWith("GPv2: invalid uid");
+      });
     });
   });
 });

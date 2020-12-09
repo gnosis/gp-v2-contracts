@@ -373,21 +373,60 @@ export function signOrder(
 }
 
 /**
+ * Order unique identifier parameters.
+ */
+export interface OrderUidParams {
+  /**
+   * The EIP-712 order struct hash.
+   */
+  orderDigest: string;
+  /**
+   * The owner of the order.
+   */
+  owner: string;
+  /**
+   * The timestamp this order is valid until.
+   */
+  validTo: number | Date;
+}
+
+/**
  * Compute the unique identifier describing a user order in the settlement
  * contract.
  *
- * @param orderDigest The digest representing the parameters of the user order.
- * @param userAddress The address of the user who owns the order.
- * @param validTo Time until which the order is valid.
+ * @param OrderUidParams The parameters used for computing the order's unique
+ * identifier.
  * @returns A string that unequivocally identifies the order of the user.
  */
-export function computeOrderUid(
-  orderDigest: string,
-  userAddress: string,
-  validTo: number | Date,
-): string {
+export function computeOrderUid({
+  orderDigest,
+  owner,
+  validTo,
+}: OrderUidParams): string {
   return ethers.utils.solidityPack(
     ["bytes32", "address", "uint32"],
-    [orderDigest, userAddress, timestamp(validTo)],
+    [orderDigest, owner, timestamp(validTo)],
   );
+}
+
+/**
+ * Extracts the order unique identifier parameters from the specified bytes.
+ *
+ * @param orderUid The order UID encoded as a hexadecimal string.
+ * @returns The extracted order UID parameters.
+ */
+export function extractOrderUidParams(orderUid: string): OrderUidParams {
+  const bytes = ethers.utils.arrayify(orderUid);
+  if (bytes.length != 56) {
+    throw new Error("invalid order UID length");
+  }
+
+  const view = new DataView(bytes.buffer);
+  return {
+    orderDigest: ethers.utils.hexlify(bytes.subarray(0, 32)),
+    owner: ethers.utils.getAddress(
+      ethers.utils.hexlify(bytes.subarray(32, 52)),
+    ),
+    validTo: view.getUint32(52),
+  };
 }

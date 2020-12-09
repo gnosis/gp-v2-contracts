@@ -20,13 +20,6 @@ library GPv2Encoding {
         bool partiallyFillable;
     }
 
-    /// @dev A struct representing arbitrary contract interactions.
-    /// Submitted to [`GPv2Settlement.settle`] for code execution.
-    struct Interaction {
-        bytes callData;
-        address target;
-    }
-
     /// @dev An enum describing an order kind, either a buy or a sell order.
     enum OrderKind {Sell, Buy}
 
@@ -58,12 +51,22 @@ library GPv2Encoding {
         uint8 sellTokenIndex;
         uint8 buyTokenIndex;
         uint256 executedAmount;
-        bytes32 digest;
         address owner;
+        bytes orderUid;
     }
 
     /// @dev The stride of an encoded trade.
     uint256 private constant TRADE_STRIDE = 204;
+
+    /// @dev The byte length of an order unique identifier.
+    uint256 private constant ORDER_UID_LENGTH = 56;
+
+    /// @dev A struct representing arbitrary contract interactions.
+    /// Submitted to [`GPv2Settlement.settle`] for code execution.
+    struct Interaction {
+        bytes callData;
+        address target;
+    }
 
     /// @dev Returns the number of trades encoded in a calldata byte array.
     ///
@@ -173,6 +176,7 @@ library GPv2Encoding {
     ) internal pure {
         uint8 sellTokenIndex;
         uint8 buyTokenIndex;
+        uint32 validTo;
         uint256 flags;
         uint8 v;
         bytes32 r;
@@ -194,10 +198,7 @@ library GPv2Encoding {
             // order.buyAmount = uint256(encodedTrade[34:66])
             mstore(add(order, 96), calldataload(add(encodedTrade.offset, 34)))
             // order.validTo = uint32(encodedTrade[66:70])
-            mstore(
-                add(order, 128),
-                shr(224, calldataload(add(encodedTrade.offset, 66)))
-            )
+            validTo := shr(224, calldataload(add(encodedTrade.offset, 66)))
             // order.appData = uint32(encodedTrade[70:74])
             mstore(
                 add(order, 160),
@@ -219,6 +220,7 @@ library GPv2Encoding {
 
         trade.order.sellToken = tokens[sellTokenIndex];
         trade.order.buyToken = tokens[buyTokenIndex];
+        trade.order.validTo = validTo;
         trade.order.kind = OrderKind(flags & 0x01);
         trade.order.partiallyFillable = flags & 0x02 != 0;
 
@@ -282,13 +284,74 @@ library GPv2Encoding {
         address owner = ecrecover(signingDigest, v & 0x1f, r, s);
         require(owner != address(0), "GPv2: invalid signature");
 
-        trade.digest = orderDigest;
         trade.owner = owner;
 
         // NOTE: Restore the free memory pointer to free temporary memory.
         // solhint-disable-next-line no-inline-assembly
         assembly {
             mstore(0x40, freeMemoryPointer)
+        }
+
+        // NOTE: Initialize the memory for the order UID if required.
+        if (trade.orderUid.length != ORDER_UID_LENGTH) {
+            trade.orderUid = new bytes(ORDER_UID_LENGTH);
+        }
+
+        // NOTE: Write the order UID to the allocated memory buffer. The order
+        // parameters are written to memory in **reverse order** as memory
+        // operations write 32-bytes at a time and we want to use a packed
+        // encoding. This means, for example, that after writing the value of
+        // `owner` to bytes `20:52`, writing the `orderDigest` to bytes `0:32`
+        // will **overwrite** bytes `20:32`. This is desirable as addresses are
+        // only 20 bytes and `20:32` should be `0`s:
+        //
+        //        |           1111111111222222222233333333334444444444555555
+        //   byte | 01234567890123456789012345678901234567890123456789012345
+        // -------+---------------------------------------------------------
+        //  field | [.........orderDigest..........][......owner.......][vT]
+        // -------+---------------------------------------------------------
+        // mstore |                         [000000000000000000000000000.vT]
+        //        |                     [00000000000.......owner.......]
+        //        | [.........orderDigest..........]
+        //
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            // orderUid = trade.orderUid.dataOffset
+            let orderUid := add(mload(add(trade, 160)), 32)
+            mstore(add(orderUid, 24), validTo)
+            mstore(add(orderUid, 20), owner)
+            mstore(orderUid, orderDigest)
+        }
+    }
+
+    /// @dev Extracts specific order information from the standardized unique
+    /// order id of the protocol.
+    ///
+    /// @param orderUid The unique identifier used to represent an order in
+    /// the protocol. This uid is the packed concatenation of the order digest,
+    /// the validTo order parameter and the address of the user who created the
+    /// order. It is used by the user to interface with the contract directly,
+    /// and not by calls that are triggered by the solvers.
+    /// @return orderDigest The EIP-712 signing digest derived from the order
+    /// parameters.
+    /// @return owner The address of the user who owns this order.
+    /// @return validTo The epoch time at which the order will stop being valid.
+    function extractOrderUidParams(bytes calldata orderUid)
+        internal
+        pure
+        returns (
+            bytes32 orderDigest,
+            address owner,
+            uint32 validTo
+        )
+    {
+        require(orderUid.length == 32 + 20 + 4, "GPv2: invalid uid");
+        // Use assembly to efficiently decode packed calldata.
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            orderDigest := calldataload(orderUid.offset)
+            owner := shr(96, calldataload(add(orderUid.offset, 32)))
+            validTo := shr(224, calldataload(add(orderUid.offset, 52)))
         }
     }
 }
