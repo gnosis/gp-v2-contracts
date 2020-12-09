@@ -412,7 +412,7 @@ export function computeOrderUid({
 /**
  * Extracts the order unique identifier parameters from the specified bytes.
  *
- * @param orderUid The order UID encoded as a hexideciaml string.
+ * @param orderUid The order UID encoded as a hexadecimal string.
  * @returns The extracted order UID prameters.
  */
 export function extractOrderUidParams(orderUid: string): OrderUidParams {
