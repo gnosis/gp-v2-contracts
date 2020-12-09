@@ -311,10 +311,13 @@ contract GPv2Settlement {
             interaction.target != address(allowanceManager),
             "GPv2: forbidden interaction"
         );
-        // solhint-disable-next-line avoid-low-level-calls
+        // solhint-disable avoid-low-level-calls
         (bool success, bytes memory response) =
             (interaction.target).call(interaction.callData);
-        require(success, string(response));
+        // solhint-enable avoid-low-level-calls
+        if (!success) {
+            revert(string(abi.encodePacked("GPv2 Interaction: ", response)));
+        }
     }
 
     /// @dev Extracts specific order information from the standardized unique
