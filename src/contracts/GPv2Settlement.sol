@@ -320,11 +320,10 @@ contract GPv2Settlement {
         // This is the topic of https://github.com/gnosis/gp-v2-contracts/issues/240
         if (!success) {
             // Assembly used to revert with correctly encoded error message.
-            // solhint-disable no-inline-assembly
+            // solhint-disable-next-line no-inline-assembly
             assembly {
                 revert(add(response, 0x20), mload(response))
             }
-            // solhint-enable no-inline-assembly
         }
     }
 
