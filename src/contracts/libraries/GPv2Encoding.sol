@@ -376,7 +376,7 @@ library GPv2Encoding {
                 shr(96, calldataload(encodedInteractions.offset))
             )
 
-            // dataLength = uint32(encodedInteractions[1])
+            // dataLength = uint24(encodedInteractions[1])
             dataLength := shr(
                 232,
                 calldataload(add(encodedInteractions.offset, 20))
