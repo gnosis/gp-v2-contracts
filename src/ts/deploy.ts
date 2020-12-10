@@ -1,6 +1,9 @@
 import { utils } from "ethers";
 import { ethers } from "hardhat";
 
+/**
+ * Dictionary containing deployed contract names.
+ */
 export const contractNames = {
   authenticator: "GPv2AllowListAuthentication",
   settlement: "GPv2Settlement",
