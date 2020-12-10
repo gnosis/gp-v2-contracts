@@ -50,11 +50,10 @@ export async function deterministicDeploymentAddress<C extends ContractName>(
   contractName: C,
   ...deploymentArguments: DeploymentArguments<C>
 ): Promise<string> {
-  // NOTE: Use `require` to load the contract artifact instead of `getContract`
-  // so that we don't need to depend on `hardhat` when using this project as
-  // a dependency.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { abi, bytecode } = require(getArtifactPath(contractName));
+  // NOTE: Use dynamic import to load the contract artifact instead of
+  // `getContract` so that we don't need to depend on `hardhat` when using this
+  // project as a dependency.
+  const { abi, bytecode } = await import(getArtifactPath(contractName));
 
   const contractInterface = new utils.Interface(abi);
   const deployData = utils.hexConcat([
