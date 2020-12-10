@@ -15,6 +15,30 @@ import {
   timestamp,
 } from "./order";
 
+/**
+ * Details representing how an order was executed.
+ */
+export interface TradeExecution {
+  /**
+   * The executed trade amount.
+   *
+   * How this amount is used by the settlement contract depends on the order
+   * flags:
+   * - Partially fillable sell orders: the amount of sell tokens to trade.
+   * - Partially fillable buy orders: the amount of buy tokens to trade.
+   * - Fill-or-kill orders: this value is ignored.
+   */
+  executedAmount: BigNumberish;
+  /**
+   * Optional fee discount to use in basis points (1/100th of 1%).
+   *
+   * If this value is `0`, then there is no discount and the full fee will be
+   * taken for the order. A value of `10000` is used to indicate a full
+   * discount, meaning no fees will be taken.
+   */
+  feeDiscount: number;
+}
+
 function encodeOrderFlags(flags: OrderFlags): number {
   const kind = flags.kind === OrderKind.SELL ? 0x00 : 0x01;
   const partiallyFillable = flags.partiallyFillable ? 0x02 : 0x00;
@@ -76,7 +100,7 @@ export class SettlementEncoder {
    * Gets the number of trades currently encoded.
    */
   public get tradeCount(): number {
-    const TRADE_STRIDE = 204;
+    const TRADE_STRIDE = 206;
     // NOTE: `TRADE_STRIDE` multiplied by 2 as hex strings encode one byte in
     // 2 characters.
     return (this._encodedTrades.length - 2) / (TRADE_STRIDE * 2);
@@ -107,17 +131,22 @@ export class SettlementEncoder {
    * Additionally, if the order references new tokens that the encoder has not
    * yet seen, they are added to the tokens array.
    * @param order The order of the trade to encode.
-   * @param executedAmount The executed trade amount.
    * @param signature The signature for the order data.
    * @param scheme The signing scheme to used to generate the specified
    * signature. See {@link SigningScheme} for more details.
+   * @param tradeExecution The execution details for the trade.
    */
   public encodeTrade(
     order: Order,
-    executedAmount: BigNumberish,
     signature: SignatureLike,
     scheme: SigningScheme,
+    tradeExecution?: Partial<TradeExecution>,
   ): void {
+    const { executedAmount, feeDiscount } = tradeExecution || {};
+    if (order.partiallyFillable && executedAmount === undefined) {
+      throw new Error("missing executed amount for partially fillable trade");
+    }
+
     const sig = ethers.utils.splitSignature(signature);
     const encodedTrade = ethers.utils.solidityPack(
       [
@@ -130,6 +159,7 @@ export class SettlementEncoder {
         "uint256",
         "uint8",
         "uint256",
+        "uint16",
         "uint8",
         "bytes32",
         "bytes32",
@@ -143,7 +173,8 @@ export class SettlementEncoder {
         order.appData,
         order.feeAmount,
         encodeOrderFlags(order),
-        executedAmount,
+        executedAmount || 0,
+        feeDiscount || 0,
         encodeSigningScheme(sig.v, scheme),
         sig.r,
         sig.s,
@@ -159,19 +190,19 @@ export class SettlementEncoder {
   /**
    * Signs an order and encodes a trade with that order.
    * @param order The order to sign for the trade.
-   * @param executedAmount The executed trade amount for the order.
    * @param owner The owner for the order used to sign.
    * @param scheme The signing scheme to use. See {@link SigningScheme} for more
    * details.
+   * @param tradeExecution The execution details for the trade.
    */
   public async signEncodeTrade(
     order: Order,
-    executedAmount: BigNumberish,
     owner: Signer,
     scheme: SigningScheme,
+    tradeExecution?: Partial<TradeExecution>,
   ): Promise<void> {
     const signature = await signOrder(this.domain, order, owner, scheme);
-    this.encodeTrade(order, executedAmount, signature, scheme);
+    this.encodeTrade(order, signature, scheme, tradeExecution);
   }
 
   private tokenIndex(token: string): number {
