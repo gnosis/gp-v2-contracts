@@ -358,12 +358,12 @@ library GPv2Encoding {
     ///
     /// @param encodedInteractions The interactions as encoded calldata bytes.
     /// @param interaction The memory location to decode the interaction to.
-    /// @return reducedEncodedInteractions The part of encodedInteractions that
+    /// @return remainingEncodedInteractions The part of encodedInteractions that
     /// has not been decoded after this function is executed.
     function decodeInteraction(
         bytes calldata encodedInteractions,
         Interaction memory interaction
-    ) internal pure returns (bytes calldata reducedEncodedInteractions) {
+    ) internal pure returns (bytes calldata remainingEncodedInteractions) {
         uint256 dataLength;
 
         // Note: use assembly to efficiently decode packed data and store the
@@ -399,11 +399,11 @@ library GPv2Encoding {
             interactionCallData.offset := add(encodedInteractions.offset, 23)
             interactionCallData.length := dataLength
 
-            reducedEncodedInteractions.offset := add(
+            remainingEncodedInteractions.offset := add(
                 encodedInteractions.offset,
                 encodedInteractionSize
             )
-            reducedEncodedInteractions.length := sub(
+            remainingEncodedInteractions.length := sub(
                 encodedInteractions.length,
                 encodedInteractionSize
             )
