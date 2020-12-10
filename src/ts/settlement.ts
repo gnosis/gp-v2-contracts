@@ -191,11 +191,11 @@ export class SettlementEncoder {
    * @param interaction The interaction to encode.
    */
   public encodeInteraction(interaction: Interaction): void {
-    const callDataLenght = ethers.utils.hexDataLength(interaction.callData);
+    const callDataLength = ethers.utils.hexDataLength(interaction.callData);
 
     const encodedInteraction = ethers.utils.solidityPack(
       ["address", "uint24", "bytes"],
-      [interaction.target, callDataLenght, interaction.callData],
+      [interaction.target, callDataLength, interaction.callData],
     );
 
     this._encodedInteractions = ethers.utils.hexConcat([
