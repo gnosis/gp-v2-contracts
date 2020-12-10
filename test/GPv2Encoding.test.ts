@@ -452,7 +452,7 @@ describe("GPv2Encoding", () => {
     });
 
     describe("invalid encoded interaction", () => {
-      it("calldata shorter than lenght", async () => {
+      it("calldata shorter than length", async () => {
         const interaction = {
           target: ethers.utils.getAddress(fillBytes(20, 0x00)),
           callData: fillDistinctBytes(10, 0x00),
@@ -470,7 +470,7 @@ describe("GPv2Encoding", () => {
         await expect(decoding).to.be.revertedWith("GPv2: invalid interaction");
       });
 
-      it("calldata longer than lenght", async () => {
+      it("calldata longer than length", async () => {
         const interaction = {
           target: ethers.utils.getAddress(fillBytes(20, 0x00)),
           callData: fillDistinctBytes(10, 0x00),
