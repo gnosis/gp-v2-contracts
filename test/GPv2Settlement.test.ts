@@ -4,6 +4,7 @@ import { BigNumber, Contract, Event, TypedDataDomain } from "ethers";
 import { artifacts, ethers, waffle } from "hardhat";
 
 import {
+  Interaction,
   OrderFlags,
   OrderKind,
   SettlementEncoder,
@@ -14,11 +15,7 @@ import {
 } from "../src/ts";
 
 import { builtAndDeployedMetadataCoincide } from "./bytecode";
-import {
-  decodeExecutedTrades,
-  encodeOutTransfers,
-  Interaction,
-} from "./encoding";
+import { decodeExecutedTrades, encodeOutTransfers } from "./encoding";
 
 function toNumberLossy(value: BigNumber): number {
   // NOTE: BigNumber throws an exception when if is outside the range of

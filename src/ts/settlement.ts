@@ -15,6 +15,8 @@ import {
   timestamp,
 } from "./order";
 
+import { Interaction } from ".";
+
 function encodeOrderFlags(flags: OrderFlags): number {
   const kind = flags.kind === OrderKind.SELL ? 0x00 : 0x01;
   const partiallyFillable = flags.partiallyFillable ? 0x02 : 0x00;
@@ -42,6 +44,7 @@ export class SettlementEncoder {
   private readonly _tokens: string[] = [];
   private readonly _tokenMap: Record<string, number | undefined> = {};
   private _encodedTrades = "0x";
+  private _encodedInteractions = "0x";
 
   /**
    * Creates a new settlement encoder instance.
@@ -70,6 +73,13 @@ export class SettlementEncoder {
    */
   public get encodedTrades(): string {
     return this._encodedTrades;
+  }
+
+  /**
+   * Gets the encoded trades as a hex-encoded string.
+   */
+  public get encodedInteractions(): string {
+    return this._encodedInteractions;
   }
 
   /**
@@ -172,6 +182,26 @@ export class SettlementEncoder {
   ): Promise<void> {
     const signature = await signOrder(this.domain, order, owner, scheme);
     this.encodeTrade(order, executedAmount, signature, scheme);
+  }
+
+  /**
+   * Encodes the input interaction in the packed format accepted by the smart
+   * contract and adds it to the interactions encoded so far.
+   *
+   * @param interaction The interaction to encode.
+   */
+  public encodeInteraction(interaction: Interaction): void {
+    const callDataLenght = ethers.utils.hexDataLength(interaction.callData);
+
+    const encodedInteraction = ethers.utils.solidityPack(
+      ["address", "uint24", "bytes"],
+      [interaction.target, callDataLenght, interaction.callData],
+    );
+
+    this._encodedInteractions = ethers.utils.hexConcat([
+      this._encodedInteractions,
+      encodedInteraction,
+    ]);
   }
 
   private tokenIndex(token: string): number {

@@ -1,7 +1,7 @@
-import { BigNumber, BytesLike } from "ethers";
+import type { BigNumber } from "ethers";
 import { ethers } from "hardhat";
 
-import { Order } from "../src/ts";
+import type { Order } from "../src/ts";
 
 export type AbiOrder = [
   string,
@@ -45,11 +45,6 @@ export function decodeTrade(trade: AbiTrade): Trade {
     owner: trade[4],
     orderUid: trade[5],
   };
-}
-
-export interface Interaction {
-  target: string;
-  callData: BytesLike;
 }
 
 export type AbiExecutedTrade = [string, string, string, BigNumber, BigNumber];
