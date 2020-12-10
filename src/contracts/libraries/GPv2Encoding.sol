@@ -383,7 +383,7 @@ library GPv2Encoding {
             )
         }
 
-        // Safety: dataLength fits a uint24, no overflow is expected.
+        // Safety: dataLength fits a uint24, no overflow is possible.
         uint256 encodedInteractionSize = 20 + 3 + dataLength;
         require(
             encodedInteractions.length >= encodedInteractionSize,
