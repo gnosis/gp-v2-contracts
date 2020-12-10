@@ -419,7 +419,9 @@ describe("GPv2Encoding", () => {
       expect(decodedInteractions[2].callData).to.equal(interaction3.callData);
     });
 
-    it("encoder fails to add interactions with too much calldata", async () => {
+    // Skipped because this test takes a surprisingly long time to complete.
+    // It is supposed to be passing without any change.
+    it.skip("encoder fails to add interactions with too much calldata", async () => {
       const interaction = {
         target: ethers.utils.getAddress(fillBytes(20, 0x00)),
         callData: fillDistinctBytes(2 ** (8 * 3), 0x00),
