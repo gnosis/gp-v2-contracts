@@ -84,8 +84,9 @@ contract GPv2EncodingTestInterface {
         interactions = new GPv2Encoding.Interaction[](expectedInteractionCount);
 
         uint256 interactionCount = 0;
-        while (encodedInteractions.length != 0) {
-            encodedInteractions = encodedInteractions.decodeInteraction(
+        bytes calldata remainingInteractions = encodedInteractions;
+        while (remainingInteractions.length != 0) {
+            remainingInteractions = remainingInteractions.decodeInteraction(
                 interactions[interactionCount]
             );
             interactionCount += 1;
