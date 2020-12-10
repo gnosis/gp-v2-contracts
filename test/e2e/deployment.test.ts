@@ -1,12 +1,12 @@
 import { expect } from "chai";
 import { Contract, Wallet } from "ethers";
 
-import { deterministicDeploymentAddress } from "../src/ts/deploy";
+import { deterministicDeploymentAddress } from "../../src/ts";
+import { builtAndDeployedMetadataCoincide } from "../bytecode";
 
-import { builtAndDeployedMetadataCoincide } from "./bytecode";
 import { deployTestContracts } from "./fixture";
 
-describe("Deployment", () => {
+describe("E2E: Deployment", () => {
   let owner: Wallet;
   let user: Wallet;
 

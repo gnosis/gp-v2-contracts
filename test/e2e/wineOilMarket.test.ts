@@ -9,11 +9,11 @@ import {
   SettlementEncoder,
   SigningScheme,
   domain,
-} from "../src/ts";
+} from "../../src/ts";
 
 import { deployTestContracts } from "./fixture";
 
-describe("GPv2Settlement: End to End Tests", () => {
+describe("E2E: RetrETH Red Wind and Olive Oil Market", () => {
   let deployer: Wallet;
   let solver: Wallet;
   let traders: Wallet[];
