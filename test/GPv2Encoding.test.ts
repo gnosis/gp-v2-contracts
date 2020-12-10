@@ -343,7 +343,7 @@ describe("GPv2Encoding", () => {
       // If this number does not correspond exactly to the amount recovered
       // after decoding, then the test call reverts.
       const numInteractions = 1;
-      const { interactions } = await encoding.decodeInteractionsTest(
+      const interactions = await encoding.decodeInteractionsTest(
         encodedInteraction,
         numInteractions,
       );
@@ -366,7 +366,7 @@ describe("GPv2Encoding", () => {
       await encoder.encodeInteraction(interaction);
 
       const numInteractions = 1;
-      const [decodedInteractions] = await encoding.decodeInteractionsTest(
+      const decodedInteractions = await encoding.decodeInteractionsTest(
         encoder.encodedInteractions,
         numInteractions,
       );
@@ -405,7 +405,7 @@ describe("GPv2Encoding", () => {
       await encoder.encodeInteraction(interaction3);
 
       const numInteractions = 3;
-      const [decodedInteractions] = await encoding.decodeInteractionsTest(
+      const decodedInteractions = await encoding.decodeInteractionsTest(
         encoder.encodedInteractions,
         numInteractions,
       );
@@ -443,7 +443,7 @@ describe("GPv2Encoding", () => {
       await encoder.encodeInteraction(interaction);
 
       const numInteractions = 1;
-      const [decodedInteractions] = await encoding.decodeInteractionsTest(
+      const decodedInteractions = await encoding.decodeInteractionsTest(
         encoder.encodedInteractions,
         numInteractions,
       );
