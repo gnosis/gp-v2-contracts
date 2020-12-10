@@ -15,11 +15,6 @@ export const SALT = utils.formatBytes32String("dev");
 const DEPLOYER_CONTRACT = "0x4e59b44847b379578588920ca78fbf26c0b4956c";
 
 /**
- * The name of a deployed contract.
- */
-export type ContractName = "GPv2AllowListAuthentication" | "GPv2Settlement";
-
-/**
  * Dictionary containing all deployed contract names.
  */
 export const CONTRACT_NAMES = {
@@ -27,19 +22,19 @@ export const CONTRACT_NAMES = {
   settlement: "GPv2Settlement",
 } as const;
 
-// NOTE: Use the compiler to assert that the contract names in the above
-// dictionary are correct.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _assertValidContractNames: Record<string, ContractName> = CONTRACT_NAMES;
+/**
+ * The name of a deployed contract.
+ */
+export type ContractName = typeof CONTRACT_NAMES[keyof typeof CONTRACT_NAMES];
 
 /**
  * The deployment args for a contract.
  */
 export type DeploymentArguments<
   T extends ContractName
-> = T extends "GPv2AllowListAuthentication"
+> = T extends typeof CONTRACT_NAMES.authenticator
   ? [string]
-  : T extends "GPv2Settlement"
+  : T extends typeof CONTRACT_NAMES.settlement
   ? [string]
   : never;
 
@@ -55,10 +50,13 @@ export async function deterministicDeploymentAddress<C extends ContractName>(
   contractName: C,
   ...deploymentArguments: DeploymentArguments<C>
 ): Promise<string> {
+  // NOTE: Use `require` to load the contract artifact instead of `getContract`
+  // so that we don't need to depend on `hardhat` when using this project as
+  // a dependency.
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { abi, bytecode } = require(getArtifactPath(contractName));
-  const contractInterface = new utils.Interface(abi);
 
+  const contractInterface = new utils.Interface(abi);
   const deployData = utils.hexConcat([
     bytecode,
     contractInterface.encodeDeploy(deploymentArguments),
@@ -72,9 +70,6 @@ export async function deterministicDeploymentAddress<C extends ContractName>(
 }
 
 function getArtifactPath(contractName: ContractName): string {
-  // NOTE: Use `require` to load the contract artifact instead of `getContract`
-  // so that we don't need to depend on `hardhat` when using this project as
-  // a dependency.
   const artifactsRoot = "../../build/artifacts/";
   return `${artifactsRoot}/src/contracts/${contractName}.sol/${contractName}.json`;
 }
