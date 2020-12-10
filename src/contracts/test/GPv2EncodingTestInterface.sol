@@ -76,11 +76,7 @@ contract GPv2EncodingTestInterface {
     function decodeInteractionsTest(
         bytes calldata encodedInteractions,
         uint256 expectedInteractionCount
-    )
-        external
-        view
-        returns (GPv2Encoding.Interaction[] memory interactions, uint256 gas_)
-    {
+    ) external view returns (GPv2Encoding.Interaction[] memory interactions) {
         interactions = new GPv2Encoding.Interaction[](expectedInteractionCount);
 
         uint256 interactionCount = 0;
