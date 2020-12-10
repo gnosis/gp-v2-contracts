@@ -1,7 +1,7 @@
 import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
-import { SALT, contractNames } from "../ts/deploy";
+import { CONTRACT_NAMES, SALT } from "../ts/deploy";
 
 const deployAuthenticator: DeployFunction = async function ({
   deployments,
@@ -10,7 +10,7 @@ const deployAuthenticator: DeployFunction = async function ({
   const { deployer, owner } = await getNamedAccounts();
   const { deploy } = deployments;
 
-  const { authenticator } = contractNames;
+  const { authenticator } = CONTRACT_NAMES;
 
   await deploy(authenticator, {
     from: deployer,
