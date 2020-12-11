@@ -1,7 +1,7 @@
-import { BigNumber, BytesLike } from "ethers";
+import type { BigNumber } from "ethers";
 import { ethers } from "hardhat";
 
-import { Order } from "../src/ts";
+import { Order, OrderKind } from "../src/ts";
 
 export type AbiOrder = [
   string,
@@ -11,7 +11,7 @@ export type AbiOrder = [
   number,
   number,
   BigNumber,
-  number,
+  string,
   boolean,
 ];
 
@@ -35,6 +35,15 @@ export interface Trade {
   orderUid: string;
 }
 
+export function decodeOrderKind(kindHash: string): OrderKind {
+  for (const kind of [OrderKind.SELL, OrderKind.BUY]) {
+    if (kindHash == ethers.utils.keccak256(ethers.utils.toUtf8Bytes(kind))) {
+      return kind;
+    }
+  }
+  throw new Error(`invalid order kind hash '${kindHash}'`);
+}
+
 export function decodeTrade(trade: AbiTrade): Trade {
   return {
     order: {
@@ -45,7 +54,7 @@ export function decodeTrade(trade: AbiTrade): Trade {
       validTo: trade[0][4],
       appData: trade[0][5],
       feeAmount: trade[0][6],
-      kind: trade[0][7],
+      kind: decodeOrderKind(trade[0][7]),
       partiallyFillable: trade[0][8],
     },
     sellTokenIndex: trade[1],
@@ -55,11 +64,6 @@ export function decodeTrade(trade: AbiTrade): Trade {
     owner: trade[5],
     orderUid: trade[6],
   };
-}
-
-export interface Interaction {
-  target: string;
-  callData: BytesLike;
 }
 
 export type AbiExecutedTrade = [string, string, string, BigNumber, BigNumber];
