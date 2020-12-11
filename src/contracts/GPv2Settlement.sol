@@ -137,7 +137,7 @@ contract GPv2Settlement {
             computeTradeExecutions(tokens, clearingPrices, encodedTrades);
         allowanceManager.transferIn(executedTrades);
 
-        require(encodedInteractions.length == 0, "not yet implemented");
+        executeInteractions(encodedInteractions);
 
         transferOut(executedTrades);
 
@@ -204,7 +204,7 @@ contract GPv2Settlement {
         GPv2TradeExecution.Data memory executedTrade
     ) internal {
         GPv2Encoding.Order memory order = trade.order;
-        // NOTE: Currently, the above instanciation allocates an unitialized
+        // NOTE: Currently, the above instantiation allocates an uninitialized
         // `Order` that gets never used. Adjust the free memory pointer to free
         // the unused memory by subtracting `sizeof(Order) == 288` bytes.
         // <https://solidity.readthedocs.io/en/v0.7.5/internals/layout_in_memory.html>
@@ -317,7 +317,23 @@ contract GPv2Settlement {
         );
     }
 
-    /// @dev Allows settlment function to make arbitrary contract executions.
+    /// @dev Execute a list of arbitrary contract calls from this contract.
+    /// @param encodedInteractions The encoded list of interactions that will be
+    /// executed.
+    function executeInteractions(bytes calldata encodedInteractions) internal {
+        // Note: at every decoding step, the content of this variable is
+        // replaced with the latest decoded interaction.
+        GPv2Encoding.Interaction memory interaction;
+
+        bytes calldata remainingEncodedInteractions = encodedInteractions;
+        while (remainingEncodedInteractions.length != 0) {
+            remainingEncodedInteractions = remainingEncodedInteractions
+                .decodeInteraction(interaction);
+            executeInteraction(interaction);
+        }
+    }
+
+    /// @dev Allows settlement function to make arbitrary contract executions.
     /// @param interaction contains address and calldata of the contract interaction.
     function executeInteraction(GPv2Encoding.Interaction memory interaction)
         internal
