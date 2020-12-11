@@ -15,7 +15,7 @@ const deploySettlement: DeployFunction = async function ({
 
   await deploy(settlement, {
     from: deployer,
-    gasLimit: 2000000,
+    gasLimit: 3000000,
     args: [authenticatorAddress],
     deterministicDeployment: SALT,
     log: true,
