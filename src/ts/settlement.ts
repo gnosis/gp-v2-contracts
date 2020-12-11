@@ -1,10 +1,4 @@
-import {
-  BigNumberish,
-  SignatureLike,
-  Signer,
-  TypedDataDomain,
-  ethers,
-} from "ethers";
+import { BigNumberish, Signer, ethers } from "ethers";
 
 import {
   Order,
@@ -14,6 +8,7 @@ import {
   signOrder,
   timestamp,
 } from "./order";
+import { TypedDataDomain, SignatureLike } from "./types/ethers";
 
 /**
  * Details representing how an order was executed.
