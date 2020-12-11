@@ -5,7 +5,7 @@ import { ethers, waffle } from "hardhat";
 
 import {
   Order,
-  OrderKind,
+  OrderKinds,
   SettlementEncoder,
   SigningScheme,
   TypedDataDomain,
@@ -88,7 +88,7 @@ describe("E2E: RetrETH Red Wind and Olive Oil Market", () => {
 
     await addOrder(traders[0], {
       ...orderDefaults,
-      kind: OrderKind.SELL,
+      kind: OrderKinds.SELL,
       partiallyFillable: false,
       sellToken: wine.address,
       buyToken: oil.address,
@@ -99,7 +99,7 @@ describe("E2E: RetrETH Red Wind and Olive Oil Market", () => {
 
     await addOrder(traders[1], {
       ...orderDefaults,
-      kind: OrderKind.SELL,
+      kind: OrderKinds.SELL,
       partiallyFillable: false,
       sellToken: oil.address,
       buyToken: eur.address,
@@ -112,7 +112,7 @@ describe("E2E: RetrETH Red Wind and Olive Oil Market", () => {
       traders[2],
       {
         ...orderDefaults,
-        kind: OrderKind.BUY,
+        kind: OrderKinds.BUY,
         partiallyFillable: true,
         buyToken: oil.address,
         sellToken: eur.address,
@@ -127,7 +127,7 @@ describe("E2E: RetrETH Red Wind and Olive Oil Market", () => {
       traders[3],
       {
         ...orderDefaults,
-        kind: OrderKind.BUY,
+        kind: OrderKinds.BUY,
         partiallyFillable: true,
         buyToken: wine.address,
         sellToken: eur.address,

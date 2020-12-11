@@ -3,7 +3,6 @@ import { BigNumberish, Signer, ethers } from "ethers";
 import {
   Order,
   OrderFlags,
-  OrderKind,
   SigningScheme,
   signOrder,
   timestamp,
@@ -37,8 +36,19 @@ export interface TradeExecution {
 import { Interaction } from ".";
 
 function encodeOrderFlags(flags: OrderFlags): number {
-  const kind = flags.kind === OrderKind.SELL ? 0x00 : 0x01;
+  let kind;
+  switch (flags.kind) {
+    case "sell":
+      kind = 0;
+      break;
+    case "buy":
+      kind = 1;
+      break;
+    default:
+      throw new Error(`invalid error kind '${kind}'`);
+  }
   const partiallyFillable = flags.partiallyFillable ? 0x02 : 0x00;
+
   return kind | partiallyFillable;
 }
 

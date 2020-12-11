@@ -6,7 +6,7 @@ import { artifacts, ethers, waffle } from "hardhat";
 import {
   Interaction,
   OrderFlags,
-  OrderKind,
+  OrderKinds,
   SettlementEncoder,
   SigningScheme,
   TradeExecution,
@@ -199,7 +199,7 @@ describe("GPv2Settlement", () => {
         await encoder.signEncodeTrade(
           {
             ...partialOrder,
-            kind: OrderKind.BUY,
+            kind: OrderKinds.BUY,
             partiallyFillable: true,
           },
           traders[0],
@@ -225,7 +225,7 @@ describe("GPv2Settlement", () => {
         {
           ...partialOrder,
           validTo: timestamp - 1,
-          kind: OrderKind.SELL,
+          kind: OrderKinds.SELL,
           partiallyFillable: false,
         },
         traders[0],
@@ -253,7 +253,7 @@ describe("GPv2Settlement", () => {
           ...partialOrder,
           sellAmount,
           buyAmount,
-          kind: OrderKind.SELL,
+          kind: OrderKinds.SELL,
           partiallyFillable: false,
         },
         traders[0],
@@ -280,7 +280,7 @@ describe("GPv2Settlement", () => {
       await encoder.signEncodeTrade(
         {
           ...partialOrder,
-          kind: OrderKind.SELL,
+          kind: OrderKinds.SELL,
           partiallyFillable: false,
         },
         traders[0],
@@ -348,7 +348,7 @@ describe("GPv2Settlement", () => {
           executedBuyAmount,
           buyPrice,
         } = await computeSettlementForOrderVariant({
-          kind: OrderKind.SELL,
+          kind: OrderKinds.SELL,
           partiallyFillable: false,
         });
 
@@ -360,7 +360,7 @@ describe("GPv2Settlement", () => {
 
       it("should respect the limit price for fill-or-kill sell orders", async () => {
         const { executedBuyAmount } = await computeSettlementForOrderVariant({
-          kind: OrderKind.SELL,
+          kind: OrderKinds.SELL,
           partiallyFillable: false,
         });
 
@@ -374,7 +374,7 @@ describe("GPv2Settlement", () => {
           executedBuyAmount,
           buyPrice,
         } = await computeSettlementForOrderVariant({
-          kind: OrderKind.BUY,
+          kind: OrderKinds.BUY,
           partiallyFillable: false,
         });
 
@@ -386,7 +386,7 @@ describe("GPv2Settlement", () => {
 
       it("should respect the limit price for fill-or-kill buy orders", async () => {
         const { executedSellAmount } = await computeSettlementForOrderVariant({
-          kind: OrderKind.BUY,
+          kind: OrderKinds.BUY,
           partiallyFillable: false,
         });
 
@@ -400,7 +400,7 @@ describe("GPv2Settlement", () => {
           executedBuyAmount,
           buyPrice,
         } = await computeSettlementForOrderVariant({
-          kind: OrderKind.SELL,
+          kind: OrderKinds.SELL,
           partiallyFillable: true,
         });
 
@@ -415,7 +415,7 @@ describe("GPv2Settlement", () => {
           executedSellAmount,
           executedBuyAmount,
         } = await computeSettlementForOrderVariant({
-          kind: OrderKind.SELL,
+          kind: OrderKinds.SELL,
           partiallyFillable: true,
         });
 
@@ -433,7 +433,7 @@ describe("GPv2Settlement", () => {
           executedBuyAmount,
           buyPrice,
         } = await computeSettlementForOrderVariant({
-          kind: OrderKind.BUY,
+          kind: OrderKinds.BUY,
           partiallyFillable: true,
         });
 
@@ -448,7 +448,7 @@ describe("GPv2Settlement", () => {
           executedSellAmount,
           executedBuyAmount,
         } = await computeSettlementForOrderVariant({
-          kind: OrderKind.BUY,
+          kind: OrderKinds.BUY,
           partiallyFillable: true,
         });
 
@@ -494,7 +494,7 @@ describe("GPv2Settlement", () => {
 
       it("should add the full fee for fill-or-kill sell orders", async () => {
         const trade = await computeExecutedTradeForOrderVariant({
-          kind: OrderKind.SELL,
+          kind: OrderKinds.SELL,
           partiallyFillable: false,
         });
 
@@ -503,7 +503,7 @@ describe("GPv2Settlement", () => {
 
       it("should add the full fee for fill-or-kill buy orders", async () => {
         const trade = await computeExecutedTradeForOrderVariant({
-          kind: OrderKind.BUY,
+          kind: OrderKinds.BUY,
           partiallyFillable: false,
         });
 
@@ -518,7 +518,7 @@ describe("GPv2Settlement", () => {
         const executedFee = feeAmount.div(3);
 
         const trade = await computeExecutedTradeForOrderVariant(
-          { kind: OrderKind.SELL, partiallyFillable: true },
+          { kind: OrderKinds.SELL, partiallyFillable: true },
           { executedAmount: executedSellAmount },
         );
 
@@ -532,7 +532,7 @@ describe("GPv2Settlement", () => {
         const executedFee = feeAmount.div(4);
 
         const trade = await computeExecutedTradeForOrderVariant(
-          { kind: OrderKind.BUY, partiallyFillable: true },
+          { kind: OrderKinds.BUY, partiallyFillable: true },
           { executedAmount: executedBuyAmount },
         );
 
@@ -547,7 +547,7 @@ describe("GPv2Settlement", () => {
       it("should apply the fee discount to the executed fees", async () => {
         const trade = await computeExecutedTradeForOrderVariant(
           {
-            kind: OrderKind.SELL,
+            kind: OrderKinds.SELL,
             partiallyFillable: false,
           },
           { feeDiscount: 100 }, // 1% discount.
@@ -597,7 +597,7 @@ describe("GPv2Settlement", () => {
 
       it("should fill the full sell amount for fill-or-kill sell orders", async () => {
         const filledAmount = await readOrderFilledAmountAfterProcessing({
-          kind: OrderKind.SELL,
+          kind: OrderKinds.SELL,
           partiallyFillable: false,
         });
 
@@ -606,7 +606,7 @@ describe("GPv2Settlement", () => {
 
       it("should fill the full buy amount for fill-or-kill buy orders", async () => {
         const filledAmount = await readOrderFilledAmountAfterProcessing({
-          kind: OrderKind.BUY,
+          kind: OrderKinds.BUY,
           partiallyFillable: false,
         });
 
@@ -616,7 +616,7 @@ describe("GPv2Settlement", () => {
       it("should fill the executed amount for partially filled sell orders", async () => {
         const executedSellAmount = sellAmount.div(3);
         const filledAmount = await readOrderFilledAmountAfterProcessing(
-          { kind: OrderKind.SELL, partiallyFillable: true },
+          { kind: OrderKinds.SELL, partiallyFillable: true },
           { executedAmount: executedSellAmount },
         );
 
@@ -626,7 +626,7 @@ describe("GPv2Settlement", () => {
       it("should fill the executed amount for partially filled buy orders", async () => {
         const executedBuyAmount = buyAmount.div(4);
         const filledAmount = await readOrderFilledAmountAfterProcessing(
-          { kind: OrderKind.BUY, partiallyFillable: true },
+          { kind: OrderKinds.BUY, partiallyFillable: true },
           { executedAmount: executedBuyAmount },
         );
 
@@ -637,7 +637,7 @@ describe("GPv2Settlement", () => {
     it("should ignore the executed trade amount for fill-or-kill orders", async () => {
       const order = {
         ...partialOrder,
-        kind: OrderKind.BUY,
+        kind: OrderKinds.BUY,
         partiallyFillable: false,
       };
 
@@ -670,7 +670,7 @@ describe("GPv2Settlement", () => {
       await encoder.signEncodeTrade(
         {
           ...partialOrder,
-          kind: OrderKind.BUY,
+          kind: OrderKinds.BUY,
           partiallyFillable: false,
         },
         traders[0],
@@ -690,7 +690,7 @@ describe("GPv2Settlement", () => {
     it("should emit a trade event", async () => {
       const order = {
         ...partialOrder,
-        kind: OrderKind.SELL,
+        kind: OrderKinds.SELL,
         partiallyFillable: false,
       };
 

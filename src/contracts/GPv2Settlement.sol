@@ -255,7 +255,7 @@ contract GPv2Settlement {
         // instead of consuming all of the remaining transaction gas when
         // dividing by zero, so no extra checks are needed for those operations.
 
-        if (order.kind == GPv2Encoding.OrderKind.Sell) {
+        if (order.kind == GPv2Encoding.ORDER_KIND_SELL) {
             if (order.partiallyFillable) {
                 executedSellAmount = trade.executedAmount;
                 executedFeeAmount =
