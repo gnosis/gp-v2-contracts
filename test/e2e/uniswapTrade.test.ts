@@ -2,13 +2,14 @@ import ERC20 from "@openzeppelin/contracts/build/contracts/ERC20PresetMinterPaus
 import UniswapV2Factory from "@uniswap/v2-core/build/UniswapV2Factory.json";
 import UniswapV2Pair from "@uniswap/v2-core/build/UniswapV2Pair.json";
 import { expect } from "chai";
-import { Contract, TypedDataDomain, Wallet } from "ethers";
+import { Contract, Wallet } from "ethers";
 import { ethers, waffle } from "hardhat";
 
 import {
   OrderKind,
   SettlementEncoder,
   SigningScheme,
+  TypedDataDomain,
   domain,
 } from "../../src/ts";
 
@@ -166,22 +167,17 @@ describe("E2E: Should Trade Surplus With Uniswap", () => {
       ]),
     });
 
-    await expect(
-      settlement.connect(solver).settle(
-        encoder.tokens,
-        encoder.clearingPrices({
-          [weth.address]: uniswapUsdtOutAmount,
-          [usdt.address]: uniswapWethInAmount,
-        }),
-        encoder.encodedTrades,
-        encoder.encodedInteractions,
-        "0x",
-      ),
-    ).to.be.revertedWith("not yet implemented");
+    await settlement.connect(solver).settle(
+      encoder.tokens,
+      encoder.clearingPrices({
+        [weth.address]: uniswapUsdtOutAmount,
+        [usdt.address]: uniswapWethInAmount,
+      }),
+      encoder.encodedTrades,
+      encoder.encodedInteractions,
+      "0x",
+    );
 
-    // TODO(nlordell): Once the settlement no longer reverts because parts are
-    // not implemented, we can enable the following assertions:
-    /*
     // NOTE: Half of the trader 0's fees were discounted. This is reflected in
     // the final WETH balances of the trade and the settlement contract.
 
@@ -207,16 +203,6 @@ describe("E2E: Should Trade Surplus With Uniswap", () => {
         .parseUnits("300.3", 6)
         .sub(uniswapUsdtOutAmount.add(ethers.utils.parseUnits("0.3", 6))),
     );
-    */
-
-    // TODO(nlordell): In the meantime, just to be able to verify that the
-    // Uniswap calculations are correct, perform the swap. This should be done
-    // by the settlement contract so it should be removed once SC interactions
-    // are finished being implemented.
-    // REMOVE FROM HERE
-    await weth.mint(uniswapPair.address, uniswapWethInAmount);
-    await uniswapPair.swap(amount0Out, amount1Out, settlement.address, "0x");
-    // REMOVE TO HERE
 
     const [token0Reserve, token1Reserve] = await uniswapPair.getReserves();
     const [finalWethReserve, finalUsdtReserve] = isWethToken0
