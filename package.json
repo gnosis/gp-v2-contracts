@@ -11,7 +11,7 @@
     "lint:sol": "solhint 'src/contracts/**/*.sol'",
     "lint:ts": "eslint --max-warnings 0 .",
     "fmt:sol": "prettier 'src/contracts/**/*.sol' -w",
-    "prepack": "yarn build && yarn deploy --network rinkeby"
+    "prepack": "yarn build"
   },
   "peerDependencies": {
     "ethers": "~5.0.18"

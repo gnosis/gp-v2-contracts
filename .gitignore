@@ -1,5 +1,6 @@
 build/
-deployments/
+deployments/*/solcInputs
 node_modules/
 lib/
 yarn-error.log
+*.tgz
