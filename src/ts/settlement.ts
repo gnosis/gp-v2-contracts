@@ -37,8 +37,19 @@ export interface TradeExecution {
 import { Interaction } from ".";
 
 function encodeOrderFlags(flags: OrderFlags): number {
-  const kind = flags.kind === OrderKind.SELL ? 0x00 : 0x01;
+  let kind;
+  switch (flags.kind) {
+    case OrderKind.SELL:
+      kind = 0;
+      break;
+    case OrderKind.BUY:
+      kind = 1;
+      break;
+    default:
+      throw new Error(`invalid error kind '${kind}'`);
+  }
   const partiallyFillable = flags.partiallyFillable ? 0x02 : 0x00;
+
   return kind | partiallyFillable;
 }
 

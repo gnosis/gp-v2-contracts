@@ -69,15 +69,15 @@ export type Timestamp = number | Date;
 /**
  * Order kind.
  */
-export const enum OrderKind {
+export enum OrderKind {
   /**
    * A sell order.
    */
-  SELL,
+  SELL = "sell",
   /**
    * A buy order.
    */
-  BUY,
+  BUY = "buy",
 }
 
 /**
@@ -91,7 +91,7 @@ export const ORDER_TYPE_FIELDS = [
   { name: "validTo", type: "uint32" },
   { name: "appData", type: "uint32" },
   { name: "feeAmount", type: "uint256" },
-  { name: "kind", type: "uint8" },
+  { name: "kind", type: "string" },
   { name: "partiallyFillable", type: "bool" },
 ];
 
