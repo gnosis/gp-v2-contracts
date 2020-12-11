@@ -1,10 +1,4 @@
-import {
-  BigNumberish,
-  SignatureLike,
-  Signer,
-  TypedDataDomain,
-  ethers,
-} from "ethers";
+import { BigNumberish, Signer, ethers } from "ethers";
 
 import {
   Order,
@@ -14,6 +8,7 @@ import {
   signOrder,
   timestamp,
 } from "./order";
+import { TypedDataDomain, SignatureLike } from "./types/ethers";
 
 /**
  * Details representing how an order was executed.
@@ -38,6 +33,8 @@ export interface TradeExecution {
    */
   feeDiscount: number;
 }
+
+import { Interaction } from ".";
 
 function encodeOrderFlags(flags: OrderFlags): number {
   const kind = flags.kind === OrderKind.SELL ? 0x00 : 0x01;
@@ -66,6 +63,7 @@ export class SettlementEncoder {
   private readonly _tokens: string[] = [];
   private readonly _tokenMap: Record<string, number | undefined> = {};
   private _encodedTrades = "0x";
+  private _encodedInteractions = "0x";
 
   /**
    * Creates a new settlement encoder instance.
@@ -94,6 +92,13 @@ export class SettlementEncoder {
    */
   public get encodedTrades(): string {
     return this._encodedTrades;
+  }
+
+  /**
+   * Gets the encoded trades as a hex-encoded string.
+   */
+  public get encodedInteractions(): string {
+    return this._encodedInteractions;
   }
 
   /**
@@ -203,6 +208,26 @@ export class SettlementEncoder {
   ): Promise<void> {
     const signature = await signOrder(this.domain, order, owner, scheme);
     this.encodeTrade(order, signature, scheme, tradeExecution);
+  }
+
+  /**
+   * Encodes the input interaction in the packed format accepted by the smart
+   * contract and adds it to the interactions encoded so far.
+   *
+   * @param interaction The interaction to encode.
+   */
+  public encodeInteraction(interaction: Interaction): void {
+    const callDataLength = ethers.utils.hexDataLength(interaction.callData);
+
+    const encodedInteraction = ethers.utils.solidityPack(
+      ["address", "uint24", "bytes"],
+      [interaction.target, callDataLength, interaction.callData],
+    );
+
+    this._encodedInteractions = ethers.utils.hexConcat([
+      this._encodedInteractions,
+      encodedInteraction,
+    ]);
   }
 
   private tokenIndex(token: string): number {

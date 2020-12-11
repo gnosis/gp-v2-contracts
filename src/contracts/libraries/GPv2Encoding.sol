@@ -65,8 +65,8 @@ library GPv2Encoding {
     /// @dev A struct representing arbitrary contract interactions.
     /// Submitted to [`GPv2Settlement.settle`] for code execution.
     struct Interaction {
-        bytes callData;
         address target;
+        bytes callData;
     }
 
     /// @dev Returns the number of trades encoded in a calldata byte array.
@@ -189,6 +189,7 @@ library GPv2Encoding {
         // byte increments.
         // solhint-disable-next-line no-inline-assembly
         assembly {
+            // order = trade.order
             let order := mload(trade)
 
             // sellTokenIndex = uint8(encodedTrade[0])
@@ -329,6 +330,94 @@ library GPv2Encoding {
             mstore(add(orderUid, 20), owner)
             mstore(orderUid, orderDigest)
         }
+    }
+
+    /// @dev Decodes an interaction from calldata into memory.
+    ///
+    /// An encoded interaction has three components: the target address, the data
+    /// length, and the actual interaction data of variable size.
+    ///
+    /// ```
+    /// struct EncodedInteraction {
+    ///     address target;
+    ///     uint24 dataLength;
+    ///     bytes callData;
+    /// }
+    /// ```
+    ///
+    /// All entries are tightly packed together in this order in the encoded
+    /// calldata. Example:
+    ///
+    /// input:    0x73c14081446bd1e4eb165250e826e80c5a523783000010000102030405060708090a0b0c0d0e0f
+    /// decoding:   [...............target.................][leng][............data..............]
+    /// stride:                                          20     3    (defined in length field) 16
+    ///
+    /// This function enforces that the encoded data stores enough bytes to
+    /// cover the full length of the decoded interaction.
+    ///
+    /// The size of `dataLength` limits the maximum calldata that can be used in
+    /// an interaction. Based on the current rules of the Ethereum protocol,
+    /// this length is enough to include any valid transaction: an extra
+    /// calldata byte costs at least 4 gas, and the maximum gas spent in a block
+    /// is 12.5M. This gives an upper bound on the calldata that can be included
+    /// in a block of
+    ///   3.125.000 < 16.777.216 = 2**(3*8) .
+    ///
+    /// @param encodedInteractions The interactions as encoded calldata bytes.
+    /// @param interaction The memory location to decode the interaction to.
+    /// @return remainingEncodedInteractions The part of encodedInteractions that
+    /// has not been decoded after this function is executed.
+    function decodeInteraction(
+        bytes calldata encodedInteractions,
+        Interaction memory interaction
+    ) internal pure returns (bytes calldata remainingEncodedInteractions) {
+        uint256 dataLength;
+
+        // Note: use assembly to efficiently decode packed data and store the
+        // target address.
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            // interaction.target = address(encodedInteractions[0])
+            mstore(
+                interaction,
+                shr(96, calldataload(encodedInteractions.offset))
+            )
+
+            // dataLength = uint24(encodedInteractions[1])
+            dataLength := shr(
+                232,
+                calldataload(add(encodedInteractions.offset, 20))
+            )
+        }
+
+        // Safety: dataLength fits a uint24, no overflow is possible.
+        uint256 encodedInteractionSize = 20 + 3 + dataLength;
+        require(
+            encodedInteractions.length >= encodedInteractionSize,
+            "GPv2: invalid interaction"
+        );
+
+        bytes calldata interactionCallData;
+        // Note: assembly is used to split the calldata into two components, one
+        // being the calldata of the current interaction and the other being the
+        // encoded bytes of the remaining interactions.
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            interactionCallData.offset := add(encodedInteractions.offset, 23)
+            interactionCallData.length := dataLength
+
+            remainingEncodedInteractions.offset := add(
+                encodedInteractions.offset,
+                encodedInteractionSize
+            )
+            remainingEncodedInteractions.length := sub(
+                encodedInteractions.length,
+                encodedInteractionSize
+            )
+        }
+
+        // Solidity takes care of copying the calldata slice into memory.
+        interaction.callData = interactionCallData;
     }
 
     /// @dev Extracts specific order information from the standardized unique
