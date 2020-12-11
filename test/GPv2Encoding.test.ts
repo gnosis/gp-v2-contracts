@@ -487,6 +487,12 @@ describe("GPv2Encoding", () => {
           numInteractions,
         );
 
+        // Note: this call does not revert with "GPv2: invalid interaction", as
+        // it would appear intuitive, but with "invalid opcode". This is because
+        // of how `decodeInteractionsTest` works: since there is some calldata
+        // left, it tries to parse it as another interaction. But the array used
+        // to store the decoded interactions has size 1, so the function is
+        // accessing an out-of-bound element.
         await expect(decoding).to.be.reverted;
       });
     });
