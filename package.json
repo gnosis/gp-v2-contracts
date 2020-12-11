@@ -48,12 +48,12 @@
     "yargs": "^16.2.0"
   },
   "main": "lib/ts/index.js",
+  "types": "lib/ts/index.d.ts",
   "files": [
-    "/bench",
     "/build",
     "/deployments",
-    "/lib",
+    "/lib/src",
+    "/network.json",
     "/src"
-  ],
-  "types": "lib/ts/index.d.ts"
+  ]
 }

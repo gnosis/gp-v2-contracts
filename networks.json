@@ -1,0 +1,20 @@
+{
+  "GPv2AllowListAuthentication": {
+    "4": {
+      "address": "0x8D8C520c2073f7F4684A6c0c36FE05821173b972",
+      "transactionHash": "0xc22b40872f4cc483aa61e830c30429b995712c0a11a6416773c17a4d78a8f73f"
+    }
+  },
+  "GPv2Settlement": {
+    "4": {
+      "address": "0x91D6387ffbB74621625F39200d91a50386C9Ab15",
+      "transactionHash": "0xd39a37b72a0ba3f6e7d05575f98494d54b5b81700366b0cfdbb9215fc218c994"
+    }
+  },
+  "GPv2AllowanceManager": {
+    "4": {
+      "address": "0x90c25afb622BBf85a7b7d48820B554b4A13bc31F",
+      "transactionHash": "0xd39a37b72a0ba3f6e7d05575f98494d54b5b81700366b0cfdbb9215fc218c994"
+    }
+  }
+}
