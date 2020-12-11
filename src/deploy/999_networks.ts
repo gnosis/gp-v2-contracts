@@ -1,7 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 
-import { Deployment, DeployFunction } from "hardhat-deploy/types";
+import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 const NETWORKS_PATH = path.join(__dirname, "../../networks.json");
@@ -13,7 +13,6 @@ type Network = Record<number, DeploymentRecord>;
 interface DeploymentRecord {
   address: string;
   transactionHash?: string;
-  deploymentArguments?: unknown[];
 }
 
 const updateNetworks: DeployFunction = async function ({
@@ -41,14 +40,14 @@ const updateNetworks: DeployFunction = async function ({
     });
   };
 
-  for (const [name, deployment] of Object.entries(await deployments.all())) {
-    const { address, transactionHash, args } = deployment;
+  for (const [name, { address, transactionHash }] of Object.entries(
+    await deployments.all(),
+  )) {
     const record = initializeRecord(name, address);
 
-    // NOTE: Preserve transaction hash and arguments in case there is no new
-    // deployment because the contract bytecode did not change.
+    // NOTE: Preserve transaction hash in case there is no new deployment
+    // because the contract bytecode did not change.
     record.transactionHash = transactionHash || record.transactionHash;
-    record.deploymentArguments = args || record.deploymentArguments;
   }
 
   const settlement = await ethers.getContractAt(
