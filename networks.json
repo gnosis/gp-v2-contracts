@@ -13,7 +13,8 @@
   },
   "GPv2AllowanceManager": {
     "4": {
-      "address": "0x90c25afb622BBf85a7b7d48820B554b4A13bc31F"
+      "address": "0x90c25afb622BBf85a7b7d48820B554b4A13bc31F",
+      "transactionHash": "0xd39a37b72a0ba3f6e7d05575f98494d54b5b81700366b0cfdbb9215fc218c994"
     }
   }
 }
