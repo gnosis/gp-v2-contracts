@@ -15,13 +15,22 @@ export type AbiOrder = [
   boolean,
 ];
 
-export type AbiTrade = [AbiOrder, number, number, BigNumber, string, string];
+export type AbiTrade = [
+  AbiOrder,
+  number,
+  number,
+  BigNumber,
+  number,
+  string,
+  string,
+];
 
 export interface Trade {
   order: Order;
   sellTokenIndex: number;
   buyTokenIndex: number;
   executedAmount: BigNumber;
+  feeDiscount: number;
   owner: string;
   orderUid: string;
 }
@@ -42,8 +51,9 @@ export function decodeTrade(trade: AbiTrade): Trade {
     sellTokenIndex: trade[1],
     buyTokenIndex: trade[2],
     executedAmount: trade[3],
-    owner: trade[4],
-    orderUid: trade[5],
+    feeDiscount: trade[4],
+    owner: trade[5],
+    orderUid: trade[6],
   };
 }
 

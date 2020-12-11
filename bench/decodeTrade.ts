@@ -1,6 +1,11 @@
 import { ethers } from "hardhat";
 
-import { SettlementEncoder, SigningScheme, OrderKind } from "../src/ts";
+import {
+  SettlementEncoder,
+  SigningScheme,
+  OrderKind,
+  isTypedDataSigner,
+} from "../src/ts";
 
 const ORDER_COUNTS = [1, 5, 10, 25, 50, 100];
 
@@ -29,11 +34,11 @@ async function main() {
           kind: OrderKind.SELL,
           partiallyFillable: false,
         },
-        ethers.utils.parseEther("42"),
         trader,
-        trader._signTypedData
+        isTypedDataSigner(trader)
           ? SigningScheme.TYPED_DATA
           : SigningScheme.MESSAGE,
+        { executedAmount: ethers.utils.parseEther("42") },
       );
     }
 

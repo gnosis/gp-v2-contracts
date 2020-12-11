@@ -14,10 +14,6 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
 
     }
 
-    function domainSeparatorTest() external view returns (bytes32) {
-        return domainSeparator;
-    }
-
     function computeTradeExecutionsTest(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
