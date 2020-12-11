@@ -38,7 +38,7 @@ contract GPv2Settlement {
     /// separator is computed following the EIP-712 standard and has replay
     /// protection mixed in so that signed orders are only valid for specific
     /// GPv2 contracts.
-    bytes32 internal immutable domainSeparator;
+    bytes32 public immutable domainSeparator;
 
     /// @dev The authenticator is used to determine who can call the settle function.
     /// That is, only authorised solvers have the ability to invoke settlements.

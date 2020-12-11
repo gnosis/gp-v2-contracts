@@ -54,7 +54,7 @@ describe("GPv2Settlement", () => {
 
   describe("domainSeparator", () => {
     it("should have an EIP-712 domain separator", async () => {
-      expect(await settlement.domainSeparatorTest()).to.equal(
+      expect(await settlement.domainSeparator()).to.equal(
         ethers.utils._TypedDataEncoder.hashDomain(testDomain),
       );
     });
@@ -66,8 +66,8 @@ describe("GPv2Settlement", () => {
       );
       const settlement2 = await GPv2Settlement.deploy(authenticator.address);
 
-      expect(await settlement.domainSeparatorTest()).to.not.equal(
-        await settlement2.domainSeparatorTest(),
+      expect(await settlement.domainSeparator()).to.not.equal(
+        await settlement2.domainSeparator(),
       );
     });
   });
