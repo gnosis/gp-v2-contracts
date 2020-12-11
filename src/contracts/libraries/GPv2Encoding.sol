@@ -22,9 +22,9 @@ library GPv2Encoding {
 
     /// @dev The marker value for a sell order for computing the order struct
     /// hash. This allows the EIP-712 compatible wallets to display a
-    /// descriptive string for the order kind (intead of 0 or 1) and is.
+    /// descriptive string for the order kind (instead of 0 or 1).
     ///
-    /// This valud is pre-computed from the following expression:
+    /// This value is pre-computed from the following expression:
     /// ```
     /// keccak256("sell")
     /// ```
