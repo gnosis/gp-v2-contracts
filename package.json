@@ -47,8 +47,8 @@
     "typescript": "^4.1.2",
     "yargs": "^16.2.0"
   },
-  "main": "lib/ts/index.js",
-  "types": "lib/ts/index.d.ts",
+  "main": "lib/src/ts/index.js",
+  "types": "lib/src/ts/index.d.ts",
   "files": [
     "/build",
     "/deployments",
