@@ -20,6 +20,7 @@ export function domain(
 }
 
 export * from "./order";
+export * from "./interaction";
 export * from "./settlement";
 export * from "./reader";
 export * from "./deploy";

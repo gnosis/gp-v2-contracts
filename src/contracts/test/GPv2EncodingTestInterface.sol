@@ -73,6 +73,31 @@ contract GPv2EncodingTestInterface {
         gas_ = gas_ - gasleft();
     }
 
+    function decodeInteractionsTest(
+        bytes calldata encodedInteractions,
+        uint256 expectedInteractionCount
+    ) external pure returns (GPv2Encoding.Interaction[] memory interactions) {
+        interactions = new GPv2Encoding.Interaction[](expectedInteractionCount);
+
+        uint256 interactionCount = 0;
+        bytes calldata remainingInteractions = encodedInteractions;
+        while (remainingInteractions.length != 0) {
+            remainingInteractions = remainingInteractions.decodeInteraction(
+                interactions[interactionCount]
+            );
+            interactionCount += 1;
+        }
+
+        // Note: expectedInteractionCount is only used to preallocate the memory
+        // needed to store all interactions in advance. It is not needed in the
+        // the settlement contract since an interaction does not need to be
+        // stored in memory after its execution.
+        require(
+            interactionCount == expectedInteractionCount,
+            "bad interaction count"
+        );
+    }
+
     function extractOrderUidParamsTest(bytes calldata orderUid)
         external
         pure
