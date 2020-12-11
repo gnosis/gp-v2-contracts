@@ -8,8 +8,9 @@ import {
   OrderKind,
   SettlementEncoder,
   SigningScheme,
-  domain,
+  TradeExecution,
   computeOrderUid,
+  domain,
   hashOrder,
 } from "../src/ts";
 
@@ -203,9 +204,9 @@ describe("GPv2Settlement", () => {
             kind: OrderKind.BUY,
             partiallyFillable: true,
           },
-          ethers.utils.parseEther("0.7734"),
           traders[0],
           SigningScheme.TYPED_DATA,
+          { executedAmount: ethers.utils.parseEther("0.7734") },
         );
       }
 
@@ -229,7 +230,6 @@ describe("GPv2Settlement", () => {
           kind: OrderKind.SELL,
           partiallyFillable: false,
         },
-        0,
         traders[0],
         SigningScheme.TYPED_DATA,
       );
@@ -258,7 +258,6 @@ describe("GPv2Settlement", () => {
           kind: OrderKind.SELL,
           partiallyFillable: false,
         },
-        0,
         traders[0],
         SigningScheme.TYPED_DATA,
       );
@@ -286,7 +285,6 @@ describe("GPv2Settlement", () => {
           kind: OrderKind.SELL,
           partiallyFillable: false,
         },
-        0,
         traders[0],
         SigningScheme.TYPED_DATA,
       );
@@ -322,9 +320,9 @@ describe("GPv2Settlement", () => {
             kind,
             partiallyFillable,
           },
-          executedAmount,
           traders[0],
           SigningScheme.TYPED_DATA,
+          { executedAmount },
         );
 
         const [
@@ -470,7 +468,7 @@ describe("GPv2Settlement", () => {
       const { [sellToken]: sellPrice, [buyToken]: buyPrice } = prices;
       const computeExecutedTradeForOrderVariant = async (
         { kind, partiallyFillable }: OrderFlags,
-        executedAmount?: BigNumber,
+        tradeExecution?: Partial<TradeExecution>,
       ) => {
         const encoder = new SettlementEncoder(testDomain);
         await encoder.signEncodeTrade(
@@ -480,9 +478,9 @@ describe("GPv2Settlement", () => {
             kind,
             partiallyFillable,
           },
-          executedAmount || 0,
           traders[0],
           SigningScheme.TYPED_DATA,
+          tradeExecution,
         );
 
         const [trade] = decodeExecutedTrades(
@@ -523,7 +521,7 @@ describe("GPv2Settlement", () => {
 
         const trade = await computeExecutedTradeForOrderVariant(
           { kind: OrderKind.SELL, partiallyFillable: true },
-          executedSellAmount,
+          { executedAmount: executedSellAmount },
         );
 
         expect(trade.sellAmount).to.deep.equal(
@@ -537,7 +535,7 @@ describe("GPv2Settlement", () => {
 
         const trade = await computeExecutedTradeForOrderVariant(
           { kind: OrderKind.BUY, partiallyFillable: true },
-          executedBuyAmount,
+          { executedAmount: executedBuyAmount },
         );
 
         const executedSellAmount = executedBuyAmount
@@ -547,13 +545,28 @@ describe("GPv2Settlement", () => {
           executedSellAmount.add(executedFee),
         );
       });
+
+      it("should apply the fee discount to the executed fees", async () => {
+        const trade = await computeExecutedTradeForOrderVariant(
+          {
+            kind: OrderKind.SELL,
+            partiallyFillable: false,
+          },
+          { feeDiscount: 100 }, // 1% discount.
+        );
+
+        const executedFeeAmount = feeAmount.mul(99).div(100);
+        expect(trade.sellAmount).to.deep.equal(
+          sellAmount.add(executedFeeAmount),
+        );
+      });
     });
 
     describe("Order Filled Amounts", () => {
       const { sellAmount, buyAmount } = partialOrder;
       const readOrderFilledAmountAfterProcessing = async (
         { kind, partiallyFillable }: OrderFlags,
-        executedAmount?: BigNumber,
+        tradeExecution?: Partial<TradeExecution>,
       ) => {
         const order = {
           ...partialOrder,
@@ -563,9 +576,9 @@ describe("GPv2Settlement", () => {
         const encoder = new SettlementEncoder(testDomain);
         await encoder.signEncodeTrade(
           order,
-          executedAmount || 0,
           traders[0],
           SigningScheme.TYPED_DATA,
+          tradeExecution,
         );
 
         await settlement.computeTradeExecutionsTest(
@@ -606,7 +619,7 @@ describe("GPv2Settlement", () => {
         const executedSellAmount = sellAmount.div(3);
         const filledAmount = await readOrderFilledAmountAfterProcessing(
           { kind: OrderKind.SELL, partiallyFillable: true },
-          executedSellAmount,
+          { executedAmount: executedSellAmount },
         );
 
         expect(filledAmount).to.deep.equal(executedSellAmount);
@@ -616,7 +629,7 @@ describe("GPv2Settlement", () => {
         const executedBuyAmount = buyAmount.div(4);
         const filledAmount = await readOrderFilledAmountAfterProcessing(
           { kind: OrderKind.BUY, partiallyFillable: true },
-          executedBuyAmount,
+          { executedAmount: executedBuyAmount },
         );
 
         expect(filledAmount).to.deep.equal(executedBuyAmount);
@@ -633,15 +646,14 @@ describe("GPv2Settlement", () => {
       const encoder = new SettlementEncoder(testDomain);
       await encoder.signEncodeTrade(
         { ...order, appData: 0 },
-        0,
         traders[0],
         SigningScheme.TYPED_DATA,
       );
       await encoder.signEncodeTrade(
         { ...order, appData: 1 },
-        ethers.utils.parseEther("1.0"),
         traders[0],
         SigningScheme.TYPED_DATA,
+        { executedAmount: ethers.utils.parseEther("1.0") },
       );
 
       const trades = decodeExecutedTrades(
@@ -655,6 +667,28 @@ describe("GPv2Settlement", () => {
       expect(trades[0]).to.deep.equal(trades[1]);
     });
 
+    it("should revert on invalid fee discount values", async () => {
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
+        {
+          ...partialOrder,
+          kind: OrderKind.BUY,
+          partiallyFillable: false,
+        },
+        traders[0],
+        SigningScheme.TYPED_DATA,
+        { feeDiscount: 10001 },
+      );
+
+      await expect(
+        settlement.computeTradeExecutionsTest(
+          encoder.tokens,
+          encoder.clearingPrices(prices),
+          encoder.encodedTrades,
+        ),
+      ).to.be.revertedWith("invalid fee discount");
+    });
+
     it("should emit a trade event", async () => {
       const order = {
         ...partialOrder,
@@ -665,7 +699,6 @@ describe("GPv2Settlement", () => {
       const encoder = new SettlementEncoder(testDomain);
       await encoder.signEncodeTrade(
         order,
-        0,
         traders[0],
         SigningScheme.TYPED_DATA,
       );

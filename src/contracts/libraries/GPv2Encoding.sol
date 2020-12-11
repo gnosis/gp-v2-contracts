@@ -51,12 +51,13 @@ library GPv2Encoding {
         uint8 sellTokenIndex;
         uint8 buyTokenIndex;
         uint256 executedAmount;
+        uint16 feeDiscount;
         address owner;
         bytes orderUid;
     }
 
     /// @dev The stride of an encoded trade.
-    uint256 private constant TRADE_STRIDE = 204;
+    uint256 private constant TRADE_STRIDE = 206;
 
     /// @dev The byte length of an order unique identifier.
     uint256 private constant ORDER_UID_LENGTH = 56;
@@ -128,6 +129,7 @@ library GPv2Encoding {
     ///     uint256 feeAmount;
     ///     uint8 flags;
     ///     uint256 executedAmount;
+    ///     uint16 feeDiscount;
     ///     Signature {
     ///         uint8 v;
     ///         bytes32 r;
@@ -210,12 +212,17 @@ library GPv2Encoding {
             flags := shr(248, calldataload(add(encodedTrade.offset, 106)))
             // trade.executedAmount = uint256(encodedTrade[107:139])
             mstore(add(trade, 96), calldataload(add(encodedTrade.offset, 107)))
-            // v = uint8(encodedTrade[139])
-            v := shr(248, calldataload(add(encodedTrade.offset, 139)))
-            // r = uint256(encodedTrade[140:172])
-            r := calldataload(add(encodedTrade.offset, 140))
-            // s = uint256(encodedTrade[172:204])
-            s := calldataload(add(encodedTrade.offset, 172))
+            // trade.feeDiscount = uint256(encodedTrade[139:141])
+            mstore(
+                add(trade, 128),
+                shr(240, calldataload(add(encodedTrade.offset, 139)))
+            )
+            // v = uint8(encodedTrade[141])
+            v := shr(248, calldataload(add(encodedTrade.offset, 141)))
+            // r = uint256(encodedTrade[142:174])
+            r := calldataload(add(encodedTrade.offset, 142))
+            // s = uint256(encodedTrade[174:206])
+            s := calldataload(add(encodedTrade.offset, 174))
         }
 
         trade.order.sellToken = tokens[sellTokenIndex];
@@ -317,7 +324,7 @@ library GPv2Encoding {
         // solhint-disable-next-line no-inline-assembly
         assembly {
             // orderUid = trade.orderUid.dataOffset
-            let orderUid := add(mload(add(trade, 160)), 32)
+            let orderUid := add(mload(add(trade, 192)), 32)
             mstore(add(orderUid, 24), validTo)
             mstore(add(orderUid, 20), owner)
             mstore(orderUid, orderDigest)
