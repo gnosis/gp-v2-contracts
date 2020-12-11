@@ -1,9 +1,9 @@
 import { ethers } from "hardhat";
 
 import {
+  OrderKind,
   SettlementEncoder,
   SigningScheme,
-  OrderKind,
   isTypedDataSigner,
 } from "../src/ts";
 

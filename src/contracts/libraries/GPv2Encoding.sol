@@ -16,12 +16,30 @@ library GPv2Encoding {
         uint32 validTo;
         uint32 appData;
         uint256 feeAmount;
-        OrderKind kind;
+        bytes32 kind;
         bool partiallyFillable;
     }
 
-    /// @dev An enum describing an order kind, either a buy or a sell order.
-    enum OrderKind {Sell, Buy}
+    /// @dev The marker value for a sell order for computing the order struct
+    /// hash. This allows the EIP-712 compatible wallets to display a
+    /// descriptive string for the order kind (instead of 0 or 1).
+    ///
+    /// This value is pre-computed from the following expression:
+    /// ```
+    /// keccak256("sell")
+    /// ```
+    bytes32 internal constant ORDER_KIND_SELL =
+        hex"f3b277728b3fee749481eb3e0b3b48980dbbab78658fc419025cb16eee346775";
+
+    /// @dev The OrderKind marker value for a buy order for computing the order
+    /// struct hash.
+    ///
+    /// This value is pre-computed from the following expression:
+    /// ```
+    /// keccak256("buy")
+    /// ```
+    bytes32 internal constant ORDER_KIND_BUY =
+        hex"6ed88e868af0a1983e3886d5f3e95a2fafbd6c3450bc229e27342283dc429ccc";
 
     /// @dev The order EIP-712 type hash for the [`Order`] struct.
     ///
@@ -36,13 +54,13 @@ library GPv2Encoding {
     ///         "uint32 validTo," +
     ///         "uint32 appData," +
     ///         "uint256 feeAmount," +
-    ///         "uint8 kind," +
+    ///         "string kind," +
     ///         "bool partiallyFillable" +
     ///     ")"
-    /// );
+    /// )
     /// ```
     bytes32 internal constant ORDER_TYPE_HASH =
-        hex"b71968fcf5e55b9c3370f2809d4078a4695be79dfa43e5aa1f2baa0a9b84f186";
+        hex"b2b38b9dcbdeb41f7ad71dea9aed79fb47f7bbc3436576fe994b43d5b16ecdec";
 
     /// @dev A struct representing a trade to be executed as part a batch
     /// settlement.
@@ -229,7 +247,11 @@ library GPv2Encoding {
         trade.order.sellToken = tokens[sellTokenIndex];
         trade.order.buyToken = tokens[buyTokenIndex];
         trade.order.validTo = validTo;
-        trade.order.kind = OrderKind(flags & 0x01);
+        if (flags & 0x01 == 0) {
+            trade.order.kind = ORDER_KIND_SELL;
+        } else {
+            trade.order.kind = ORDER_KIND_BUY;
+        }
         trade.order.partiallyFillable = flags & 0x02 != 0;
 
         trade.sellTokenIndex = sellTokenIndex;
