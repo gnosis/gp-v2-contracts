@@ -34,7 +34,7 @@ library GPv2Encoding {
     /// @dev The OrderKind marker value for a sell order for computing the order
     /// struct hash.
     ///
-    /// This valud is pre-computed from the following expression:
+    /// This value is pre-computed from the following expression:
     /// ```
     /// keccak256("buy")
     /// ```
