@@ -37,6 +37,6 @@ These files should be committed to this repository.
 In order to verify the contract in Etherscan, run:
 
 ```
-MY_ETHERSCAN_API_KEY="your key"
+ETHERSCAN_API_KEY="your key"
 npx hardhat verify --network $NETWORK DEPLOYED_CONTRACT_ADDRESS "Constructor argument 1"
 ```
