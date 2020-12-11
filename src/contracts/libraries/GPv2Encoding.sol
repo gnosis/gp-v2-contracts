@@ -31,7 +31,7 @@ library GPv2Encoding {
     bytes32 internal constant ORDER_KIND_SELL =
         hex"f3b277728b3fee749481eb3e0b3b48980dbbab78658fc419025cb16eee346775";
 
-    /// @dev The OrderKind marker value for a sell order for computing the order
+    /// @dev The OrderKind marker value for a buy order for computing the order
     /// struct hash.
     ///
     /// This value is pre-computed from the following expression:
