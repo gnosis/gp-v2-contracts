@@ -1,6 +1,6 @@
 import IERC20 from "@openzeppelin/contracts/build/contracts/IERC20.json";
 import { expect } from "chai";
-import { BigNumber, Contract, Event, TypedDataDomain } from "ethers";
+import { BigNumber, Contract, Event } from "ethers";
 import { artifacts, ethers, waffle } from "hardhat";
 
 import {
@@ -9,6 +9,7 @@ import {
   SettlementEncoder,
   SigningScheme,
   TradeExecution,
+  TypedDataDomain,
   computeOrderUid,
   domain,
   hashOrder,

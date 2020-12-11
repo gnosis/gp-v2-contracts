@@ -1,4 +1,6 @@
-import { ethers, BigNumberish, Signer, TypedDataDomain } from "ethers";
+import { ethers, BigNumberish, Signer } from "ethers";
+
+import { TypedDataDomain, isTypedDataSigner } from "./types/ethers";
 
 /**
  * Gnosis Protocol v2 order data.
@@ -164,7 +166,7 @@ export function signOrder(
 ): Promise<string> {
   switch (scheme) {
     case SigningScheme.TYPED_DATA:
-      if (!owner._signTypedData) {
+      if (!isTypedDataSigner(owner)) {
         throw new Error("signer does not support signing typed data");
       }
       return owner._signTypedData(
