@@ -1,6 +1,11 @@
 import { ethers } from "hardhat";
 
-import { SettlementEncoder, SigningScheme, isTypedDataSigner } from "../src/ts";
+import {
+  OrderKind,
+  SettlementEncoder,
+  SigningScheme,
+  isTypedDataSigner,
+} from "../src/ts";
 
 const ORDER_COUNTS = [1, 5, 10, 25, 50, 100];
 
@@ -26,7 +31,7 @@ async function main() {
           validTo: 0xffffffff,
           appData: i,
           feeAmount: ethers.constants.WeiPerEther,
-          kind: "sell",
+          kind: OrderKind.SELL,
           partiallyFillable: false,
         },
         trader,

@@ -4,7 +4,7 @@ import { ethers, waffle } from "hardhat";
 
 import {
   ORDER_TYPE_HASH,
-  OrderKinds,
+  OrderKind,
   SettlementEncoder,
   SigningScheme,
   computeOrderUid,
@@ -40,7 +40,7 @@ describe("GPv2Encoding", () => {
     validTo: 0xffffffff,
     appData: 0,
     feeAmount: ethers.utils.parseEther("1.0"),
-    kind: OrderKinds.SELL,
+    kind: OrderKind.SELL,
     partiallyFillable: false,
   };
 
@@ -114,7 +114,7 @@ describe("GPv2Encoding", () => {
         validTo: fillUint(32, 0x05).toNumber(),
         appData: fillUint(32, 0x06).toNumber(),
         feeAmount: fillUint(256, 0x07),
-        kind: OrderKinds.BUY,
+        kind: OrderKind.BUY,
         partiallyFillable: true,
       };
       const tradeExecution = {

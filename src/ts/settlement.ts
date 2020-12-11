@@ -3,6 +3,7 @@ import { BigNumberish, Signer, ethers } from "ethers";
 import {
   Order,
   OrderFlags,
+  OrderKind,
   SigningScheme,
   signOrder,
   timestamp,
@@ -38,10 +39,10 @@ import { Interaction } from ".";
 function encodeOrderFlags(flags: OrderFlags): number {
   let kind;
   switch (flags.kind) {
-    case "sell":
+    case OrderKind.SELL:
       kind = 0;
       break;
-    case "buy":
+    case OrderKind.BUY:
       kind = 1;
       break;
     default:

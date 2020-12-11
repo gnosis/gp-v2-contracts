@@ -69,15 +69,16 @@ export type Timestamp = number | Date;
 /**
  * Order kind.
  */
-export type OrderKind = "sell" | "buy";
-
-/**
- * All possible order kinds.
- */
-export const OrderKinds = {
-  SELL: "sell",
-  BUY: "buy",
-} as const;
+export enum OrderKind {
+  /**
+   * A sell order.
+   */
+  SELL = "sell",
+  /**
+   * A buy order.
+   */
+  BUY = "buy",
+}
 
 /**
  * The EIP-712 type fields definition for a Gnosis Protocol v2 order.
