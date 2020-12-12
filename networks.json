@@ -7,14 +7,14 @@
   },
   "GPv2Settlement": {
     "4": {
-      "address": "0x91D6387ffbB74621625F39200d91a50386C9Ab15",
-      "transactionHash": "0xd39a37b72a0ba3f6e7d05575f98494d54b5b81700366b0cfdbb9215fc218c994"
+      "address": "0x58BC5137849d22cD586601adf1f3454FdF2fd0e2",
+      "transactionHash": "0xcf3e366336799ca5484bd285237704db42789bc9bd89d95ca1efeb930b4587a0"
     }
   },
   "GPv2AllowanceManager": {
     "4": {
-      "address": "0x90c25afb622BBf85a7b7d48820B554b4A13bc31F",
-      "transactionHash": "0xd39a37b72a0ba3f6e7d05575f98494d54b5b81700366b0cfdbb9215fc218c994"
+      "address": "0x31658E2405Ea55446Ec2271AAD661E706DEeFB33",
+      "transactionHash": "0xcf3e366336799ca5484bd285237704db42789bc9bd89d95ca1efeb930b4587a0"
     }
   }
 }
