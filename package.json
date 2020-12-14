@@ -56,5 +56,8 @@
     "/lib/src",
     "/network.json",
     "/src"
-  ]
+  ],
+  "dependencies": {
+    "hardhat-gas-reporter": "^1.0.3"
+  }
 }

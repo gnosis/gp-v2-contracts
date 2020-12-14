@@ -4,6 +4,7 @@ import "hardhat-deploy";
 import dotenv from "dotenv";
 import type { HttpNetworkUserConfig } from "hardhat/types";
 import yargs from "yargs";
+import "hardhat-gas-reporter";
 
 const argv = yargs
   .option("network", {
@@ -75,5 +76,10 @@ export default {
       default: "0x" + "1".padStart(40, "0"),
       hardhat: 1,
     },
+  },
+  gasReporter: {
+    enabled: process.env.REPORT_GAS ? true : false,
+    currency: "USD",
+    gasPrice: 21,
   },
 };
