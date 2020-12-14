@@ -1,5 +1,6 @@
 import { BigNumberish, Signer, ethers } from "ethers";
 
+import { Interaction } from "./interaction";
 import {
   Order,
   OrderFlags,
@@ -33,8 +34,6 @@ export interface TradeExecution {
    */
   feeDiscount: number;
 }
-
-import { Interaction } from ".";
 
 function encodeOrderFlags(flags: OrderFlags): number {
   let kind;

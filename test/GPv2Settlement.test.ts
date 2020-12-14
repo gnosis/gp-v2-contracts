@@ -743,6 +743,82 @@ describe("GPv2Settlement", () => {
     });
   });
 
+  describe("executeInteractions", () => {
+    it("executes valid interactions", async () => {
+      const EventEmitter = await ethers.getContractFactory("EventEmitter");
+      const contract1 = await EventEmitter.deploy();
+      const contract2 = await EventEmitter.deploy();
+      const contract3 = await EventEmitter.deploy();
+      expect(contract1.address)
+        .not.to.equal(contract2.address)
+        .not.to.equal(contract3.address);
+      expect(contract2.address).not.to.equal(contract3.address);
+
+      const encoder = new SettlementEncoder(testDomain);
+      encoder.encodeInteraction({
+        target: contract1.address,
+        callData: contract1.interface.encodeFunctionData("emitEvent", [1]),
+      });
+      encoder.encodeInteraction({
+        target: contract2.address,
+        callData: contract2.interface.encodeFunctionData("emitEvent", [2]),
+      });
+      encoder.encodeInteraction({
+        target: contract3.address,
+        callData: contract3.interface.encodeFunctionData("emitEvent", [3]),
+      });
+
+      const settled = settlement.executeInteractionsTest(
+        encoder.encodedInteractions,
+      );
+      const events = (await (await settled).wait()).events;
+
+      // Note: all contracts were touched.
+      await expect(settled).to.emit(contract1, "Event");
+      await expect(settled).to.emit(contract2, "Event");
+      await expect(settled).to.emit(contract3, "Event");
+
+      const uint256ToBytes32 = (n: number) =>
+        ethers.utils.solidityPack(["uint256"], [n]);
+      // Note: the execution order was respected.
+      expect(events[0].data).to.equal(uint256ToBytes32(1));
+      expect(events[1].data).to.equal(uint256ToBytes32(2));
+      expect(events[2].data).to.equal(uint256ToBytes32(3));
+
+      // Note: no extra calls.
+      expect(events.length).to.equal(3);
+    });
+
+    it("reverts if any of the interactions reverts", async () => {
+      const mockPass = await waffle.deployMockContract(deployer, [
+        "function alwaysPasses()",
+      ]);
+      await mockPass.mock.alwaysPasses.returns();
+      const mockRevert = await waffle.deployMockContract(deployer, [
+        "function alwaysReverts()",
+      ]);
+      await mockRevert.mock.alwaysReverts.revertsWithReason("test error");
+
+      const encoder = new SettlementEncoder(testDomain);
+      encoder.encodeInteraction({
+        target: mockPass.address,
+        callData: mockPass.interface.encodeFunctionData("alwaysPasses"),
+      });
+      encoder.encodeInteraction({
+        target: mockRevert.address,
+        callData: mockRevert.interface.encodeFunctionData("alwaysReverts"),
+      });
+
+      // TODO - update this error with concatenated version "GPv2 Interaction:
+      // test error"
+      await expect(
+        settlement.callStatic.executeInteractionsTest(
+          encoder.encodedInteractions,
+        ),
+      ).to.be.revertedWith("test error");
+    });
+  });
+
   describe("executeInteraction", () => {
     it("should fail when target is allowanceManager", async () => {
       const invalidInteraction: Interaction = {
@@ -762,7 +838,6 @@ describe("GPv2Settlement", () => {
       await reverter.mock.alwaysReverts.revertsWithReason("test error");
       const revertingCallData = reverter.interface.encodeFunctionData(
         "alwaysReverts",
-        [],
       );
       const failingInteraction: Interaction = {
         target: reverter.address,
