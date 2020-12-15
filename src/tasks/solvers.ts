@@ -5,12 +5,6 @@ import { Contract, Signer } from "ethers";
 import { subtask, task } from "hardhat/config";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
-import {
-  deterministicDeploymentAddress,
-  CONTRACT_NAMES,
-  getArtifacts,
-} from "../ts/deploy";
-
 const solversTaskList = ["add", "check", "remove"] as const;
 type SolversTasks = typeof solversTaskList[number];
 
@@ -32,17 +26,15 @@ async function getOwnerSigner({
 
 async function getAuthenticator({
   ethers,
-  getNamedAccounts,
+  deployments,
 }: HardhatRuntimeEnvironment): Promise<Contract> {
-  const { owner } = await getNamedAccounts();
-  const authenticatorAddress = deterministicDeploymentAddress(
-    CONTRACT_NAMES.authenticator,
-    owner,
+  const authenticatorDeployment = await deployments.get(
+    "GPv2AllowListAuthentication",
   );
 
   const authenticator = new Contract(
-    authenticatorAddress,
-    getArtifacts(CONTRACT_NAMES.authenticator).abi,
+    authenticatorDeployment.address,
+    authenticatorDeployment.abi,
   ).connect(ethers.provider);
 
   return authenticator;
