@@ -5,6 +5,8 @@ import dotenv from "dotenv";
 import type { HttpNetworkUserConfig } from "hardhat/types";
 import yargs from "yargs";
 
+import { setupSolversTask } from "./src/tasks/solvers";
+
 const argv = yargs
   .option("network", {
     type: "string",
@@ -34,6 +36,8 @@ if (["rinkeby", "mainnet"].includes(argv.network) && INFURA_KEY === undefined) {
     `Could not find Infura key in env, unable to connect to network ${argv.network}`,
   );
 }
+
+setupSolversTask();
 
 export default {
   paths: {
@@ -72,7 +76,7 @@ export default {
     owner: {
       // The contract deployment addresses depend on the owner address.
       // To have the same addresses on all networks, the owner must be the same.
-      default: "0x" + "1".padStart(40, "0"),
+      default: "0x6Fb5916c0f57f88004d5b5EB25f6f4D77353a1eD",
       hardhat: 1,
     },
   },

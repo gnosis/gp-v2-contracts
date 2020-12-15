@@ -1,20 +1,20 @@
 {
   "GPv2AllowListAuthentication": {
     "4": {
-      "address": "0x1FD0E31C81e71563C56366946367c5A198753FDF",
-      "transactionHash": "0x23d3a6e2ef6972d20f184dd5896cb8023e61724f902622eb893f437bb2b5d126"
+      "address": "0x60027a9c1EF06EE9890f086B05A4ACc6cd041D62",
+      "transactionHash": "0x42859862cf1ace9085954a5514950d98c0c103949903e631cc3c82a9c07fafe0"
     }
   },
   "GPv2Settlement": {
     "4": {
-      "address": "0x2344e1ee1212C756bAF39547e59118c44f4D7F70",
-      "transactionHash": "0x6e28faf2987f14fe795994cddefa2985020b76c28c2e9f787cea4b6bbc78a1d8"
+      "address": "0x4E608b7Da83f8E9213F554BDAA77C72e125529d0",
+      "transactionHash": "0xd1030e85508042a6762598935751d38c4acd537401e2f2980c8fba5261022691"
     }
   },
   "GPv2AllowanceManager": {
     "4": {
-      "address": "0x7d46Fc5183ce7daAC5Ad9cEC8a042a93875b9F79",
-      "transactionHash": "0x6e28faf2987f14fe795994cddefa2985020b76c28c2e9f787cea4b6bbc78a1d8"
+      "address": "0x7B0F8dEE044af57eb9D57Fb16A8738cd84aB1f9E",
+      "transactionHash": "0xd1030e85508042a6762598935751d38c4acd537401e2f2980c8fba5261022691"
     }
   }
 }
