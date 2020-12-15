@@ -3,7 +3,7 @@
   "version": "0.0.1-alpha.5",
   "license": "LGPL-3.0-or-later",
   "scripts": {
-    "build": "tsc && hardhat compile",
+    "build": "hardhat compile && tsc",
     "deploy": "hardhat deploy",
     "test": "hardhat test",
     "bench:decodeTrade": "hardhat run bench/decodeTrade.ts",
