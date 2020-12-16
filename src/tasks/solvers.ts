@@ -123,16 +123,17 @@ const setupSolversTask: () => void = () => {
     await removeSolver(args[0], hardhatRuntime);
   });
 
-  subtask("solvers-check", "List all allowed solvers in GPv2.").setAction(
-    async ({ args }, hardhatRuntime) => {
-      if (!args || args.length !== 1) {
-        throw new Error(
-          "Invalid number of arguments. Expected the address of the solver to be checked",
-        );
-      }
-      await isSolver(args[0], hardhatRuntime);
-    },
-  );
+  subtask(
+    "solvers-check",
+    "Checks that an address is registered as a solver in GPv2.",
+  ).setAction(async ({ args }, hardhatRuntime) => {
+    if (!args || args.length !== 1) {
+      throw new Error(
+        "Invalid number of arguments. Expected the address of the solver to be checked",
+      );
+    }
+    await isSolver(args[0], hardhatRuntime);
+  });
 };
 
 export { setupSolversTask };
