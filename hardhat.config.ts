@@ -1,10 +1,10 @@
 import "@nomiclabs/hardhat-waffle";
 import "hardhat-deploy";
+import "hardhat-gas-reporter";
 
 import dotenv from "dotenv";
 import type { HttpNetworkUserConfig } from "hardhat/types";
 import yargs from "yargs";
-import "hardhat-gas-reporter";
 
 const argv = yargs
   .option("network", {
