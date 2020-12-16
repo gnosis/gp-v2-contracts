@@ -72,7 +72,7 @@ export function deterministicDeploymentAddress<C extends ContractName>(
   );
 }
 
-export function getArtifacts(contractName: ContractName): Artifact {
+function getArtifacts(contractName: ContractName): Artifact {
   switch (contractName) {
     case CONTRACT_NAMES.settlement:
       return settlementArtifacts;
