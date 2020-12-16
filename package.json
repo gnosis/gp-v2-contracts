@@ -5,6 +5,7 @@
   "scripts": {
     "build": "hardhat compile && tsc",
     "deploy": "hardhat deploy",
+    "solvers": "hardhat solvers",
     "test": "hardhat test",
     "bench:decodeTrade": "hardhat run bench/decodeTrade.ts",
     "lint": "yarn lint:sol && yarn lint:ts",

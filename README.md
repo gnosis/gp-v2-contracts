@@ -53,3 +53,31 @@ Gas consumption can be reported using by setting the `REPORT_GAS` flag when runn
 ```sh
 REPORT_GAS=1 yarn test
 ```
+
+## Solver Authentication
+
+This repo contains scripts to manage the list of authenticated solvers in all networks the contract has been deployed.
+
+The scripts are called with:
+
+```
+yarn solvers command [arg ...]
+```
+
+Here is a list of available commands.
+The commands flagged with [*] require the private key of the authentication contract owner to be available to the script, for example by exporting it with
+`export PK=<private key>`.
+
+1. `add $ADDRESS` [*]. Adds the address to the list of registered solvers.
+2. `remove $ADDRESS` [*]. Removes the address from the list of registered
+   solvers.
+3. `check $ADDRESS`. Checks if the given address is in the list of registered
+   solvers.
+
+For example, adding the address `0x0000000000000000000000000000000000000042` to
+the solver list:
+
+```
+export PK=<private key>
+yarn solvers add 0x0000000000000000000000000000000000000042
+```

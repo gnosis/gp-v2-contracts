@@ -50,10 +50,10 @@ export type DeploymentArguments<
  * @param deploymentArguments Extra arguments that are necessary to deploy.
  * @returns The address that is expected to store the deployed code.
  */
-export async function deterministicDeploymentAddress<C extends ContractName>(
+export function deterministicDeploymentAddress<C extends ContractName>(
   contractName: C,
   ...deploymentArguments: DeploymentArguments<C>
-): Promise<string> {
+): string {
   // NOTE: Use dynamic import to load the contract artifact instead of
   // `getContract` so that we don't need to depend on `hardhat` when using this
   // project as a dependency.
