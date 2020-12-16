@@ -45,3 +45,11 @@ npx hardhat etherscan-verify --network $NETWORK
 This package additonally contains a `networks.json` file at the root with the
 address of each deployed contract as well the hash of the Ethereum transaction
 used to create the contract.
+
+## Gas Reporter
+
+Gas consumption can be reported using by setting the `REPORT_GAS` flag when running tests as
+
+```sh
+REPORT_GAS=1 yarn test
+```

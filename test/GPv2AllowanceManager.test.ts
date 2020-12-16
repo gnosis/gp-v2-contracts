@@ -45,22 +45,21 @@ describe("GPv2AllowanceManager", () => {
         .withArgs(traders[1].address, recipient.address, amount)
         .returns(true);
 
-      await expect(
-        allowanceManager.transferIn(
-          encodeInTransfers([
-            {
-              owner: traders[0].address,
-              sellToken: tokens[0].address,
-              sellAmount: amount,
-            },
-            {
-              owner: traders[1].address,
-              sellToken: tokens[1].address,
-              sellAmount: amount,
-            },
-          ]),
-        ),
-      ).to.not.be.reverted;
+      const tx = await allowanceManager.transferIn(
+        encodeInTransfers([
+          {
+            owner: traders[0].address,
+            sellToken: tokens[0].address,
+            sellAmount: amount,
+          },
+          {
+            owner: traders[1].address,
+            sellToken: tokens[1].address,
+            sellAmount: amount,
+          },
+        ]),
+      );
+      await expect(tx.wait()).to.not.be.reverted;
     });
 
     it("should revert on failed ERC20 transfers", async () => {
