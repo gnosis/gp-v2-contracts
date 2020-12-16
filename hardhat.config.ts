@@ -1,5 +1,6 @@
 import "@nomiclabs/hardhat-waffle";
 import "hardhat-deploy";
+import "hardhat-gas-reporter";
 
 import dotenv from "dotenv";
 import type { HttpNetworkUserConfig } from "hardhat/types";
@@ -17,7 +18,7 @@ const argv = yargs
 
 // Load environment variables.
 dotenv.config();
-const { INFURA_KEY, MNEMONIC, PK } = process.env;
+const { INFURA_KEY, MNEMONIC, PK, REPORT_GAS } = process.env;
 
 const DEFAULT_MNEMONIC =
   "candy maple cake sugar pudding cream honey rich smooth crumble sweet treat";
@@ -79,5 +80,10 @@ export default {
       default: "0x6Fb5916c0f57f88004d5b5EB25f6f4D77353a1eD",
       hardhat: 1,
     },
+  },
+  gasReporter: {
+    enabled: REPORT_GAS ? true : false,
+    currency: "USD",
+    gasPrice: 21,
   },
 };

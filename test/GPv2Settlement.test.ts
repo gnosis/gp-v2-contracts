@@ -139,9 +139,9 @@ describe("GPv2Settlement", () => {
     });
 
     it("accepts transactions from solvers", async () => {
-      await authenticator.connect(owner).addSolver(solver.address);
-      await expect(settlement.connect(solver).settle([], [], [], [], [])).to.not
-        .be.reverted;
+      (await authenticator.connect(owner).addSolver(solver.address)).wait();
+      const tx = await settlement.connect(solver).settle([], [], [], [], []);
+      await expect(tx.wait()).to.not.be.reverted;
     });
   });
 
@@ -155,7 +155,7 @@ describe("GPv2Settlement", () => {
         validTo,
       });
 
-      await settlement.connect(traders[0]).invalidateOrder(orderUid);
+      (await settlement.connect(traders[0]).invalidateOrder(orderUid)).wait();
       expect(await settlement.filledAmount(orderUid)).to.equal(
         ethers.constants.MaxUint256,
       );
@@ -855,10 +855,8 @@ describe("GPv2Settlement", () => {
         target: ethers.constants.AddressZero,
         callData: "0x",
       };
-
-      await expect(
-        settlement.callStatic.executeInteractionTest(passingInteraction),
-      ).to.not.be.reverted;
+      const tx = await settlement.executeInteractionTest(passingInteraction);
+      await expect(tx.wait()).to.not.be.reverted;
     });
   });
 
@@ -876,23 +874,21 @@ describe("GPv2Settlement", () => {
       await tokens[1].mock.transfer
         .withArgs(traders[1].address, amount)
         .returns(true);
-
-      await expect(
-        settlement.transferOutTest(
-          encodeOutTransfers([
-            {
-              owner: traders[0].address,
-              buyToken: tokens[0].address,
-              buyAmount: amount,
-            },
-            {
-              owner: traders[1].address,
-              buyToken: tokens[1].address,
-              buyAmount: amount,
-            },
-          ]),
-        ),
-      ).to.not.be.reverted;
+      const tx = await settlement.transferOutTest(
+        encodeOutTransfers([
+          {
+            owner: traders[0].address,
+            buyToken: tokens[0].address,
+            buyAmount: amount,
+          },
+          {
+            owner: traders[1].address,
+            buyToken: tokens[1].address,
+            buyAmount: amount,
+          },
+        ]),
+      );
+      await expect(tx.wait()).to.not.be.reverted;
     });
   });
 });
