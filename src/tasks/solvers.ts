@@ -18,7 +18,7 @@ async function getOwnerSigner({
   );
   if (signer == undefined) {
     throw new Error(
-      "No owner found among the signers. Did you export the owner's private key?",
+      'No owner found among the signers. Did you export the owner\'s private key with "export PK=<your key>"?',
     );
   }
   return signer;
