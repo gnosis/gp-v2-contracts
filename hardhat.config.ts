@@ -16,7 +16,7 @@ const argv = yargs
 
 // Load environment variables.
 dotenv.config();
-const { INFURA_KEY, MNEMONIC, PK } = process.env;
+const { INFURA_KEY, MNEMONIC, PK, REPORT_GAS } = process.env;
 
 const DEFAULT_MNEMONIC =
   "candy maple cake sugar pudding cream honey rich smooth crumble sweet treat";
@@ -78,7 +78,7 @@ export default {
     },
   },
   gasReporter: {
-    enabled: process.env.REPORT_GAS ? true : false,
+    enabled: REPORT_GAS ? true : false,
     currency: "USD",
     gasPrice: 21,
   },
