@@ -1,4 +1,8 @@
 import { utils } from "ethers";
+import { Artifact } from "hardhat/types";
+
+import authenticatorArtifacts from "../../build/artifacts/src/contracts/GPv2AllowListAuthentication.sol/GPv2AllowListAuthentication.json";
+import settlementArtifacts from "../../build/artifacts/src/contracts/GPv2Settlement.sol/GPv2Settlement.json";
 
 /**
  * The salt used when deterministically deploying smart contracts.
@@ -53,7 +57,7 @@ export async function deterministicDeploymentAddress<C extends ContractName>(
   // NOTE: Use dynamic import to load the contract artifact instead of
   // `getContract` so that we don't need to depend on `hardhat` when using this
   // project as a dependency.
-  const { abi, bytecode } = await import(getArtifactPath(contractName));
+  const { abi, bytecode } = getArtifacts(contractName);
 
   const contractInterface = new utils.Interface(abi);
   const deployData = utils.hexConcat([
@@ -68,7 +72,11 @@ export async function deterministicDeploymentAddress<C extends ContractName>(
   );
 }
 
-function getArtifactPath(contractName: ContractName): string {
-  const artifactsRoot = "../../build/artifacts/";
-  return `${artifactsRoot}/src/contracts/${contractName}.sol/${contractName}.json`;
+function getArtifacts(contractName: ContractName): Artifact {
+  switch (contractName) {
+    case CONTRACT_NAMES.settlement:
+      return settlementArtifacts;
+    case CONTRACT_NAMES.authenticator:
+      return authenticatorArtifacts;
+  }
 }

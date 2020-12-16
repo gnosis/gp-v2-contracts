@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: LGPL-3.0
 pragma solidity ^0.7.5;
 pragma abicoder v2;
 
