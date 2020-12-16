@@ -46,10 +46,9 @@ This package additonally contains a `networks.json` file at the root with the
 address of each deployed contract as well the hash of the Ethereum transaction
 used to create the contract.
 
-## Solver authentication
+## Solver Authentication
 
-This repo defines scripts to manage the list of authenticated solver in all
-networks the contract is deployed to.
+This repo contains scripts to manage the list of authenticated solvers in all networks the contract has been deployed.
 
 The scripts are called with:
 
@@ -58,8 +57,7 @@ yarn solvers command [arg ...]
 ```
 
 Here is a list of available commands.
-The commands flagged with [*] require the private key of the authentication
-contract owner to be available to the script, for example by exporting it with
+The commands flagged with [*] require the private key of the authentication contract owner to be available to the script, for example by exporting it with
 `export PK=<private key>`.
 
 1. `add $ADDRESS` [*]. Adds the address to the list of registered solvers.
