@@ -33,6 +33,13 @@ yarn deploy --network $NETWORK --gasprice $GAS_PRICE_WEI
 New files containing details of this deployment will be created in the `deployment` folder.
 These files should be committed to this repository.
 
+## Verify Contracts on Etherscan
+
+```
+ETHERSCAN_API_KEY=<Your Key>
+npx hardhat etherscan-verify --network $NETWORK
+```
+
 ## Deployed Contract Addresses
 
 This package additonally contains a `networks.json` file at the root with the
