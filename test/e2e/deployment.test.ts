@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { Contract, Wallet } from "ethers";
 
-import { deterministicDeploymentAddress } from "../../src/ts";
+import { deterministicDeploymentAddress } from "../../src/ts/deterministic_address";
 import { builtAndDeployedMetadataCoincide } from "../bytecode";
 
 import { deployTestContracts } from "./fixture";
