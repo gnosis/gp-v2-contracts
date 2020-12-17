@@ -1,6 +1,6 @@
 {
   "name": "@gnosis.pm/gp-v2-contracts",
-  "version": "0.0.1-alpha.8",
+  "version": "0.0.1-alpha.9",
   "license": "LGPL-3.0-or-later",
   "scripts": {
     "build": "hardhat compile && tsc",
@@ -55,6 +55,7 @@
   "files": [
     "/build",
     "/deployments",
+    "/lib/build",
     "/lib/src",
     "/networks.json",
     "/src"
