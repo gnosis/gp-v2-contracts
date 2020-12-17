@@ -1,6 +1,6 @@
 {
   "name": "@gnosis.pm/gp-v2-contracts",
-  "version": "0.0.1-alpha.10",
+  "version": "0.0.1-alpha.11",
   "license": "LGPL-3.0-or-later",
   "scripts": {
     "build": "hardhat compile && tsc",
