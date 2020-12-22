@@ -167,7 +167,7 @@ describe("E2E: Should Trade Surplus With Uniswap", () => {
       ]),
     });
 
-    const settlementTx = await settlement.connect(solver).settle(
+    await settlement.connect(solver).settle(
       encoder.tokens,
       encoder.clearingPrices({
         [weth.address]: uniswapUsdtOutAmount,
@@ -177,8 +177,6 @@ describe("E2E: Should Trade Surplus With Uniswap", () => {
       encoder.encodedInteractions,
       "0x",
     );
-    // Needed to wait for gas reporting.
-    settlementTx.wait();
 
     // NOTE: Half of the trader 0's fees were discounted. This is reflected in
     // the final WETH balances of the trade and the settlement contract.
