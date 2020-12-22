@@ -26,8 +26,8 @@ describe("GPv2AllowListAuthentication", () => {
 
   describe("addSolver(address)", () => {
     it("should add a solver", async () => {
-      const tx = await authenticator.connect(owner).addSolver(solver.address);
-      await expect(tx.wait()).to.not.be.reverted;
+      await expect(authenticator.connect(owner).addSolver(solver.address)).to
+        .not.be.reverted;
     });
 
     it("should not allow non-owner to add solver", async () => {
@@ -39,10 +39,8 @@ describe("GPv2AllowListAuthentication", () => {
 
   describe("removeSolver(address)", () => {
     it("should allow owner to remove solver", async () => {
-      const tx = await authenticator
-        .connect(owner)
-        .removeSolver(solver.address);
-      await expect(tx.wait()).to.not.be.reverted;
+      await expect(authenticator.connect(owner).removeSolver(solver.address)).to
+        .not.be.reverted;
     });
 
     it("should not allow non-owner to remove solver", async () => {
@@ -54,7 +52,7 @@ describe("GPv2AllowListAuthentication", () => {
 
   describe("isSolver(address)", () => {
     it("returns true when given address is a recognized solver", async () => {
-      (await authenticator.connect(owner).addSolver(solver.address)).wait();
+      await authenticator.connect(owner).addSolver(solver.address);
       expect(await authenticator.isSolver(solver.address)).to.equal(true);
     });
 

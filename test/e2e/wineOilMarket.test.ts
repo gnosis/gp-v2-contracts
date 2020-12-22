@@ -138,7 +138,7 @@ describe("E2E: RetrETH Red Wine and Olive Oil Market", () => {
       ethers.utils.parseEther("12.0"),
     );
 
-    const settlmentTx = await settlement.connect(solver).settle(
+    await settlement.connect(solver).settle(
       encoder.tokens,
       encoder.clearingPrices({
         [eur.address]: ethers.utils.parseEther("1.0"),
@@ -149,8 +149,6 @@ describe("E2E: RetrETH Red Wine and Olive Oil Market", () => {
       "0x",
       "0x",
     );
-    // Used for gas reporting
-    settlmentTx.wait();
 
     expect(await wine.balanceOf(traders[0].address)).to.deep.equal(
       STARTING_BALANCE.sub(ethers.utils.parseEther("12.0")).sub(
