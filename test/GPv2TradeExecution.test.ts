@@ -37,16 +37,18 @@ describe("GPv2TradeExecution", () => {
       await sellToken.mock.transferFrom
         .withArgs(traders[0].address, recipient.address, amount)
         .returns(true);
-      const tradeExecutionTx = await tradeExecution.transferSellAmountToRecipientTest(
-        encodeExecutedTrade({
-          owner: traders[0].address,
-          sellToken: sellToken.address,
-          sellAmount: amount,
-          ...withoutBuy,
-        }),
-        recipient.address,
-      );
-      await expect(tradeExecutionTx.wait()).to.not.be.reverted;
+
+      await expect(
+        tradeExecution.transferSellAmountToRecipientTest(
+          encodeExecutedTrade({
+            owner: traders[0].address,
+            sellToken: sellToken.address,
+            sellAmount: amount,
+            ...withoutBuy,
+          }),
+          recipient.address,
+        ),
+      ).to.not.be.reverted;
     });
 
     it("should revert on failed ERC20 transfers", async () => {
@@ -95,16 +97,18 @@ describe("GPv2TradeExecution", () => {
         await sellToken.mock.transferFrom
           .withArgs(traders[0].address, recipient.address, amount)
           .returns();
-        const tradeExecutionTx = await tradeExecution.transferSellAmountToRecipientTest(
-          encodeExecutedTrade({
-            owner: traders[0].address,
-            sellToken: sellToken.address,
-            sellAmount: amount,
-            ...withoutBuy,
-          }),
-          recipient.address,
-        );
-        await expect(tradeExecutionTx.wait()).to.not.be.reverted;
+
+        await expect(
+          tradeExecution.transferSellAmountToRecipientTest(
+            encodeExecutedTrade({
+              owner: traders[0].address,
+              sellToken: sellToken.address,
+              sellAmount: amount,
+              ...withoutBuy,
+            }),
+            recipient.address,
+          ),
+        ).to.not.be.reverted;
       });
 
       it("should revert when ERC20 transfer returns false", async () => {
@@ -143,15 +147,17 @@ describe("GPv2TradeExecution", () => {
       await buyToken.mock.transfer
         .withArgs(traders[0].address, amount)
         .returns(true);
-      const transferTx = await tradeExecution.transferBuyAmountToOwnerTest(
-        encodeExecutedTrade({
-          owner: traders[0].address,
-          buyToken: buyToken.address,
-          buyAmount: amount,
-          ...withoutSell,
-        }),
-      );
-      await expect(transferTx.wait()).to.not.be.reverted;
+
+      await expect(
+        tradeExecution.transferBuyAmountToOwnerTest(
+          encodeExecutedTrade({
+            owner: traders[0].address,
+            buyToken: buyToken.address,
+            buyAmount: amount,
+            ...withoutSell,
+          }),
+        ),
+      ).to.not.be.reverted;
     });
 
     it("should revert on failed ERC20 transfers", async () => {
@@ -198,15 +204,17 @@ describe("GPv2TradeExecution", () => {
         await buyToken.mock.transfer
           .withArgs(traders[0].address, amount)
           .returns();
-        const transferTx = await tradeExecution.transferBuyAmountToOwnerTest(
-          encodeExecutedTrade({
-            owner: traders[0].address,
-            buyToken: buyToken.address,
-            buyAmount: amount,
-            ...withoutSell,
-          }),
-        );
-        await expect(transferTx.wait()).to.not.be.reverted;
+
+        await expect(
+          tradeExecution.transferBuyAmountToOwnerTest(
+            encodeExecutedTrade({
+              owner: traders[0].address,
+              buyToken: buyToken.address,
+              buyAmount: amount,
+              ...withoutSell,
+            }),
+          ),
+        ).to.not.be.reverted;
       });
 
       it("should revert when ERC20 transfer returns false", async () => {
