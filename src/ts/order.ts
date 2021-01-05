@@ -189,7 +189,7 @@ function encodeSigningScheme(v: number, scheme: SigningScheme): number {
  * Returns the signature for the specified order with the signing scheme encoded
  * into the signature bytes.
  * @param domain The domain to sign the order for. This is used by the smart
- * contract to ensure order's can't be replayed across different applications,
+ * contract to ensure orders can't be replayed across different applications,
  * but also different deployments (as the contract chain ID and address are
  * mixed into to the domain value).
  * @param order The order to sign.
