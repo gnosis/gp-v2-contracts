@@ -196,7 +196,7 @@ function encodeSigningScheme(v: number, scheme: SigningScheme): number {
  * @param owner The owner for the order used to sign.
  * @param scheme The signing scheme to use. See {@link SigningScheme} for more
  * details.
- * @return Hex-encoded signature with encoded singing scheme for the order.
+ * @return Hex-encoded signature with encoded signing scheme for the order.
  */
 export async function signOrder(
   domain: TypedDataDomain,
