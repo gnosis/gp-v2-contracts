@@ -238,7 +238,7 @@ describe("GPv2Encoding", () => {
       // NOTE: `v` must be either `27` or `28`, so just set it to something else
       // to generate an invalid signature.
       const encodedTradeBytes = ethers.utils.arrayify(encoder.encodedTrades);
-      encodedTradeBytes[141] = 42;
+      encodedTradeBytes[205] = 42;
 
       await expect(
         encoding.decodeTradesTest(encoder.tokens, encodedTradeBytes),

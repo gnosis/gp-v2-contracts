@@ -209,11 +209,11 @@ export async function signOrder(
   );
 
   return ethers.utils.solidityPack(
-    ["uint8", "bytes32", "bytes32"],
+    ["bytes32", "bytes32", "uint8"],
     [
-      encodeSigningScheme(ecdsaSignature.v, scheme),
       ecdsaSignature.r,
       ecdsaSignature.s,
+      encodeSigningScheme(ecdsaSignature.v, scheme),
     ],
   );
 }
