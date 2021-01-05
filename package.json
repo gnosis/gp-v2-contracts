@@ -3,7 +3,7 @@
   "version": "0.0.1-alpha.11",
   "license": "LGPL-3.0-or-later",
   "scripts": {
-    "build": "hardhat compile && tsc",
+    "build": "tsc && hardhat compile",
     "deploy": "hardhat deploy",
     "solvers": "hardhat solvers",
     "test": "hardhat test",
@@ -53,11 +53,10 @@
   "main": "lib/src/ts/index.js",
   "types": "lib/src/ts/index.d.ts",
   "files": [
-    "/build",
-    "/deployments",
-    "/lib/build",
-    "/lib/src",
-    "/networks.json",
-    "/src"
+    "build/",
+    "deployments/",
+    "lib/src/",
+    "networks.json",
+    "src/"
   ]
 }
