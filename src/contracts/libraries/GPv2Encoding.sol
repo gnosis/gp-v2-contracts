@@ -149,9 +149,9 @@ library GPv2Encoding {
     ///     uint256 executedAmount;
     ///     uint16 feeDiscount;
     ///     Signature {
-    ///         uint8 v;
     ///         bytes32 r;
     ///         bytes32 s;
+    ///         uint8 v;
     ///     } signature;
     /// }
     /// ```
@@ -236,12 +236,12 @@ library GPv2Encoding {
                 add(trade, 128),
                 shr(240, calldataload(add(encodedTrade.offset, 139)))
             )
-            // v = uint8(encodedTrade[141])
-            v := shr(248, calldataload(add(encodedTrade.offset, 141)))
-            // r = uint256(encodedTrade[142:174])
-            r := calldataload(add(encodedTrade.offset, 142))
-            // s = uint256(encodedTrade[174:206])
-            s := calldataload(add(encodedTrade.offset, 174))
+            // r = uint256(encodedTrade[141:173])
+            r := calldataload(add(encodedTrade.offset, 141))
+            // s = uint256(encodedTrade[173:205])
+            s := calldataload(add(encodedTrade.offset, 173))
+            // v = uint8(encodedTrade[205])
+            v := shr(248, calldataload(add(encodedTrade.offset, 205)))
         }
 
         trade.order.sellToken = tokens[sellTokenIndex];
