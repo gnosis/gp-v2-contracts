@@ -146,19 +146,7 @@ export const enum SigningScheme {
   MESSAGE,
 }
 
-/**
- * Returns the signature for the specified order.
- * @param domain The domain to sign the order for. This is used by the smart
- * contract to ensure order's can't be replayed across different applications,
- * but also different deployments (as the contract chain ID and address are
- * mixed into to the domain value).
- * @param order The order to sign.
- * @param owner The owner for the order used to sign.
- * @param scheme The signing scheme to use. See {@link SigningScheme} for more
- * details.
- * @return Hex-encoded signature for the order.
- */
-export function signOrder(
+function ecdsaSignOrder(
   domain: TypedDataDomain,
   order: Order,
   owner: Signer,
@@ -185,6 +173,49 @@ export function signOrder(
         ),
       );
   }
+}
+
+function encodeSigningScheme(v: number, scheme: SigningScheme): number {
+  const ORDER_MESSAGE_SCHEME_FLAG = 0x80;
+  switch (scheme) {
+    case SigningScheme.TYPED_DATA:
+      return v;
+    case SigningScheme.MESSAGE:
+      return v | ORDER_MESSAGE_SCHEME_FLAG;
+  }
+}
+
+/**
+ * Returns the signature for the specified order with the signing scheme encoded
+ * into the signature bytes.
+ * @param domain The domain to sign the order for. This is used by the smart
+ * contract to ensure orders can't be replayed across different applications,
+ * but also different deployments (as the contract chain ID and address are
+ * mixed into to the domain value).
+ * @param order The order to sign.
+ * @param owner The owner for the order used to sign.
+ * @param scheme The signing scheme to use. See {@link SigningScheme} for more
+ * details.
+ * @return Hex-encoded signature with encoded signing scheme for the order.
+ */
+export async function signOrder(
+  domain: TypedDataDomain,
+  order: Order,
+  owner: Signer,
+  scheme: SigningScheme,
+): Promise<string> {
+  const ecdsaSignature = ethers.utils.splitSignature(
+    await ecdsaSignOrder(domain, order, owner, scheme),
+  );
+
+  return ethers.utils.solidityPack(
+    ["uint8", "bytes32", "bytes32"],
+    [
+      encodeSigningScheme(ecdsaSignature.v, scheme),
+      ecdsaSignature.r,
+      ecdsaSignature.s,
+    ],
+  );
 }
 
 /**

@@ -1,4 +1,4 @@
-import { BigNumberish, Signer, ethers } from "ethers";
+import { BigNumberish, BytesLike, Signer, ethers } from "ethers";
 
 import { Interaction } from "./interaction";
 import {
@@ -9,7 +9,7 @@ import {
   signOrder,
   timestamp,
 } from "./order";
-import { TypedDataDomain, SignatureLike } from "./types/ethers";
+import { TypedDataDomain } from "./types/ethers";
 
 /**
  * Details representing how an order was executed.
@@ -50,16 +50,6 @@ function encodeOrderFlags(flags: OrderFlags): number {
   const partiallyFillable = flags.partiallyFillable ? 0x02 : 0x00;
 
   return kind | partiallyFillable;
-}
-
-function encodeSigningScheme(v: number, scheme: SigningScheme): number {
-  const ORDER_MESSAGE_SCHEME_FLAG = 0x80;
-  switch (scheme) {
-    case SigningScheme.TYPED_DATA:
-      return v;
-    case SigningScheme.MESSAGE:
-      return v | ORDER_MESSAGE_SCHEME_FLAG;
-  }
 }
 
 /**
@@ -153,8 +143,7 @@ export class SettlementEncoder {
    */
   public encodeTrade(
     order: Order,
-    signature: SignatureLike,
-    scheme: SigningScheme,
+    signature: BytesLike,
     tradeExecution?: Partial<TradeExecution>,
   ): void {
     const { executedAmount, feeDiscount } = tradeExecution || {};
@@ -162,7 +151,11 @@ export class SettlementEncoder {
       throw new Error("missing executed amount for partially fillable trade");
     }
 
-    const sig = ethers.utils.splitSignature(signature);
+    const SIGNATURE_LENGTH = 65;
+    if (ethers.utils.hexDataLength(signature) !== SIGNATURE_LENGTH) {
+      throw new Error("invalid signatuare bytes");
+    }
+
     const encodedTrade = ethers.utils.solidityPack(
       [
         "uint8",
@@ -175,9 +168,7 @@ export class SettlementEncoder {
         "uint8",
         "uint256",
         "uint16",
-        "uint8",
-        "bytes32",
-        "bytes32",
+        "bytes",
       ],
       [
         this.tokenIndex(order.sellToken),
@@ -190,9 +181,7 @@ export class SettlementEncoder {
         encodeOrderFlags(order),
         executedAmount || 0,
         feeDiscount || 0,
-        encodeSigningScheme(sig.v, scheme),
-        sig.r,
-        sig.s,
+        signature,
       ],
     );
 
@@ -217,7 +206,7 @@ export class SettlementEncoder {
     tradeExecution?: Partial<TradeExecution>,
   ): Promise<void> {
     const signature = await signOrder(this.domain, order, owner, scheme);
-    this.encodeTrade(order, signature, scheme, tradeExecution);
+    this.encodeTrade(order, signature, tradeExecution);
   }
 
   /**
