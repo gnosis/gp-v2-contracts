@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LGPL-3.0
-pragma solidity ^0.7.5;
+pragma solidity ^0.7.6;
 
 contract EventEmitter {
     event Event(uint256 number);
