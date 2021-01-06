@@ -160,6 +160,7 @@ describe("GPv2Settlement", () => {
         ethers.constants.MaxUint256,
       );
     });
+
     it("fails to invalidate order that is not owned by the caller", async () => {
       const orderDigest = "0x".padEnd(66, "1");
       const validTo = 2 ** 32 - 1;
@@ -892,6 +893,40 @@ describe("GPv2Settlement", () => {
           ]),
         ),
       ).to.not.be.reverted;
+    });
+  });
+
+  describe("freeOrderStorage", () => {
+    it("should set filled amount to 0", async () => {
+      const orderDigest = "0x" + "11".repeat(32);
+      const { timestamp } = await ethers.provider.getBlock("latest");
+      const orderUid = computeOrderUid({
+        orderDigest,
+        owner: traders[0].address,
+        validTo: timestamp - 1,
+      });
+
+      await settlement.connect(traders[0]).invalidateOrder(orderUid);
+      expect(await settlement.filledAmount(orderUid)).to.not.deep.equal(
+        ethers.constants.Zero,
+      );
+
+      await settlement.freeOrderStorageTest(orderUid);
+      expect(await settlement.filledAmount(orderUid)).to.deep.equal(
+        ethers.constants.Zero,
+      );
+    });
+
+    it("should revert if the order is still valid", async () => {
+      const orderDigest = "0x" + "11".repeat(32);
+      const orderUid = computeOrderUid({
+        orderDigest,
+        owner: traders[0].address,
+        validTo: 0xffffffff,
+      });
+      await expect(
+        settlement.freeOrderStorageTest(orderUid),
+      ).to.be.revertedWith("order still valid");
     });
   });
 });
