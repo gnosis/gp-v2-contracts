@@ -209,7 +209,7 @@ describe("GPv2TradeExecution", () => {
       ).to.be.revertedWith("call to non-contract");
     });
 
-    it("should transfer Eth if the marker address is used", async () => {
+    it("should transfer Ether if the marker address is used", async () => {
       const amount = ethers.utils.parseEther("1.0");
       const initialBalance = await traders[0].getBalance();
 

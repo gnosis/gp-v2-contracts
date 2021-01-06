@@ -95,7 +95,7 @@ contract GPv2Settlement {
     // solhint-disable-next-line no-empty-blocks
     receive() external payable {
         // NOTE: Include an empty receive function so that the settlement
-        // contract can receive ETH from contract interactions.
+        // contract can receive Ether from contract interactions.
     }
 
     /// @dev This modifier is called by settle function to block any non-listed

@@ -47,14 +47,14 @@ describe("E2E: Buy Ether", () => {
     usdt = await waffle.deployContract(deployer, ERC20, ["USDT", 6]);
   });
 
-  it("should unwrap WETH for orders buying ETH", async () => {
+  it("should unwrap WETH for orders buying Ether", async () => {
     // Settle a trivial batch between two overlapping trades:
     //
     //   /----(1. SELL 1 WETH for USDT if p(WETH) >= 1100)----\
     //   |                                                    v
-    // [USDT]                                              [WETH]
+    // [USDT]                                              [(W)ETH]
     //   ^                                                    |
-    //   \----(2. BUY 1 WETH for USDT if p(WETH) <= 1200)-----/
+    //   \-----(2. BUY 1 ETH for USDT if p(WETH) <= 1200)-----/
 
     const encoder = new SettlementEncoder(domainSeparator);
 

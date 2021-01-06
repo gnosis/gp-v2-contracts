@@ -57,7 +57,7 @@ export interface Order {
 }
 
 /**
- * Marker address to indicate that an order is buying ETH.
+ * Marker address to indicate that an order is buying Ether.
  *
  * Note that this address is only has special meaning in the `buyToken` and will
  * be treated as a ERC20 token address in the `sellToken` position, causing the
