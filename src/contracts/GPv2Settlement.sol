@@ -375,13 +375,14 @@ contract GPv2Settlement {
     /// @dev Claims order gas refunds by freeing storage for all encoded order
     /// gas refunds.
     function claimOrderRefunds(bytes calldata encodedOrderRefunds) internal {
-        uint256 orderUidLength = GPv2Encoding.ORDER_UID_LENGTH;
         for (
             uint256 i = 0;
             i < encodedOrderRefunds.length;
-            i += orderUidLength
+            i += GPv2Encoding.ORDER_UID_LENGTH
         ) {
-            freeOrderStorage(encodedOrderRefunds[i:i + orderUidLength]);
+            freeOrderStorage(
+                encodedOrderRefunds[i:i + GPv2Encoding.ORDER_UID_LENGTH]
+            );
         }
     }
 
