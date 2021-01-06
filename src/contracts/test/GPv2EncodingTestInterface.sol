@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LGPL-3.0
-pragma solidity ^0.7.5;
+pragma solidity ^0.7.6;
 pragma abicoder v2;
 
 import "../libraries/GPv2Encoding.sol";
