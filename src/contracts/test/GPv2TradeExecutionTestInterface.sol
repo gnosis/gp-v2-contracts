@@ -19,4 +19,7 @@ contract GPv2TradeExecutionTestInterface {
     ) external {
         trade.transferBuyAmountToOwner();
     }
+
+    // solhint-disable-next-line no-empty-blocks
+    receive() external payable {}
 }
