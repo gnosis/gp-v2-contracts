@@ -88,7 +88,7 @@ describe("GPv2TradeExecution", () => {
       ).to.be.revertedWith("call to non-contract");
     });
 
-    it("should revert when using marker buy Ether address", async () => {
+    it("should revert when mistakenly trying to sell ETH using the marker buy Ether address", async () => {
       await expect(
         tradeExecution.transferSellAmountToRecipientTest(
           encodeExecutedTrade({
