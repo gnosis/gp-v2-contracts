@@ -374,14 +374,9 @@ contract GPv2Settlement {
     /// @param encodedOrderRefunds Packed encoded order unique identifiers for
     /// which to claim gas refunds.
     function claimOrderRefunds(bytes calldata encodedOrderRefunds) internal {
-        for (
-            uint256 i = 0;
-            i < encodedOrderRefunds.length;
-            i += GPv2Encoding.ORDER_UID_LENGTH
-        ) {
-            freeOrderStorage(
-                encodedOrderRefunds[i:i + GPv2Encoding.ORDER_UID_LENGTH]
-            );
+        uint256 refundCount = encodedOrderRefunds.orderUidCount();
+        for (uint256 i = 0; i < refundCount; i++) {
+            freeOrderStorage(encodedOrderRefunds.orderUidAtIndex(i));
         }
     }
 

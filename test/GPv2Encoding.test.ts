@@ -533,4 +533,34 @@ describe("GPv2Encoding", () => {
       });
     });
   });
+
+  describe("decodeOrderUidsTest", () => {
+    it("should round trip encode/decode", async () => {
+      // Start from 17 (0x11) so that the first byte has no zeroes.
+      const orderUids = [
+        fillDistinctBytes(56, 17),
+        fillDistinctBytes(56, 17 + 56),
+        fillDistinctBytes(56, 17 + 56 * 2),
+      ];
+
+      const decodedOrderUids = await encoding.decodeOrderUidsTest(
+        ethers.utils.solidityPack(
+          orderUids.map(() => "bytes"),
+          orderUids,
+        ),
+      );
+      expect(decodedOrderUids).to.deep.equal(orderUids);
+    });
+
+    it("should accept empty order UIDs", async () => {
+      expect(await encoding.decodeOrderUidsTest("0x")).to.deep.equal([]);
+    });
+
+    it("should revert on malformed order UIDs", async () => {
+      const invalidUids = "0x00";
+      await expect(
+        encoding.decodeOrderUidsTest(invalidUids),
+      ).to.be.revertedWith("malformed order UIDs");
+    });
+  });
 });
