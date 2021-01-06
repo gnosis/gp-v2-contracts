@@ -2314,6 +2314,11 @@ caniuse-lite@^1.0.30000844:
   resolved "https://registry.yarnpkg.com/caniuse-lite/-/caniuse-lite-1.0.30001173.tgz#3c47bbe3cd6d7a9eda7f50ac016d158005569f56"
   integrity sha512-R3aqmjrICdGCTAnSXtNyvWYMK3YtV5jwudbq0T7nN9k4kmE4CBuwPqyJ+KBzepSTh0huivV2gLbSMEzTTmfeYw==
 
+canonical-weth@^1.4.0:
+  version "1.4.0"
+  resolved "https://registry.yarnpkg.com/canonical-weth/-/canonical-weth-1.4.0.tgz#e6b16574443e8ff0a132f1b4947bb2faf8c3e078"
+  integrity sha512-9rkLfAFndWALLhxd5lpyTX4RkV36WmVBZ92NYtYr1kWdAUmclRp7I5KkK4wvogzDcCI++yw53TLwx/GCPcocMg==
+
 caseless@^0.12.0, caseless@~0.12.0:
   version "0.12.0"
   resolved "https://registry.yarnpkg.com/caseless/-/caseless-0.12.0.tgz#1b681c21ff84033c826543090689420d187151dc"

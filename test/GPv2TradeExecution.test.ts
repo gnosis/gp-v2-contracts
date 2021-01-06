@@ -213,7 +213,7 @@ describe("GPv2TradeExecution", () => {
       const amount = ethers.utils.parseEther("1.0");
       const initialBalance = await traders[0].getBalance();
 
-      deployer.sendTransaction({
+      await deployer.sendTransaction({
         to: tradeExecution.address,
         value: amount,
       });
