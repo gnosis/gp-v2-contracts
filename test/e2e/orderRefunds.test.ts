@@ -61,8 +61,8 @@ describe("E2E: Expired Order Gas Refunds", () => {
     //   \--(2. BUY 100 OWL for DAI if p(OWL/DAI) <= 1.1)--/
 
     // NOTE: Mint extra tokens for all traders and the settlement contract to
-    // ensure that things like un-zeroing or zeroing a balance affects the gas
-    // results.
+    // ensure that things like un-zeroing or zeroing a balance does not affect
+    // the gas usage results.
     for (const token of [owl, dai]) {
       await token.mint(settlement.address, ethers.utils.parseEther("1.0"));
       for (const trader of traders.slice(0, 2)) {
