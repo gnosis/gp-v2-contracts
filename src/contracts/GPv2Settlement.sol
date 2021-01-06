@@ -375,7 +375,8 @@ contract GPv2Settlement {
     /// @dev Claims order gas refunds by freeing storage for all encoded order
     /// gas refunds.
     ///
-    /// @param orderUids The order unique identifiers as packed bytes.
+    /// @param encodedOrderRefunds Packed encoded order unique identifiers for
+    /// which to claim gas refunds.
     function claimOrderRefunds(bytes calldata encodedOrderRefunds) internal {
         for (
             uint256 i = 0;
