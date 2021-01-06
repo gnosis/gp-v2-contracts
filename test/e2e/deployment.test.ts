@@ -1,10 +1,23 @@
 import { expect } from "chai";
 import { Contract, Wallet } from "ethers";
+import { artifacts } from "hardhat";
 
-import { deterministicDeploymentAddress } from "../../src/ts/deterministic_address";
+import {
+  ContractName,
+  DeploymentArguments,
+  deterministicDeploymentAddress,
+} from "../../src/ts";
 import { builtAndDeployedMetadataCoincide } from "../bytecode";
 
 import { deployTestContracts } from "./fixture";
+
+async function contractAddress<C extends ContractName>(
+  contractName: C,
+  ...deploymentArguments: DeploymentArguments<C>
+): Promise<string> {
+  const artifact = await artifacts.readArtifact(contractName);
+  return deterministicDeploymentAddress(artifact, deploymentArguments);
+}
 
 describe("E2E: Deployment", () => {
   let owner: Wallet;
@@ -60,19 +73,13 @@ describe("E2E: Deployment", () => {
   describe("deterministic addresses", () => {
     it("authenticator", async () => {
       expect(
-        await deterministicDeploymentAddress(
-          "GPv2AllowListAuthentication",
-          owner.address,
-        ),
+        await contractAddress("GPv2AllowListAuthentication", owner.address),
       ).to.equal(authenticator.address);
     });
 
     it("settlement", async () => {
       expect(
-        await deterministicDeploymentAddress(
-          "GPv2Settlement",
-          authenticator.address,
-        ),
+        await contractAddress("GPv2Settlement", authenticator.address),
       ).to.equal(settlement.address);
     });
   });

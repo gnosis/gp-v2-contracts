@@ -1,4 +1,5 @@
 import { utils } from "ethers";
+import { Artifact } from "hardhat/types";
 
 /**
  * The salt used when deterministically deploying smart contracts.
@@ -36,4 +37,38 @@ export type DeploymentArguments<
   ? [string]
   : T extends typeof CONTRACT_NAMES.settlement
   ? [string]
-  : never;
+  : unknown[];
+
+/**
+ * An artifact with a contract name matching one of the deterministically
+ * deployed contracts.
+ */
+export interface NamedArtifact<C extends ContractName>
+  extends Pick<Artifact, "abi" | "bytecode"> {
+  contractName: C;
+}
+
+/**
+ * Computes the deterministic address at which the contract will be deployed.
+ * This address does not depend on which network the contract is deployed to.
+ *
+ * @param contractName Name of the contract for which to find the address.
+ * @param deploymentArguments Extra arguments that are necessary to deploy.
+ * @returns The address that is expected to store the deployed code.
+ */
+export function deterministicDeploymentAddress<C extends ContractName>(
+  { abi, bytecode }: NamedArtifact<C> | Artifact,
+  deploymentArguments: DeploymentArguments<C>,
+): string {
+  const contractInterface = new utils.Interface(abi);
+  const deployData = utils.hexConcat([
+    bytecode,
+    contractInterface.encodeDeploy(deploymentArguments),
+  ]);
+
+  return utils.getCreate2Address(
+    DEPLOYER_CONTRACT,
+    SALT,
+    utils.keccak256(deployData),
+  );
+}
