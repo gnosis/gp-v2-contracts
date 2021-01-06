@@ -371,4 +371,17 @@ contract GPv2Settlement {
             trades[i].transferBuyAmountToOwner();
         }
     }
+
+    /// @dev Frees the storage for an order that is no longer valid granting a
+    /// gas refund.
+    ///
+    /// This method reverts if the order is still valid.
+    ///
+    /// @param orderUid The unique identifier of the order to free.
+    function freeOrderStorage(bytes calldata orderUid) internal {
+        (, , uint32 validTo) = orderUid.extractOrderUidParams();
+        // solhint-disable-next-line not-rely-on-time
+        require(validTo < block.timestamp, "GPv2: order still valid");
+        filledAmount[orderUid] = 0;
+    }
 }
