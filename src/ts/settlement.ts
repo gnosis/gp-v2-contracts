@@ -36,6 +36,11 @@ export interface TradeExecution {
   feeDiscount: number;
 }
 
+/**
+ * Fee discount value used to indicate that all fees should be waived.
+ */
+export const FULL_FEE_DISCOUNT = 10000;
+
 function encodeOrderFlags(flags: OrderFlags): number {
   let kind;
   switch (flags.kind) {
