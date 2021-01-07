@@ -3,6 +3,8 @@ import { expect } from "chai";
 import { Contract } from "ethers";
 import { ethers, waffle } from "hardhat";
 
+import { BUY_ETH_ADDRESS } from "../src/ts";
+
 import { encodeExecutedTrade } from "./encoding";
 
 const NON_STANDARD_ERC20 = [
@@ -84,6 +86,20 @@ describe("GPv2TradeExecution", () => {
           recipient.address,
         ),
       ).to.be.revertedWith("call to non-contract");
+    });
+
+    it("should revert when mistakenly trying to sell ETH using the marker buy Ether address", async () => {
+      await expect(
+        tradeExecution.transferSellAmountToRecipientTest(
+          encodeExecutedTrade({
+            owner: traders[0].address,
+            sellToken: BUY_ETH_ADDRESS,
+            sellAmount: ethers.utils.parseEther("1.0"),
+            ...withoutBuy,
+          }),
+          recipient.address,
+        ),
+      ).to.be.reverted;
     });
 
     describe("Non-Standard ERC20 Tokens", () => {
@@ -191,6 +207,29 @@ describe("GPv2TradeExecution", () => {
           }),
         ),
       ).to.be.revertedWith("call to non-contract");
+    });
+
+    it("should transfer Ether if the marker address is used", async () => {
+      const amount = ethers.utils.parseEther("1.0");
+      const initialBalance = await traders[0].getBalance();
+
+      await deployer.sendTransaction({
+        to: tradeExecution.address,
+        value: amount,
+      });
+
+      await tradeExecution.transferBuyAmountToOwnerTest(
+        encodeExecutedTrade({
+          owner: traders[0].address,
+          buyToken: BUY_ETH_ADDRESS,
+          buyAmount: amount,
+          ...withoutSell,
+        }),
+      );
+
+      expect(await traders[0].getBalance()).to.deep.equal(
+        initialBalance.add(amount),
+      );
     });
 
     describe("Non-Standard ERC20 Tokens", () => {

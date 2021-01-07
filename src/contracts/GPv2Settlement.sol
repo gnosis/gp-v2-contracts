@@ -92,6 +92,12 @@ contract GPv2Settlement {
         allowanceManager = new GPv2AllowanceManager();
     }
 
+    // solhint-disable-next-line no-empty-blocks
+    receive() external payable {
+        // NOTE: Include an empty receive function so that the settlement
+        // contract can receive Ether from contract interactions.
+    }
+
     /// @dev This modifier is called by settle function to block any non-listed
     /// senders from settling batches.
     modifier onlySolver {
