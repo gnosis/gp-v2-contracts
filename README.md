@@ -37,7 +37,7 @@ These files should be committed to this repository.
 
 ```
 ETHERSCAN_API_KEY=<Your Key>
-npx hardhat etherscan-verify --network $NETWORK
+yarn verify --network $NETWORK
 ```
 
 ## Deployed Contract Addresses
