@@ -13,6 +13,7 @@ import {
   TypedDataDomain,
   computeOrderUid,
   domain,
+  encodeOrderRefunds,
   hashOrder,
 } from "../src/ts";
 
@@ -907,9 +908,58 @@ describe("GPv2Settlement", () => {
     });
   });
 
+  describe("claimOrderRefunds", () => {
+    it("should free storage for all orders", async () => {
+      const orderUids = [
+        computeOrderUid({
+          orderDigest: `0x${"11".repeat(32)}`,
+          owner: traders[0].address,
+          validTo: 0,
+        }),
+        computeOrderUid({
+          orderDigest: `0x${"22".repeat(32)}`,
+          owner: traders[0].address,
+          validTo: 0,
+        }),
+        computeOrderUid({
+          orderDigest: `0x${"33".repeat(32)}`,
+          owner: traders[0].address,
+          validTo: 0,
+        }),
+      ];
+
+      for (const orderUid of orderUids) {
+        await settlement.connect(traders[0]).invalidateOrder(orderUid);
+        expect(await settlement.filledAmount(orderUid)).to.not.deep.equal(
+          ethers.constants.Zero,
+        );
+      }
+
+      await settlement.claimOrderRefundsTest(encodeOrderRefunds(orderUids));
+      for (const orderUid of orderUids) {
+        expect(await settlement.filledAmount(orderUid)).to.deep.equal(
+          ethers.constants.Zero,
+        );
+      }
+    });
+
+    it("should revert if the encoded order UIDs are malformed", async () => {
+      const malformedOrderUids = ethers.utils.hexConcat([
+        computeOrderUid({
+          orderDigest: ethers.constants.HashZero,
+          owner: ethers.constants.AddressZero,
+          validTo: 0,
+        }),
+        "0x00",
+      ]);
+      await expect(settlement.claimOrderRefundsTest(malformedOrderUids)).to.be
+        .reverted;
+    });
+  });
+
   describe("freeOrderStorage", () => {
     it("should set filled amount to 0", async () => {
-      const orderDigest = "0x" + "11".repeat(32);
+      const orderDigest = `0x${"11".repeat(32)}`;
       const { timestamp } = await ethers.provider.getBlock("latest");
       const orderUid = computeOrderUid({
         orderDigest,

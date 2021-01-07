@@ -285,3 +285,17 @@ export function extractOrderUidParams(orderUid: string): OrderUidParams {
     validTo: view.getUint32(52),
   };
 }
+
+/**
+ * Encodes order UIDs for gas refunds.
+ *
+ * @param orderUid The order UID encoded as a hexadecimal string.
+ * @returns The extracted order UID parameters.
+ */
+export function encodeOrderRefunds(orderUids: string[]): string {
+  if (!orderUids.every((orderUid) => ethers.utils.isHexString(orderUid, 56))) {
+    throw new Error("one or more invalid order UIDs");
+  }
+
+  return ethers.utils.hexConcat(orderUids);
+}

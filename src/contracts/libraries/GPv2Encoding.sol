@@ -78,7 +78,7 @@ library GPv2Encoding {
     uint256 private constant TRADE_STRIDE = 206;
 
     /// @dev The byte length of an order unique identifier.
-    uint256 private constant ORDER_UID_LENGTH = 56;
+    uint256 internal constant ORDER_UID_LENGTH = 56;
 
     /// @dev A struct representing arbitrary contract interactions.
     /// Submitted to [`GPv2Settlement.settle`] for code execution.
