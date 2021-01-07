@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LGPL-3.0
-pragma solidity ^0.7.5;
+pragma solidity ^0.7.6;
 pragma abicoder v2;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -90,6 +90,12 @@ contract GPv2Settlement {
             )
         );
         allowanceManager = new GPv2AllowanceManager();
+    }
+
+    // solhint-disable-next-line no-empty-blocks
+    receive() external payable {
+        // NOTE: Include an empty receive function so that the settlement
+        // contract can receive Ether from contract interactions.
     }
 
     /// @dev This modifier is called by settle function to block any non-listed
@@ -204,16 +210,6 @@ contract GPv2Settlement {
         GPv2TradeExecution.Data memory executedTrade
     ) internal {
         GPv2Encoding.Order memory order = trade.order;
-        // NOTE: Currently, the above instantiation allocates an uninitialized
-        // `Order` that gets never used. Adjust the free memory pointer to free
-        // the unused memory by subtracting `sizeof(Order) == 288` bytes.
-        // <https://solidity.readthedocs.io/en/v0.7.5/internals/layout_in_memory.html>
-        // TODO: Remove this once the following fix is merged and released:
-        // <https://github.com/ethereum/solidity/pull/10341>
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            mstore(0x40, sub(mload(0x40), 288))
-        }
 
         // solhint-disable-next-line not-rely-on-time
         require(order.validTo >= block.timestamp, "GPv2: order expired");
