@@ -109,4 +109,15 @@ contract GPv2EncodingTestInterface {
     {
         return orderUid.extractOrderUidParams();
     }
+
+    function decodeOrderUidsTest(bytes calldata encodedOrderUids)
+        external
+        pure
+        returns (bytes[] memory orderUids)
+    {
+        orderUids = new bytes[](encodedOrderUids.orderUidCount());
+        for (uint256 i = 0; i < orderUids.length; i++) {
+            orderUids[i] = encodedOrderUids.orderUidAtIndex(i);
+        }
+    }
 }

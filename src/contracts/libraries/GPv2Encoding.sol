@@ -78,7 +78,7 @@ library GPv2Encoding {
     uint256 private constant TRADE_STRIDE = 206;
 
     /// @dev The byte length of an order unique identifier.
-    uint256 internal constant ORDER_UID_LENGTH = 56;
+    uint256 private constant ORDER_UID_LENGTH = 56;
 
     /// @dev A struct representing arbitrary contract interactions.
     /// Submitted to [`GPv2Settlement.settle`] for code execution.
@@ -439,6 +439,48 @@ library GPv2Encoding {
 
         // Solidity takes care of copying the calldata slice into memory.
         interaction.callData = interactionCallData;
+    }
+
+    /// @dev Returns the number of order UIDs packed in a calldata byte array.
+    ///
+    /// This method reverts if the order UIDs data is malformed, i.e. the total
+    /// length is not a multiple of the length of a single order UID.
+    ///
+    /// @param orderUids The packed order UIDs.
+    /// @return count The total number of order UIDs packed in the specified
+    /// bytes.
+    function orderUidCount(bytes calldata orderUids)
+        internal
+        pure
+        returns (uint256 count)
+    {
+        require(
+            orderUids.length % ORDER_UID_LENGTH == 0,
+            "GPv2: malformed order UIDs"
+        );
+        count = orderUids.length / ORDER_UID_LENGTH;
+    }
+
+    /// @dev Returns a calldata slice to an order UID at the specified index.
+    ///
+    /// Note that this method does not check that the index is within the bounds
+    /// of the specified packed order UIDs, and is expected to be verified by
+    /// the caller, typically, with a call to [`orderUidCount`].
+    function orderUidAtIndex(bytes calldata orderUids, uint256 index)
+        internal
+        pure
+        returns (bytes calldata orderUid)
+    {
+        // NOTE: Use assembly to slice the calldata bytes without generating
+        // code for bounds checking.
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            orderUid.offset := add(
+                orderUids.offset,
+                mul(index, ORDER_UID_LENGTH)
+            )
+            orderUid.length := ORDER_UID_LENGTH
+        }
     }
 
     /// @dev Extracts specific order information from the standardized unique
