@@ -11,7 +11,6 @@ import {
   TypedDataDomain,
   computeOrderUid,
   domain,
-  encodeOrderRefunds,
   hashOrder,
 } from "../../src/ts";
 
@@ -131,6 +130,7 @@ describe("E2E: Expired Order Gas Refunds", () => {
     };
 
     const [encoder1, orderUids] = await prepareBatch();
+
     const txWithoutRefunds = await settlement.connect(solver).settle(
       encoder1.tokens,
       encoder1.clearingPrices({
@@ -147,6 +147,8 @@ describe("E2E: Expired Order Gas Refunds", () => {
     await ethers.provider.send("evm_mine", []);
 
     const [encoder2] = await prepareBatch();
+    encoder2.encodeOrderRefunds(...orderUids);
+
     const txWithRefunds = await settlement.connect(solver).settle(
       encoder2.tokens,
       encoder2.clearingPrices({
@@ -155,7 +157,7 @@ describe("E2E: Expired Order Gas Refunds", () => {
       }),
       encoder2.encodedTrades,
       encoder2.encodedInteractions,
-      encodeOrderRefunds(orderUids),
+      encoder2.encodedOrderRefunds,
     );
     const { gasUsed: gasUsedWithRefunds } = await txWithRefunds.wait();
 

@@ -13,7 +13,6 @@ import {
   TypedDataDomain,
   computeOrderUid,
   domain,
-  encodeOrderRefunds,
   hashOrder,
 } from "../src/ts";
 
@@ -935,7 +934,7 @@ describe("GPv2Settlement", () => {
         );
       }
 
-      await settlement.claimOrderRefundsTest(encodeOrderRefunds(orderUids));
+      await settlement.claimOrderRefundsTest(ethers.utils.hexConcat(orderUids));
       for (const orderUid of orderUids) {
         expect(await settlement.filledAmount(orderUid)).to.deep.equal(
           ethers.constants.Zero,
