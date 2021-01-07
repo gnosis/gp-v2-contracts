@@ -2,6 +2,7 @@ import { BigNumberish, BytesLike, Signer, ethers } from "ethers";
 
 import { Interaction } from "./interaction";
 import {
+  ORDER_UID_LENGTH,
   Order,
   OrderFlags,
   OrderKind,
@@ -64,6 +65,7 @@ export class SettlementEncoder {
   private readonly _tokenMap: Record<string, number | undefined> = {};
   private _encodedTrades = "0x";
   private _encodedInteractions = "0x";
+  private _encodedOrderRefunds = "0x";
 
   /**
    * Creates a new settlement encoder instance.
@@ -102,13 +104,27 @@ export class SettlementEncoder {
   }
 
   /**
+   * Gets the currently encoded order UIDs for gas refunds.
+   */
+  public get encodedOrderRefunds(): string {
+    return this._encodedOrderRefunds;
+  }
+
+  /**
    * Gets the number of trades currently encoded.
    */
   public get tradeCount(): number {
     const TRADE_STRIDE = 206;
-    // NOTE: `TRADE_STRIDE` multiplied by 2 as hex strings encode one byte in
-    // 2 characters.
-    return (this._encodedTrades.length - 2) / (TRADE_STRIDE * 2);
+    return ethers.utils.hexDataLength(this._encodedTrades) / TRADE_STRIDE;
+  }
+
+  /**
+   * Gets the number of order refunds currently encoded.
+   */
+  public get orderRefundCount(): number {
+    return (
+      ethers.utils.hexDataLength(this._encodedOrderRefunds) / ORDER_UID_LENGTH
+    );
   }
 
   /**
@@ -226,6 +242,26 @@ export class SettlementEncoder {
     this._encodedInteractions = ethers.utils.hexConcat([
       this._encodedInteractions,
       encodedInteraction,
+    ]);
+  }
+
+  /**
+   * Encodes order UIDs for gas refunds.
+   *
+   * @param orderUids The order UIDs for which to claim gas refunds.
+   */
+  public encodeOrderRefunds(...orderUids: string[]): void {
+    if (
+      !orderUids.every((orderUid) =>
+        ethers.utils.isHexString(orderUid, ORDER_UID_LENGTH),
+      )
+    ) {
+      throw new Error("one or more invalid order UIDs");
+    }
+
+    this._encodedOrderRefunds = ethers.utils.hexConcat([
+      this._encodedOrderRefunds,
+      ...orderUids,
     ]);
   }
 

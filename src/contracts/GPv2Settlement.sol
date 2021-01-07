@@ -147,7 +147,7 @@ contract GPv2Settlement {
 
         transferOut(executedTrades);
 
-        require(encodedOrderRefunds.length == 0, "not yet implemented");
+        claimOrderRefunds(encodedOrderRefunds);
     }
 
     /// @dev Invalidate onchain an order that has been signed offline.
