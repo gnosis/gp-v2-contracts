@@ -57,6 +57,15 @@ export interface Order {
 }
 
 /**
+ * Marker address to indicate that an order is buying Ether.
+ *
+ * Note that this address is only has special meaning in the `buyToken` and will
+ * be treated as a ERC20 token address in the `sellToken` position, causing the
+ * settlement to revert.
+ */
+export const BUY_ETH_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
+
+/**
  * Gnosis Protocol v2 order flags.
  */
 export type OrderFlags = Pick<Order, "kind" | "partiallyFillable">;

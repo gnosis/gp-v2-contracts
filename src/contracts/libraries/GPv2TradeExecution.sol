@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LGPL-3.0
-pragma solidity ^0.7.5;
+pragma solidity ^0.7.6;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
@@ -8,6 +8,10 @@ import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 /// @author Gnosis Developers
 library GPv2TradeExecution {
     using SafeERC20 for IERC20;
+
+    /// @dev Ether marker address used to indicate an order is buying Ether.
+    address internal constant BUY_ETH_ADDRESS =
+        0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
     /// @dev Executed trade data.
     struct Data {
@@ -34,6 +38,10 @@ library GPv2TradeExecution {
     /// @dev Executes the trade's buy amount, transferring it to the trade's
     /// owner from the caller's address.
     function transferBuyAmountToOwner(Data memory trade) internal {
-        trade.buyToken.safeTransfer(trade.owner, trade.buyAmount);
+        if (address(trade.buyToken) == BUY_ETH_ADDRESS) {
+            payable(trade.owner).transfer(trade.buyAmount);
+        } else {
+            trade.buyToken.safeTransfer(trade.owner, trade.buyAmount);
+        }
     }
 }

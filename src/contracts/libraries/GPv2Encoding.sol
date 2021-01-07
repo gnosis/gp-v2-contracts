@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LGPL-3.0
-pragma solidity ^0.7.5;
+pragma solidity ^0.7.6;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -202,14 +202,13 @@ library GPv2Encoding {
         bytes32 r;
         bytes32 s;
 
+        GPv2Encoding.Order memory order = trade.order;
+
         // NOTE: Use assembly to efficiently decode packed data. Memory structs
         // in Solidity aren't packed, so the `Order` fields are in order at 32
         // byte increments.
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            // order = trade.order
-            let order := mload(trade)
-
             // sellTokenIndex = uint8(encodedTrade[0])
             sellTokenIndex := shr(248, calldataload(encodedTrade.offset))
             // buyTokenIndex = uint8(encodedTrade[1])
@@ -244,15 +243,15 @@ library GPv2Encoding {
             v := shr(248, calldataload(add(encodedTrade.offset, 205)))
         }
 
-        trade.order.sellToken = tokens[sellTokenIndex];
-        trade.order.buyToken = tokens[buyTokenIndex];
-        trade.order.validTo = validTo;
+        order.sellToken = tokens[sellTokenIndex];
+        order.buyToken = tokens[buyTokenIndex];
+        order.validTo = validTo;
         if (flags & 0x01 == 0) {
-            trade.order.kind = ORDER_KIND_SELL;
+            order.kind = ORDER_KIND_SELL;
         } else {
-            trade.order.kind = ORDER_KIND_BUY;
+            order.kind = ORDER_KIND_BUY;
         }
-        trade.order.partiallyFillable = flags & 0x02 != 0;
+        order.partiallyFillable = flags & 0x02 != 0;
 
         trade.sellTokenIndex = sellTokenIndex;
         trade.buyTokenIndex = buyTokenIndex;
@@ -281,7 +280,7 @@ library GPv2Encoding {
         // allocations to effectively free the memory. This is safe as the
         // memory used can be discarded, and the memory pointed to by the free
         // memory pointer **does not have to point to zero-ed out memory**.
-        // <https://solidity.readthedocs.io/en/v0.7.5/internals/layout_in_memory.html>
+        // <https://docs.soliditylang.org/en/v0.7.6/internals/layout_in_memory.html>
         uint256 freeMemoryPointer;
         // solhint-disable-next-line no-inline-assembly
         assembly {
