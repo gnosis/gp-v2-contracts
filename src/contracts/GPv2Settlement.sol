@@ -147,7 +147,7 @@ contract GPv2Settlement {
 
         transferOut(executedTrades);
 
-        require(encodedOrderRefunds.length == 0, "not yet implemented");
+        claimOrderRefunds(encodedOrderRefunds);
     }
 
     /// @dev Invalidate onchain an order that has been signed offline.
@@ -365,6 +365,23 @@ contract GPv2Settlement {
     function transferOut(GPv2TradeExecution.Data[] memory trades) internal {
         for (uint256 i = 0; i < trades.length; i++) {
             trades[i].transferBuyAmountToOwner();
+        }
+    }
+
+    /// @dev Claims order gas refunds by freeing storage for all encoded order
+    /// gas refunds.
+    ///
+    /// @param encodedOrderRefunds Packed encoded order unique identifiers for
+    /// which to claim gas refunds.
+    function claimOrderRefunds(bytes calldata encodedOrderRefunds) internal {
+        for (
+            uint256 i = 0;
+            i < encodedOrderRefunds.length;
+            i += GPv2Encoding.ORDER_UID_LENGTH
+        ) {
+            freeOrderStorage(
+                encodedOrderRefunds[i:i + GPv2Encoding.ORDER_UID_LENGTH]
+            );
         }
     }
 

@@ -228,6 +228,11 @@ export async function signOrder(
 }
 
 /**
+ * The byte length of an order UID.
+ */
+export const ORDER_UID_LENGTH = 56;
+
+/**
  * Order unique identifier parameters.
  */
 export interface OrderUidParams {
@@ -272,7 +277,7 @@ export function computeOrderUid({
  */
 export function extractOrderUidParams(orderUid: string): OrderUidParams {
   const bytes = ethers.utils.arrayify(orderUid);
-  if (bytes.length != 56) {
+  if (bytes.length != ORDER_UID_LENGTH) {
     throw new Error("invalid order UID length");
   }
 
