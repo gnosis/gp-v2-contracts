@@ -3,11 +3,13 @@ pragma solidity ^0.7.6;
 pragma abicoder v2;
 
 import "./libraries/GPv2TradeExecution.sol";
+import "./libraries/GPv2TradeExecutionWithErrorMsg.sol";
 
 /// @title Gnosis Protocol v2 Allowance Manager Contract
 /// @author Gnosis Developers
 contract GPv2AllowanceManager {
     using GPv2TradeExecution for GPv2TradeExecution.Data;
+    using GPv2TradeExecutionWithErrorMsg for GPv2TradeExecutionWithErrorMsg.Data;
 
     /// @dev The recipient of all transfers made by the allowance manager. The
     /// recipient is set at creation time and cannot change.
@@ -39,6 +41,18 @@ contract GPv2AllowanceManager {
     {
         for (uint256 i = 0; i < trades.length; i++) {
             GPv2TradeExecution.transferSellAmountToRecipient(
+                trades[i],
+                msg.sender
+            );
+        }
+    }
+
+    function transferIn2(GPv2TradeExecutionWithErrorMsg.Data[] calldata trades)
+        external
+        onlyRecipient
+    {
+        for (uint256 i = 0; i < trades.length; i++) {
+            GPv2TradeExecutionWithErrorMsg.transferSellAmountToRecipient(
                 trades[i],
                 msg.sender
             );

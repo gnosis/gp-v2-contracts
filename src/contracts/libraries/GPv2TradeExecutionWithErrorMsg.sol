@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 /// @title Gnosis Protocol v2 Trade Execution
 /// @author Gnosis Developers
-library GPv2TradeExecution {
+library GPv2TradeExecutionWithErrorMsg {
     using SafeERC20 for IERC20;
 
     /// @dev Ether marker address used to indicate an order is buying Ether.
