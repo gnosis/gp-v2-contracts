@@ -69,6 +69,9 @@ contract GPv2Settlement {
         bytes orderUid
     );
 
+    /// @dev Event emitted when an order is invalidated.
+    event OrderInvalidated(address indexed owner, bytes orderUid);
+
     constructor(GPv2Authentication authenticator_) {
         authenticator = authenticator_;
 
@@ -159,6 +162,7 @@ contract GPv2Settlement {
         (, address owner, ) = orderUid.extractOrderUidParams();
         require(owner == msg.sender, "GPv2: caller does not own order");
         filledAmount[orderUid] = uint256(-1);
+        emit OrderInvalidated(owner, orderUid);
     }
 
     /// @dev Process all trades for EOA orders one at a time returning the
