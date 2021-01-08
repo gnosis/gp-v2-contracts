@@ -1,9 +1,8 @@
 import ERC20 from "@openzeppelin/contracts/build/contracts/ERC20PresetMinterPauser.json";
 import UniswapV2Factory from "@uniswap/v2-core/build/UniswapV2Factory.json";
 import UniswapV2Pair from "@uniswap/v2-core/build/UniswapV2Pair.json";
-import { expect } from "chai";
 import Debug from "debug";
-import { BigNumber, Contract, ContractReceipt, Wallet } from "ethers";
+import { Contract, ContractReceipt, Wallet } from "ethers";
 import { ethers, waffle } from "hardhat";
 
 import {
@@ -51,7 +50,10 @@ class TokenManager {
 
     const token = await waffle.deployContract(deployer, ERC20, [symbol, 18]);
 
+    // NOTE: Fund the settlement contract is funded with a lot of extra tokens,
+    // so the settlements don't have to balance out.
     await token.mint(settlement.address, LOTS);
+
     for (const trader of this.traders) {
       await token.mint(trader.address, LOTS);
       await token.connect(trader).approve(allowanceManager.address, LOTS);
@@ -106,28 +108,19 @@ export class BenchFixture {
       UniswapV2Factory,
       [deployer.address],
     );
-
     await tokens.ensureTokenCount(2);
-    const uniswapTokens =
-      tokens.id(0).address.toLowerCase() < tokens.id(1).address.toLowerCase()
-        ? [tokens.id(0), tokens.id(1)]
-        : [tokens.id(1), tokens.id(0)];
-
-    await uniswapFactory.createPair(
-      uniswapTokens[0].address,
-      uniswapTokens[1].address,
-    );
+    await uniswapFactory.createPair(tokens.id(0).address, tokens.id(1).address);
     const uniswapPair = new Contract(
-      await uniswapFactory.getPair(
-        uniswapTokens[0].address,
-        uniswapTokens[1].address,
-      ),
+      await uniswapFactory.getPair(tokens.id(0).address, tokens.id(1).address),
       UniswapV2Pair.abi,
       deployer,
     );
 
-    expect(await uniswapPair.token0()).to.equal(uniswapTokens[0].address);
-
+    debug("funding Uniswap pool");
+    const uniswapTokens = [
+      await uniswapPair.token0(),
+      await uniswapPair.token1(),
+    ].map((tokenAddress) => new Contract(tokenAddress, ERC20.abi, deployer));
     await uniswapTokens[0].mint(uniswapPair.address, LOTS);
     await uniswapTokens[1].mint(uniswapPair.address, LOTS);
     await uniswapPair.mint(owner.address);
@@ -157,9 +150,6 @@ export class BenchFixture {
   }
 
   public async settle(options: SettlementOptions): Promise<ContractReceipt> {
-    // NOTE: The settlement contract is funded with a lot of extra tokens, so
-    // the settlement doesn't have to be perfect or balance out.
-
     debug(`running fixture with ${JSON.stringify(options)}`);
 
     const {
@@ -242,7 +232,7 @@ export class BenchFixture {
       await encoder.signEncodeTrade(
         {
           sellToken: tokens.id(i % options.tokens).address,
-          buyToken: tokens.id(i % options.tokens).address,
+          buyToken: tokens.id((i + 1) % options.tokens).address,
           feeAmount: ethers.utils.parseEther("1"),
           validTo: 0xffffffff,
           appData: this.nonce++,
@@ -292,8 +282,9 @@ export class BenchFixture {
     }
     for (let i = 0; i < options.refunds; i++) {
       const trader = traders[i % traders.length];
+      const key = (i + 1).toString(16).padStart(2, "0");
       const orderUid = computeOrderUid({
-        orderDigest: `0x${"42".repeat(32)}`,
+        orderDigest: `0x${key}${"42".repeat(31)}`,
         owner: trader.address,
         validTo: 0,
       });
@@ -306,7 +297,7 @@ export class BenchFixture {
         ...prices,
         [token.address]: ethers.constants.One,
       }),
-      {} as Record<string, BigNumber>,
+      {},
     );
 
     debug(`executing settlement`);

@@ -5,6 +5,7 @@ import { BenchFixture } from "./fixture";
 async function main() {
   const fixture = await BenchFixture.create();
 
+  const pad = (x: unknown) => ` ${x} `.padStart(14);
   console.log(chalk.bold("=== Settlement Gas Benchmarks ==="));
   console.log(
     chalk.gray(
@@ -12,16 +13,15 @@ async function main() {
     ),
   );
   console.log(
-    chalk.gray(
-      " tokens       | trades       | interactions | refunds      | gas          ",
-    ),
+    ["tokens", "trades", "interactions", "refunds", "gas"]
+      .map((header) => chalk.cyan(pad(header)))
+      .join(chalk.gray("|")),
   );
   console.log(
     chalk.gray(
       "--------------+--------------+--------------+--------------+--------------",
     ),
   );
-  const pad = (x: unknown) => ` ${x} `.padStart(14);
   for (const [tokens, trades, interactions, refunds] of [
     [2, 10, 0, 0],
     [3, 10, 0, 0],
@@ -29,7 +29,6 @@ async function main() {
     [5, 10, 0, 0],
     [6, 10, 0, 0],
     [7, 10, 0, 0],
-    [8, 10, 0, 0],
     [8, 10, 0, 0],
     [8, 20, 0, 0],
     [8, 30, 0, 0],
