@@ -44,7 +44,7 @@ contract GPv2Settlement {
     /// That is, only authorised solvers have the ability to invoke settlements.
     /// Any valid authenticator implements an isSolver method called by the onlySolver
     /// modifier below.
-    GPv2Authentication private immutable authenticator;
+    GPv2Authentication public immutable authenticator;
 
     /// @dev The allowance manager which has access to EOA order funds. This
     /// contract is created during deployment

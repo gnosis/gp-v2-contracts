@@ -70,6 +70,12 @@ describe("GPv2Settlement", () => {
     });
   });
 
+  describe("authenticator", () => {
+    it("should be set to the authenticator the contract was initialized with", async () => {
+      expect(await settlement.authenticator()).to.equal(authenticator.address);
+    });
+  });
+
   describe("allowanceManager", () => {
     it("should deploy an allowance manager", async () => {
       const deployedAllowanceManager = await settlement.allowanceManager();
