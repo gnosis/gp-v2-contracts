@@ -3,7 +3,6 @@ import "hardhat-deploy";
 import "hardhat-gas-reporter";
 
 import dotenv from "dotenv";
-import type { HttpNetworkUserConfig } from "hardhat/types";
 import yargs from "yargs";
 
 import { setupSolversTask } from "./src/tasks/solvers";
@@ -23,14 +22,16 @@ const { INFURA_KEY, MNEMONIC, PK, REPORT_GAS } = process.env;
 const DEFAULT_MNEMONIC =
   "candy maple cake sugar pudding cream honey rich smooth crumble sweet treat";
 
-const sharedNetworkConfig: HttpNetworkUserConfig = {};
-if (PK) {
-  sharedNetworkConfig.accounts = [PK];
-} else {
-  sharedNetworkConfig.accounts = {
-    mnemonic: MNEMONIC || DEFAULT_MNEMONIC,
-  };
-}
+const soliditySettings = {
+  optimizer: {
+    enabled: true,
+    runs: 1000000,
+  },
+};
+
+const sharedNetworkConfig = {
+  accounts: PK ? [PK] : { mnemonic: MNEMONIC || DEFAULT_MNEMONIC },
+};
 
 if (["rinkeby", "mainnet"].includes(argv.network) && INFURA_KEY === undefined) {
   throw new Error(
@@ -48,13 +49,16 @@ export default {
     sources: "src/contracts",
   },
   solidity: {
-    version: "0.7.6",
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 1000000,
+    compilers: [
+      {
+        version: "0.7.6",
+        settings: soliditySettings,
       },
-    },
+      {
+        version: "0.8.0",
+        settings: soliditySettings,
+      },
+    ],
   },
   networks: {
     mainnet: {

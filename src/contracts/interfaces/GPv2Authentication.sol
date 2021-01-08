@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
-pragma solidity ^0.7.6;
+pragma solidity >=0.7.6 <0.9.0;
 
 /// @title Gnosis Protocol v2 Authentication Interface
 /// @author Gnosis Developers

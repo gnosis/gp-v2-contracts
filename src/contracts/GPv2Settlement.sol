@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
-pragma solidity ^0.7.6;
-pragma abicoder v2;
+pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
+import "./vendored/@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "./GPv2AllowanceManager.sol";
 import "./interfaces/GPv2Authentication.sol";
@@ -15,7 +13,6 @@ import "./libraries/GPv2TradeExecution.sol";
 contract GPv2Settlement {
     using GPv2Encoding for bytes;
     using GPv2TradeExecution for GPv2TradeExecution.Data;
-    using SafeMath for uint256;
 
     /// @dev The EIP-712 domain type hash used for computing the domain
     /// separator.
@@ -158,7 +155,7 @@ contract GPv2Settlement {
     function invalidateOrder(bytes calldata orderUid) external {
         (, address owner, ) = orderUid.extractOrderUidParams();
         require(owner == msg.sender, "GPv2: caller does not own order");
-        filledAmount[orderUid] = uint256(-1);
+        filledAmount[orderUid] = type(uint256).max;
     }
 
     /// @dev Process all trades for EOA orders one at a time returning the
@@ -236,7 +233,7 @@ contract GPv2Settlement {
         // ```
 
         require(
-            order.sellAmount.mul(sellPrice) >= order.buyAmount.mul(buyPrice),
+            order.sellAmount * sellPrice >= order.buyAmount * buyPrice,
             "GPv2: limit price not respected"
         );
 
@@ -245,28 +242,22 @@ contract GPv2Settlement {
         uint256 executedFeeAmount;
         uint256 currentFilledAmount;
 
-        // NOTE: Don't use `SafeMath.div` or `SafeMath.sub` anywhere here as it
-        // allocates a string even if it does not revert. Additionally, `div`
-        // only checks that the divisor is non-zero and `revert`s in that case
-        // instead of consuming all of the remaining transaction gas when
-        // dividing by zero, so no extra checks are needed for those operations.
-
         if (order.kind == GPv2Encoding.ORDER_KIND_SELL) {
             if (order.partiallyFillable) {
                 executedSellAmount = trade.executedAmount;
                 executedFeeAmount =
-                    order.feeAmount.mul(executedSellAmount) /
+                    (order.feeAmount * executedSellAmount) /
                     order.sellAmount;
             } else {
                 executedSellAmount = order.sellAmount;
                 executedFeeAmount = order.feeAmount;
             }
 
-            executedBuyAmount = executedSellAmount.mul(sellPrice) / buyPrice;
+            executedBuyAmount = (executedSellAmount * sellPrice) / buyPrice;
 
-            currentFilledAmount = filledAmount[trade.orderUid].add(
-                executedSellAmount
-            );
+            currentFilledAmount =
+                filledAmount[trade.orderUid] +
+                executedSellAmount;
             require(
                 currentFilledAmount <= order.sellAmount,
                 "GPv2: order filled"
@@ -275,30 +266,29 @@ contract GPv2Settlement {
             if (order.partiallyFillable) {
                 executedBuyAmount = trade.executedAmount;
                 executedFeeAmount =
-                    order.feeAmount.mul(executedBuyAmount) /
+                    (order.feeAmount * executedBuyAmount) /
                     order.buyAmount;
             } else {
                 executedBuyAmount = order.buyAmount;
                 executedFeeAmount = order.feeAmount;
             }
 
-            executedSellAmount = executedBuyAmount.mul(buyPrice) / sellPrice;
+            executedSellAmount = (executedBuyAmount * buyPrice) / sellPrice;
 
-            currentFilledAmount = filledAmount[trade.orderUid].add(
-                executedBuyAmount
-            );
+            currentFilledAmount =
+                filledAmount[trade.orderUid] +
+                executedBuyAmount;
             require(
                 currentFilledAmount <= order.buyAmount,
                 "GPv2: order filled"
             );
         }
 
-        require(trade.feeDiscount <= BPS_BASE, "GPv2: invalid fee discount");
         executedFeeAmount =
-            executedFeeAmount.mul(BPS_BASE - trade.feeDiscount) /
+            (executedFeeAmount * (BPS_BASE - trade.feeDiscount)) /
             BPS_BASE;
 
-        executedTrade.sellAmount = executedSellAmount.add(executedFeeAmount);
+        executedTrade.sellAmount = executedSellAmount + executedFeeAmount;
         executedTrade.buyAmount = executedBuyAmount;
 
         filledAmount[trade.orderUid] = currentFilledAmount;

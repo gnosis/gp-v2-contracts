@@ -696,7 +696,7 @@ describe("GPv2Settlement", () => {
           encoder.clearingPrices(prices),
           encoder.encodedTrades,
         ),
-      ).to.be.revertedWith("invalid fee discount");
+      ).to.be.reverted;
     });
 
     it("should emit a trade event", async () => {
