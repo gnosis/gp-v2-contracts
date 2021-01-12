@@ -975,6 +975,30 @@ describe("GPv2Settlement", () => {
         );
     });
 
+    it("masks the function selector to the first 4 bytes for the emitted event", async () => {
+      const abi = new ethers.utils.Interface([
+        "function someFunction(bytes32 parameter)",
+      ]);
+
+      const tx = await settlement.executeInteractionTest({
+        target: ethers.constants.AddressZero,
+        value: 0,
+        callData: abi.encodeFunctionData("someFunction", [
+          `0x${"ff".repeat(32)}`,
+        ]),
+      });
+
+      const {
+        events: [{ data }],
+      } = await tx.wait();
+      expect(data).to.equal(
+        ethers.utils.defaultAbiCoder.encode(
+          ["uint256", "bytes4"],
+          [0, abi.getSighash("someFunction")],
+        ),
+      );
+    });
+
     it("computes selector for parameterless functions", async () => {
       const contract = await waffle.deployMockContract(deployer, [
         "function someFunction()",

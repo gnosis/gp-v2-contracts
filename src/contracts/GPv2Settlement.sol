@@ -377,10 +377,12 @@ contract GPv2Settlement {
         bytes4 selector;
         if (interaction.callData.length >= 4) {
             bytes memory callData = interaction.callData;
-            // Assembly used to read selector with a single `mload`.
+            // Assembly used to read selector with a single `mload`. Note that
+            // we read offset by 32 bytes, as the first word in a `bytes memory`
+            // is the length.
             // solhint-disable-next-line no-inline-assembly
             assembly {
-                selector := and(mload(add(callData, 32)), "\xff\xff\xff\xff")
+                selector := mload(add(callData, 32))
             }
         }
         emit Interaction(interaction.target, interaction.value, selector);
