@@ -169,7 +169,7 @@ contract GPv2Settlement {
     /// computed net in and out transfers for the trades.
     ///
     /// This method reverts if processing of any single trade fails. See
-    /// [`processOrder`] for more details.
+    /// [`computeTradeExecution`] for more details.
     /// @param tokens An array of ERC20 tokens to be traded in the settlement.
     /// @param clearingPrices An array of token clearing prices.
     /// @param encodedTrades Encoded trades for signed EOA orders.
