@@ -2,9 +2,9 @@
 pragma solidity ^0.7.6;
 
 contract EventEmitter {
-    event Event(uint256 number);
+    event Event(uint256 value, uint256 number);
 
-    function emitEvent(uint256 number) external {
-        emit Event(number);
+    function emitEvent(uint256 number) external payable {
+        emit Event(msg.value, number);
     }
 }

@@ -1,4 +1,4 @@
-import type { BytesLike } from "ethers";
+import type { BigNumberish, BytesLike } from "ethers";
 
 /**
  * Gnosis Protocol v2 interaction data.
@@ -9,7 +9,11 @@ export interface Interaction {
    */
   target: string;
   /**
+   * Call value in wei for the interaction, allowing Ether to be sent.
+   */
+  value?: BigNumberish;
+  /**
    * Call data used in the interaction with a smart contract.
    */
-  callData: BytesLike;
+  callData?: BytesLike;
 }
