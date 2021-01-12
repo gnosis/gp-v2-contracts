@@ -178,6 +178,25 @@ describe("GPv2Settlement", () => {
       );
     });
 
+    it("emits an OrderInvalidated event log", async () => {
+      const orderUid = computeOrderUid({
+        orderDigest: ethers.constants.HashZero,
+        owner: traders[0].address,
+        validTo: 0,
+      });
+
+      const invalidateOrder = settlement
+        .connect(traders[0])
+        .invalidateOrder(orderUid);
+
+      await expect(invalidateOrder).to.emit(settlement, "OrderInvalidated");
+
+      const tx = await invalidateOrder;
+      const { events } = await tx.wait();
+
+      expect(events[0].args).to.deep.equal([traders[0].address, orderUid]);
+    });
+
     it("fails to invalidate order that is not owned by the caller", async () => {
       const orderDigest = "0x".padEnd(66, "1");
       const validTo = 2 ** 32 - 1;
