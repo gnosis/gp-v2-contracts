@@ -792,12 +792,12 @@ describe("GPv2Settlement", () => {
         {
           target: await EventEmitter.deploy(),
           value: ethers.utils.parseEther("0.1337"),
-          number: 1,
+          number: 2,
         },
         {
           target: await EventEmitter.deploy(),
           value: ethers.constants.Zero,
-          number: 1,
+          number: 3,
         },
       ];
 
