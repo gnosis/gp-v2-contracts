@@ -69,6 +69,9 @@ contract GPv2Settlement {
         bytes orderUid
     );
 
+    /// @dev Event emitted when a settlement complets
+    event Settlement(address indexed solver);
+
     /// @dev Event emitted when an order is invalidated.
     event OrderInvalidated(address indexed owner, bytes orderUid);
 
@@ -151,6 +154,8 @@ contract GPv2Settlement {
         transferOut(executedTrades);
 
         claimOrderRefunds(encodedOrderRefunds);
+
+        emit Settlement(msg.sender);
     }
 
     /// @dev Invalidate onchain an order that has been signed offline.
