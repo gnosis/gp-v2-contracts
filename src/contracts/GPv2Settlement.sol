@@ -375,7 +375,7 @@ contract GPv2Settlement {
         }
 
         bytes4 selector;
-        if (interaction.callData.length > 4) {
+        if (interaction.callData.length >= 4) {
             bytes memory callData = interaction.callData;
             // Assembly used to read selector with a single `mload`.
             // solhint-disable-next-line no-inline-assembly

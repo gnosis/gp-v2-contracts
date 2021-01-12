@@ -975,7 +975,30 @@ describe("GPv2Settlement", () => {
         );
     });
 
-    it("emits an Interaction event with a 0 selector for empty or short calldata", async () => {
+    it("computes selector for parameterless functions", async () => {
+      const contract = await waffle.deployMockContract(deployer, [
+        "function someFunction()",
+      ]);
+
+      await contract.mock.someFunction.returns();
+
+      const callData = contract.interface.encodeFunctionData(
+        "someFunction",
+        [],
+      );
+      expect(callData).to.equal(contract.interface.getSighash("someFunction"));
+
+      const tx = settlement.executeInteractionTest({
+        target: contract.address,
+        value: 0,
+        callData,
+      });
+      await expect(tx)
+        .to.emit(settlement, "Interaction")
+        .withArgs(contract.address, ethers.constants.Zero, callData);
+    });
+
+    it("uses 0 selector for empty or short calldata", async () => {
       for (const callData of ["0x", "0xabcdef"]) {
         const tx = settlement.executeInteractionTest({
           target: ethers.constants.AddressZero,
