@@ -160,6 +160,13 @@ describe("GPv2Settlement", () => {
       await expect(settlement.connect(solver).settle([], [], [], [], [])).to.not
         .be.reverted;
     });
+
+    it("emits a Settlement event", async () => {
+      await authenticator.connect(owner).addSolver(solver.address);
+      await expect(settlement.connect(solver).settle([], [], [], [], []))
+        .to.emit(settlement, "Settlement")
+        .withArgs(solver.address);
+    });
   });
 
   describe("invalidateOrder", () => {
