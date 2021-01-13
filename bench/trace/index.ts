@@ -15,9 +15,9 @@ async function main() {
 
   const tx = await fixture.settle({
     tokens: 4,
-    trades: 20,
+    trades: 6,
     interactions: 2,
-    refunds: 10,
+    refunds: 3,
   });
   const trace = getLastTrace(fixture.settlement.interface.getSighash("settle"));
   if (!trace) {
