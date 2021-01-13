@@ -4,6 +4,7 @@ import { BigNumber, Contract, Event } from "ethers";
 import { artifacts, ethers, waffle } from "hardhat";
 
 import {
+  FULL_FEE_DISCOUNT,
   Interaction,
   OrderFlags,
   OrderKind,
@@ -719,7 +720,7 @@ describe("GPv2Settlement", () => {
         },
         traders[0],
         SigningScheme.TYPED_DATA,
-        { feeDiscount: 10001 },
+        { feeDiscount: FULL_FEE_DISCOUNT + 1 },
       );
 
       await expect(
