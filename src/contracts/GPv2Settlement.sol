@@ -349,9 +349,12 @@ contract GPv2Settlement {
             interaction.target != address(allowanceManager),
             "GPv2: forbidden interaction"
         );
+
         // solhint-disable avoid-low-level-calls
         (bool success, bytes memory response) =
-            (interaction.target).call(interaction.callData);
+            (interaction.target).call{value: interaction.value}(
+                interaction.callData
+            );
         // solhint-enable avoid-low-level-calls
 
         // TODO - concatenate the following reponse "GPv2: Failed Interaction"
