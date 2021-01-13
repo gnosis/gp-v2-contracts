@@ -1,6 +1,6 @@
 import IERC20 from "@openzeppelin/contracts/build/contracts/IERC20.json";
 import { expect } from "chai";
-import { BigNumber, Contract, Event } from "ethers";
+import { BigNumber, Contract, ContractReceipt, Event } from "ethers";
 import { artifacts, ethers, waffle } from "hardhat";
 
 import {
@@ -835,22 +835,25 @@ describe("GPv2Settlement", () => {
       const settled = settlement.executeInteractionsTest(
         encoder.encodedInteractions,
       );
-      const { events } = await (await settled).wait();
+      const { events }: ContractReceipt = await (await settled).wait();
 
       // Note: all contracts were touched.
       for (const { target } of interactionParameters) {
         await expect(settled).to.emit(target, "Event");
       }
+      await expect(settled).to.emit(settlement, "Interaction");
 
-      // Note: no extra calls.
-      expect(events.length).to.equal(interactionParameters.length);
+      const emitterEvents = (events || []).filter(
+        ({ address }) => address !== settlement.address,
+      );
+      expect(emitterEvents.length).to.equal(interactionParameters.length);
 
       // Note: the execution order was respected.
       for (let i = 0; i < interactionParameters.length; i++) {
         const params = interactionParameters[i];
         const args = params.target.interface.decodeEventLog(
           "Event",
-          events[i].data,
+          emitterEvents[i].data,
         );
 
         expect(args.value).to.equal(params.value);
@@ -943,6 +946,97 @@ describe("GPv2Settlement", () => {
       };
       await expect(settlement.executeInteractionTest(passingInteraction)).to.not
         .be.reverted;
+    });
+
+    it("emits an Interaction event", async () => {
+      const contract = await waffle.deployMockContract(deployer, [
+        "function someFunction(bytes32 parameter)",
+      ]);
+
+      const value = ethers.utils.parseEther("1.0");
+      const parameter = `0x${"ff".repeat(32)}`;
+
+      await deployer.sendTransaction({ to: settlement.address, value });
+      await contract.mock.someFunction.withArgs(parameter).returns();
+
+      const tx = settlement.executeInteractionTest({
+        target: contract.address,
+        value,
+        callData: contract.interface.encodeFunctionData("someFunction", [
+          parameter,
+        ]),
+      });
+      await expect(tx)
+        .to.emit(settlement, "Interaction")
+        .withArgs(
+          contract.address,
+          value,
+          contract.interface.getSighash("someFunction"),
+        );
+    });
+
+    it("masks the function selector to the first 4 bytes for the emitted event", async () => {
+      const abi = new ethers.utils.Interface([
+        "function someFunction(bytes32 parameter)",
+      ]);
+
+      const tx = await settlement.executeInteractionTest({
+        target: ethers.constants.AddressZero,
+        value: 0,
+        callData: abi.encodeFunctionData("someFunction", [
+          `0x${"ff".repeat(32)}`,
+        ]),
+      });
+
+      const {
+        events: [{ data }],
+      } = await tx.wait();
+      expect(data).to.equal(
+        ethers.utils.defaultAbiCoder.encode(
+          ["uint256", "bytes4"],
+          [0, abi.getSighash("someFunction")],
+        ),
+      );
+    });
+
+    it("computes selector for parameterless functions", async () => {
+      const contract = await waffle.deployMockContract(deployer, [
+        "function someFunction()",
+      ]);
+
+      await contract.mock.someFunction.returns();
+
+      const callData = contract.interface.encodeFunctionData(
+        "someFunction",
+        [],
+      );
+      expect(callData).to.equal(contract.interface.getSighash("someFunction"));
+
+      const tx = settlement.executeInteractionTest({
+        target: contract.address,
+        value: 0,
+        callData,
+      });
+      await expect(tx)
+        .to.emit(settlement, "Interaction")
+        .withArgs(contract.address, ethers.constants.Zero, callData);
+    });
+
+    it("uses 0 selector for empty or short calldata", async () => {
+      for (const callData of ["0x", "0xabcdef"]) {
+        const tx = settlement.executeInteractionTest({
+          target: ethers.constants.AddressZero,
+          value: ethers.constants.Zero,
+          callData,
+        });
+        await expect(tx)
+          .to.emit(settlement, "Interaction")
+          .withArgs(
+            ethers.constants.AddressZero,
+            ethers.constants.Zero,
+            "0x00000000",
+          );
+      }
     });
   });
 

@@ -69,6 +69,13 @@ contract GPv2Settlement {
         bytes orderUid
     );
 
+    /// @dev Event emitted for each executed interaction.
+    ///
+    /// For gas effeciency, only the interaction calldata selector (first 4
+    /// bytes) is included in the event. For interactions without calldata or
+    /// whose calldata is shorter than 4 bytes, the selector will be `0`.
+    event Interaction(address indexed target, uint256 value, bytes4 selector);
+
     /// @dev Event emitted when a settlement complets
     event Settlement(address indexed solver);
 
@@ -366,6 +373,19 @@ contract GPv2Settlement {
                 revert(add(response, 0x20), mload(response))
             }
         }
+
+        bytes4 selector;
+        if (interaction.callData.length >= 4) {
+            bytes memory callData = interaction.callData;
+            // Assembly used to read selector with a single `mload`. Note that
+            // we read offset by 32 bytes, as the first word in a `bytes memory`
+            // is the length.
+            // solhint-disable-next-line no-inline-assembly
+            assembly {
+                selector := mload(add(callData, 32))
+            }
+        }
+        emit Interaction(interaction.target, interaction.value, selector);
     }
 
     /// @dev Transfers all buy amounts for the executed trades from the
