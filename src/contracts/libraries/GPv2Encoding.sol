@@ -84,6 +84,7 @@ library GPv2Encoding {
     /// Submitted to [`GPv2Settlement.settle`] for code execution.
     struct Interaction {
         address target;
+        uint256 value;
         bytes callData;
     }
 
@@ -355,23 +356,30 @@ library GPv2Encoding {
 
     /// @dev Decodes an interaction from calldata into memory.
     ///
-    /// An encoded interaction has three components: the target address, the data
-    /// length, and the actual interaction data of variable size.
+    /// An encoded interaction has four components: the target address, the
+    /// optional call value, the data length, and the actual interaction data of
+    /// variable size.
     ///
     /// ```
     /// struct EncodedInteraction {
     ///     address target;
+    ///     bytes1 hasValue;
     ///     uint24 dataLength;
+    ///     uint256? value;
     ///     bytes callData;
     /// }
     /// ```
     ///
     /// All entries are tightly packed together in this order in the encoded
-    /// calldata. Example:
+    /// calldata. Examples:
     ///
-    /// input:    0x73c14081446bd1e4eb165250e826e80c5a523783000010000102030405060708090a0b0c0d0e0f
-    /// decoding:   [...............target.................][leng][............data..............]
-    /// stride:                                          20     3    (defined in length field) 16
+    /// input:    0x73c14081446bd1e4eb165250e826e80c5a523783_00_000010_____000102030405060708090a0b0c0d0e0f
+    /// decoding:   [...............target.................][hv][leng][val][............data..............]
+    /// stride:                                          20   1     3    0    (defined in length field) 16
+    ///
+    /// input:    0x0000000000000000000000000000000000000000_01_0000000000000000000000000000000000000000000000000000000de0b6b3a7640000
+    /// decoding:   [...............target.................][hv][leng][............................value.............................][data]
+    /// stride:                                          20   1     3                                                              32     0
     ///
     /// This function enforces that the encoded data stores enough bytes to
     /// cover the full length of the decoded interaction.
@@ -392,6 +400,7 @@ library GPv2Encoding {
         bytes calldata encodedInteractions,
         Interaction memory interaction
     ) internal pure returns (bytes calldata remainingEncodedInteractions) {
+        bool hasValue;
         uint256 dataLength;
 
         // Note: use assembly to efficiently decode packed data and store the
@@ -404,27 +413,51 @@ library GPv2Encoding {
                 shr(96, calldataload(encodedInteractions.offset))
             )
 
-            // dataLength = uint24(encodedInteractions[1])
+            // hasValue = bool(encodedInteractions[20])
+            hasValue := iszero(
+                iszero(
+                    shr(248, calldataload(add(encodedInteractions.offset, 20)))
+                )
+            )
+
+            // dataLength = uint24(encodedInteractions[21:24])
             dataLength := shr(
                 232,
-                calldataload(add(encodedInteractions.offset, 20))
+                calldataload(add(encodedInteractions.offset, 21))
             )
         }
 
         // Safety: dataLength fits a uint24, no overflow is possible.
-        uint256 encodedInteractionSize = 20 + 3 + dataLength;
+        uint256 encodedInteractionSize = 20 + 1 + 3 + dataLength;
+        if (hasValue) {
+            encodedInteractionSize += 32;
+        }
         require(
             encodedInteractions.length >= encodedInteractionSize,
             "GPv2: invalid interaction"
         );
 
+        uint256 value;
         bytes calldata interactionCallData;
         // Note: assembly is used to split the calldata into two components, one
         // being the calldata of the current interaction and the other being the
         // encoded bytes of the remaining interactions.
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            interactionCallData.offset := add(encodedInteractions.offset, 23)
+            switch hasValue
+                case 0 {
+                    interactionCallData.offset := add(
+                        encodedInteractions.offset,
+                        24
+                    )
+                }
+                default {
+                    value := calldataload(add(encodedInteractions.offset, 24))
+                    interactionCallData.offset := add(
+                        encodedInteractions.offset,
+                        56
+                    )
+                }
             interactionCallData.length := dataLength
 
             remainingEncodedInteractions.offset := add(
@@ -437,6 +470,7 @@ library GPv2Encoding {
             )
         }
 
+        interaction.value = value;
         // Solidity takes care of copying the calldata slice into memory.
         interaction.callData = interactionCallData;
     }

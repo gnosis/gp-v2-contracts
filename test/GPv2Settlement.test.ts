@@ -790,47 +790,71 @@ describe("GPv2Settlement", () => {
   describe("executeInteractions", () => {
     it("executes valid interactions", async () => {
       const EventEmitter = await ethers.getContractFactory("EventEmitter");
-      const contract1 = await EventEmitter.deploy();
-      const contract2 = await EventEmitter.deploy();
-      const contract3 = await EventEmitter.deploy();
-      expect(contract1.address)
-        .not.to.equal(contract2.address)
-        .not.to.equal(contract3.address);
-      expect(contract2.address).not.to.equal(contract3.address);
+      const interactionParameters = [
+        {
+          target: await EventEmitter.deploy(),
+          value: ethers.utils.parseEther("0.42"),
+          number: 1,
+        },
+        {
+          target: await EventEmitter.deploy(),
+          value: ethers.utils.parseEther("0.1337"),
+          number: 2,
+        },
+        {
+          target: await EventEmitter.deploy(),
+          value: ethers.constants.Zero,
+          number: 3,
+        },
+      ];
+
+      const uniqueContractAddresses = new Set(
+        interactionParameters.map((params) => params.target.address),
+      );
+      expect(uniqueContractAddresses.size).to.equal(
+        interactionParameters.length,
+      );
 
       const encoder = new SettlementEncoder(testDomain);
-      encoder.encodeInteraction({
-        target: contract1.address,
-        callData: contract1.interface.encodeFunctionData("emitEvent", [1]),
-      });
-      encoder.encodeInteraction({
-        target: contract2.address,
-        callData: contract2.interface.encodeFunctionData("emitEvent", [2]),
-      });
-      encoder.encodeInteraction({
-        target: contract3.address,
-        callData: contract3.interface.encodeFunctionData("emitEvent", [3]),
+      for (const { target, value, number } of interactionParameters) {
+        encoder.encodeInteraction({
+          target: target.address,
+          value,
+          callData: target.interface.encodeFunctionData("emitEvent", [number]),
+        });
+      }
+
+      // Note: make sure to send some Ether to the settlement contract so that
+      // it can execute the interactions with values.
+      await deployer.sendTransaction({
+        to: settlement.address,
+        value: ethers.utils.parseEther("1.0"),
       });
 
       const settled = settlement.executeInteractionsTest(
         encoder.encodedInteractions,
       );
-      const events = (await (await settled).wait()).events;
+      const { events } = await (await settled).wait();
 
       // Note: all contracts were touched.
-      await expect(settled).to.emit(contract1, "Event");
-      await expect(settled).to.emit(contract2, "Event");
-      await expect(settled).to.emit(contract3, "Event");
-
-      const uint256ToBytes32 = (n: number) =>
-        ethers.utils.solidityPack(["uint256"], [n]);
-      // Note: the execution order was respected.
-      expect(events[0].data).to.equal(uint256ToBytes32(1));
-      expect(events[1].data).to.equal(uint256ToBytes32(2));
-      expect(events[2].data).to.equal(uint256ToBytes32(3));
+      for (const { target } of interactionParameters) {
+        await expect(settled).to.emit(target, "Event");
+      }
 
       // Note: no extra calls.
-      expect(events.length).to.equal(3);
+      expect(events.length).to.equal(interactionParameters.length);
+
+      // Note: the execution order was respected.
+      for (let i = 0; i < interactionParameters.length; i++) {
+        const params = interactionParameters[i];
+        const args = params.target.interface.decodeEventLog(
+          "Event",
+          events[i].data,
+        );
+
+        expect(args.value).to.equal(params.value);
+        expect(args.number).to.equal(params.number);
+      }
     });
 
     it("reverts if any of the interactions reverts", async () => {
@@ -856,26 +880,25 @@ describe("GPv2Settlement", () => {
       // TODO - update this error with concatenated version "GPv2 Interaction:
       // test error"
       await expect(
-        settlement.callStatic.executeInteractionsTest(
-          encoder.encodedInteractions,
-        ),
+        settlement.executeInteractionsTest(encoder.encodedInteractions),
       ).to.be.revertedWith("test error");
     });
   });
 
   describe("executeInteraction", () => {
-    it("should fail when target is allowanceManager", async () => {
+    it("should revert when target is allowanceManager", async () => {
       const invalidInteraction: Interaction = {
         target: await settlement.allowanceManager(),
         callData: [],
+        value: 0,
       };
 
       await expect(
-        settlement.callStatic.executeInteractionTest(invalidInteraction),
+        settlement.executeInteractionTest(invalidInteraction),
       ).to.be.revertedWith("GPv2: forbidden interaction");
     });
 
-    it("should fail when interaction reverts", async () => {
+    it("should revert when interaction reverts", async () => {
       const reverter = await waffle.deployMockContract(deployer, [
         "function alwaysReverts()",
       ]);
@@ -886,22 +909,39 @@ describe("GPv2Settlement", () => {
       const failingInteraction: Interaction = {
         target: reverter.address,
         callData: revertingCallData,
+        value: 0,
       };
 
       // TODO - update this error with concatenated version "GPv2 Interaction: test error"
       await expect(
-        settlement.callStatic.executeInteractionTest(failingInteraction),
+        settlement.executeInteractionTest(failingInteraction),
       ).to.be.revertedWith("test error");
+    });
+
+    it("reverts if the settlement contract does not have sufficient Ether balance", async () => {
+      const value = ethers.utils.parseEther("1000000.0");
+      expect(value.gt(await ethers.provider.getBalance(settlement.address))).to
+        .be.true;
+
+      const encoder = new SettlementEncoder(testDomain);
+      encoder.encodeInteraction({
+        target: ethers.constants.AddressZero,
+        value,
+      });
+
+      await expect(
+        settlement.executeInteractionsTest(encoder.encodedInteractions),
+      ).to.be.reverted;
     });
 
     it("should pass on successful execution", async () => {
       const passingInteraction: Interaction = {
         target: ethers.constants.AddressZero,
         callData: "0x",
+        value: 0,
       };
-      await expect(
-        settlement.callStatic.executeInteractionTest(passingInteraction),
-      ).to.not.be.reverted;
+      await expect(settlement.executeInteractionTest(passingInteraction)).to.not
+        .be.reverted;
     });
   });
 

@@ -1,4 +1,4 @@
-import { BigNumberish, BytesLike, Signer, ethers } from "ethers";
+import { BigNumber, BigNumberish, BytesLike, Signer, ethers } from "ethers";
 
 import { Interaction } from "./interaction";
 import {
@@ -232,12 +232,19 @@ export class SettlementEncoder {
    * @param interaction The interaction to encode.
    */
   public encodeInteraction(interaction: Interaction): void {
-    const callDataLength = ethers.utils.hexDataLength(interaction.callData);
+    const value = BigNumber.from(interaction.value || 0);
+    const callData = interaction.callData || "0x";
+    const callDataLength = ethers.utils.hexDataLength(callData);
 
-    const encodedInteraction = ethers.utils.solidityPack(
-      ["address", "uint24", "bytes"],
-      [interaction.target, callDataLength, interaction.callData],
-    );
+    const encodedInteraction = value.isZero()
+      ? ethers.utils.solidityPack(
+          ["address", "bool", "uint24", "bytes"],
+          [interaction.target, false, callDataLength, callData],
+        )
+      : ethers.utils.solidityPack(
+          ["address", "bool", "uint24", "uint256", "bytes"],
+          [interaction.target, true, callDataLength, value, callData],
+        );
 
     this._encodedInteractions = ethers.utils.hexConcat([
       this._encodedInteractions,
