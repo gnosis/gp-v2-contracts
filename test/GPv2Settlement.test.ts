@@ -71,6 +71,12 @@ describe("GPv2Settlement", () => {
     });
   });
 
+  describe("authenticator", () => {
+    it("should be set to the authenticator the contract was initialized with", async () => {
+      expect(await settlement.authenticator()).to.equal(authenticator.address);
+    });
+  });
+
   describe("allowanceManager", () => {
     it("should deploy an allowance manager", async () => {
       const deployedAllowanceManager = await settlement.allowanceManager();
@@ -171,6 +177,25 @@ describe("GPv2Settlement", () => {
       expect(await settlement.filledAmount(orderUid)).to.equal(
         ethers.constants.MaxUint256,
       );
+    });
+
+    it("emits an OrderInvalidated event log", async () => {
+      const orderUid = computeOrderUid({
+        orderDigest: ethers.constants.HashZero,
+        owner: traders[0].address,
+        validTo: 0,
+      });
+
+      const invalidateOrder = settlement
+        .connect(traders[0])
+        .invalidateOrder(orderUid);
+
+      await expect(invalidateOrder).to.emit(settlement, "OrderInvalidated");
+
+      const tx = await invalidateOrder;
+      const { events } = await tx.wait();
+
+      expect(events[0].args).to.deep.equal([traders[0].address, orderUid]);
     });
 
     it("fails to invalidate order that is not owned by the caller", async () => {

@@ -44,7 +44,7 @@ contract GPv2Settlement {
     /// That is, only authorised solvers have the ability to invoke settlements.
     /// Any valid authenticator implements an isSolver method called by the onlySolver
     /// modifier below.
-    GPv2Authentication private immutable authenticator;
+    GPv2Authentication public immutable authenticator;
 
     /// @dev The allowance manager which has access to EOA order funds. This
     /// contract is created during deployment
@@ -68,6 +68,9 @@ contract GPv2Settlement {
         uint256 feeAmount,
         bytes orderUid
     );
+
+    /// @dev Event emitted when an order is invalidated.
+    event OrderInvalidated(address indexed owner, bytes orderUid);
 
     constructor(GPv2Authentication authenticator_) {
         authenticator = authenticator_;
@@ -159,13 +162,14 @@ contract GPv2Settlement {
         (, address owner, ) = orderUid.extractOrderUidParams();
         require(owner == msg.sender, "GPv2: caller does not own order");
         filledAmount[orderUid] = uint256(-1);
+        emit OrderInvalidated(owner, orderUid);
     }
 
     /// @dev Process all trades for EOA orders one at a time returning the
     /// computed net in and out transfers for the trades.
     ///
     /// This method reverts if processing of any single trade fails. See
-    /// [`processOrder`] for more details.
+    /// [`computeTradeExecution`] for more details.
     /// @param tokens An array of ERC20 tokens to be traded in the settlement.
     /// @param clearingPrices An array of token clearing prices.
     /// @param encodedTrades Encoded trades for signed EOA orders.
