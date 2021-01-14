@@ -1,5 +1,4 @@
 import { BigNumber, BigNumberish, ContractReceipt } from "ethers";
-import Debug from "debug";
 import { ethers } from "hardhat";
 import {
   CallMessageTrace,
@@ -7,26 +6,40 @@ import {
   isCallTrace,
   isEvmStep,
   isPrecompileTrace,
-  MessageTraceStep,
+  PrecompileMessageTrace,
 } from "hardhat/internal/hardhat-network/stack-traces/message-trace";
-import { JumpType } from "hardhat/internal/hardhat-network/stack-traces/model";
-
-const debug = Debug("bench:trace:gas");
 
 export interface GasTrace {
   name: string;
-  gas: BigNumber;
   cumulativeGas: BigNumber;
+  gasUsed?: BigNumber;
+  gasRefund?: BigNumber;
   children: GasTrace[];
 }
 
-function node(
-  name: string,
-  gas: BigNumberish,
-  cumulativeGas: BigNumberish,
-  children?: GasTrace[],
-): GasTrace {
-  return { name, gas: BigNumber.from(gas), cumulativeGas: BigNumber.from(cumulativeGas), children: children || [] };
+type BN = CallMessageTrace["gasUsed"];
+
+function num(value: BigNumberish | BN): BigNumber {
+  return BigNumber.from(value.toString());
+}
+
+interface GasTraceish {
+  name: string;
+  cumulativeGas: BigNumberish | BN;
+  gasUsed?: BigNumberish | BN;
+  gasRefund?: BigNumberish | BN;
+  children?: GasTrace[];
+}
+
+function node(trace: GasTraceish): GasTrace {
+  const gasRefund = num(trace.gasRefund || 0);
+  return {
+    name: trace.name,
+    cumulativeGas: num(trace.cumulativeGas),
+    gasUsed: trace.gasUsed ? num(trace.gasUsed) : undefined,
+    gasRefund: gasRefund.isZero() ? undefined : gasRefund,
+    children: trace.children || [],
+  };
 }
 
 export function decodeGasTrace(
@@ -43,16 +56,70 @@ export function decodeGasTrace(
     (gas, byte) => gas + (byte === 0 ? 4 : 16),
     0,
   );
+  const transactionGas = baseGas + calldataGas;
 
-  return node(callName(trace), tx.gasUsed, 0, [
-    node("<base>", baseGas, 0),
-    node("<calldata>", calldataGas, baseGas),
-    entrypoint(trace, baseGas + calldataGas),
-  ]);
+  const { gasRefund } = (trace as unknown) as GasExtension;
+
+  return node({
+    name: callName(trace),
+    cumulativeGas: tx.gasUsed,
+    gasRefund,
+    children: [
+      node({ name: "<base>", cumulativeGas: baseGas }),
+      node({
+        name: "<calldata>",
+        cumulativeGas: transactionGas,
+        gasUsed: calldataGas,
+      }),
+      node({
+        name: "<entrypoint>",
+        cumulativeGas: trace.gasUsed.addn(transactionGas),
+        gasUsed: trace.gasUsed,
+        children: computeGasTrace(trace, transactionGas),
+      }),
+    ],
+  });
+}
+
+interface FunctionSymbol {
+  contractName: string;
+  functionName: string;
+}
+
+function fallbackSelectors(
+  abis: Record<string, string[]>,
+): Record<string, FunctionSymbol | undefined> {
+  const result: Record<string, FunctionSymbol | undefined> = {};
+  for (const [contractName, functionSignatures] of Object.entries(abis)) {
+    for (const functionSignature of functionSignatures) {
+      const abi = new ethers.utils.Interface([functionSignature]);
+      const [func] = Object.values(abi.functions);
+      result[abi.getSighash(func)] = {
+        contractName,
+        functionName: func.name,
+      };
+    }
+  }
+  return result;
 }
 
 function callName({ address, bytecode, calldata }: CallMessageTrace): string {
   const selector = calldata.slice(0, 4);
+
+  // NOTE: In order to provide better tracing output, here are some manually
+  // specified function selectors for contracts that the tracer can't find the
+  // source for.
+  const FALLBACK_SELECTORS = fallbackSelectors({
+    ERC20: [
+      "function balanceOf(address)",
+      "function transferFrom(address, address, uint256)",
+      "function transfer(address, uint256)",
+    ],
+    UniswapV2Pair: [
+      "function swap(uint256, uint256, address, bytes)",
+      "function swap(uint256, uint256, address, bytes)",
+    ],
+  });
 
   let contractName, functionName;
   if (bytecode) {
@@ -61,96 +128,88 @@ function callName({ address, bytecode, calldata }: CallMessageTrace): string {
       f.selector?.equals(selector),
     )?.name;
   } else {
-    contractName = `<${ethers.utils.getAddress(
+    const addr = (contractName = ethers.utils.getAddress(
       ethers.utils.hexlify(address),
-    )}>`;
+    ));
+    const sighash = ethers.utils.hexlify(selector);
+
+    const fallback = FALLBACK_SELECTORS[sighash];
+    if (fallback) {
+      ({ contractName, functionName } = fallback);
+      contractName = `${contractName}[${addr.substr(0, 6)}..${addr.substr(
+        -4,
+      )}]`;
+    } else {
+      contractName = `<${contractName}>`;
+      functionName = `<${sighash}>`;
+    }
   }
 
-  return `${contractName}.${
-    functionName || `<${ethers.utils.hexlify(selector)}>`
-  }`;
+  return `${contractName}.${functionName}`;
 }
 
-function entrypoint(trace: CallMessageTrace, startingGas: BigNumberish): GasTrace {
-  const tracer = new CodeTracer(trace, startingGas);
-  const name = "<entrypoint>";
-  return node(name, trace.gasUsed.toString(), 0, tracer.traceToEnd(name));
+function precompileName({ precompile }: PrecompileMessageTrace): string {
+  switch (precompile) {
+    case 1:
+      return "@ecrecover";
+    // TODO: Add more precompiles if we run into any...
+    default:
+      return `<precompile 0x${precompile.toString(16)}>`;
+  }
 }
 
-type GasExtended<T> = T & {
-  gasLeft?: unknown;
-  gasRefund?: unknown;
+interface GasExtension {
+  gasLeft: BN;
+  gasRefund?: BN;
 }
 
-class CodeTracer {
-  private stepIndex = -1;
+function computeGasTrace(
+  { steps }: CallMessageTrace,
+  transactionGas: BigNumberish,
+): GasTrace[] {
+  const nodes = [];
 
-  constructor(
-    public readonly trace: CallMessageTrace,
-    private readonly startingGas: BigNumberish,
-  ) {}
+  const { gasLeft: initialGasLeft } = (steps[0] as unknown) as GasExtension;
+  const gasLimit = num(initialGasLeft).add(transactionGas);
 
-  get step(): GasExtended<MessageTraceStep> {
-    return this.trace.steps[this.stepIndex];
-  }
-
-  private get cumulativeGas(): BigNumber {
-    return BigNumber.from(this.startingGas);
-  }
-
-  private nextStep(): GasExtended<MessageTraceStep> {
-    this.stepIndex++;
-    return this.step;
-  }
-
-  public traceToEnd(name: string): GasTrace[] {
-    const nodes = this.traceLocal(name);
-    if (this.step) {
-      throw new Error("trace to end with remaining steps")
+  for (const [i, step] of steps.entries()) {
+    if (isEvmStep(step)) {
+      // TODO: Try and keep an internal function stack trace, although this has
+      // proven quite difficult as the instruction locations seem all over the
+      // place.
+      continue;
     }
 
-    return nodes;
-  }
-
-  private traceLocal(name: string): GasTrace[] {
-    debug(`>>> entering ${name}`);
-    
-    const nodes = [];
-    let step;
-    while (step = this.nextStep()) {
-      const { gasLeft, gasRefund } = step;
-      if (isEvmStep(step)) {
-        // TODO: Stack trace is not very accurate with optimizations turned on.
-        const instruction = this.trace.bytecode?.getInstruction(step.pc)
-        const jumpType = instruction?.jumpType;
-        if (jumpType == JumpType.INTO_FUNCTION) {
-            const name = instruction?.location?.getContainingFunction()?.name || "<unknown>";
-            const startingGas = BigNumber.from(`${gasLeft || 0}`);
-            const children = this.traceLocal(name);
-            const endingGas = BigNumber.from(`${this.step?.gasLeft || 0}`);
-            nodes.push(node(
-              name,
-              startingGas.sub(endingGas),
-              this.cumulativeGas,
-              children,
-            ))
-        } else if (jumpType == JumpType.OUTOF_FUNCTION) {
-          break;
-        }
-      } else if (isCallTrace(step)) {
-        const subTracer = new CodeTracer(step, this.startingGas);
-        const name = callName(step);
-        nodes.push(
-          node(name, step.gasUsed.toString(), this.cumulativeGas, subTracer.traceToEnd(name)),
-        );
-      } else if (isPrecompileTrace(step)) {
-        nodes.push(
-          node(`<precompile 0x${step.precompile}>`, step.gasUsed.toString(), this.cumulativeGas),
-        );
-      }
+    const [prevStep, nextStep] = [steps[i - 1], steps[i + 1]];
+    if (!isEvmStep(prevStep) || !isEvmStep(nextStep)) {
+      throw new Error("expected EVM step surrounding sub trace");
     }
 
-    debug(`<<< exiting ${name}`);
-    return nodes;
+    const { gasLeft: gasLeftAfterCall } = (nextStep as unknown) as GasExtension;
+    const cumulativeGas = gasLimit.sub(num(gasLeftAfterCall));
+    const { gasUsed } = step;
+
+    if (isCallTrace(step)) {
+      const { gasRefund } = (step as unknown) as GasExtension;
+      nodes.push(
+        node({
+          name: callName(step),
+          cumulativeGas,
+          gasUsed,
+          gasRefund,
+          children: computeGasTrace(step, 0),
+        }),
+      );
+    } else if (isPrecompileTrace(step)) {
+      nodes.push(
+        node({
+          name: precompileName(step),
+          gasUsed,
+          cumulativeGas,
+        }),
+      );
+    }
   }
+
+  return nodes;
 }
