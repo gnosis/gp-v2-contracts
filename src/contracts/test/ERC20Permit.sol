@@ -29,6 +29,7 @@ contract ERC20Permit is ERC20PresetMinterPauser {
 
     mapping(address => Counters.Counter) private _nonces;
 
+    // solhint-disable-next-line var-name-mixedcase
     bytes32 public immutable DOMAIN_SEPARATOR;
 
     // solhint-disable-next-line var-name-mixedcase
@@ -42,9 +43,7 @@ contract ERC20Permit is ERC20PresetMinterPauser {
      *
      * It's a good idea to use the same `name` that is defined as the ERC20 token name.
      */
-    constructor(string memory symbol)
-        ERC20PresetMinterPauser(symbol, symbol)
-    {
+    constructor(string memory symbol) ERC20PresetMinterPauser(symbol, symbol) {
         DOMAIN_SEPARATOR = keccak256(
             abi.encode(
                 keccak256(
