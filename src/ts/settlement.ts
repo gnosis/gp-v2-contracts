@@ -1,6 +1,6 @@
-import { BigNumber, BigNumberish, BytesLike, Signer, ethers } from "ethers";
+import { BigNumberish, BytesLike, Signer, ethers } from "ethers";
 
-import { Interaction } from "./interaction";
+import { Interaction, encodeInteraction } from "./interaction";
 import {
   ORDER_UID_LENGTH,
   Order,
@@ -68,6 +68,7 @@ function encodeOrderFlags(flags: OrderFlags): number {
 export class SettlementEncoder {
   private readonly _tokens: string[] = [];
   private readonly _tokenMap: Record<string, number | undefined> = {};
+  private _encodedPreparations = "0x";
   private _encodedTrades = "0x";
   private _encodedInteractions = "0x";
   private _encodedOrderRefunds = "0x";
@@ -95,6 +96,13 @@ export class SettlementEncoder {
   }
 
   /**
+   * Gets the encoded settlement preparations as a hex-encoded string.
+   */
+  public get encodedPreparations(): string {
+    return this._encodedPreparations;
+  }
+
+  /**
    * Gets the encoded trades as a hex-encoded string.
    */
   public get encodedTrades(): string {
@@ -102,7 +110,7 @@ export class SettlementEncoder {
   }
 
   /**
-   * Gets the encoded trades as a hex-encoded string.
+   * Gets the encoded interactions as a hex-encoded string.
    */
   public get encodedInteractions(): string {
     return this._encodedInteractions;
@@ -148,6 +156,19 @@ export class SettlementEncoder {
       }
       return price;
     });
+  }
+
+  /**
+   * Encodes the input preparation in the packed format accepted by the smart
+   * contract and adds it to the settlement preparations encoded so far.
+   *
+   * @param preparation The preparation to encode.
+   */
+  public encodePreparation(preparation: Interaction): void {
+    this._encodedPreparations = ethers.utils.hexConcat([
+      this._encodedPreparations,
+      encodeInteraction(preparation),
+    ]);
   }
 
   /**
@@ -237,23 +258,9 @@ export class SettlementEncoder {
    * @param interaction The interaction to encode.
    */
   public encodeInteraction(interaction: Interaction): void {
-    const value = BigNumber.from(interaction.value || 0);
-    const callData = interaction.callData || "0x";
-    const callDataLength = ethers.utils.hexDataLength(callData);
-
-    const encodedInteraction = value.isZero()
-      ? ethers.utils.solidityPack(
-          ["address", "bool", "uint24", "bytes"],
-          [interaction.target, false, callDataLength, callData],
-        )
-      : ethers.utils.solidityPack(
-          ["address", "bool", "uint24", "uint256", "bytes"],
-          [interaction.target, true, callDataLength, value, callData],
-        );
-
     this._encodedInteractions = ethers.utils.hexConcat([
       this._encodedInteractions,
-      encodedInteraction,
+      encodeInteraction(interaction),
     ]);
   }
 

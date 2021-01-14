@@ -310,6 +310,7 @@ export class BenchFixture {
       .settle(
         encoder.tokens,
         encoder.clearingPrices(prices),
+        encoder.encodedPreparations,
         encoder.encodedTrades,
         encoder.encodedInteractions,
         encoder.encodedOrderRefunds,
