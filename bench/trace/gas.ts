@@ -115,10 +115,7 @@ function callName({ address, bytecode, calldata }: CallMessageTrace): string {
       "function transferFrom(address, address, uint256)",
       "function transfer(address, uint256)",
     ],
-    UniswapV2Pair: [
-      "function swap(uint256, uint256, address, bytes)",
-      "function swap(uint256, uint256, address, bytes)",
-    ],
+    UniswapV2Pair: ["function swap(uint256, uint256, address, bytes)"],
   });
 
   let contractName, functionName;

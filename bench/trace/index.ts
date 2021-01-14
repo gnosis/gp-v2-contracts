@@ -52,10 +52,12 @@ function formatGasTrace(gasTrace: GasTrace, path: GasTrace[] = []) {
 
   const { name, cumulativeGas, gasUsed, gasRefund, children } = gasTrace;
   const chalkedName = name.match(/^<.*>$/)
-    ? chalk.gray(name)
+    ? chalk.bold(chalk.gray(name))
     : name.match(/^@/)
     ? chalk.magenta(name)
-    : chalk.cyan(name);
+    : name.match(/\[.*\]\./)
+    ? chalk.cyan(name)
+    : chalk.bold(chalk.cyan(name));
 
   let gas = `${chalk.yellow(cumulativeGas)}`;
   if (gasUsed) {
