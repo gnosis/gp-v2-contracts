@@ -26,12 +26,19 @@ export function decodeGasTrace(
   tx: ContractReceipt,
   trace: DecodedCallMessageTrace,
 ): GasTrace {
+  // NOTE: The `gasUsed` data from the trace is just for the code execution, and
+  // does not account for other gas costs when executing a transaction.
+  // Specifically, create a gas trace node for the fixed base transaction cost
+  // as well as the calldata gas cost which costs 4 gas per `0` byte and 16 gas
+  // per non-`0` byte.
+  const baseGas = 21000;
   const calldataGas = trace.calldata.reduce(
     (gas, byte) => gas + (byte === 0 ? 4 : 16),
     0,
   );
+
   return node(callName(trace), tx.gasUsed, [
-    node("<base>", 21000),
+    node("<base>", baseGas),
     node("<calldata>", calldataGas),
     entrypoint(trace),
   ]);
