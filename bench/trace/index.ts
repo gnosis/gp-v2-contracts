@@ -50,12 +50,24 @@ function formatGasTrace(gasTrace: GasTrace, path: GasTrace[] = []) {
     },
   );
 
-  const { name, gas, children } = gasTrace;
+  const { name, cumulativeGas, gasUsed, gasRefund, children } = gasTrace;
   const chalkedName = name.match(/^<.*>$/)
-    ? chalk.gray(name)
-    : chalk.cyan(name);
+    ? chalk.bold(chalk.gray(name))
+    : name.match(/^@/)
+    ? chalk.magenta(name)
+    : name.match(/\[.*\]\./)
+    ? chalk.cyan(name)
+    : chalk.bold(chalk.cyan(name));
 
-  console.log(`${padding}${chalkedName} ${chalk.yellow(gas)}`);
+  let gas = `${chalk.yellow(cumulativeGas)}`;
+  if (gasUsed) {
+    gas = `${gas} ${chalk.red(`-${gasUsed}`)}`;
+  }
+  if (gasRefund) {
+    gas = `${gas} ${chalk.green(`+${gasRefund}`)}`;
+  }
+
+  console.log(`${padding}${chalkedName} ${gas}`);
   const subpath = [...path, gasTrace];
   for (const child of children) {
     formatGasTrace(child, subpath);
