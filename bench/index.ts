@@ -54,6 +54,8 @@ async function main() {
     [2, 50, 0, 40],
     [2, 50, 0, 45],
     [2, 50, 0, 50],
+    [2, 2, 0, 0],
+    [2, 1, 1, 0],
     [10, 100, 10, 20],
   ]) {
     const { gasUsed } = await fixture.settle({
