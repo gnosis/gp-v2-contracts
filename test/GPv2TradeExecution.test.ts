@@ -84,7 +84,7 @@ describe("GPv2TradeExecution", () => {
       ).not.to.be.reverted;
     });
 
-    it("does not revert when mistakenly trying to sell ETH using the marker buy Ether address", async () => {
+    it("reverts when mistakenly trying to sell ETH using the marker buy Ether address", async () => {
       await expect(
         tradeExecution.transferSellAmountToRecipientTest(
           encodeExecutedTrade({
@@ -95,7 +95,7 @@ describe("GPv2TradeExecution", () => {
           }),
           recipient.address,
         ),
-      ).not.to.be.reverted;
+      ).to.be.revertedWith("GPv2: cannot transfer native ETH");
     });
 
     describe("Non-Standard ERC20 Tokens", () => {

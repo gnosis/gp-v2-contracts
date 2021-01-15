@@ -28,6 +28,10 @@ library GPv2TradeExecution {
         Data calldata trade,
         address recipient
     ) internal {
+        require(
+            address(trade.sellToken) != BUY_ETH_ADDRESS,
+            "GPv2: cannot transfer native ETH"
+        );
         trade.sellToken.safeTransferFrom(
             trade.owner,
             recipient,
