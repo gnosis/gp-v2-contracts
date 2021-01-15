@@ -5,12 +5,8 @@ import { ethers, waffle } from "hardhat";
 
 import { BUY_ETH_ADDRESS } from "../src/ts";
 
+import { NON_STANDARD_ERC20 } from "./ERC20";
 import { encodeExecutedTrade } from "./encoding";
-
-const NON_STANDARD_ERC20 = [
-  "function transfer(address recipient, uint256 amount)",
-  "function transferFrom(address sender, address recipient, uint256 amount)",
-];
 
 describe("GPv2TradeExecution", () => {
   const [deployer, recipient, ...traders] = waffle.provider.getWallets();
