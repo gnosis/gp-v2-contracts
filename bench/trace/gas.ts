@@ -177,9 +177,9 @@ function computeGasTrace(
       continue;
     }
 
-    const [prevStep, nextStep] = [steps[i - 1], steps[i + 1]];
-    if (!isEvmStep(prevStep) || !isEvmStep(nextStep)) {
-      throw new Error("expected EVM step surrounding sub trace");
+    const nextStep = steps[i + 1];
+    if (!isEvmStep(nextStep)) {
+      throw new Error("expected EVM step after sub trace");
     }
 
     const { gasLeft: gasLeftAfterCall } = (nextStep as unknown) as GasExtension;
