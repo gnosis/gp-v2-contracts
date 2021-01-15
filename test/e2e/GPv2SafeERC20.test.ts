@@ -11,11 +11,11 @@ describe("GPv2SafeERC20.sol", () => {
   let executor: Contract;
 
   beforeEach(async () => {
-    const TransferExecutor = await ethers.getContractFactory(
-      "TransferExecutor",
+    const GPv2SafeERC20TestInterface = await ethers.getContractFactory(
+      "GPv2SafeERC20TestInterface",
     );
 
-    executor = await TransferExecutor.deploy();
+    executor = await GPv2SafeERC20TestInterface.deploy();
   });
 
   describe("transfer", () => {

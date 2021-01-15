@@ -5,7 +5,7 @@ pragma abicoder v2;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../libraries/GPv2SafeERC20.sol";
 
-contract TransferExecutor {
+contract GPv2SafeERC20TestInterface {
     using GPv2SafeERC20 for IERC20;
 
     function transfer(
