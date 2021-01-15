@@ -9,6 +9,7 @@
     "solvers": "hardhat solvers",
     "test": "hardhat test",
     "bench": "hardhat run bench/index.ts",
+    "bench:trace": "hardhat run bench/trace/index.ts",
     "lint": "yarn lint:sol && yarn lint:ts",
     "lint:sol": "solhint 'src/contracts/**/*.sol'",
     "lint:ts": "eslint --max-warnings 0 .",
@@ -50,8 +51,7 @@
     "solhint": "^3.3.2",
     "solhint-plugin-prettier": "^0.0.5",
     "ts-node": "^9.1.1",
-    "typescript": "^4.1.3",
-    "yargs": "^16.2.0"
+    "typescript": "^4.1.3"
   },
   "main": "lib/src/ts/index.js",
   "types": "lib/src/ts/index.d.ts",

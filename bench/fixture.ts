@@ -149,6 +149,10 @@ export class BenchFixture {
     );
   }
 
+  public get settlement(): Contract {
+    return this.deployment.settlement;
+  }
+
   public async settle(options: SettlementOptions): Promise<ContractReceipt> {
     debug(`running fixture with ${JSON.stringify(options)}`);
 
