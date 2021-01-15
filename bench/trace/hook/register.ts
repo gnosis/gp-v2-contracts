@@ -5,6 +5,7 @@ import {
   DecodedCallMessageTrace,
   isDecodedCallTrace,
 } from "hardhat/internal/hardhat-network/stack-traces/message-trace";
+import { VMTracer } from "hardhat/internal/hardhat-network/stack-traces/vm-tracer";
 
 const debug = Debug("bench:trace:hook:register");
 
@@ -27,6 +28,35 @@ experimentalAddHardhatNetworkMessageTraceHook(async ({ ethers }, trace) => {
 
   lastTrace = trace;
 });
+
+// NOTE: Leverage how hacky you can get with NodeJS and modify the tracer to
+// include additional gas information for instructions and subtraces. This code
+// should ideally be upstreamed and the experimental tracing extended to include
+// additional gas usage data.
+/* eslint-disable @typescript-eslint/no-explicit-any */
+const VMTracerPrototype = VMTracer.prototype as any;
+const { _stepHandler, _afterMessageHandler } = VMTracerPrototype;
+VMTracerPrototype._stepHandler = function (step: any, next: any) {
+  const trace = this._messageTraces[this._messageTraces.length - 1] || {
+    steps: [],
+  };
+  const nsteps = trace.steps.length;
+  return _stepHandler.call(this, step, (...args: unknown[]) => {
+    // NOTE: Check if the step handler added a step, and if it did, the add gas
+    // information to it.
+    if (trace.steps.length != nsteps) {
+      trace.steps[nsteps].gasLeft = step.gasLeft;
+    }
+    next(...args);
+  });
+};
+VMTracerPrototype._afterMessageHandler = function (result: any, next: any) {
+  const trace = this._messageTraces[this._messageTraces.length - 1] || {};
+  trace.gasLeft = result?.execResult?.gas;
+  trace.gasRefund = result?.execResult?.gasRefund;
+  return _afterMessageHandler.call(this, result, next);
+};
+/* eslint-enable */
 
 export function getLastTrace(
   selector?: string,
