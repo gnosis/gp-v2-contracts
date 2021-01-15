@@ -122,7 +122,6 @@ contract GPv2Settlement {
     /// the responsibility of the caller to ensure that all GPv2 invariants are
     /// upheld for the input settlement, otherwise this call will revert.
     /// Namely:
-    /// - The fee factor cannot lead to fees > 0.1%
     /// - All orders are valid and signed
     /// - Accounts have sufficient balance and approval.
     /// - Settlement contract has sufficient balance to execute trades. Note
@@ -141,6 +140,8 @@ contract GPv2Settlement {
     /// Orders and interactions encode tokens as indices into this array.
     /// @param clearingPrices An array of clearing prices where the `i`-th price
     /// is for the `i`-th token in the [`tokens`] array.
+    /// @param encodedPreparations Encoded smart contract interactions for
+    /// preparing a settlement.
     /// @param encodedTrades Encoded trades for signed EOA orders.
     /// @param encodedInteractions Encoded smart contract interactions.
     /// @param encodedOrderRefunds Encoded order refunds for clearing storage
@@ -148,10 +149,13 @@ contract GPv2Settlement {
     function settle(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
+        bytes calldata encodedPreparations,
         bytes calldata encodedTrades,
         bytes calldata encodedInteractions,
         bytes calldata encodedOrderRefunds
     ) external onlySolver {
+        executeInteractions(encodedPreparations);
+
         GPv2TradeExecution.Data[] memory executedTrades =
             computeTradeExecutions(tokens, clearingPrices, encodedTrades);
         allowanceManager.transferIn(executedTrades);

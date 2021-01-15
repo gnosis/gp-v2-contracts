@@ -150,21 +150,23 @@ describe("GPv2Settlement", () => {
   });
 
   describe("settle", () => {
+    const empty = [[], [], "0x", "0x", "0x", "0x"];
+
     it("rejects transactions from non-solvers", async () => {
-      await expect(settlement.settle([], [], [], [], [])).to.be.revertedWith(
+      await expect(settlement.settle(...empty)).to.be.revertedWith(
         "GPv2: not a solver",
       );
     });
 
     it("accepts transactions from solvers", async () => {
       await authenticator.connect(owner).addSolver(solver.address);
-      await expect(settlement.connect(solver).settle([], [], [], [], [])).to.not
-        .be.reverted;
+      await expect(settlement.connect(solver).settle(...empty)).to.not.be
+        .reverted;
     });
 
     it("emits a Settlement event", async () => {
       await authenticator.connect(owner).addSolver(solver.address);
-      await expect(settlement.connect(solver).settle([], [], [], [], []))
+      await expect(settlement.connect(solver).settle(...empty))
         .to.emit(settlement, "Settlement")
         .withArgs(solver.address);
     });

@@ -115,6 +115,7 @@ describe("E2E: Buy Ether", () => {
         [BUY_ETH_ADDRESS]: ethers.utils.parseUnits("1150.0", 6),
         [usdt.address]: ethers.utils.parseEther("1.0"),
       }),
+      "0x",
       encoder.encodedTrades,
       encoder.encodedInteractions,
       "0x",

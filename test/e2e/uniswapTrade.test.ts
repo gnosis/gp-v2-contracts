@@ -173,6 +173,7 @@ describe("E2E: Should Trade Surplus With Uniswap", () => {
         [weth.address]: uniswapUsdtOutAmount,
         [usdt.address]: uniswapWethInAmount,
       }),
+      "0x",
       encoder.encodedTrades,
       encoder.encodedInteractions,
       "0x",
