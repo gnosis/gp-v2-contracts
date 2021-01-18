@@ -319,29 +319,42 @@ describe("GPv2Encoding", () => {
   });
 
   describe("decodeInteraction", () => {
-    it("decodes sample encoded interaction", async () => {
-      // Example from the documentation describing `decodeInteraction` in the
+    it("decodes sample encoded interactions", async () => {
+      // Examples from the documentation describing `decodeInteraction` in the
       // [`GPv2Encoding`] library.
-      const encodedInteraction =
-        "0x73c14081446bd1e4eb165250e826e80c5a523783000010000102030405060708090a0b0c0d0e0f";
-      const callData = "0x000102030405060708090a0b0c0d0e0f";
-      const target = ethers.utils.getAddress(
-        "0x73c14081446bd1e4eb165250e826e80c5a523783",
-      );
+      for (const sample of [
+        {
+          encodedInteraction:
+            "0x73c14081446bd1e4eb165250e826e80c5a52378300000010000102030405060708090a0b0c0d0e0f",
+          target: ethers.utils.getAddress(
+            "0x73c14081446bd1e4eb165250e826e80c5a523783",
+          ),
+          value: ethers.constants.Zero,
+          callData: "0x000102030405060708090a0b0c0d0e0f",
+        },
+        {
+          encodedInteraction:
+            "0x0000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000de0b6b3a7640000",
+          target: ethers.constants.AddressZero,
+          value: ethers.utils.parseEther("1.0"),
+          callData: "0x",
+        },
+      ]) {
+        // Note: the number of interactions is a convenience input used to
+        // preallocate the memory needed to store all interactions simultaneously.
+        // If this number does not correspond exactly to the amount recovered
+        // after decoding, then the test call reverts.
+        const numInteractions = 1;
+        const interactions = await encoding.decodeInteractionsTest(
+          sample.encodedInteraction,
+          numInteractions,
+        );
 
-      // Note: the number of interactions is a convenience input used to
-      // preallocate the memory needed to store all interactions simultaneously.
-      // If this number does not correspond exactly to the amount recovered
-      // after decoding, then the test call reverts.
-      const numInteractions = 1;
-      const interactions = await encoding.decodeInteractionsTest(
-        encodedInteraction,
-        numInteractions,
-      );
-
-      expect(interactions.length).to.equal(1);
-      expect(interactions[0].target).to.equal(target);
-      expect(interactions[0].callData).to.equal(callData);
+        expect(interactions.length).to.equal(1);
+        expect(interactions[0].target).to.equal(sample.target);
+        expect(interactions[0].callData).to.equal(sample.callData);
+        expect(interactions[0].value).to.deep.equal(sample.value);
+      }
     });
 
     it("should round-trip encode a single interaction", async () => {
@@ -350,7 +363,8 @@ describe("GPv2Encoding", () => {
       // hex representation.
       const interaction = {
         target: ethers.utils.getAddress(fillDistinctBytes(20, 0x11)),
-        callData: fillDistinctBytes(42, 0x11 + 20),
+        value: BigNumber.from(fillDistinctBytes(32, 0x11 + 20)),
+        callData: fillDistinctBytes(42, 0x11 + 52),
       };
 
       const encoder = new SettlementEncoder(testDomain);
@@ -369,53 +383,64 @@ describe("GPv2Encoding", () => {
 
     it("should round-trip encode multiple interactions", async () => {
       // Note: all fields should use distinct bytes as much as possible to make
-      // decoding errors easier to spot. 0x11 is used to avoid having bytes with
+      // decoding errors easier to spot. 0x01 is used to avoid having bytes with
       // zeroes in their hex representation.
-      const interaction1 = {
-        target: ethers.utils.getAddress(fillDistinctBytes(20, 0x11)),
-        callData: fillDistinctBytes(42, 0x11 + 20),
-      };
-      const interaction2 = {
-        target: ethers.utils.getAddress(fillDistinctBytes(20, 0x11 + 20 + 42)),
-        callData: fillDistinctBytes(1337, 0x11 + 2 * 20 + 42),
-      };
-      const interaction3 = {
-        target: ethers.utils.getAddress(
-          fillDistinctBytes(20, 0x11 + 2 * 20 + 42 + 1337),
-        ),
-        // Note: if the interaction decoding becomes significantly more
-        // inefficient, this test might fail with "tx has a higher gas limit
-        // than the block". In this case, the number of bytes below should be
-        // reduced.
-        callData: fillDistinctBytes(12000, 0x11 + 3 * 20 + 42 + 1337),
-      };
+      let seed = 0x01;
+      const nextBytes = (n: number) => fillDistinctBytes(n, (seed += n) - n);
+      const nextAddress = () => ethers.utils.getAddress(nextBytes(20));
+      const nextUint = () => BigNumber.from(nextBytes(32));
+      const interactions = [
+        {
+          target: nextAddress(),
+          value: nextUint(),
+          callData: nextBytes(42),
+        },
+        {
+          target: nextAddress(),
+          value: nextUint(),
+        },
+        {
+          target: nextAddress(),
+          // Note: if the interaction decoding becomes significantly more
+          // inefficient, this test might fail with "tx has a higher gas limit
+          // than the block". In this case, the number of bytes below should be
+          // reduced.
+          callData: nextBytes(12000),
+        },
+        {
+          target: nextAddress(),
+        },
+      ];
 
       const encoder = new SettlementEncoder(testDomain);
-      await encoder.encodeInteraction(interaction1);
-      await encoder.encodeInteraction(interaction2);
-      await encoder.encodeInteraction(interaction3);
+      for (const interaction of interactions) {
+        encoder.encodeInteraction(interaction);
+      }
 
-      const numInteractions = 3;
       const decodedInteractions = await encoding.decodeInteractionsTest(
         encoder.encodedInteractions,
-        numInteractions,
+        interactions.length,
       );
 
-      expect(decodedInteractions.length).to.equal(3);
-      expect(decodedInteractions[0].target).to.equal(interaction1.target);
-      expect(decodedInteractions[0].callData).to.equal(interaction1.callData);
-      expect(decodedInteractions[1].target).to.equal(interaction2.target);
-      expect(decodedInteractions[1].callData).to.equal(interaction2.callData);
-      expect(decodedInteractions[2].target).to.equal(interaction3.target);
-      expect(decodedInteractions[2].callData).to.equal(interaction3.callData);
+      expect(decodedInteractions.length).to.equal(interactions.length);
+      for (let i = 0; i < interactions.length; i++) {
+        const decodedInteraction = decodedInteractions[0];
+        const interaction = interactions[0];
+
+        expect(decodedInteraction.target).to.equal(interaction.target);
+        expect(decodedInteraction.value).to.equal(
+          interaction.value || ethers.constants.Zero,
+        );
+        expect(decodedInteraction.callData).to.equal(
+          interaction.callData || "0x",
+        );
+      }
     });
 
-    // Skipped because this test takes a surprisingly long time to complete.
-    // It is supposed to be passing without any change.
-    it.skip("encoder fails to add interactions with too much calldata", async () => {
+    it("encoder fails to add interactions with too much calldata", async () => {
       const interaction = {
         target: ethers.utils.getAddress(fillBytes(20, 0x00)),
-        callData: fillDistinctBytes(2 ** (8 * 3), 0x00),
+        callData: new Uint8Array(2 ** 24),
       };
 
       const encoder = new SettlementEncoder(testDomain);
@@ -427,7 +452,6 @@ describe("GPv2Encoding", () => {
         target: ethers.utils.getAddress(
           "0x73c14081446bd1e4eb165250e826e80c5a523783",
         ),
-        callData: "0x",
       };
 
       const encoder = new SettlementEncoder(testDomain);
@@ -441,13 +465,15 @@ describe("GPv2Encoding", () => {
 
       expect(decodedInteractions.length).to.equal(1);
       expect(decodedInteractions[0].target).to.equal(interaction.target);
-      expect(decodedInteractions[0].callData).to.equal(interaction.callData);
+      expect(decodedInteractions[0].value).to.deep.equal(ethers.constants.Zero);
+      expect(decodedInteractions[0].callData).to.equal("0x");
     });
 
     describe("invalid encoded interaction", () => {
       it("calldata shorter than length", async () => {
         const interaction = {
           target: ethers.utils.getAddress(fillBytes(20, 0x00)),
+          value: ethers.utils.parseEther("42.1337"),
           callData: fillDistinctBytes(10, 0x00),
         };
 
@@ -466,6 +492,7 @@ describe("GPv2Encoding", () => {
       it("calldata longer than length", async () => {
         const interaction = {
           target: ethers.utils.getAddress(fillBytes(20, 0x00)),
+          value: ethers.utils.parseEther("42.1337"),
           callData: fillDistinctBytes(10, 0x00),
         };
 

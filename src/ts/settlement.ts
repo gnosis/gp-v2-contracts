@@ -1,6 +1,6 @@
 import { BigNumberish, BytesLike, Signer, ethers } from "ethers";
 
-import { Interaction } from "./interaction";
+import { Interaction, encodeInteraction } from "./interaction";
 import {
   ORDER_UID_LENGTH,
   Order,
@@ -36,6 +36,11 @@ export interface TradeExecution {
   feeDiscount: number;
 }
 
+/**
+ * Fee discount value used to indicate that all fees should be waived.
+ */
+export const FULL_FEE_DISCOUNT = 10000;
+
 function encodeOrderFlags(flags: OrderFlags): number {
   let kind;
   switch (flags.kind) {
@@ -63,6 +68,7 @@ function encodeOrderFlags(flags: OrderFlags): number {
 export class SettlementEncoder {
   private readonly _tokens: string[] = [];
   private readonly _tokenMap: Record<string, number | undefined> = {};
+  private _encodedPreparations = "0x";
   private _encodedTrades = "0x";
   private _encodedInteractions = "0x";
   private _encodedOrderRefunds = "0x";
@@ -90,6 +96,13 @@ export class SettlementEncoder {
   }
 
   /**
+   * Gets the encoded settlement preparations as a hex-encoded string.
+   */
+  public get encodedPreparations(): string {
+    return this._encodedPreparations;
+  }
+
+  /**
    * Gets the encoded trades as a hex-encoded string.
    */
   public get encodedTrades(): string {
@@ -97,7 +110,7 @@ export class SettlementEncoder {
   }
 
   /**
-   * Gets the encoded trades as a hex-encoded string.
+   * Gets the encoded interactions as a hex-encoded string.
    */
   public get encodedInteractions(): string {
     return this._encodedInteractions;
@@ -143,6 +156,19 @@ export class SettlementEncoder {
       }
       return price;
     });
+  }
+
+  /**
+   * Encodes the input preparation in the packed format accepted by the smart
+   * contract and adds it to the settlement preparations encoded so far.
+   *
+   * @param preparation The preparation to encode.
+   */
+  public encodePreparation(preparation: Interaction): void {
+    this._encodedPreparations = ethers.utils.hexConcat([
+      this._encodedPreparations,
+      encodeInteraction(preparation),
+    ]);
   }
 
   /**
@@ -232,16 +258,9 @@ export class SettlementEncoder {
    * @param interaction The interaction to encode.
    */
   public encodeInteraction(interaction: Interaction): void {
-    const callDataLength = ethers.utils.hexDataLength(interaction.callData);
-
-    const encodedInteraction = ethers.utils.solidityPack(
-      ["address", "uint24", "bytes"],
-      [interaction.target, callDataLength, interaction.callData],
-    );
-
     this._encodedInteractions = ethers.utils.hexConcat([
       this._encodedInteractions,
-      encodedInteraction,
+      encodeInteraction(interaction),
     ]);
   }
 

@@ -137,8 +137,9 @@ describe("E2E: Expired Order Gas Refunds", () => {
         [owl.address]: ethers.utils.parseEther("1.05"),
         [dai.address]: ethers.utils.parseEther("1.0"),
       }),
+      "0x",
       encoder1.encodedTrades,
-      encoder1.encodedInteractions,
+      "0x",
       "0x",
     );
     const { gasUsed: gasUsedWithoutRefunds } = await txWithoutRefunds.wait();
@@ -155,8 +156,9 @@ describe("E2E: Expired Order Gas Refunds", () => {
         [owl.address]: ethers.utils.parseEther("1.05"),
         [dai.address]: ethers.utils.parseEther("1.0"),
       }),
+      "0x",
       encoder2.encodedTrades,
-      encoder2.encodedInteractions,
+      "0x",
       encoder2.encodedOrderRefunds,
     );
     const { gasUsed: gasUsedWithRefunds } = await txWithRefunds.wait();

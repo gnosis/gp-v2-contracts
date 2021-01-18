@@ -1,9 +1,10 @@
 import IERC20 from "@openzeppelin/contracts/build/contracts/IERC20.json";
 import { expect } from "chai";
-import { BigNumber, Contract, Event } from "ethers";
+import { BigNumber, Contract, ContractReceipt, Event } from "ethers";
 import { artifacts, ethers, waffle } from "hardhat";
 
 import {
+  FULL_FEE_DISCOUNT,
   Interaction,
   OrderFlags,
   OrderKind,
@@ -149,16 +150,25 @@ describe("GPv2Settlement", () => {
   });
 
   describe("settle", () => {
+    const empty = [[], [], "0x", "0x", "0x", "0x"];
+
     it("rejects transactions from non-solvers", async () => {
-      await expect(settlement.settle([], [], [], [], [])).to.be.revertedWith(
+      await expect(settlement.settle(...empty)).to.be.revertedWith(
         "GPv2: not a solver",
       );
     });
 
     it("accepts transactions from solvers", async () => {
       await authenticator.connect(owner).addSolver(solver.address);
-      await expect(settlement.connect(solver).settle([], [], [], [], [])).to.not
-        .be.reverted;
+      await expect(settlement.connect(solver).settle(...empty)).to.not.be
+        .reverted;
+    });
+
+    it("emits a Settlement event", async () => {
+      await authenticator.connect(owner).addSolver(solver.address);
+      await expect(settlement.connect(solver).settle(...empty))
+        .to.emit(settlement, "Settlement")
+        .withArgs(solver.address);
     });
   });
 
@@ -176,6 +186,25 @@ describe("GPv2Settlement", () => {
       expect(await settlement.filledAmount(orderUid)).to.equal(
         ethers.constants.MaxUint256,
       );
+    });
+
+    it("emits an OrderInvalidated event log", async () => {
+      const orderUid = computeOrderUid({
+        orderDigest: ethers.constants.HashZero,
+        owner: traders[0].address,
+        validTo: 0,
+      });
+
+      const invalidateOrder = settlement
+        .connect(traders[0])
+        .invalidateOrder(orderUid);
+
+      await expect(invalidateOrder).to.emit(settlement, "OrderInvalidated");
+
+      const tx = await invalidateOrder;
+      const { events } = await tx.wait();
+
+      expect(events[0].args).to.deep.equal([traders[0].address, orderUid]);
     });
 
     it("fails to invalidate order that is not owned by the caller", async () => {
@@ -693,7 +722,7 @@ describe("GPv2Settlement", () => {
         },
         traders[0],
         SigningScheme.TYPED_DATA,
-        { feeDiscount: 10001 },
+        { feeDiscount: FULL_FEE_DISCOUNT + 1 },
       );
 
       await expect(
@@ -764,47 +793,74 @@ describe("GPv2Settlement", () => {
   describe("executeInteractions", () => {
     it("executes valid interactions", async () => {
       const EventEmitter = await ethers.getContractFactory("EventEmitter");
-      const contract1 = await EventEmitter.deploy();
-      const contract2 = await EventEmitter.deploy();
-      const contract3 = await EventEmitter.deploy();
-      expect(contract1.address)
-        .not.to.equal(contract2.address)
-        .not.to.equal(contract3.address);
-      expect(contract2.address).not.to.equal(contract3.address);
+      const interactionParameters = [
+        {
+          target: await EventEmitter.deploy(),
+          value: ethers.utils.parseEther("0.42"),
+          number: 1,
+        },
+        {
+          target: await EventEmitter.deploy(),
+          value: ethers.utils.parseEther("0.1337"),
+          number: 2,
+        },
+        {
+          target: await EventEmitter.deploy(),
+          value: ethers.constants.Zero,
+          number: 3,
+        },
+      ];
+
+      const uniqueContractAddresses = new Set(
+        interactionParameters.map((params) => params.target.address),
+      );
+      expect(uniqueContractAddresses.size).to.equal(
+        interactionParameters.length,
+      );
 
       const encoder = new SettlementEncoder(testDomain);
-      encoder.encodeInteraction({
-        target: contract1.address,
-        callData: contract1.interface.encodeFunctionData("emitEvent", [1]),
-      });
-      encoder.encodeInteraction({
-        target: contract2.address,
-        callData: contract2.interface.encodeFunctionData("emitEvent", [2]),
-      });
-      encoder.encodeInteraction({
-        target: contract3.address,
-        callData: contract3.interface.encodeFunctionData("emitEvent", [3]),
+      for (const { target, value, number } of interactionParameters) {
+        encoder.encodeInteraction({
+          target: target.address,
+          value,
+          callData: target.interface.encodeFunctionData("emitEvent", [number]),
+        });
+      }
+
+      // Note: make sure to send some Ether to the settlement contract so that
+      // it can execute the interactions with values.
+      await deployer.sendTransaction({
+        to: settlement.address,
+        value: ethers.utils.parseEther("1.0"),
       });
 
       const settled = settlement.executeInteractionsTest(
         encoder.encodedInteractions,
       );
-      const events = (await (await settled).wait()).events;
+      const { events }: ContractReceipt = await (await settled).wait();
 
       // Note: all contracts were touched.
-      await expect(settled).to.emit(contract1, "Event");
-      await expect(settled).to.emit(contract2, "Event");
-      await expect(settled).to.emit(contract3, "Event");
+      for (const { target } of interactionParameters) {
+        await expect(settled).to.emit(target, "Event");
+      }
+      await expect(settled).to.emit(settlement, "Interaction");
 
-      const uint256ToBytes32 = (n: number) =>
-        ethers.utils.solidityPack(["uint256"], [n]);
+      const emitterEvents = (events || []).filter(
+        ({ address }) => address !== settlement.address,
+      );
+      expect(emitterEvents.length).to.equal(interactionParameters.length);
+
       // Note: the execution order was respected.
-      expect(events[0].data).to.equal(uint256ToBytes32(1));
-      expect(events[1].data).to.equal(uint256ToBytes32(2));
-      expect(events[2].data).to.equal(uint256ToBytes32(3));
+      for (let i = 0; i < interactionParameters.length; i++) {
+        const params = interactionParameters[i];
+        const args = params.target.interface.decodeEventLog(
+          "Event",
+          emitterEvents[i].data,
+        );
 
-      // Note: no extra calls.
-      expect(events.length).to.equal(3);
+        expect(args.value).to.equal(params.value);
+        expect(args.number).to.equal(params.number);
+      }
     });
 
     it("reverts if any of the interactions reverts", async () => {
@@ -830,26 +886,25 @@ describe("GPv2Settlement", () => {
       // TODO - update this error with concatenated version "GPv2 Interaction:
       // test error"
       await expect(
-        settlement.callStatic.executeInteractionsTest(
-          encoder.encodedInteractions,
-        ),
+        settlement.executeInteractionsTest(encoder.encodedInteractions),
       ).to.be.revertedWith("test error");
     });
   });
 
   describe("executeInteraction", () => {
-    it("should fail when target is allowanceManager", async () => {
+    it("should revert when target is allowanceManager", async () => {
       const invalidInteraction: Interaction = {
         target: await settlement.allowanceManager(),
         callData: [],
+        value: 0,
       };
 
       await expect(
-        settlement.callStatic.executeInteractionTest(invalidInteraction),
+        settlement.executeInteractionTest(invalidInteraction),
       ).to.be.revertedWith("GPv2: forbidden interaction");
     });
 
-    it("should fail when interaction reverts", async () => {
+    it("should revert when interaction reverts", async () => {
       const reverter = await waffle.deployMockContract(deployer, [
         "function alwaysReverts()",
       ]);
@@ -860,22 +915,130 @@ describe("GPv2Settlement", () => {
       const failingInteraction: Interaction = {
         target: reverter.address,
         callData: revertingCallData,
+        value: 0,
       };
 
       // TODO - update this error with concatenated version "GPv2 Interaction: test error"
       await expect(
-        settlement.callStatic.executeInteractionTest(failingInteraction),
+        settlement.executeInteractionTest(failingInteraction),
       ).to.be.revertedWith("test error");
+    });
+
+    it("reverts if the settlement contract does not have sufficient Ether balance", async () => {
+      const value = ethers.utils.parseEther("1000000.0");
+      expect(value.gt(await ethers.provider.getBalance(settlement.address))).to
+        .be.true;
+
+      const encoder = new SettlementEncoder(testDomain);
+      encoder.encodeInteraction({
+        target: ethers.constants.AddressZero,
+        value,
+      });
+
+      await expect(
+        settlement.executeInteractionsTest(encoder.encodedInteractions),
+      ).to.be.reverted;
     });
 
     it("should pass on successful execution", async () => {
       const passingInteraction: Interaction = {
         target: ethers.constants.AddressZero,
         callData: "0x",
+        value: 0,
       };
-      await expect(
-        settlement.callStatic.executeInteractionTest(passingInteraction),
-      ).to.not.be.reverted;
+      await expect(settlement.executeInteractionTest(passingInteraction)).to.not
+        .be.reverted;
+    });
+
+    it("emits an Interaction event", async () => {
+      const contract = await waffle.deployMockContract(deployer, [
+        "function someFunction(bytes32 parameter)",
+      ]);
+
+      const value = ethers.utils.parseEther("1.0");
+      const parameter = `0x${"ff".repeat(32)}`;
+
+      await deployer.sendTransaction({ to: settlement.address, value });
+      await contract.mock.someFunction.withArgs(parameter).returns();
+
+      const tx = settlement.executeInteractionTest({
+        target: contract.address,
+        value,
+        callData: contract.interface.encodeFunctionData("someFunction", [
+          parameter,
+        ]),
+      });
+      await expect(tx)
+        .to.emit(settlement, "Interaction")
+        .withArgs(
+          contract.address,
+          value,
+          contract.interface.getSighash("someFunction"),
+        );
+    });
+
+    it("masks the function selector to the first 4 bytes for the emitted event", async () => {
+      const abi = new ethers.utils.Interface([
+        "function someFunction(bytes32 parameter)",
+      ]);
+
+      const tx = await settlement.executeInteractionTest({
+        target: ethers.constants.AddressZero,
+        value: 0,
+        callData: abi.encodeFunctionData("someFunction", [
+          `0x${"ff".repeat(32)}`,
+        ]),
+      });
+
+      const {
+        events: [{ data }],
+      } = await tx.wait();
+      expect(data).to.equal(
+        ethers.utils.defaultAbiCoder.encode(
+          ["uint256", "bytes4"],
+          [0, abi.getSighash("someFunction")],
+        ),
+      );
+    });
+
+    it("computes selector for parameterless functions", async () => {
+      const contract = await waffle.deployMockContract(deployer, [
+        "function someFunction()",
+      ]);
+
+      await contract.mock.someFunction.returns();
+
+      const callData = contract.interface.encodeFunctionData(
+        "someFunction",
+        [],
+      );
+      expect(callData).to.equal(contract.interface.getSighash("someFunction"));
+
+      const tx = settlement.executeInteractionTest({
+        target: contract.address,
+        value: 0,
+        callData,
+      });
+      await expect(tx)
+        .to.emit(settlement, "Interaction")
+        .withArgs(contract.address, ethers.constants.Zero, callData);
+    });
+
+    it("uses 0 selector for empty or short calldata", async () => {
+      for (const callData of ["0x", "0xabcdef"]) {
+        const tx = settlement.executeInteractionTest({
+          target: ethers.constants.AddressZero,
+          value: ethers.constants.Zero,
+          callData,
+        });
+        await expect(tx)
+          .to.emit(settlement, "Interaction")
+          .withArgs(
+            ethers.constants.AddressZero,
+            ethers.constants.Zero,
+            "0x00000000",
+          );
+      }
     });
   });
 

@@ -69,6 +69,19 @@ contract GPv2Settlement {
         bytes orderUid
     );
 
+    /// @dev Event emitted for each executed interaction.
+    ///
+    /// For gas effeciency, only the interaction calldata selector (first 4
+    /// bytes) is included in the event. For interactions without calldata or
+    /// whose calldata is shorter than 4 bytes, the selector will be `0`.
+    event Interaction(address indexed target, uint256 value, bytes4 selector);
+
+    /// @dev Event emitted when a settlement complets
+    event Settlement(address indexed solver);
+
+    /// @dev Event emitted when an order is invalidated.
+    event OrderInvalidated(address indexed owner, bytes orderUid);
+
     constructor(GPv2Authentication authenticator_) {
         authenticator = authenticator_;
 
@@ -109,7 +122,6 @@ contract GPv2Settlement {
     /// the responsibility of the caller to ensure that all GPv2 invariants are
     /// upheld for the input settlement, otherwise this call will revert.
     /// Namely:
-    /// - The fee factor cannot lead to fees > 0.1%
     /// - All orders are valid and signed
     /// - Accounts have sufficient balance and approval.
     /// - Settlement contract has sufficient balance to execute trades. Note
@@ -128,6 +140,8 @@ contract GPv2Settlement {
     /// Orders and interactions encode tokens as indices into this array.
     /// @param clearingPrices An array of clearing prices where the `i`-th price
     /// is for the `i`-th token in the [`tokens`] array.
+    /// @param encodedPreparations Encoded smart contract interactions for
+    /// preparing a settlement.
     /// @param encodedTrades Encoded trades for signed EOA orders.
     /// @param encodedInteractions Encoded smart contract interactions.
     /// @param encodedOrderRefunds Encoded order refunds for clearing storage
@@ -135,10 +149,13 @@ contract GPv2Settlement {
     function settle(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
+        bytes calldata encodedPreparations,
         bytes calldata encodedTrades,
         bytes calldata encodedInteractions,
         bytes calldata encodedOrderRefunds
     ) external onlySolver {
+        executeInteractions(encodedPreparations);
+
         GPv2TradeExecution.Data[] memory executedTrades =
             computeTradeExecutions(tokens, clearingPrices, encodedTrades);
         allowanceManager.transferIn(executedTrades);
@@ -148,6 +165,8 @@ contract GPv2Settlement {
         transferOut(executedTrades);
 
         claimOrderRefunds(encodedOrderRefunds);
+
+        emit Settlement(msg.sender);
     }
 
     /// @dev Invalidate onchain an order that has been signed offline.
@@ -159,13 +178,14 @@ contract GPv2Settlement {
         (, address owner, ) = orderUid.extractOrderUidParams();
         require(owner == msg.sender, "GPv2: caller does not own order");
         filledAmount[orderUid] = uint256(-1);
+        emit OrderInvalidated(owner, orderUid);
     }
 
     /// @dev Process all trades for EOA orders one at a time returning the
     /// computed net in and out transfers for the trades.
     ///
     /// This method reverts if processing of any single trade fails. See
-    /// [`processOrder`] for more details.
+    /// [`computeTradeExecution`] for more details.
     /// @param tokens An array of ERC20 tokens to be traded in the settlement.
     /// @param clearingPrices An array of token clearing prices.
     /// @param encodedTrades Encoded trades for signed EOA orders.
@@ -340,9 +360,12 @@ contract GPv2Settlement {
             interaction.target != address(allowanceManager),
             "GPv2: forbidden interaction"
         );
+
         // solhint-disable avoid-low-level-calls
         (bool success, bytes memory response) =
-            (interaction.target).call(interaction.callData);
+            (interaction.target).call{value: interaction.value}(
+                interaction.callData
+            );
         // solhint-enable avoid-low-level-calls
 
         // TODO - concatenate the following reponse "GPv2: Failed Interaction"
@@ -354,6 +377,19 @@ contract GPv2Settlement {
                 revert(add(response, 0x20), mload(response))
             }
         }
+
+        bytes4 selector;
+        if (interaction.callData.length >= 4) {
+            bytes memory callData = interaction.callData;
+            // Assembly used to read selector with a single `mload`. Note that
+            // we read offset by 32 bytes, as the first word in a `bytes memory`
+            // is the length.
+            // solhint-disable-next-line no-inline-assembly
+            assembly {
+                selector := mload(add(callData, 32))
+            }
+        }
+        emit Interaction(interaction.target, interaction.value, selector);
     }
 
     /// @dev Transfers all buy amounts for the executed trades from the

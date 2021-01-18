@@ -145,6 +145,7 @@ describe("E2E: RetrETH Red Wine and Olive Oil Market", () => {
         [oil.address]: ethers.utils.parseEther("13.0"),
         [wine.address]: ethers.utils.parseEther("14.0"),
       }),
+      "0x",
       encoder.encodedTrades,
       "0x",
       "0x",
