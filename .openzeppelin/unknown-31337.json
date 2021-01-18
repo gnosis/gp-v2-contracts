@@ -1,0 +1,8 @@
+{
+  "manifestVersion": "3.1",
+  "impls": {},
+  "admin": {
+    "address": "0x7eDB9E529D912714eb154561cd3Ef0F5D6e0352c",
+    "txHash": "0x089274ac74f6f22c73909dcaf88b3a3f8c4768b3039934c09d2d4b0ce7bf1bdc"
+  }
+}
