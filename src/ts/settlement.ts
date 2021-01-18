@@ -17,7 +17,7 @@ import { TypedDataDomain } from "./types/ethers";
  */
 export enum InteractionStage {
   /**
-   * The interaction will be executed before any trading occur.
+   * The interaction will be executed before any trading occurs.
    *
    * This can be used, for example, to perform as EIP-2612 `permit` call for a
    * user trading in the current settlement.
