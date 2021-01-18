@@ -60,5 +60,8 @@
     "lib/src/",
     "networks.json",
     "src/"
-  ]
+  ],
+  "dependencies": {
+    "@openzeppelin/hardhat-upgrades": "^1.4.3"
+  }
 }

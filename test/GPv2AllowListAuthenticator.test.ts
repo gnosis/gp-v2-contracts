@@ -12,7 +12,7 @@ describe("GPv2AllowListAuthentication", () => {
       deployer,
     );
 
-    authenticator = await GPv2AllowListAuthentication.deploy(owner.address);
+    authenticator = await GPv2AllowListAuthentication.connect(owner).deploy();
   });
 
   describe("constructor", () => {

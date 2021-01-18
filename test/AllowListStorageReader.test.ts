@@ -21,7 +21,7 @@ describe("GPv2AllowListAuthentication", () => {
     );
 
     reader = await AllowListStorageReader.deploy();
-    authenticator = await GPv2AllowListAuthentication.deploy(owner.address);
+    authenticator = await GPv2AllowListAuthentication.connect(owner).deploy();
     allowListReader = new AllowListReader(authenticator, reader);
   });
 
