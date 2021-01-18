@@ -6,6 +6,7 @@ import { artifacts, ethers, waffle } from "hardhat";
 import {
   FULL_FEE_DISCOUNT,
   Interaction,
+  InteractionStage,
   OrderFlags,
   OrderKind,
   SettlementEncoder,
@@ -150,7 +151,7 @@ describe("GPv2Settlement", () => {
   });
 
   describe("settle", () => {
-    const empty = [[], [], "0x", "0x", "0x", "0x"];
+    const empty = new SettlementEncoder(testDomain).encodedSettlement({});
 
     it("rejects transactions from non-solvers", async () => {
       await expect(settlement.settle(...empty)).to.be.revertedWith(
@@ -820,11 +821,16 @@ describe("GPv2Settlement", () => {
 
       const encoder = new SettlementEncoder(testDomain);
       for (const { target, value, number } of interactionParameters) {
-        encoder.encodeInteraction({
-          target: target.address,
-          value,
-          callData: target.interface.encodeFunctionData("emitEvent", [number]),
-        });
+        encoder.encodeInteraction(
+          {
+            target: target.address,
+            value,
+            callData: target.interface.encodeFunctionData("emitEvent", [
+              number,
+            ]),
+          },
+          InteractionStage.INTER,
+        );
       }
 
       // Note: make sure to send some Ether to the settlement contract so that
@@ -835,7 +841,7 @@ describe("GPv2Settlement", () => {
       });
 
       const settled = settlement.executeInteractionsTest(
-        encoder.encodedInteractions,
+        encoder.encodedInteractions[InteractionStage.INTER],
       );
       const { events }: ContractReceipt = await (await settled).wait();
 
@@ -874,19 +880,27 @@ describe("GPv2Settlement", () => {
       await mockRevert.mock.alwaysReverts.revertsWithReason("test error");
 
       const encoder = new SettlementEncoder(testDomain);
-      encoder.encodeInteraction({
-        target: mockPass.address,
-        callData: mockPass.interface.encodeFunctionData("alwaysPasses"),
-      });
-      encoder.encodeInteraction({
-        target: mockRevert.address,
-        callData: mockRevert.interface.encodeFunctionData("alwaysReverts"),
-      });
+      encoder.encodeInteraction(
+        {
+          target: mockPass.address,
+          callData: mockPass.interface.encodeFunctionData("alwaysPasses"),
+        },
+        InteractionStage.INTER,
+      );
+      encoder.encodeInteraction(
+        {
+          target: mockRevert.address,
+          callData: mockRevert.interface.encodeFunctionData("alwaysReverts"),
+        },
+        InteractionStage.INTER,
+      );
 
       // TODO - update this error with concatenated version "GPv2 Interaction:
       // test error"
       await expect(
-        settlement.executeInteractionsTest(encoder.encodedInteractions),
+        settlement.executeInteractionsTest(
+          encoder.encodedInteractions[InteractionStage.INTER],
+        ),
       ).to.be.revertedWith("test error");
     });
   });
@@ -930,13 +944,18 @@ describe("GPv2Settlement", () => {
         .be.true;
 
       const encoder = new SettlementEncoder(testDomain);
-      encoder.encodeInteraction({
-        target: ethers.constants.AddressZero,
-        value,
-      });
+      encoder.encodeInteraction(
+        {
+          target: ethers.constants.AddressZero,
+          value,
+        },
+        InteractionStage.INTER,
+      );
 
       await expect(
-        settlement.executeInteractionsTest(encoder.encodedInteractions),
+        settlement.executeInteractionsTest(
+          encoder.encodedInteractions[InteractionStage.INTER],
+        ),
       ).to.be.reverted;
     });
 

@@ -8,6 +8,7 @@ import {
   SettlementEncoder,
   SigningScheme,
   computeOrderUid,
+  encodeInteraction,
   extractOrderUidParams,
   hashOrder,
 } from "../src/ts";
@@ -367,12 +368,9 @@ describe("GPv2Encoding", () => {
         callData: fillDistinctBytes(42, 0x11 + 52),
       };
 
-      const encoder = new SettlementEncoder(testDomain);
-      await encoder.encodeInteraction(interaction);
-
       const numInteractions = 1;
       const decodedInteractions = await encoding.decodeInteractionsTest(
-        encoder.encodedInteractions,
+        encodeInteraction(interaction),
         numInteractions,
       );
 
@@ -412,13 +410,12 @@ describe("GPv2Encoding", () => {
         },
       ];
 
-      const encoder = new SettlementEncoder(testDomain);
-      for (const interaction of interactions) {
-        encoder.encodeInteraction(interaction);
-      }
+      const encodedInteractions = ethers.utils.hexConcat(
+        interactions.map(encodeInteraction),
+      );
 
       const decodedInteractions = await encoding.decodeInteractionsTest(
-        encoder.encodedInteractions,
+        encodedInteractions,
         interactions.length,
       );
 
@@ -454,12 +451,9 @@ describe("GPv2Encoding", () => {
         ),
       };
 
-      const encoder = new SettlementEncoder(testDomain);
-      await encoder.encodeInteraction(interaction);
-
       const numInteractions = 1;
       const decodedInteractions = await encoding.decodeInteractionsTest(
-        encoder.encodedInteractions,
+        encodeInteraction(interaction),
         numInteractions,
       );
 
@@ -477,12 +471,9 @@ describe("GPv2Encoding", () => {
           callData: fillDistinctBytes(10, 0x00),
         };
 
-        const encoder = new SettlementEncoder(testDomain);
-        await encoder.encodeInteraction(interaction);
-
         const numInteractions = 1;
         const decoding = encoding.decodeInteractionsTest(
-          encoder.encodedInteractions.slice(0, -2),
+          encodeInteraction(interaction).slice(0, -2),
           numInteractions,
         );
 
@@ -496,12 +487,9 @@ describe("GPv2Encoding", () => {
           callData: fillDistinctBytes(10, 0x00),
         };
 
-        const encoder = new SettlementEncoder(testDomain);
-        await encoder.encodeInteraction(interaction);
-
         const numInteractions = 1;
         const decoding = encoding.decodeInteractionsTest(
-          encoder.encodedInteractions + "00",
+          encodeInteraction(interaction) + "00",
           numInteractions,
         );
 

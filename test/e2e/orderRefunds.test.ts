@@ -132,15 +132,10 @@ describe("E2E: Expired Order Gas Refunds", () => {
     const [encoder1, orderUids] = await prepareBatch();
 
     const txWithoutRefunds = await settlement.connect(solver).settle(
-      encoder1.tokens,
-      encoder1.clearingPrices({
+      ...encoder1.encodedSettlement({
         [owl.address]: ethers.utils.parseEther("1.05"),
         [dai.address]: ethers.utils.parseEther("1.0"),
       }),
-      "0x",
-      encoder1.encodedTrades,
-      "0x",
-      "0x",
     );
     const { gasUsed: gasUsedWithoutRefunds } = await txWithoutRefunds.wait();
 
@@ -151,15 +146,10 @@ describe("E2E: Expired Order Gas Refunds", () => {
     encoder2.encodeOrderRefunds(...orderUids);
 
     const txWithRefunds = await settlement.connect(solver).settle(
-      encoder2.tokens,
-      encoder2.clearingPrices({
+      ...encoder2.encodedSettlement({
         [owl.address]: ethers.utils.parseEther("1.05"),
         [dai.address]: ethers.utils.parseEther("1.0"),
       }),
-      "0x",
-      encoder2.encodedTrades,
-      "0x",
-      encoder2.encodedOrderRefunds,
     );
     const { gasUsed: gasUsedWithRefunds } = await txWithRefunds.wait();
 

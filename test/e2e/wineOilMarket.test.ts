@@ -139,16 +139,11 @@ describe("E2E: RetrETH Red Wine and Olive Oil Market", () => {
     );
 
     await settlement.connect(solver).settle(
-      encoder.tokens,
-      encoder.clearingPrices({
+      ...encoder.encodedSettlement({
         [eur.address]: ethers.utils.parseEther("1.0"),
         [oil.address]: ethers.utils.parseEther("13.0"),
         [wine.address]: ethers.utils.parseEther("14.0"),
       }),
-      "0x",
-      encoder.encodedTrades,
-      "0x",
-      "0x",
     );
 
     expect(await wine.balanceOf(traders[0].address)).to.deep.equal(
