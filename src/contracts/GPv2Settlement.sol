@@ -195,12 +195,14 @@ contract GPv2Settlement {
         uint256[] calldata clearingPrices,
         bytes calldata encodedTrades
     ) internal returns (GPv2TradeExecution.Data[] memory executedTrades) {
-        uint256 tradeCount = encodedTrades.tradeCount();
+        (uint256 tradeCount, bytes calldata remainingEncodedTrades) =
+            encodedTrades.decodeTradeCount();
         executedTrades = new GPv2TradeExecution.Data[](tradeCount);
 
         GPv2Encoding.Trade memory trade;
-        for (uint256 i = 0; i < tradeCount; i++) {
-            encodedTrades.tradeAtIndex(i).decodeTrade(
+        uint256 i = 0;
+        while (remainingEncodedTrades.length != 0) {
+            remainingEncodedTrades = remainingEncodedTrades.decodeTrade(
                 domainSeparator,
                 tokens,
                 trade
@@ -211,7 +213,10 @@ contract GPv2Settlement {
                 clearingPrices[trade.buyTokenIndex],
                 executedTrades[i]
             );
+            i++;
         }
+
+        require(i == tradeCount, "GPv2: invalid trade encoding");
     }
 
     /// @dev Compute the in and out transfer amounts for a single EOA order

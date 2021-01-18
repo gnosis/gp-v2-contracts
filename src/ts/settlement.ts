@@ -41,6 +41,12 @@ export interface TradeExecution {
  */
 export const FULL_FEE_DISCOUNT = 10000;
 
+/**
+ * Maximum number of trades that can be included in a single call to the settle
+ * function.
+ */
+export const MAX_TRADES_IN_SETTLEMENT = 255;
+
 function encodeOrderFlags(flags: OrderFlags): number {
   let kind;
   switch (flags.kind) {
@@ -70,6 +76,7 @@ export class SettlementEncoder {
   private readonly _tokenMap: Record<string, number | undefined> = {};
   private _encodedPreparations = "0x";
   private _encodedTrades = "0x";
+  private _tradeCount = 0;
   private _encodedInteractions = "0x";
   private _encodedOrderRefunds = "0x";
 
@@ -106,7 +113,13 @@ export class SettlementEncoder {
    * Gets the encoded trades as a hex-encoded string.
    */
   public get encodedTrades(): string {
-    return this._encodedTrades;
+    if (this._tradeCount > MAX_TRADES_IN_SETTLEMENT) {
+      throw new Error("too many orders to encode in a single settlement");
+    }
+    return ethers.utils.hexConcat([
+      ethers.utils.solidityPack(["uint8"], [this._tradeCount]),
+      this._encodedTrades,
+    ]);
   }
 
   /**
@@ -127,8 +140,7 @@ export class SettlementEncoder {
    * Gets the number of trades currently encoded.
    */
   public get tradeCount(): number {
-    const TRADE_STRIDE = 206;
-    return ethers.utils.hexDataLength(this._encodedTrades) / TRADE_STRIDE;
+    return this._tradeCount;
   }
 
   /**
@@ -179,8 +191,6 @@ export class SettlementEncoder {
    * yet seen, they are added to the tokens array.
    * @param order The order of the trade to encode.
    * @param signature The signature for the order data.
-   * @param scheme The signing scheme to used to generate the specified
-   * signature. See {@link SigningScheme} for more details.
    * @param tradeExecution The execution details for the trade.
    */
   public encodeTrade(
@@ -188,6 +198,11 @@ export class SettlementEncoder {
     signature: BytesLike,
     tradeExecution?: Partial<TradeExecution>,
   ): void {
+    if (this._tradeCount >= MAX_TRADES_IN_SETTLEMENT) {
+      throw new Error("too many orders for a single settlement");
+    }
+    this._tradeCount++;
+
     const { executedAmount, feeDiscount } = tradeExecution || {};
     if (order.partiallyFillable && executedAmount === undefined) {
       throw new Error("missing executed amount for partially fillable trade");

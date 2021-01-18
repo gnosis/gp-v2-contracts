@@ -150,7 +150,7 @@ describe("GPv2Settlement", () => {
   });
 
   describe("settle", () => {
-    const empty = [[], [], "0x", "0x", "0x", "0x"];
+    const empty = [[], [], "0x", "0x00", "0x", "0x"];
 
     it("rejects transactions from non-solvers", async () => {
       await expect(settlement.settle(...empty)).to.be.revertedWith(
@@ -263,6 +263,64 @@ describe("GPv2Settlement", () => {
         ),
       );
       expect(trades.length).to.equal(tradeCount);
+    });
+
+    describe("bad trade encoding", () => {
+      it("should revert if encoded length is larger than number of encoded trades", async () => {
+        const tradeCount = 10;
+        const encoder = new SettlementEncoder(testDomain);
+        for (let i = 0; i < tradeCount; i++) {
+          await encoder.signEncodeTrade(
+            {
+              ...partialOrder,
+              kind: OrderKind.BUY,
+              partiallyFillable: true,
+            },
+            traders[0],
+            SigningScheme.TYPED_DATA,
+            { executedAmount: ethers.utils.parseEther("0.7734") },
+          );
+        }
+
+        const encodedBytes = ethers.utils.arrayify(encoder.encodedTrades);
+        expect(encodedBytes[0]).to.equal(tradeCount);
+        encodedBytes[0] = tradeCount + 1;
+        await expect(
+          settlement.computeTradeExecutionsTest(
+            encoder.tokens,
+            encoder.clearingPrices(prices),
+            ethers.utils.hexlify(encodedBytes),
+          ),
+        ).to.be.revertedWith("GPv2: invalid trade encoding");
+      });
+
+      it("should revert if encoded length is smaller than number of encoded trades", async () => {
+        const tradeCount = 10;
+        const encoder = new SettlementEncoder(testDomain);
+        for (let i = 0; i < tradeCount; i++) {
+          await encoder.signEncodeTrade(
+            {
+              ...partialOrder,
+              kind: OrderKind.BUY,
+              partiallyFillable: true,
+            },
+            traders[0],
+            SigningScheme.TYPED_DATA,
+            { executedAmount: ethers.utils.parseEther("0.7734") },
+          );
+        }
+
+        const encodedBytes = ethers.utils.arrayify(encoder.encodedTrades);
+        expect(encodedBytes[0]).to.equal(tradeCount);
+        encodedBytes[0] = tradeCount - 1;
+        await expect(
+          settlement.computeTradeExecutionsTest(
+            encoder.tokens,
+            encoder.clearingPrices(prices),
+            ethers.utils.hexlify(encodedBytes),
+          ),
+        ).to.be.reverted;
+      });
     });
 
     it("should revert if the order expired", async () => {
