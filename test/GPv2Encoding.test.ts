@@ -8,9 +8,9 @@ import {
   SettlementEncoder,
   SigningScheme,
   computeOrderUid,
-  encodeInteraction,
   extractOrderUidParams,
   hashOrder,
+  packInteractions,
 } from "../src/ts";
 
 import { decodeTrade } from "./encoding";
@@ -370,7 +370,7 @@ describe("GPv2Encoding", () => {
 
       const numInteractions = 1;
       const decodedInteractions = await encoding.decodeInteractionsTest(
-        encodeInteraction(interaction),
+        packInteractions([interaction]),
         numInteractions,
       );
 
@@ -410,12 +410,8 @@ describe("GPv2Encoding", () => {
         },
       ];
 
-      const encodedInteractions = ethers.utils.hexConcat(
-        interactions.map(encodeInteraction),
-      );
-
       const decodedInteractions = await encoding.decodeInteractionsTest(
-        encodedInteractions,
+        packInteractions(interactions),
         interactions.length,
       );
 
@@ -453,7 +449,7 @@ describe("GPv2Encoding", () => {
 
       const numInteractions = 1;
       const decodedInteractions = await encoding.decodeInteractionsTest(
-        encodeInteraction(interaction),
+        packInteractions([interaction]),
         numInteractions,
       );
 
@@ -473,7 +469,7 @@ describe("GPv2Encoding", () => {
 
         const numInteractions = 1;
         const decoding = encoding.decodeInteractionsTest(
-          encodeInteraction(interaction).slice(0, -2),
+          packInteractions([interaction]).slice(0, -2),
           numInteractions,
         );
 
@@ -489,7 +485,7 @@ describe("GPv2Encoding", () => {
 
         const numInteractions = 1;
         const decoding = encoding.decodeInteractionsTest(
-          encodeInteraction(interaction) + "00",
+          packInteractions([interaction]) + "00",
           numInteractions,
         );
 
