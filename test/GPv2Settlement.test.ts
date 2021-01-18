@@ -767,7 +767,7 @@ describe("GPv2Settlement", () => {
             kind: OrderKind.SELL,
             partiallyFillable: false,
           },
-          { feeDiscount: 100 }, // 1% discount.
+          { feeDiscountBps: 100 }, // 1% discount.
         );
 
         const executedFeeAmount = feeAmount.mul(99).div(100);
@@ -889,10 +889,11 @@ describe("GPv2Settlement", () => {
           ...partialOrder,
           kind: OrderKind.BUY,
           partiallyFillable: false,
+          feeAmount: ethers.utils.parseEther("1.0"),
         },
         traders[0],
         SigningScheme.TYPED_DATA,
-        { feeDiscount: FULL_FEE_DISCOUNT + 1 },
+        { feeDiscountBps: FULL_FEE_DISCOUNT + 1 },
       );
 
       await expect(

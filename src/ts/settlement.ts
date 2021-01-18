@@ -62,7 +62,7 @@ export interface TradeExecution {
    * taken for the order. A value of `10000` is used to indicate a full
    * discount, meaning no fees will be taken.
    */
-  feeDiscount: number;
+  feeDiscountBps: number;
 }
 
 /**
@@ -239,7 +239,7 @@ export class SettlementEncoder {
     }
     this._tradeCount++;
 
-    const { executedAmount, feeDiscount } = tradeExecution || {};
+    const { executedAmount, feeDiscountBps } = tradeExecution || {};
     if (order.partiallyFillable && executedAmount === undefined) {
       throw new Error("missing executed amount for partially fillable trade");
     }
@@ -273,7 +273,7 @@ export class SettlementEncoder {
         order.feeAmount,
         encodeOrderFlags(order),
         executedAmount || 0,
-        feeDiscount || 0,
+        feeDiscountBps || 0,
         signature,
       ],
     );

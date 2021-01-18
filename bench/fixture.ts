@@ -218,7 +218,7 @@ export class BenchFixture {
         (i + Math.floor(i / 4)) % 2 == 0
           ? SigningScheme.TYPED_DATA
           : SigningScheme.MESSAGE;
-      const feeDiscount = (i % 3) * (FULL_FEE_DISCOUNT / 2); // 0% | 50% | 100%
+      const feeDiscountBps = (i % 3) * (FULL_FEE_DISCOUNT / 2); // 0% | 50% | 100%
 
       const dbg = {
         fill: orderSpice.partiallyFillable
@@ -227,7 +227,7 @@ export class BenchFixture {
         kind: orderSpice.kind == OrderKind.SELL ? "sell" : "buy",
         sign:
           signingScheme == SigningScheme.TYPED_DATA ? "typed-data" : "message",
-        fee: 100 * (1 - feeDiscount / FULL_FEE_DISCOUNT),
+        fee: 100 * (1 - feeDiscountBps / FULL_FEE_DISCOUNT),
       };
       debug(
         `encoding ${dbg.fill} ${dbg.kind} order with ${dbg.sign} signature and ${dbg.fee}% fees`,
@@ -246,7 +246,7 @@ export class BenchFixture {
         signingScheme,
         {
           executedAmount: ethers.utils.parseEther("100.0"),
-          feeDiscount,
+          feeDiscountBps,
         },
       );
     }

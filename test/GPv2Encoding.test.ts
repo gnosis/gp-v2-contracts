@@ -3,6 +3,7 @@ import { Contract, BigNumber } from "ethers";
 import { ethers, waffle } from "hardhat";
 
 import {
+  FULL_FEE_DISCOUNT,
   ORDER_TYPE_HASH,
   OrderKind,
   SettlementEncoder,
@@ -127,13 +128,13 @@ describe("GPv2Encoding", () => {
         buyAmount: fillUint(256, 0x04),
         validTo: fillUint(32, 0x05).toNumber(),
         appData: fillUint(32, 0x06).toNumber(),
-        feeAmount: fillUint(256, 0x07),
+        feeAmount: fillUint(256, 0x07).shr(16),
         kind: OrderKind.BUY,
         partiallyFillable: true,
       };
       const tradeExecution = {
         executedAmount: fillUint(256, 0x08),
-        feeDiscount: fillUint(16, 0x09).toNumber(),
+        feeDiscountBps: 5001,
       };
 
       const encoder = new SettlementEncoder(testDomain);
@@ -157,7 +158,12 @@ describe("GPv2Encoding", () => {
         trades[0],
       );
       expect(decodedOrder).to.deep.equal(order);
-      expect({ executedAmount, feeDiscount }).to.deep.equal(tradeExecution);
+      expect({ executedAmount, feeDiscount }).to.deep.equal({
+        executedAmount: tradeExecution.executedAmount,
+        feeDiscount: order.feeAmount
+          .mul(tradeExecution.feeDiscountBps)
+          .div(FULL_FEE_DISCOUNT),
+      });
     });
 
     it("should return order token indices", async () => {

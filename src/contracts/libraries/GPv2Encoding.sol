@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 pragma solidity ^0.7.6;
 
+import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title Gnosis Protocol v2 Encoding Library.
 /// @author Gnosis Developers
 library GPv2Encoding {
+    using SafeMath for uint256;
+
     /// @dev A struct representing an order containing all order parameters that
     /// are signed by a user for submitting to GP.
     struct Order {
@@ -27,7 +30,7 @@ library GPv2Encoding {
         uint8 sellTokenIndex;
         uint8 buyTokenIndex;
         uint256 executedAmount;
-        uint16 feeDiscount;
+        uint256 feeDiscount;
         address owner;
         bytes orderUid;
     }
@@ -85,6 +88,9 @@ library GPv2Encoding {
     /// @dev The stride of the fixed-length components in an encoded trade.
     uint256 private constant FIXED_LENGTH_TRADE_STRIDE = 206;
 
+    /// @dev The number of basis points to make up 100%.
+    uint256 private constant BPS_BASE = 10000;
+
     /// @dev The byte length of an order unique identifier.
     uint256 private constant ORDER_UID_LENGTH = 56;
 
@@ -134,7 +140,7 @@ library GPv2Encoding {
     ///     uint256 feeAmount;
     ///     uint8 flags;
     ///     uint256 executedAmount;
-    ///     uint16 feeDiscount;
+    ///     uint16 feeDiscountBps;
     ///     Signature {
     ///         bytes32 r;
     ///         bytes32 s;
@@ -196,6 +202,7 @@ library GPv2Encoding {
         {
             uint8 sellTokenIndex;
             uint8 buyTokenIndex;
+            uint256 feeDiscountBps;
             uint256 flags;
 
             GPv2Encoding.Order memory order = trade.order;
@@ -241,10 +248,10 @@ library GPv2Encoding {
                     add(trade, 96),
                     calldataload(add(encodedTrade.offset, 107))
                 )
-                // trade.feeDiscount = uint256(encodedTrade[139:141])
-                mstore(
-                    add(trade, 128),
-                    shr(240, calldataload(add(encodedTrade.offset, 139)))
+                // feeDiscountBps = uint256(encodedTrade[139:141])
+                feeDiscountBps := shr(
+                    240,
+                    calldataload(add(encodedTrade.offset, 139))
                 )
             }
 
@@ -260,6 +267,7 @@ library GPv2Encoding {
 
             trade.sellTokenIndex = sellTokenIndex;
             trade.buyTokenIndex = buyTokenIndex;
+            trade.feeDiscount = order.feeAmount.mul(feeDiscountBps) / BPS_BASE;
 
             // NOTE: Compute the EIP-712 order struct hash in place. The hash is
             // computed from the order type hash concatenated with the ABI

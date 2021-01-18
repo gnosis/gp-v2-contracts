@@ -2,8 +2,8 @@
 pragma solidity ^0.7.6;
 pragma abicoder v2;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import "./GPv2AllowanceManager.sol";
@@ -30,9 +30,6 @@ contract GPv2Settlement is ReentrancyGuard {
 
     /// @dev The EIP-712 domain version used for computing the domain separator.
     bytes32 private constant DOMAIN_VERSION = keccak256("v2");
-
-    /// @dev The number of basis points to make up 100%.
-    uint256 private constant BPS_BASE = 10000;
 
     /// @dev The domain separator used for signing orders that gets mixed in
     /// making signatures for different domains incompatible. This domain
@@ -250,22 +247,12 @@ contract GPv2Settlement is ReentrancyGuard {
         // amount_x * price_x = amount_y * price_y
         // ```
         // Intuitively, if a chocolate bar is 0,50€ and a beer is 4€, 1 beer
-        // is roughly worth 8 chocolate bars (`1 * 4 = 8 * 0.5`). From this
-        // equation, we can derive:
-        // - The limit price for selling `x` and buying `y` is respected iff
-        // ```
-        // limit_x * price_x >= limit_y * price_y
-        // ```
-        // - The executed amount of token `y` given some amount of `x` and
-        //   clearing prices is:
+        // is roughly worth 8 chocolate bars (`1 * 4 = 8 * 0.5`). From the
+        // above equation, we can derive the executed amount of the token `y`
+        // given some amount of token `x` and the clearing prices:
         // ```
         // amount_y = amount_x * price_x / price_y
         // ```
-
-        require(
-            order.sellAmount.mul(sellPrice) >= order.buyAmount.mul(buyPrice),
-            "GPv2: limit price not respected"
-        );
 
         uint256 executedSellAmount;
         uint256 executedBuyAmount;
@@ -320,13 +307,25 @@ contract GPv2Settlement is ReentrancyGuard {
             );
         }
 
-        require(trade.feeDiscount <= BPS_BASE, "GPv2: fee discount too large");
-        executedFeeAmount =
-            executedFeeAmount.mul(BPS_BASE - trade.feeDiscount) /
-            BPS_BASE;
-
-        executedTrade.sellAmount = executedSellAmount.add(executedFeeAmount);
+        require(
+            executedFeeAmount >= trade.feeDiscount,
+            "GPv2: fee discount too large"
+        );
+        executedTrade.sellAmount =
+            executedSellAmount.add(executedFeeAmount) -
+            trade.feeDiscount;
         executedTrade.buyAmount = executedBuyAmount;
+
+        // NOTE: Verify that the limit price is respected using the actual
+        // executed trade amounts after applying fees. This allows solvers to
+        // "give up" some amount of fee it would earn in order to match an order
+        // at a worse price, effectively covering the order's loss.
+        require(
+            order.sellAmount.add(order.feeAmount).mul(
+                executedTrade.buyAmount
+            ) >= order.buyAmount.mul(executedTrade.sellAmount),
+            "GPv2: limit price not respected"
+        );
 
         filledAmount[trade.orderUid] = currentFilledAmount;
         emit Trade(
