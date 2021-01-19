@@ -141,17 +141,17 @@ describe("GPv2Encoding", () => {
         tradeExecution,
       );
 
-      const [decodedTrades] = await encoding.decodeTradesTest(
+      const { trades } = await encoding.decodeTradesTest(
         encoder.tokens,
         encoder.encodedTrades,
       );
 
       // NOTE: Ethers.js returns a tuple and not a struct with named fields for
       // `abicoder v2` structs.
-      expect(decodedTrades.length).to.equal(1);
+      expect(trades.length).to.equal(1);
 
       const { order: decodedOrder, executedAmount, feeDiscount } = decodeTrade(
-        decodedTrades[0],
+        trades[0],
       );
       expect(decodedOrder).to.deep.equal(order);
       expect({ executedAmount, feeDiscount }).to.deep.equal(tradeExecution);
@@ -165,11 +165,11 @@ describe("GPv2Encoding", () => {
         SigningScheme.TYPED_DATA,
       );
 
-      const [decodedTrades] = await encoding.decodeTradesTest(
+      const { trades } = await encoding.decodeTradesTest(
         encoder.tokens,
         encoder.encodedTrades,
       );
-      const { sellTokenIndex, buyTokenIndex } = decodeTrade(decodedTrades[0]);
+      const { sellTokenIndex, buyTokenIndex } = decodeTrade(trades[0]);
       expect(sellTokenIndex).to.equal(
         encoder.tokens.indexOf(sampleOrder.sellToken),
       );
@@ -186,13 +186,13 @@ describe("GPv2Encoding", () => {
         SigningScheme.TYPED_DATA,
       );
 
-      const [decodedTrades] = await encoding.decodeTradesTest(
+      const { trades } = await encoding.decodeTradesTest(
         encoder.tokens,
         encoder.encodedTrades,
       );
 
       const { orderDigest } = extractOrderUidParams(
-        decodeTrade(decodedTrades[0]).orderUid,
+        decodeTrade(trades[0]).orderUid,
       );
       expect(orderDigest).to.equal(hashOrder(sampleOrder));
     });
@@ -205,12 +205,12 @@ describe("GPv2Encoding", () => {
         SigningScheme.TYPED_DATA,
       );
 
-      const [decodedTrades] = await encoding.decodeTradesTest(
+      const { trades } = await encoding.decodeTradesTest(
         encoder.tokens,
         encoder.encodedTrades,
       );
 
-      const { orderUid } = decodeTrade(decodedTrades[0]);
+      const { orderUid } = decodeTrade(trades[0]);
       expect(orderUid).to.equal(
         computeOrderUid({
           orderDigest: hashOrder(sampleOrder),
@@ -226,13 +226,13 @@ describe("GPv2Encoding", () => {
         await encoder.signEncodeTrade(sampleOrder, traders[0], scheme);
       }
 
-      const [decodedTrades] = await encoding.decodeTradesTest(
+      const { trades } = await encoding.decodeTradesTest(
         encoder.tokens,
         encoder.encodedTrades,
       );
 
       const traderAddress = await traders[0].getAddress();
-      for (const decodedTrade of decodedTrades) {
+      for (const decodedTrade of trades) {
         const { owner } = decodeTrade(decodedTrade);
         expect(owner).to.equal(traderAddress);
       }
