@@ -140,29 +140,30 @@ contract GPv2Settlement {
     /// Orders and interactions encode tokens as indices into this array.
     /// @param clearingPrices An array of clearing prices where the `i`-th price
     /// is for the `i`-th token in the [`tokens`] array.
-    /// @param encodedPreparations Encoded smart contract interactions for
-    /// preparing a settlement.
     /// @param encodedTrades Encoded trades for signed EOA orders.
-    /// @param encodedInteractions Encoded smart contract interactions.
+    /// @param encodedInteractions Encoded smart contract interactions split
+    /// into three separate chunks to be run before the settlement, during the
+    /// settlement and after the settlement respectively.
     /// @param encodedOrderRefunds Encoded order refunds for clearing storage
     /// related to invalid orders.
     function settle(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
-        bytes calldata encodedPreparations,
         bytes calldata encodedTrades,
-        bytes calldata encodedInteractions,
+        bytes[3] calldata encodedInteractions,
         bytes calldata encodedOrderRefunds
     ) external onlySolver {
-        executeInteractions(encodedPreparations);
+        executeInteractions(encodedInteractions[0]);
 
         GPv2TradeExecution.Data[] memory executedTrades =
             computeTradeExecutions(tokens, clearingPrices, encodedTrades);
         allowanceManager.transferIn(executedTrades);
 
-        executeInteractions(encodedInteractions);
+        executeInteractions(encodedInteractions[1]);
 
         transferOut(executedTrades);
+
+        executeInteractions(encodedInteractions[2]);
 
         claimOrderRefunds(encodedOrderRefunds);
 

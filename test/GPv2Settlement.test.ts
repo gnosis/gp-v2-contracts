@@ -6,6 +6,7 @@ import { artifacts, ethers, waffle } from "hardhat";
 import {
   FULL_FEE_DISCOUNT,
   Interaction,
+  InteractionStage,
   OrderFlags,
   OrderKind,
   SettlementEncoder,
@@ -15,6 +16,7 @@ import {
   computeOrderUid,
   domain,
   hashOrder,
+  packInteractions,
 } from "../src/ts";
 
 import { builtAndDeployedMetadataCoincide } from "./bytecode";
@@ -150,7 +152,7 @@ describe("GPv2Settlement", () => {
   });
 
   describe("settle", () => {
-    const empty = [[], [], "0x", "0x", "0x", "0x"];
+    const empty = new SettlementEncoder(testDomain).encodedSettlement({});
 
     it("rejects transactions from non-solvers", async () => {
       await expect(settlement.settle(...empty)).to.be.revertedWith(
@@ -169,6 +171,84 @@ describe("GPv2Settlement", () => {
       await expect(settlement.connect(solver).settle(...empty))
         .to.emit(settlement, "Settlement")
         .withArgs(solver.address);
+    });
+
+    it("executes interactions stages in the correct order", async () => {
+      const stageTarget = (stage: InteractionStage): string =>
+        ethers.utils.getAddress(
+          ethers.utils.hexDataSlice(ethers.utils.keccak256([stage]), 0, 20),
+        );
+
+      // NOTE: Extra care is taken that the interactions with the following
+      // stages are **not** encoded in execution order.
+      const stages = [
+        InteractionStage.POST,
+        InteractionStage.PRE,
+        InteractionStage.INTRA,
+      ];
+
+      const encoder = new SettlementEncoder(testDomain);
+      for (const stage of stages) {
+        encoder.encodeInteraction(
+          {
+            target: stageTarget(stage),
+          },
+          stage,
+        );
+      }
+
+      await authenticator.connect(owner).addSolver(solver.address);
+      const tx = await settlement
+        .connect(solver)
+        .settle(...encoder.encodedSettlement({}));
+      const receipt: ContractReceipt = await tx.wait();
+      const events = receipt.events || [];
+
+      expect(events.length).to.equal(stages.length + 1);
+      expect(events[0].args?.target).to.equal(
+        stageTarget(InteractionStage.PRE),
+      );
+      expect(events[1].args?.target).to.equal(
+        stageTarget(InteractionStage.INTRA),
+      );
+      expect(events[2].args?.target).to.equal(
+        stageTarget(InteractionStage.POST),
+      );
+      expect(events[3].event).to.equal("Settlement");
+    });
+
+    it("reverts if encoded interactions has incorrect number of stages", async () => {
+      await authenticator.connect(owner).addSolver(solver.address);
+
+      const [
+        tokens,
+        clearingPrices,
+        encodedTrades,
+        ,
+        encodedOrderRefunds,
+      ] = empty;
+      await expect(
+        settlement
+          .connect(solver)
+          .settle([
+            tokens,
+            clearingPrices,
+            encodedTrades,
+            ["0x", "0x"],
+            encodedOrderRefunds,
+          ]),
+      ).to.be.reverted;
+      await expect(
+        settlement
+          .connect(solver)
+          .settle([
+            tokens,
+            clearingPrices,
+            encodedTrades,
+            ["0x", "0x", "0x", "0x"],
+            encodedOrderRefunds,
+          ]),
+      ).to.be.reverted;
     });
   });
 
@@ -818,14 +898,13 @@ describe("GPv2Settlement", () => {
         interactionParameters.length,
       );
 
-      const encoder = new SettlementEncoder(testDomain);
-      for (const { target, value, number } of interactionParameters) {
-        encoder.encodeInteraction({
+      const encodedInteractions = packInteractions(
+        interactionParameters.map(({ target, value, number }) => ({
           target: target.address,
           value,
           callData: target.interface.encodeFunctionData("emitEvent", [number]),
-        });
-      }
+        })),
+      );
 
       // Note: make sure to send some Ether to the settlement contract so that
       // it can execute the interactions with values.
@@ -834,9 +913,7 @@ describe("GPv2Settlement", () => {
         value: ethers.utils.parseEther("1.0"),
       });
 
-      const settled = settlement.executeInteractionsTest(
-        encoder.encodedInteractions,
-      );
+      const settled = settlement.executeInteractionsTest(encodedInteractions);
       const { events }: ContractReceipt = await (await settled).wait();
 
       // Note: all contracts were touched.
@@ -873,20 +950,23 @@ describe("GPv2Settlement", () => {
       ]);
       await mockRevert.mock.alwaysReverts.revertsWithReason("test error");
 
-      const encoder = new SettlementEncoder(testDomain);
-      encoder.encodeInteraction({
-        target: mockPass.address,
-        callData: mockPass.interface.encodeFunctionData("alwaysPasses"),
-      });
-      encoder.encodeInteraction({
-        target: mockRevert.address,
-        callData: mockRevert.interface.encodeFunctionData("alwaysReverts"),
-      });
-
       // TODO - update this error with concatenated version "GPv2 Interaction:
       // test error"
       await expect(
-        settlement.executeInteractionsTest(encoder.encodedInteractions),
+        settlement.executeInteractionsTest(
+          packInteractions([
+            {
+              target: mockPass.address,
+              callData: mockPass.interface.encodeFunctionData("alwaysPasses"),
+            },
+            {
+              target: mockRevert.address,
+              callData: mockRevert.interface.encodeFunctionData(
+                "alwaysReverts",
+              ),
+            },
+          ]),
+        ),
       ).to.be.revertedWith("test error");
     });
   });
@@ -929,14 +1009,15 @@ describe("GPv2Settlement", () => {
       expect(value.gt(await ethers.provider.getBalance(settlement.address))).to
         .be.true;
 
-      const encoder = new SettlementEncoder(testDomain);
-      encoder.encodeInteraction({
-        target: ethers.constants.AddressZero,
-        value,
-      });
-
       await expect(
-        settlement.executeInteractionsTest(encoder.encodedInteractions),
+        settlement.executeInteractionsTest(
+          packInteractions([
+            {
+              target: ethers.constants.AddressZero,
+              value,
+            },
+          ]),
+        ),
       ).to.be.reverted;
     });
 

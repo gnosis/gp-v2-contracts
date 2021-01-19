@@ -10,6 +10,7 @@ import {
   computeOrderUid,
   extractOrderUidParams,
   hashOrder,
+  packInteractions,
 } from "../src/ts";
 
 import { decodeTrade } from "./encoding";
@@ -367,12 +368,9 @@ describe("GPv2Encoding", () => {
         callData: fillDistinctBytes(42, 0x11 + 52),
       };
 
-      const encoder = new SettlementEncoder(testDomain);
-      await encoder.encodeInteraction(interaction);
-
       const numInteractions = 1;
       const decodedInteractions = await encoding.decodeInteractionsTest(
-        encoder.encodedInteractions,
+        packInteractions([interaction]),
         numInteractions,
       );
 
@@ -412,13 +410,8 @@ describe("GPv2Encoding", () => {
         },
       ];
 
-      const encoder = new SettlementEncoder(testDomain);
-      for (const interaction of interactions) {
-        encoder.encodeInteraction(interaction);
-      }
-
       const decodedInteractions = await encoding.decodeInteractionsTest(
-        encoder.encodedInteractions,
+        packInteractions(interactions),
         interactions.length,
       );
 
@@ -454,12 +447,9 @@ describe("GPv2Encoding", () => {
         ),
       };
 
-      const encoder = new SettlementEncoder(testDomain);
-      await encoder.encodeInteraction(interaction);
-
       const numInteractions = 1;
       const decodedInteractions = await encoding.decodeInteractionsTest(
-        encoder.encodedInteractions,
+        packInteractions([interaction]),
         numInteractions,
       );
 
@@ -477,12 +467,9 @@ describe("GPv2Encoding", () => {
           callData: fillDistinctBytes(10, 0x00),
         };
 
-        const encoder = new SettlementEncoder(testDomain);
-        await encoder.encodeInteraction(interaction);
-
         const numInteractions = 1;
         const decoding = encoding.decodeInteractionsTest(
-          encoder.encodedInteractions.slice(0, -2),
+          packInteractions([interaction]).slice(0, -2),
           numInteractions,
         );
 
@@ -496,12 +483,9 @@ describe("GPv2Encoding", () => {
           callData: fillDistinctBytes(10, 0x00),
         };
 
-        const encoder = new SettlementEncoder(testDomain);
-        await encoder.encodeInteraction(interaction);
-
         const numInteractions = 1;
         const decoding = encoding.decodeInteractionsTest(
-          encoder.encodedInteractions + "00",
+          packInteractions([interaction]) + "00",
           numInteractions,
         );
 
