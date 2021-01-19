@@ -20,6 +20,26 @@ library GPv2Encoding {
         bool partiallyFillable;
     }
 
+    /// @dev A struct representing a trade to be executed as part a batch
+    /// settlement.
+    struct Trade {
+        Order order;
+        uint8 sellTokenIndex;
+        uint8 buyTokenIndex;
+        uint256 executedAmount;
+        uint16 feeDiscount;
+        address owner;
+        bytes orderUid;
+    }
+
+    /// @dev A struct representing arbitrary contract interactions.
+    /// Submitted to [`GPv2Settlement.settle`] for code execution.
+    struct Interaction {
+        address target;
+        uint256 value;
+        bytes callData;
+    }
+
     /// @dev The marker value for a sell order for computing the order struct
     /// hash. This allows the EIP-712 compatible wallets to display a
     /// descriptive string for the order kind (instead of 0 or 1).
@@ -62,31 +82,11 @@ library GPv2Encoding {
     bytes32 internal constant ORDER_TYPE_HASH =
         hex"b2b38b9dcbdeb41f7ad71dea9aed79fb47f7bbc3436576fe994b43d5b16ecdec";
 
-    /// @dev A struct representing a trade to be executed as part a batch
-    /// settlement.
-    struct Trade {
-        Order order;
-        uint8 sellTokenIndex;
-        uint8 buyTokenIndex;
-        uint256 executedAmount;
-        uint16 feeDiscount;
-        address owner;
-        bytes orderUid;
-    }
-
     /// @dev The stride of an encoded trade.
     uint256 private constant TRADE_STRIDE = 206;
 
     /// @dev The byte length of an order unique identifier.
     uint256 private constant ORDER_UID_LENGTH = 56;
-
-    /// @dev A struct representing arbitrary contract interactions.
-    /// Submitted to [`GPv2Settlement.settle`] for code execution.
-    struct Interaction {
-        address target;
-        uint256 value;
-        bytes callData;
-    }
 
     /// @dev Returns the number of trades encoded in a calldata byte array.
     ///

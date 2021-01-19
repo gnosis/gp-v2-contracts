@@ -9,10 +9,6 @@ import "./GPv2SafeERC20.sol";
 library GPv2TradeExecution {
     using GPv2SafeERC20 for IERC20;
 
-    /// @dev Ether marker address used to indicate an order is buying Ether.
-    address internal constant BUY_ETH_ADDRESS =
-        0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
-
     /// @dev Executed trade data.
     struct Data {
         address owner;
@@ -21,6 +17,10 @@ library GPv2TradeExecution {
         uint256 sellAmount;
         uint256 buyAmount;
     }
+
+    /// @dev Ether marker address used to indicate an order is buying Ether.
+    address internal constant BUY_ETH_ADDRESS =
+        0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
     /// @dev Executes the trade's sell amount, transferring it from the trade's
     /// owner to the specified recipient.
