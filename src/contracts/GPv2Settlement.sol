@@ -313,7 +313,7 @@ contract GPv2Settlement {
             );
         }
 
-        require(trade.feeDiscount <= BPS_BASE, "GPv2: invalid fee discount");
+        require(trade.feeDiscount <= BPS_BASE, "GPv2: fee discount too large");
         executedFeeAmount =
             executedFeeAmount.mul(BPS_BASE - trade.feeDiscount) /
             BPS_BASE;
