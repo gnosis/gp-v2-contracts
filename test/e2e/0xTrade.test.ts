@@ -17,6 +17,8 @@ import { deployTestContracts } from "./fixture";
 
 const debug = Debug("test:e2e:0xTrade");
 
+// NOTE: Order type from:
+// <https://0x.org/docs/guides/v3-specification#order>
 interface ZeroExOrder {
   makerAddress: string;
   takerAddress: string;
@@ -96,7 +98,7 @@ async function signZeroExSimpleOrder(
 
     // NOTE: Setting taker and sender address to `address(0)` means that the
     // order can be executed (sender) against any counterparty (taker). For the
-    // purposes of GPv2, this needs to be either `address(0)` or the settlement
+    // purposes of GPv2, these need to be either `address(0)` or the settlement
     // contract.
     takerAddress: ethers.constants.AddressZero,
     senderAddress: ethers.constants.AddressZero,
@@ -117,20 +119,23 @@ async function signZeroExSimpleOrder(
     order,
   );
 
-  const ETHSIGN_SIGNATURE_ID = 0x03;
+  // NOTE: Use EIP-712 signing scheme for the order. The signature is just the
+  // ECDSA signature post-fixed with the signature scheme ID (0x02):
+  // <https://0x.org/docs/guides/v3-specification#signature-types>
+
+  const EIP712_SIGNATURE_ID = 0x02;
   const { v, r, s } = ethers.utils.splitSignature(
-    //await maker._signTypedData(domain, ZERO_EX_ORDER_TYPE_DESCRIPTOR, order),
-    await maker.signMessage(hash),
+    await maker._signTypedData(domain, ZERO_EX_ORDER_TYPE_DESCRIPTOR, order),
   );
   const signature = ethers.utils.solidityPack(
-    ["uint8", "uint8", "bytes32", "bytes32"],
-    [ETHSIGN_SIGNATURE_ID, v, r, s],
+    ["uint8", "bytes32", "bytes32", "uint8"],
+    [v, r, s, EIP712_SIGNATURE_ID],
   );
 
   return { order, hash, signature };
 }
 
-describe.only("E2E: Can settle a 0x trade", () => {
+describe("E2E: Can settle a 0x trade", () => {
   let deployer: Wallet;
   let solver: Wallet;
   let trader: Wallet;
@@ -180,9 +185,12 @@ describe.only("E2E: Can settle a 0x trade", () => {
 
     await erc20Proxy.addAuthorizedAddress(exchange.address);
     await exchange.registerAssetProxy(erc20Proxy.address);
+
     zeroEx = {
       exchange,
       erc20Proxy,
+      // NOTE: Domain separator parameters taken from:
+      // <https://0x.org/docs/guides/v3-specification#eip-712-usage>
       domainSeparator: {
         name: "0x Protocol",
         version: "3.0.0",
@@ -196,40 +204,29 @@ describe.only("E2E: Can settle a 0x trade", () => {
     // Settles a market order buying 1 GNO for 120 OWL and get matched with a
     // market maker using 0x orders.
 
-    const encoder = new SettlementEncoder(domainSeparator);
-
-    await owl.mint(trader.address, ethers.utils.parseEther("130"));
+    await owl.mint(trader.address, ethers.utils.parseEther("140"));
     await owl
       .connect(trader)
       .approve(allowanceManager.address, ethers.constants.MaxUint256);
-    await encoder.signEncodeTrade(
-      {
-        kind: OrderKind.BUY,
-        partiallyFillable: false,
-        buyToken: gno.address,
-        sellToken: owl.address,
-        buyAmount: ethers.utils.parseEther("1.0"),
-        sellAmount: ethers.utils.parseEther("120.0"),
-        feeAmount: ethers.utils.parseEther("10.0"),
-        validTo: 0xffffffff,
-        appData: 1,
-      },
-      trader,
-      //SigningScheme.TYPED_DATA,
-      SigningScheme.MESSAGE,
-    );
 
     await gno.mint(marketMaker.address, ethers.utils.parseEther("1000.0"));
     await gno
       .connect(marketMaker)
       .approve(zeroEx.erc20Proxy.address, ethers.constants.MaxUint256);
-    encoder.encodeInteraction({
-      target: owl.address,
-      callData: owl.interface.encodeFunctionData("approve", [
-        zeroEx.erc20Proxy.address,
-        ethers.utils.parseEther("1.0"),
-      ]),
-    });
+
+    const gpv2Order = {
+      kind: OrderKind.BUY,
+      partiallyFillable: false,
+      buyToken: gno.address,
+      sellToken: owl.address,
+      buyAmount: ethers.utils.parseEther("1.0"),
+      sellAmount: ethers.utils.parseEther("130.0"),
+      feeAmount: ethers.utils.parseEther("10.0"),
+      validTo: 0xffffffff,
+      appData: 1,
+    };
+
+    const zeroExGnoPrice = 110;
     const zeroExSignedOrder = await signZeroExSimpleOrder(
       marketMaker,
       zeroEx.domainSeparator,
@@ -237,38 +234,39 @@ describe.only("E2E: Can settle a 0x trade", () => {
         makerAssetAddress: gno.address,
         makerAssetAmount: ethers.utils.parseEther("1000.0"),
         takerAssetAddress: owl.address,
-        takerAssetAmount: ethers.utils.parseEther("1000.0").mul(110),
+        takerAssetAmount: ethers.utils.parseEther("1000.0").mul(zeroExGnoPrice),
       },
     );
-    const { orderHash: zeroExOrderHash } = await zeroEx.exchange.getOrderInfo(
-      zeroExSignedOrder.order,
-    );
-    expect(zeroExOrderHash).to.equal(zeroExSignedOrder.hash);
+    expect(
+      await zeroEx.exchange.isValidOrderSignature(
+        zeroExSignedOrder.order,
+        zeroExSignedOrder.signature,
+      ),
+    ).to.be.true;
+
+    const encoder = new SettlementEncoder(domainSeparator);
+    await encoder.signEncodeTrade(gpv2Order, trader, SigningScheme.TYPED_DATA);
+    encoder.encodeInteraction({
+      target: owl.address,
+      callData: owl.interface.encodeFunctionData("approve", [
+        zeroEx.erc20Proxy.address,
+        gpv2Order.buyAmount.mul(zeroExGnoPrice),
+      ]),
+    });
     encoder.encodeInteraction({
       target: zeroEx.exchange.address,
       callData: zeroEx.exchange.interface.encodeFunctionData("fillOrder", [
         zeroExSignedOrder.order,
-        ethers.utils.parseEther("1.0"),
+        gpv2Order.buyAmount.mul(zeroExGnoPrice),
         zeroExSignedOrder.signature,
       ]),
     });
 
-    await owl
-      .connect(trader)
-      .approve(zeroEx.erc20Proxy.address, ethers.constants.MaxUint256);
-    await zeroEx.exchange
-      .connect(trader)
-      .fillOrder(
-        zeroExSignedOrder.order,
-        ethers.utils.parseEther("110.0"),
-        zeroExSignedOrder.signature,
-        { gasLimit: 1e6 },
-      );
-
+    const gpv2GnoPrice = 120;
     const tx = await settlement.connect(solver).settle(
       ...encoder.encodedSettlement({
         [owl.address]: 1,
-        [gno.address]: 120,
+        [gno.address]: gpv2GnoPrice,
       }),
     );
 
@@ -280,6 +278,14 @@ describe.only("E2E: Can settle a 0x trade", () => {
     );
     expect(await gno.balanceOf(marketMaker.address)).to.deep.equal(
       ethers.utils.parseEther("999.0"),
+    );
+
+    // NOTE: The exchange keeps the surplus from the 0x order.
+    const zeroExOwlSurplus = gpv2Order.buyAmount.mul(
+      gpv2GnoPrice - zeroExGnoPrice,
+    );
+    expect(await owl.balanceOf(settlement.address)).to.deep.equal(
+      gpv2Order.feeAmount.add(zeroExOwlSurplus),
     );
   });
 });
