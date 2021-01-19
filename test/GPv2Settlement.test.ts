@@ -173,6 +173,21 @@ describe("GPv2Settlement", () => {
       ).to.be.revertedWith("ReentrancyGuard: reentrant call");
     });
 
+    it("rejects reentrancy attempt even if settlement contract is registered solver", async () => {
+      await authenticator.connect(owner).addSolver(solver.address);
+      // Add settlement contract address as registered solver
+      await authenticator.connect(owner).addSolver(settlement.address);
+      const encoder = new SettlementEncoder(testDomain);
+      encoder.encodeInteraction({
+        target: settlement.address,
+        callData: settlement.interface.encodeFunctionData("settle", empty),
+      });
+
+      await expect(
+        settlement.connect(solver).settle(...encoder.encodedSettlement({})),
+      ).to.be.revertedWith("ReentrancyGuard: reentrant call");
+    });
+
     it("accepts transactions from solvers", async () => {
       await authenticator.connect(owner).addSolver(solver.address);
       await expect(settlement.connect(solver).settle(...empty)).to.not.be
