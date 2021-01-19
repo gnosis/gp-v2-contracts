@@ -17,21 +17,25 @@ import { TypedDataDomain } from "./types/ethers";
  */
 export enum InteractionStage {
   /**
-   * The interaction will be executed before any trading occurs.
+   * A pre-settlement intraction.
    *
-   * This can be used, for example, to perform as EIP-2612 `permit` call for a
-   * user trading in the current settlement.
+   * The interaction will be executed before any trading occurs. This can be
+   * used, for example, to perform as EIP-2612 `permit` call for a user trading
+   * in the current settlement.
    */
   PRE = 0,
   /**
+   * An intra-settlement interaction.
+   *
    * The interaction will be executed after all trade sell amounts are
    * transferred into the settlement contract, but before the buy amounts are
-   * transferred out to the traders.
-   *
-   * This can be used, for example, to interact with on-chain AMMs.
+   * transferred out to the traders. This can be used, for example, to interact
+   * with on-chain AMMs.
    */
-  INTER = 1,
+  INTRA = 1,
   /**
+   * A post-settlement interaction.
+   *
    * The interaction will be executed after all trading has completed.
    */
   POST = 2,
@@ -117,7 +121,7 @@ export class SettlementEncoder {
   private _encodedTrades = "0x";
   private _encodedInteractions = {
     [InteractionStage.PRE]: "0x",
-    [InteractionStage.INTER]: "0x",
+    [InteractionStage.INTRA]: "0x",
     [InteractionStage.POST]: "0x",
   };
   private _encodedOrderRefunds = "0x";
@@ -158,7 +162,7 @@ export class SettlementEncoder {
   public get encodedInteractions(): [string, string, string] {
     return [
       this._encodedInteractions[InteractionStage.PRE],
-      this._encodedInteractions[InteractionStage.INTER],
+      this._encodedInteractions[InteractionStage.INTRA],
       this._encodedInteractions[InteractionStage.POST],
     ];
   }
@@ -292,7 +296,7 @@ export class SettlementEncoder {
    */
   public encodeInteraction(
     interaction: Interaction,
-    stage: InteractionStage = InteractionStage.INTER,
+    stage: InteractionStage = InteractionStage.INTRA,
   ): void {
     this._encodedInteractions[stage] = ethers.utils.hexConcat([
       this._encodedInteractions[stage],

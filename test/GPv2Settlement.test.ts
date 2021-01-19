@@ -184,7 +184,7 @@ describe("GPv2Settlement", () => {
       const stages = [
         InteractionStage.POST,
         InteractionStage.PRE,
-        InteractionStage.INTER,
+        InteractionStage.INTRA,
       ];
 
       const encoder = new SettlementEncoder(testDomain);
@@ -209,7 +209,7 @@ describe("GPv2Settlement", () => {
         stageTarget(InteractionStage.PRE),
       );
       expect(events[1].args?.target).to.equal(
-        stageTarget(InteractionStage.INTER),
+        stageTarget(InteractionStage.INTRA),
       );
       expect(events[2].args?.target).to.equal(
         stageTarget(InteractionStage.POST),
