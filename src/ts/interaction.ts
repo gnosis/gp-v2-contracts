@@ -34,3 +34,7 @@ export function encodeInteraction(interaction: Interaction): string {
       );
   return encodedInteraction;
 }
+
+export function packInteractions(interactions: Interaction[]): string {
+  return ethers.utils.hexConcat(interactions.map(encodeInteraction));
+}

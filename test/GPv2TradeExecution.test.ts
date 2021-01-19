@@ -5,12 +5,8 @@ import { ethers, waffle } from "hardhat";
 
 import { BUY_ETH_ADDRESS } from "../src/ts";
 
+import { NON_STANDARD_ERC20 } from "./ERC20";
 import { encodeExecutedTrade } from "./encoding";
-
-const NON_STANDARD_ERC20 = [
-  "function transfer(address recipient, uint256 amount)",
-  "function transferFrom(address sender, address recipient, uint256 amount)",
-];
 
 describe("GPv2TradeExecution", () => {
   const [deployer, recipient, ...traders] = waffle.provider.getWallets();
@@ -74,7 +70,7 @@ describe("GPv2TradeExecution", () => {
       ).to.be.revertedWith("test error");
     });
 
-    it("should revert when transfering a token with no contract at its address", async () => {
+    it("does not revert when transfering a token with no contract at its address", async () => {
       await expect(
         tradeExecution.transferSellAmountToRecipientTest(
           encodeExecutedTrade({
@@ -85,10 +81,10 @@ describe("GPv2TradeExecution", () => {
           }),
           recipient.address,
         ),
-      ).to.be.revertedWith("call to non-contract");
+      ).not.to.be.reverted;
     });
 
-    it("should revert when mistakenly trying to sell ETH using the marker buy Ether address", async () => {
+    it("reverts when mistakenly trying to sell ETH using the marker buy Ether address", async () => {
       await expect(
         tradeExecution.transferSellAmountToRecipientTest(
           encodeExecutedTrade({
@@ -99,7 +95,7 @@ describe("GPv2TradeExecution", () => {
           }),
           recipient.address,
         ),
-      ).to.be.reverted;
+      ).to.be.revertedWith("GPv2: cannot transfer native ETH");
     });
 
     describe("Non-Standard ERC20 Tokens", () => {
@@ -145,7 +141,7 @@ describe("GPv2TradeExecution", () => {
             }),
             recipient.address,
           ),
-        ).to.be.revertedWith("ERC20 operation did not succeed");
+        ).to.be.revertedWith("GPv2SafeERC20: failed transfer");
       });
     });
   });
@@ -206,7 +202,7 @@ describe("GPv2TradeExecution", () => {
             ...withoutSell,
           }),
         ),
-      ).to.be.revertedWith("call to non-contract");
+      ).not.to.be.reverted;
     });
 
     it("should transfer Ether if the marker address is used", async () => {
@@ -273,7 +269,7 @@ describe("GPv2TradeExecution", () => {
               ...withoutSell,
             }),
           ),
-        ).to.be.revertedWith("ERC20 operation did not succeed");
+        ).to.be.revertedWith("GPv2SafeERC20: failed transfer");
       });
     });
   });
