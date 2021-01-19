@@ -19,6 +19,8 @@ contract GPv2AllowListAuthentication is GPv2Authentication, StorageAccessible {
         address indexed newOwner
     );
 
+    EnumerableSet.AddressSet private solvers;
+
     // solhint-disable-next-line no-empty-blocks
     // constructor(address initialOwner) CustomInitiallyOwnable(initialOwner) {}
     function initialize(address initialOwner) public {
