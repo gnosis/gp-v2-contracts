@@ -3,6 +3,7 @@ import { Contract, Wallet } from "ethers";
 import { ethers } from "hardhat";
 
 import {
+  InteractionStage,
   OrderKind,
   SettlementEncoder,
   SigningScheme,
@@ -110,18 +111,21 @@ describe("E2E: EIP-2612 Permit", () => {
         permit,
       ),
     );
-    encoder.encodePreparation({
-      target: eurs[1].address,
-      callData: eurs[1].interface.encodeFunctionData("permit", [
-        permit.owner,
-        permit.spender,
-        permit.value,
-        permit.deadline,
-        v,
-        r,
-        s,
-      ]),
-    });
+    encoder.encodeInteraction(
+      {
+        target: eurs[1].address,
+        callData: eurs[1].interface.encodeFunctionData("permit", [
+          permit.owner,
+          permit.spender,
+          permit.value,
+          permit.deadline,
+          v,
+          r,
+          s,
+        ]),
+      },
+      InteractionStage.PRE,
+    );
 
     await encoder.signEncodeTrade(
       {
@@ -140,15 +144,10 @@ describe("E2E: EIP-2612 Permit", () => {
     );
 
     await settlement.connect(solver).settle(
-      encoder.tokens,
-      encoder.clearingPrices({
+      ...encoder.encodedSettlement({
         [eurs[0].address]: 1,
         [eurs[1].address]: 1,
       }),
-      encoder.encodedPreparations,
-      encoder.encodedTrades,
-      "0x",
-      "0x",
     );
 
     expect(await eurs[1].balanceOf(traders[1].address)).to.deep.equal(

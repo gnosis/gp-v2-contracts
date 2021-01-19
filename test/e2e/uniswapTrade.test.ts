@@ -168,15 +168,10 @@ describe("E2E: Should Trade Surplus With Uniswap", () => {
     });
 
     await settlement.connect(solver).settle(
-      encoder.tokens,
-      encoder.clearingPrices({
+      ...encoder.encodedSettlement({
         [weth.address]: uniswapUsdtOutAmount,
         [usdt.address]: uniswapWethInAmount,
       }),
-      "0x",
-      encoder.encodedTrades,
-      encoder.encodedInteractions,
-      "0x",
     );
 
     // NOTE: Half of the trader 0's fees were discounted. This is reflected in
