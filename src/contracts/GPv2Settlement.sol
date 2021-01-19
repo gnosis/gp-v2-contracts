@@ -341,10 +341,11 @@ contract GPv2Settlement {
         // replaced with the latest decoded interaction.
         GPv2Encoding.Interaction memory interaction;
 
-        bytes calldata remainingEncodedInteractions = encodedInteractions;
-        while (remainingEncodedInteractions.length != 0) {
-            remainingEncodedInteractions = remainingEncodedInteractions
-                .decodeInteraction(interaction);
+        bytes calldata remainingInteractions = encodedInteractions;
+        while (remainingInteractions.length != 0) {
+            remainingInteractions = remainingInteractions.decodeInteraction(
+                interaction
+            );
             executeInteraction(interaction);
         }
     }
