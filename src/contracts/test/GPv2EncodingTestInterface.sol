@@ -34,8 +34,8 @@ contract GPv2EncodingTestInterface {
         external
         view
         returns (
-            GPv2Encoding.Trade[] memory trades,
             uint256 tradeCount,
+            GPv2Encoding.Trade[] memory trades,
             uint256 mem,
             uint256 gas_
         )
