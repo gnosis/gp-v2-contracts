@@ -149,6 +149,10 @@ export class BenchFixture {
     );
   }
 
+  public get settlement(): Contract {
+    return this.deployment.settlement;
+  }
+
   public async settle(options: SettlementOptions): Promise<ContractReceipt> {
     debug(`running fixture with ${JSON.stringify(options)}`);
 
@@ -303,13 +307,7 @@ export class BenchFixture {
     debug(`executing settlement`);
     const transaction = await settlement
       .connect(solver)
-      .settle(
-        encoder.tokens,
-        encoder.clearingPrices(prices),
-        encoder.encodedTrades,
-        encoder.encodedInteractions,
-        encoder.encodedOrderRefunds,
-      );
+      .settle(...encoder.encodedSettlement(prices));
 
     return await transaction.wait();
   }

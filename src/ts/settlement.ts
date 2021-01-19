@@ -1,6 +1,6 @@
-import { BigNumber, BigNumberish, BytesLike, Signer, ethers } from "ethers";
+import { BigNumberish, BytesLike, Signer, ethers } from "ethers";
 
-import { Interaction } from "./interaction";
+import { Interaction, encodeInteraction } from "./interaction";
 import {
   ORDER_UID_LENGTH,
   Order,
@@ -11,6 +11,35 @@ import {
   timestamp,
 } from "./order";
 import { TypedDataDomain } from "./types/ethers";
+
+/**
+ * The stage an interaction should be executed in.
+ */
+export enum InteractionStage {
+  /**
+   * A pre-settlement intraction.
+   *
+   * The interaction will be executed before any trading occurs. This can be
+   * used, for example, to perform as EIP-2612 `permit` call for a user trading
+   * in the current settlement.
+   */
+  PRE = 0,
+  /**
+   * An intra-settlement interaction.
+   *
+   * The interaction will be executed after all trade sell amounts are
+   * transferred into the settlement contract, but before the buy amounts are
+   * transferred out to the traders. This can be used, for example, to interact
+   * with on-chain AMMs.
+   */
+  INTRA = 1,
+  /**
+   * A post-settlement interaction.
+   *
+   * The interaction will be executed after all trading has completed.
+   */
+  POST = 2,
+}
 
 /**
  * Details representing how an order was executed.
@@ -35,6 +64,27 @@ export interface TradeExecution {
    */
   feeDiscount: number;
 }
+
+/**
+ * Table mapping token addresses to their respective clearing prices.
+ */
+export type Prices = Record<string, BigNumberish | undefined>;
+
+/**
+ * Encoded settlement parameters.
+ */
+export type EncodedSettlement = [
+  /** Tokens. */
+  string[],
+  /** Clearing prices. */
+  BigNumberish[],
+  /** Encoded trades. */
+  BytesLike,
+  /** Encoded interactions. */
+  [BytesLike, BytesLike, BytesLike],
+  /** Encoded order refunds. */
+  BytesLike,
+];
 
 /**
  * Fee discount value used to indicate that all fees should be waived.
@@ -69,7 +119,11 @@ export class SettlementEncoder {
   private readonly _tokens: string[] = [];
   private readonly _tokenMap: Record<string, number | undefined> = {};
   private _encodedTrades = "0x";
-  private _encodedInteractions = "0x";
+  private _encodedInteractions = {
+    [InteractionStage.PRE]: "0x",
+    [InteractionStage.INTRA]: "0x",
+    [InteractionStage.POST]: "0x",
+  };
   private _encodedOrderRefunds = "0x";
 
   /**
@@ -102,10 +156,15 @@ export class SettlementEncoder {
   }
 
   /**
-   * Gets the encoded trades as a hex-encoded string.
+   * Gets the encoded interactions for the specified stage as a hex-encoded
+   * string.
    */
-  public get encodedInteractions(): string {
-    return this._encodedInteractions;
+  public get encodedInteractions(): [string, string, string] {
+    return [
+      this._encodedInteractions[InteractionStage.PRE],
+      this._encodedInteractions[InteractionStage.INTRA],
+      this._encodedInteractions[InteractionStage.POST],
+    ];
   }
 
   /**
@@ -138,9 +197,7 @@ export class SettlementEncoder {
    * @param prices The price map from token address to price.
    * @return The price vector.
    */
-  public clearingPrices(
-    prices: Record<string, BigNumberish | undefined>,
-  ): BigNumberish[] {
+  public clearingPrices(prices: Prices): BigNumberish[] {
     return this.tokens.map((token) => {
       const price = prices[token];
       if (price === undefined) {
@@ -234,26 +291,16 @@ export class SettlementEncoder {
    * Encodes the input interaction in the packed format accepted by the smart
    * contract and adds it to the interactions encoded so far.
    *
+   * @param stage The stage the interaction should be executed.
    * @param interaction The interaction to encode.
    */
-  public encodeInteraction(interaction: Interaction): void {
-    const value = BigNumber.from(interaction.value || 0);
-    const callData = interaction.callData || "0x";
-    const callDataLength = ethers.utils.hexDataLength(callData);
-
-    const encodedInteraction = value.isZero()
-      ? ethers.utils.solidityPack(
-          ["address", "bool", "uint24", "bytes"],
-          [interaction.target, false, callDataLength, callData],
-        )
-      : ethers.utils.solidityPack(
-          ["address", "bool", "uint24", "uint256", "bytes"],
-          [interaction.target, true, callDataLength, value, callData],
-        );
-
-    this._encodedInteractions = ethers.utils.hexConcat([
-      this._encodedInteractions,
-      encodedInteraction,
+  public encodeInteraction(
+    interaction: Interaction,
+    stage: InteractionStage = InteractionStage.INTRA,
+  ): void {
+    this._encodedInteractions[stage] = ethers.utils.hexConcat([
+      this._encodedInteractions[stage],
+      encodeInteraction(interaction),
     ]);
   }
 
@@ -275,6 +322,19 @@ export class SettlementEncoder {
       this._encodedOrderRefunds,
       ...orderUids,
     ]);
+  }
+
+  /**
+   * Returns the encoded settlement parameters.
+   */
+  public encodedSettlement(prices: Prices): EncodedSettlement {
+    return [
+      this.tokens,
+      this.clearingPrices(prices),
+      this.encodedTrades,
+      this.encodedInteractions,
+      this.encodedOrderRefunds,
+    ];
   }
 
   private tokenIndex(token: string): number {
