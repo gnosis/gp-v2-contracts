@@ -153,7 +153,7 @@ contract GPv2Settlement is ReentrancyGuard {
         bytes calldata encodedTrades,
         bytes[3] calldata encodedInteractions,
         bytes calldata encodedOrderRefunds
-    ) external onlySolver nonReentrant {
+    ) external nonReentrant onlySolver {
         executeInteractions(encodedInteractions[0]);
 
         GPv2TradeExecution.Data[] memory executedTrades =
