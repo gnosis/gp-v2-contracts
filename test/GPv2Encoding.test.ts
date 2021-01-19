@@ -102,11 +102,14 @@ describe("GPv2Encoding", () => {
       const [, encodedTrades] = await encoding.tradeCountTest(
         encoder.encodedTrades,
       );
-      expect(encodedTrades).to.equal("0x" + encoder.encodedTrades.slice(4));
+      expect(encodedTrades).to.equal("0x" + encoder.encodedTrades.slice(6));
     });
 
     it("should revert if length is not specified", async () => {
       await expect(encoding.tradeCountTest("0x")).to.be.revertedWith(
+        "GPv2: malformed trade data",
+      );
+      await expect(encoding.tradeCountTest("0x00")).to.be.revertedWith(
         "GPv2: malformed trade data",
       );
     });
@@ -249,7 +252,7 @@ describe("GPv2Encoding", () => {
       // NOTE: `v` must be either `27` or `28`, so just set it to something else
       // to generate an invalid signature.
       const encodedTradeBytes = ethers.utils.arrayify(encoder.encodedTrades);
-      encodedTradeBytes[206] = 42;
+      encodedTradeBytes[207] = 42;
 
       await expect(
         encoding.decodeTradesTest(encoder.tokens, encodedTradeBytes),

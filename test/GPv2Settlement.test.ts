@@ -363,8 +363,10 @@ describe("GPv2Settlement", () => {
         }
 
         const encodedBytes = ethers.utils.arrayify(encoder.encodedTrades);
-        expect(encodedBytes[0]).to.equal(tradeCount);
-        encodedBytes[0] = tradeCount + 1;
+        expect(encodedBytes.slice(0, 2)).to.deep.equal(
+          Uint8Array.from([0, tradeCount]),
+        );
+        encodedBytes[1] = tradeCount + 1;
         await expect(
           settlement.computeTradeExecutionsTest(
             encoder.tokens,
@@ -391,8 +393,10 @@ describe("GPv2Settlement", () => {
         }
 
         const encodedBytes = ethers.utils.arrayify(encoder.encodedTrades);
-        expect(encodedBytes[0]).to.equal(tradeCount);
-        encodedBytes[0] = tradeCount - 1;
+        expect(encodedBytes.slice(0, 2)).to.deep.equal(
+          Uint8Array.from([0, tradeCount]),
+        );
+        encodedBytes[1] = tradeCount - 1;
         await expect(
           settlement.computeTradeExecutionsTest(
             encoder.tokens,

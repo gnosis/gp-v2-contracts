@@ -90,9 +90,9 @@ library GPv2Encoding {
 
     /// @dev Returns the number of trades encoded in a calldata byte array.
     ///
-    /// The number of interaction is encoded in the first byte, the remaining
-    /// calldata stores the encoded interactions. If no length is found, this
-    /// method reverts
+    /// The number of interaction is encoded in the first two bytes, the
+    /// remaining calldata stores the encoded interactions. If no length is
+    /// found, this method reverts.
     ///
     /// @param encodedTrades The encoded trades including the number of trades.
     /// @return count The total number of trades encoded in the specified bytes.
@@ -103,16 +103,16 @@ library GPv2Encoding {
         pure
         returns (uint256 count, bytes calldata encodedTradesWithoutLength)
     {
-        require(encodedTrades.length >= 1, "GPv2: malformed trade data");
+        require(encodedTrades.length >= 2, "GPv2: malformed trade data");
 
         // NOTE: Use assembly to slice the calldata bytes without generating
         // code for bounds checking.
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            count := shr(248, calldataload(encodedTrades.offset))
+            count := shr(240, calldataload(encodedTrades.offset))
 
-            encodedTradesWithoutLength.offset := add(encodedTrades.offset, 1)
-            encodedTradesWithoutLength.length := sub(encodedTrades.length, 1)
+            encodedTradesWithoutLength.offset := add(encodedTrades.offset, 2)
+            encodedTradesWithoutLength.length := sub(encodedTrades.length, 2)
         }
     }
 

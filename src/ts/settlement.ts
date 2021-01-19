@@ -95,7 +95,7 @@ export const FULL_FEE_DISCOUNT = 10000;
  * Maximum number of trades that can be included in a single call to the settle
  * function.
  */
-export const MAX_TRADES_IN_SETTLEMENT = 255;
+export const MAX_TRADES_IN_SETTLEMENT = 2 ** 16 - 1;
 
 function encodeOrderFlags(flags: OrderFlags): number {
   let kind;
@@ -163,7 +163,7 @@ export class SettlementEncoder {
       throw new Error("too many orders to encode in a single settlement");
     }
     return ethers.utils.hexConcat([
-      ethers.utils.solidityPack(["uint8"], [this._tradeCount]),
+      ethers.utils.solidityPack(["uint16"], [this._tradeCount]),
       this._encodedTrades,
     ]);
   }
