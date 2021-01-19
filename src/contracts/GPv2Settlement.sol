@@ -4,6 +4,7 @@ pragma abicoder v2;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import "./GPv2AllowanceManager.sol";
 import "./interfaces/GPv2Authentication.sol";
@@ -12,7 +13,7 @@ import "./libraries/GPv2TradeExecution.sol";
 
 /// @title Gnosis Protocol v2 Settlement Contract
 /// @author Gnosis Developers
-contract GPv2Settlement {
+contract GPv2Settlement is ReentrancyGuard {
     using GPv2Encoding for bytes;
     using GPv2TradeExecution for GPv2TradeExecution.Data;
     using SafeMath for uint256;
@@ -152,7 +153,7 @@ contract GPv2Settlement {
         bytes calldata encodedTrades,
         bytes[3] calldata encodedInteractions,
         bytes calldata encodedOrderRefunds
-    ) external onlySolver {
+    ) external nonReentrant onlySolver {
         executeInteractions(encodedInteractions[0]);
 
         GPv2TradeExecution.Data[] memory executedTrades =
