@@ -280,6 +280,12 @@ describe("E2E: Can settle a 0x trade", () => {
       ethers.utils.parseEther("999.0"),
     );
 
+    // NOTE: The user keeps the surplus from their trade.
+    const gpv2OwlSurplus = gpv2Order.sellAmount.sub(
+      gpv2Order.buyAmount.mul(gpv2GnoPrice),
+    );
+    expect(await owl.balanceOf(trader.address)).to.deep.equal(gpv2OwlSurplus);
+
     // NOTE: The exchange keeps the surplus from the 0x order.
     const zeroExOwlSurplus = gpv2Order.buyAmount.mul(
       gpv2GnoPrice - zeroExGnoPrice,
