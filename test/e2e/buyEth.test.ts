@@ -109,16 +109,11 @@ describe("E2E: Buy Ether", () => {
 
     const trader1InitialBalance = await traders[1].getBalance();
     await settlement.connect(solver).settle(
-      encoder.tokens,
-      encoder.clearingPrices({
+      ...encoder.encodedSettlement({
         [weth.address]: ethers.utils.parseUnits("1150.0", 6),
         [BUY_ETH_ADDRESS]: ethers.utils.parseUnits("1150.0", 6),
         [usdt.address]: ethers.utils.parseEther("1.0"),
       }),
-      "0x",
-      encoder.encodedTrades,
-      encoder.encodedInteractions,
-      "0x",
     );
 
     expect(await weth.balanceOf(settlement.address)).to.deep.equal(

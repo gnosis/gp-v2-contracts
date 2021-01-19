@@ -307,14 +307,7 @@ export class BenchFixture {
     debug(`executing settlement`);
     const transaction = await settlement
       .connect(solver)
-      .settle(
-        encoder.tokens,
-        encoder.clearingPrices(prices),
-        encoder.encodedPreparations,
-        encoder.encodedTrades,
-        encoder.encodedInteractions,
-        encoder.encodedOrderRefunds,
-      );
+      .settle(...encoder.encodedSettlement(prices));
 
     return await transaction.wait();
   }

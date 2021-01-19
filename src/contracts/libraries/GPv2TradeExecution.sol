@@ -2,16 +2,12 @@
 pragma solidity ^0.7.6;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "./GPv2SafeERC20.sol";
 
 /// @title Gnosis Protocol v2 Trade Execution
 /// @author Gnosis Developers
 library GPv2TradeExecution {
-    using SafeERC20 for IERC20;
-
-    /// @dev Ether marker address used to indicate an order is buying Ether.
-    address internal constant BUY_ETH_ADDRESS =
-        0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+    using GPv2SafeERC20 for IERC20;
 
     /// @dev Executed trade data.
     struct Data {
@@ -22,12 +18,20 @@ library GPv2TradeExecution {
         uint256 buyAmount;
     }
 
+    /// @dev Ether marker address used to indicate an order is buying Ether.
+    address internal constant BUY_ETH_ADDRESS =
+        0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+
     /// @dev Executes the trade's sell amount, transferring it from the trade's
     /// owner to the specified recipient.
     function transferSellAmountToRecipient(
         Data calldata trade,
         address recipient
     ) internal {
+        require(
+            address(trade.sellToken) != BUY_ETH_ADDRESS,
+            "GPv2: cannot transfer native ETH"
+        );
         trade.sellToken.safeTransferFrom(
             trade.owner,
             recipient,

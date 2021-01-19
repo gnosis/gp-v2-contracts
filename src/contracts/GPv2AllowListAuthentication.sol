@@ -15,10 +15,10 @@ contract GPv2AllowListAuthentication is
 {
     using EnumerableSet for EnumerableSet.AddressSet;
 
+    EnumerableSet.AddressSet private solvers;
+
     // solhint-disable-next-line no-empty-blocks
     constructor(address initialOwner) CustomInitiallyOwnable(initialOwner) {}
-
-    EnumerableSet.AddressSet private solvers;
 
     function addSolver(address solver) external onlyOwner {
         solvers.add(solver);
