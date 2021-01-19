@@ -389,7 +389,7 @@ describe("GPv2Encoding", () => {
         SigningScheme.MESSAGE,
       );
 
-      const [, mem] = await encoding.decodeTradesTest(
+      const { mem } = await encoding.decodeTradesTest(
         encoder.tokens,
         encoder.encodedTrades,
       );
