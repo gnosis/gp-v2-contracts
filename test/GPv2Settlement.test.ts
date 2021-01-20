@@ -373,6 +373,68 @@ describe("GPv2Settlement", () => {
       expect(trades.length).to.equal(tradeCount);
     });
 
+    describe("bad trade encoding", () => {
+      it("should revert if encoded length is larger than number of encoded trades", async () => {
+        const tradeCount = 10;
+        const encoder = new SettlementEncoder(testDomain);
+        for (let i = 0; i < tradeCount; i++) {
+          await encoder.signEncodeTrade(
+            {
+              ...partialOrder,
+              kind: OrderKind.BUY,
+              partiallyFillable: true,
+            },
+            traders[0],
+            SigningScheme.TYPED_DATA,
+            { executedAmount: ethers.utils.parseEther("0.7734") },
+          );
+        }
+
+        const encodedBytes = ethers.utils.arrayify(encoder.encodedTrades);
+        expect(encodedBytes.slice(0, 2)).to.deep.equal(
+          Uint8Array.from([0, tradeCount]),
+        );
+        encodedBytes[1] = tradeCount + 1;
+        await expect(
+          settlement.computeTradeExecutionsTest(
+            encoder.tokens,
+            encoder.clearingPrices(prices),
+            ethers.utils.hexlify(encodedBytes),
+          ),
+        ).to.be.revertedWith("GPv2: invalid trade encoding");
+      });
+
+      it("should revert if encoded length is smaller than number of encoded trades", async () => {
+        const tradeCount = 10;
+        const encoder = new SettlementEncoder(testDomain);
+        for (let i = 0; i < tradeCount; i++) {
+          await encoder.signEncodeTrade(
+            {
+              ...partialOrder,
+              kind: OrderKind.BUY,
+              partiallyFillable: true,
+            },
+            traders[0],
+            SigningScheme.TYPED_DATA,
+            { executedAmount: ethers.utils.parseEther("0.7734") },
+          );
+        }
+
+        const encodedBytes = ethers.utils.arrayify(encoder.encodedTrades);
+        expect(encodedBytes.slice(0, 2)).to.deep.equal(
+          Uint8Array.from([0, tradeCount]),
+        );
+        encodedBytes[1] = tradeCount - 1;
+        await expect(
+          settlement.computeTradeExecutionsTest(
+            encoder.tokens,
+            encoder.clearingPrices(prices),
+            ethers.utils.hexlify(encodedBytes),
+          ),
+        ).to.be.reverted;
+      });
+    });
+
     it("should revert if the order expired", async () => {
       const { timestamp } = await ethers.provider.getBlock("latest");
       const encoder = new SettlementEncoder(testDomain);

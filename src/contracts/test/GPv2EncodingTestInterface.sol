@@ -22,9 +22,9 @@ contract GPv2EncodingTestInterface {
     function tradeCountTest(bytes calldata encodedTrades)
         external
         pure
-        returns (uint256 count)
+        returns (uint256 count, bytes calldata encodedTradesWithoutLength)
     {
-        count = encodedTrades.tradeCount();
+        (count, encodedTradesWithoutLength) = encodedTrades.decodeTradeCount();
     }
 
     function decodeTradesTest(
@@ -34,6 +34,7 @@ contract GPv2EncodingTestInterface {
         external
         view
         returns (
+            uint256 tradeCount,
             GPv2Encoding.Trade[] memory trades,
             uint256 mem,
             uint256 gas_
@@ -41,9 +42,12 @@ contract GPv2EncodingTestInterface {
     {
         bytes32 domainSeparator = DOMAIN_SEPARATOR;
 
-        uint256 tradeCount = encodedTrades.tradeCount();
+        bytes calldata remainingEncodedTrades;
+        (tradeCount, remainingEncodedTrades) = encodedTrades.decodeTradeCount();
+
         trades = new GPv2Encoding.Trade[](tradeCount);
-        for (uint256 i = 0; i < tradeCount; i++) {
+        uint256 i;
+        for (i = 0; i < tradeCount; i++) {
             trades[i].orderUid = new bytes(56);
         }
 
@@ -58,12 +62,14 @@ contract GPv2EncodingTestInterface {
         }
         gas_ = gasleft();
 
-        for (uint256 i = 0; i < tradeCount; i++) {
-            encodedTrades.tradeAtIndex(i).decodeTrade(
+        i = 0;
+        while (remainingEncodedTrades.length != 0) {
+            remainingEncodedTrades = remainingEncodedTrades.decodeTrade(
                 domainSeparator,
                 tokens,
                 trades[i]
             );
+            i++;
         }
 
         // solhint-disable-next-line no-inline-assembly

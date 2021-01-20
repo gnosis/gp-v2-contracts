@@ -82,51 +82,37 @@ library GPv2Encoding {
     bytes32 internal constant ORDER_TYPE_HASH =
         hex"b2b38b9dcbdeb41f7ad71dea9aed79fb47f7bbc3436576fe994b43d5b16ecdec";
 
-    /// @dev The stride of an encoded trade.
-    uint256 private constant TRADE_STRIDE = 206;
+    /// @dev The stride of the fixed-length components in an encoded trade.
+    uint256 private constant FIXED_LENGTH_TRADE_STRIDE = 206;
 
     /// @dev The byte length of an order unique identifier.
     uint256 private constant ORDER_UID_LENGTH = 56;
 
     /// @dev Returns the number of trades encoded in a calldata byte array.
     ///
-    /// This method reverts if the encoded trades are malformed, i.e. the total
-    /// length is not a multiple of the stride of a single trade.
-    /// @param encodedTrades The encoded trades.
-    /// @return count The total number of trades encoded in the specified bytes.
-    function tradeCount(bytes calldata encodedTrades)
-        internal
-        pure
-        returns (uint256 count)
-    {
-        require(
-            encodedTrades.length % TRADE_STRIDE == 0,
-            "GPv2: malformed trade data"
-        );
-        count = encodedTrades.length / TRADE_STRIDE;
-    }
-
-    /// @dev Returns a calldata slice to an encoded trade at the specified
-    /// index.
+    /// The number of interaction is encoded in the first two bytes, the
+    /// remaining calldata stores the encoded interactions. If no length is
+    /// found, this method reverts.
     ///
-    /// Note that this method does not check that the index is within the bounds
-    /// of the specified encoded trades, as reading calldata out of bounds just
-    /// produces 0's and will just decode to an invalid trade that will either
-    /// fail to recover an address or recover a bogus one.
-    function tradeAtIndex(bytes calldata encodedTrades, uint256 index)
+    /// @param encodedTrades The encoded trades including the number of trades.
+    /// @return count The total number of trades encoded in the specified bytes.
+    /// @return encodedTradesWithoutLength The remaining calldata storing the
+    /// encoded trades.
+    function decodeTradeCount(bytes calldata encodedTrades)
         internal
         pure
-        returns (bytes calldata encodedTrade)
+        returns (uint256 count, bytes calldata encodedTradesWithoutLength)
     {
+        require(encodedTrades.length >= 2, "GPv2: malformed trade data");
+
         // NOTE: Use assembly to slice the calldata bytes without generating
         // code for bounds checking.
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            encodedTrade.offset := add(
-                encodedTrades.offset,
-                mul(index, TRADE_STRIDE)
-            )
-            encodedTrade.length := TRADE_STRIDE
+            count := shr(240, calldataload(encodedTrades.offset))
+
+            encodedTradesWithoutLength.offset := add(encodedTrades.offset, 2)
+            encodedTradesWithoutLength.length := sub(encodedTrades.length, 2)
         }
     }
 
@@ -189,89 +175,108 @@ library GPv2Encoding {
     /// indices in the encoded order parameters map to tokens in this array.
     /// @param encodedTrade The trade as encoded calldata bytes.
     /// @param trade The memory location to decode trade to.
+    /// @return remainingEncodedTrades Input calldata that has not been used to
+    /// decode the current order.
     function decodeTrade(
         bytes calldata encodedTrade,
         bytes32 domainSeparator,
         IERC20[] calldata tokens,
         Trade memory trade
-    ) internal pure {
-        uint8 sellTokenIndex;
-        uint8 buyTokenIndex;
+    ) internal pure returns (bytes calldata remainingEncodedTrades) {
+        require(
+            encodedTrade.length >= FIXED_LENGTH_TRADE_STRIDE,
+            "GPv2: invalid trade"
+        );
+
         uint32 validTo;
-        uint256 flags;
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-
-        GPv2Encoding.Order memory order = trade.order;
-
-        // NOTE: Use assembly to efficiently decode packed data. Memory structs
-        // in Solidity aren't packed, so the `Order` fields are in order at 32
-        // byte increments.
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            // sellTokenIndex = uint8(encodedTrade[0])
-            sellTokenIndex := shr(248, calldataload(encodedTrade.offset))
-            // buyTokenIndex = uint8(encodedTrade[1])
-            buyTokenIndex := shr(248, calldataload(add(encodedTrade.offset, 1)))
-            // order.sellAmount = uint256(encodedTrade[2:34])
-            mstore(add(order, 64), calldataload(add(encodedTrade.offset, 2)))
-            // order.buyAmount = uint256(encodedTrade[34:66])
-            mstore(add(order, 96), calldataload(add(encodedTrade.offset, 34)))
-            // order.validTo = uint32(encodedTrade[66:70])
-            validTo := shr(224, calldataload(add(encodedTrade.offset, 66)))
-            // order.appData = uint32(encodedTrade[70:74])
-            mstore(
-                add(order, 160),
-                shr(224, calldataload(add(encodedTrade.offset, 70)))
-            )
-            // order.feeAmount = uint256(encodedTrade[74:106])
-            mstore(add(order, 192), calldataload(add(encodedTrade.offset, 74)))
-            // flags = uint8(encodedTrade[106])
-            flags := shr(248, calldataload(add(encodedTrade.offset, 106)))
-            // trade.executedAmount = uint256(encodedTrade[107:139])
-            mstore(add(trade, 96), calldataload(add(encodedTrade.offset, 107)))
-            // trade.feeDiscount = uint256(encodedTrade[139:141])
-            mstore(
-                add(trade, 128),
-                shr(240, calldataload(add(encodedTrade.offset, 139)))
-            )
-            // r = uint256(encodedTrade[141:173])
-            r := calldataload(add(encodedTrade.offset, 141))
-            // s = uint256(encodedTrade[173:205])
-            s := calldataload(add(encodedTrade.offset, 173))
-            // v = uint8(encodedTrade[205])
-            v := shr(248, calldataload(add(encodedTrade.offset, 205)))
-        }
-
-        order.sellToken = tokens[sellTokenIndex];
-        order.buyToken = tokens[buyTokenIndex];
-        order.validTo = validTo;
-        if (flags & 0x01 == 0) {
-            order.kind = ORDER_KIND_SELL;
-        } else {
-            order.kind = ORDER_KIND_BUY;
-        }
-        order.partiallyFillable = flags & 0x02 != 0;
-
-        trade.sellTokenIndex = sellTokenIndex;
-        trade.buyTokenIndex = buyTokenIndex;
-
-        // NOTE: Compute the EIP-712 order struct hash in place. The hash is
-        // computed from the order type hash concatenated with the ABI encoded
-        // order fields for a total of `10 * sizeof(uint) = 320` bytes.
-        // Fortunately, since Solidity memory structs **are not** packed, they
-        // are already laid out in memory exactly as is needed to compute the
-        // struct hash, just requiring the order type hash to be temporarily
-        // writen to the memory slot coming right before the order data.
         bytes32 orderDigest;
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            let dataStart := sub(mload(trade), 32)
-            let temp := mload(dataStart)
-            mstore(dataStart, ORDER_TYPE_HASH)
-            orderDigest := keccak256(dataStart, 320)
-            mstore(dataStart, temp)
+
+        // This scope is needed to clear variables from the stack after use and
+        // avoids stack too deep errors.
+        {
+            uint8 sellTokenIndex;
+            uint8 buyTokenIndex;
+            uint256 flags;
+
+            GPv2Encoding.Order memory order = trade.order;
+
+            // NOTE: Use assembly to efficiently decode packed data. Memory
+            // structs in Solidity aren't packed, so the `Order` fields are in
+            // order at 32 byte increments.
+            // solhint-disable-next-line no-inline-assembly
+            assembly {
+                // sellTokenIndex = uint8(encodedTrade[0])
+                sellTokenIndex := shr(248, calldataload(encodedTrade.offset))
+                // buyTokenIndex = uint8(encodedTrade[1])
+                buyTokenIndex := shr(
+                    248,
+                    calldataload(add(encodedTrade.offset, 1))
+                )
+                // order.sellAmount = uint256(encodedTrade[2:34])
+                mstore(
+                    add(order, 64),
+                    calldataload(add(encodedTrade.offset, 2))
+                )
+                // order.buyAmount = uint256(encodedTrade[34:66])
+                mstore(
+                    add(order, 96),
+                    calldataload(add(encodedTrade.offset, 34))
+                )
+                // order.validTo = uint32(encodedTrade[66:70])
+                validTo := shr(224, calldataload(add(encodedTrade.offset, 66)))
+                // order.appData = uint32(encodedTrade[70:74])
+                mstore(
+                    add(order, 160),
+                    shr(224, calldataload(add(encodedTrade.offset, 70)))
+                )
+                // order.feeAmount = uint256(encodedTrade[74:106])
+                mstore(
+                    add(order, 192),
+                    calldataload(add(encodedTrade.offset, 74))
+                )
+                // flags = uint8(encodedTrade[106])
+                flags := shr(248, calldataload(add(encodedTrade.offset, 106)))
+                // trade.executedAmount = uint256(encodedTrade[107:139])
+                mstore(
+                    add(trade, 96),
+                    calldataload(add(encodedTrade.offset, 107))
+                )
+                // trade.feeDiscount = uint256(encodedTrade[139:141])
+                mstore(
+                    add(trade, 128),
+                    shr(240, calldataload(add(encodedTrade.offset, 139)))
+                )
+            }
+
+            order.sellToken = tokens[sellTokenIndex];
+            order.buyToken = tokens[buyTokenIndex];
+            order.validTo = validTo;
+            if (flags & 0x01 == 0) {
+                order.kind = ORDER_KIND_SELL;
+            } else {
+                order.kind = ORDER_KIND_BUY;
+            }
+            order.partiallyFillable = flags & 0x02 != 0;
+
+            trade.sellTokenIndex = sellTokenIndex;
+            trade.buyTokenIndex = buyTokenIndex;
+
+            // NOTE: Compute the EIP-712 order struct hash in place. The hash is
+            // computed from the order type hash concatenated with the ABI
+            // encoded order fields for a total of `10 * sizeof(uint) = 320`
+            // bytes. Fortunately, since Solidity memory structs **are not**
+            // packed, they are already laid out in memory exactly as is needed
+            // to compute the struct hash, just requiring the order type hash to
+            // be temporarily written to the memory slot coming right before the
+            // order data.
+            // solhint-disable-next-line no-inline-assembly
+            assembly {
+                let dataStart := sub(mload(trade), 32)
+                let temp := mload(dataStart)
+                mstore(dataStart, ORDER_TYPE_HASH)
+                orderDigest := keccak256(dataStart, 320)
+                mstore(dataStart, temp)
+            }
         }
 
         // NOTE: Solidity allocates, but does not free, memory when:
@@ -288,31 +293,49 @@ library GPv2Encoding {
             freeMemoryPointer := mload(0x40)
         }
 
-        bytes32 signingDigest;
-        if (v & 0x80 == 0) {
-            // NOTE: The most significant bit **is not set**, so the order is
-            // signed using the EIP-712 sheme, the signing hash is of:
-            // `"\x19\x01" || domainSeparator || orderDigest`.
-            signingDigest = keccak256(
-                abi.encodePacked("\x19\x01", domainSeparator, orderDigest)
-            );
-        } else {
-            // NOTE: The most significant bit **is set**, so the order is signed
-            // using generic message scheme, the signing hash is of:
-            // `"\x19Ethereum Signed Message:\n" || length || data` where the
-            // length is a constant 64 bytes and the data is defined as:
-            // `domainSeparator || orderDigest`.
-            signingDigest = keccak256(
-                abi.encodePacked(
-                    "\x19Ethereum Signed Message:\n64",
-                    domainSeparator,
-                    orderDigest
-                )
-            );
-        }
+        address owner;
 
-        address owner = ecrecover(signingDigest, v & 0x1f, r, s);
-        require(owner != address(0), "GPv2: invalid signature");
+        {
+            uint8 v;
+            bytes32 r;
+            bytes32 s;
+            // NOTE: Use assembly to efficiently decode signature data.
+            // solhint-disable-next-line no-inline-assembly
+            assembly {
+                // r = uint256(encodedTrade[141:173])
+                r := calldataload(add(encodedTrade.offset, 141))
+                // s = uint256(encodedTrade[173:205])
+                s := calldataload(add(encodedTrade.offset, 173))
+                // v = uint8(encodedTrade[205])
+                v := shr(248, calldataload(add(encodedTrade.offset, 205)))
+            }
+
+            bytes32 signingDigest;
+            if (v & 0x80 == 0) {
+                // NOTE: The most significant bit **is not set**, so the order
+                // issigned using the EIP-712 sheme, the signing hash is of:
+                // `"\x19\x01" || domainSeparator || orderDigest`.
+                signingDigest = keccak256(
+                    abi.encodePacked("\x19\x01", domainSeparator, orderDigest)
+                );
+            } else {
+                // NOTE: The most significant bit **is set**, so the order is
+                // signed using generic message scheme, the signing hash is of:
+                // `"\x19Ethereum Signed Message:\n" || length || data` where
+                // the length is a constant 64 bytes and the data is defined as:
+                // `domainSeparator || orderDigest`.
+                signingDigest = keccak256(
+                    abi.encodePacked(
+                        "\x19Ethereum Signed Message:\n64",
+                        domainSeparator,
+                        orderDigest
+                    )
+                );
+            }
+
+            owner = ecrecover(signingDigest, v & 0x1f, r, s);
+            require(owner != address(0), "GPv2: invalid signature");
+        }
 
         trade.owner = owner;
 
@@ -351,6 +374,20 @@ library GPv2Encoding {
             mstore(add(orderUid, 24), validTo)
             mstore(add(orderUid, 20), owner)
             mstore(orderUid, orderDigest)
+        }
+
+        // NOTE: Use assembly to slice the calldata bytes without generating
+        // code for bounds checking.
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            remainingEncodedTrades.offset := add(
+                encodedTrade.offset,
+                FIXED_LENGTH_TRADE_STRIDE
+            )
+            remainingEncodedTrades.length := sub(
+                encodedTrade.length,
+                FIXED_LENGTH_TRADE_STRIDE
+            )
         }
     }
 
@@ -394,8 +431,8 @@ library GPv2Encoding {
     ///
     /// @param encodedInteractions The interactions as encoded calldata bytes.
     /// @param interaction The memory location to decode the interaction to.
-    /// @return remainingEncodedInteractions The part of encodedInteractions that
-    /// has not been decoded after this function is executed.
+    /// @return remainingEncodedInteractions The part of encodedInteractions
+    /// that has not been decoded after this function is executed.
     function decodeInteraction(
         bytes calldata encodedInteractions,
         Interaction memory interaction
