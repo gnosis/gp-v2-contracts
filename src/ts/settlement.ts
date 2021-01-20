@@ -42,6 +42,16 @@ export enum InteractionStage {
 }
 
 /**
+ * Gnosis Protocol v2 trade flags.
+ */
+export interface TradeFlags extends OrderFlags {
+  /**
+   * True if and only if the owner of the order is a smart contract.
+   */
+  contractOrder: boolean;
+}
+
+/**
  * Details representing how an order was executed.
  */
 export interface TradeExecution {
@@ -63,6 +73,13 @@ export interface TradeExecution {
    * discount, meaning no fees will be taken.
    */
   feeDiscount: number;
+  /**
+   * Whether the trade was created by a smart contract.
+   *
+   * A smart contract order uses different signing schemes compared to
+   * externally owned accounts.
+   */
+  contractOrder: boolean;
 }
 
 /**
@@ -97,7 +114,7 @@ export const FULL_FEE_DISCOUNT = 10000;
  */
 export const MAX_TRADES_IN_SETTLEMENT = 2 ** 16 - 1;
 
-function encodeOrderFlags(flags: OrderFlags): number {
+function encodeTradeFlags(flags: TradeFlags): number {
   let kind;
   switch (flags.kind) {
     case OrderKind.SELL:
@@ -110,8 +127,9 @@ function encodeOrderFlags(flags: OrderFlags): number {
       throw new Error(`invalid error kind '${kind}'`);
   }
   const partiallyFillable = flags.partiallyFillable ? 0x02 : 0x00;
+  const contractOrder = flags.contractOrder ? 0x80 : 0x00;
 
-  return kind | partiallyFillable;
+  return contractOrder | kind | partiallyFillable;
 }
 
 /**
@@ -239,14 +257,22 @@ export class SettlementEncoder {
     }
     this._tradeCount++;
 
-    const { executedAmount, feeDiscount } = tradeExecution || {};
+    const { executedAmount, feeDiscount, contractOrder } = tradeExecution || {};
     if (order.partiallyFillable && executedAmount === undefined) {
       throw new Error("missing executed amount for partially fillable trade");
     }
 
-    const SIGNATURE_LENGTH = 65;
-    if (ethers.utils.hexDataLength(signature) !== SIGNATURE_LENGTH) {
-      throw new Error("invalid signatuare bytes");
+    const tradeFlags = {
+      ...order,
+      contractOrder: contractOrder ?? false,
+    };
+
+    const EOA_SIGNATURE_LENGTH = 65;
+    if (
+      !tradeFlags.contractOrder &&
+      ethers.utils.hexDataLength(signature) !== EOA_SIGNATURE_LENGTH
+    ) {
+      throw new Error("invalid eoa signature bytes");
     }
 
     const encodedTrade = ethers.utils.solidityPack(
@@ -271,7 +297,7 @@ export class SettlementEncoder {
         timestamp(order.validTo),
         order.appData,
         order.feeAmount,
-        encodeOrderFlags(order),
+        encodeTradeFlags(tradeFlags),
         executedAmount || 0,
         feeDiscount || 0,
         signature,
@@ -287,7 +313,7 @@ export class SettlementEncoder {
   /**
    * Signs an order and encodes a trade with that order.
    * @param order The order to sign for the trade.
-   * @param owner The owner for the order used to sign.
+   * @param owner The externally owned account that should sign the order.
    * @param scheme The signing scheme to use. See {@link SigningScheme} for more
    * details.
    * @param tradeExecution The execution details for the trade.

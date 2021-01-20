@@ -83,25 +83,28 @@ library GPv2Encoding {
         hex"b2b38b9dcbdeb41f7ad71dea9aed79fb47f7bbc3436576fe994b43d5b16ecdec";
 
     /// @dev The stride of the fixed-length components in an encoded trade.
-    uint256 private constant FIXED_LENGTH_TRADE_STRIDE = 206;
+    uint256 private constant FIXED_LENGTH_TRADE_STRIDE = 141;
+
+    /// @dev The stride of any signature from an externally owned account.
+    uint256 private constant EOA_SIGNATURE_STRIDE = 65;
 
     /// @dev The byte length of an order unique identifier.
     uint256 private constant ORDER_UID_LENGTH = 56;
 
     /// @dev Returns the number of trades encoded in a calldata byte array.
     ///
-    /// The number of interaction is encoded in the first two bytes, the
+    /// The number of interactions is encoded in the first two bytes, the
     /// remaining calldata stores the encoded interactions. If no length is
     /// found, this method reverts.
     ///
     /// @param encodedTrades The encoded trades including the number of trades.
     /// @return count The total number of trades encoded in the specified bytes.
-    /// @return encodedTradesWithoutLength The remaining calldata storing the
-    /// encoded trades.
+    /// @return unusedCalldata The remaining calldata storing the encoded
+    /// trades.
     function decodeTradeCount(bytes calldata encodedTrades)
         internal
         pure
-        returns (uint256 count, bytes calldata encodedTradesWithoutLength)
+        returns (uint256 count, bytes calldata unusedCalldata)
     {
         require(encodedTrades.length >= 2, "GPv2: malformed trade data");
 
@@ -109,10 +112,11 @@ library GPv2Encoding {
         // code for bounds checking.
         // solhint-disable-next-line no-inline-assembly
         assembly {
+            // count = uint256(encodedTrades[0:16])
             count := shr(240, calldataload(encodedTrades.offset))
-
-            encodedTradesWithoutLength.offset := add(encodedTrades.offset, 2)
-            encodedTradesWithoutLength.length := sub(encodedTrades.length, 2)
+            // unusedCalldata = encodedTrades[16:]
+            unusedCalldata.offset := add(encodedTrades.offset, 2)
+            unusedCalldata.length := sub(encodedTrades.length, 2)
         }
     }
 
@@ -135,54 +139,53 @@ library GPv2Encoding {
     ///     uint8 flags;
     ///     uint256 executedAmount;
     ///     uint16 feeDiscount;
-    ///     Signature {
-    ///         bytes32 r;
-    ///         bytes32 s;
-    ///         uint8 v;
-    ///     } signature;
+    ///     bytes signature;
     /// }
     /// ```
     ///
-    /// Order flags are used to encode additional order parameters such as the
-    /// kind of order, either a sell or a buy order, as well as whether the
-    /// order is partially fillable or if it is a "fill-or-kill" order. As the
-    /// most likely values are fill-or-kill sell orders, the flags are chosen
-    /// such that `0x00` represents this kind of order. The flags byte uses has
-    /// the following format:
+    /// The signature encoding depends on the scheme used to sign. The owner of
+    /// the order can be derived from the signature. See [`decodeEoaOwner`] for
+    /// encoding signatures originating from externally owned accounts (EOA).
+    ///
+    /// Trade flags are used to tightly encode information on how to decode
+    /// an order. Examples that directly affect the structure of an order are
+    /// the kind of order (either a sell or a buy order) as well as whether the
+    /// order is partially fillable or if it is a "fill-or-kill" order. It also
+    /// encodes whether the order comes from a smart contract or an EOA, in
+    /// order to choose the right signature scheme when decoding. As the most
+    /// likely values are fill-or-kill sell orders by an EOA, the flags are
+    /// chosen such that `0x00` represents this kind of order. The flags byte
+    /// uses the following format:
     /// ```
     /// bit | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
     /// ----+-----------------------+---+---+
-    ///     |        unsused        | * | * |
-    ///                               |   |
-    ///                               |   +---- order kind bit, 0 for a sell
-    ///                               |         order and 1 for a buy order
-    ///                               |
-    ///                               +-------- order fill bit, 0 for fill-or-
-    ///                                         kill and 1 for a partially
-    ///                                         fillable order
+    ///     | * |      unsused      | * | * |
+    ///       ^                       |   |
+    ///       |                       |   +---- order kind bit, 0 for a sell
+    ///       |                       |         order and 1 for a buy order
+    ///       |                       |
+    ///       |                       +-------- order fill bit, 0 for fill-or-
+    ///       |                                 kill and 1 for a partially
+    ///       |                                 fillable order
+    ///       |
+    ///       +-------------------------------- constract signature bit, 0 for
+    ///                                         smart contract orders and 1 for
+    ///                                         EOA orders.
     /// ```
-    ///
-    /// Order signatures support two schemes:
-    /// - EIP-712 for signing typed data, this is the default scheme that will
-    ///   be used when recovering the signing address from the signature.
-    /// - Generic message signature, this scheme will be used **only** if the
-    ///   `v` signature parameter's most significant bit is set. This is done as
-    ///   there are only two possible values `v` can have: 27 or 28, which only
-    ///   take up the lower 5 bits of the `uint8`.
     ///
     /// @param domainSeparator The domain separator used for signing the order.
     /// @param tokens The list of tokens included in the settlement. The token
     /// indices in the encoded order parameters map to tokens in this array.
     /// @param encodedTrade The trade as encoded calldata bytes.
     /// @param trade The memory location to decode trade to.
-    /// @return remainingEncodedTrades Input calldata that has not been used to
-    /// decode the current order.
+    /// @return unusedCalldata Input calldata that has not been used while
+    /// decoding the current order.
     function decodeTrade(
         bytes calldata encodedTrade,
         bytes32 domainSeparator,
         IERC20[] calldata tokens,
         Trade memory trade
-    ) internal pure returns (bytes calldata remainingEncodedTrades) {
+    ) internal pure returns (bytes calldata unusedCalldata) {
         require(
             encodedTrade.length >= FIXED_LENGTH_TRADE_STRIDE,
             "GPv2: invalid trade"
@@ -190,13 +193,13 @@ library GPv2Encoding {
 
         uint32 validTo;
         bytes32 orderDigest;
+        uint256 flags;
 
         // This scope is needed to clear variables from the stack after use and
         // avoids stack too deep errors.
         {
             uint8 sellTokenIndex;
             uint8 buyTokenIndex;
-            uint256 flags;
 
             GPv2Encoding.Order memory order = trade.order;
 
@@ -279,71 +282,32 @@ library GPv2Encoding {
             }
         }
 
-        // NOTE: Solidity allocates, but does not free, memory when:
-        // - calling the ABI encoding methods
-        // - calling the `ecrecover` precompile.
-        // However, we can restore the free memory pointer to before we made
-        // allocations to effectively free the memory. This is safe as the
-        // memory used can be discarded, and the memory pointed to by the free
-        // memory pointer **does not have to point to zero-ed out memory**.
-        // <https://docs.soliditylang.org/en/v0.7.6/internals/layout_in_memory.html>
-        uint256 freeMemoryPointer;
+        bytes calldata signature;
+        // NOTE: Use assembly to slice the calldata bytes without generating
+        // code for bounds checking.
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            freeMemoryPointer := mload(0x40)
+            signature.offset := add(
+                encodedTrade.offset,
+                FIXED_LENGTH_TRADE_STRIDE
+            )
+            signature.length := sub(
+                encodedTrade.length,
+                FIXED_LENGTH_TRADE_STRIDE
+            )
         }
 
         address owner;
-
-        {
-            uint8 v;
-            bytes32 r;
-            bytes32 s;
-            // NOTE: Use assembly to efficiently decode signature data.
-            // solhint-disable-next-line no-inline-assembly
-            assembly {
-                // r = uint256(encodedTrade[141:173])
-                r := calldataload(add(encodedTrade.offset, 141))
-                // s = uint256(encodedTrade[173:205])
-                s := calldataload(add(encodedTrade.offset, 173))
-                // v = uint8(encodedTrade[205])
-                v := shr(248, calldataload(add(encodedTrade.offset, 205)))
-            }
-
-            bytes32 signingDigest;
-            if (v & 0x80 == 0) {
-                // NOTE: The most significant bit **is not set**, so the order
-                // issigned using the EIP-712 sheme, the signing hash is of:
-                // `"\x19\x01" || domainSeparator || orderDigest`.
-                signingDigest = keccak256(
-                    abi.encodePacked("\x19\x01", domainSeparator, orderDigest)
-                );
-            } else {
-                // NOTE: The most significant bit **is set**, so the order is
-                // signed using generic message scheme, the signing hash is of:
-                // `"\x19Ethereum Signed Message:\n" || length || data` where
-                // the length is a constant 64 bytes and the data is defined as:
-                // `domainSeparator || orderDigest`.
-                signingDigest = keccak256(
-                    abi.encodePacked(
-                        "\x19Ethereum Signed Message:\n64",
-                        domainSeparator,
-                        orderDigest
-                    )
-                );
-            }
-
-            owner = ecrecover(signingDigest, v & 0x1f, r, s);
-            require(owner != address(0), "GPv2: invalid signature");
+        if (flags & 0x80 == 0) {
+            (owner, unusedCalldata) = decodeEoaOwner(
+                domainSeparator,
+                orderDigest,
+                signature
+            );
+        } else {
+            revert("unimplemented");
         }
-
         trade.owner = owner;
-
-        // NOTE: Restore the free memory pointer to free temporary memory.
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            mstore(0x40, freeMemoryPointer)
-        }
 
         // NOTE: Initialize the memory for the order UID if required.
         if (trade.orderUid.length != ORDER_UID_LENGTH) {
@@ -375,18 +339,121 @@ library GPv2Encoding {
             mstore(add(orderUid, 20), owner)
             mstore(orderUid, orderDigest)
         }
+    }
+
+    /// @dev Decodes signature bytes originating from EOAs.
+    ///
+    /// Two schemes can be used to sign orders from an EOA:
+    /// - EIP-712 for signing typed data, this is the default scheme that will
+    ///   be used when recovering the signing address from the signature.
+    /// - Generic message signature, this scheme will be used **only** if the
+    ///   `v` signature parameter's most significant bit is set. This is done as
+    ///   there are only two possible values `v` can have: 27 or 28, which only
+    ///   take up the lower 5 bits of the `uint8`.
+    ///
+    /// The first bytes of the signature calldata are supposed to store the
+    /// signature parameters in the following tightly packed struct:
+    ///
+    /// ```
+    /// struct EncodedSignature {
+    ///     bytes32 r;
+    ///     bytes32 s;
+    ///     uint8 v;
+    /// }
+    /// ```
+    ///
+    /// Unused signature data is returned along with the address of the signer.
+    /// If the signature is not valid, the function reverts.
+    ///
+    /// @param domainSeparator The domain separator used for signing the order.
+    /// @param orderDigest The EIP-712 signing digest derived from the order
+    /// parameters.
+    /// @param encodedSignature Calldata pointing to tightly packed signature
+    /// bytes.
+    /// @return owner The address of the signer.
+    /// @return unusedCalldata Input calldata that has not been used to decode
+    /// the current order.
+    function decodeEoaOwner(
+        bytes32 domainSeparator,
+        bytes32 orderDigest,
+        bytes calldata encodedSignature
+    ) internal pure returns (address owner, bytes calldata unusedCalldata) {
+        require(
+            encodedSignature.length >= EOA_SIGNATURE_STRIDE,
+            "GPv2: invalid encoding"
+        );
+
+        bytes32 r;
+        bytes32 s;
+        uint8 v;
+        // NOTE: Use assembly to efficiently decode signature data.
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            // r = uint256(encodedTrade[0:32])
+            r := calldataload(encodedSignature.offset)
+            // s = uint256(encodedTrade[32:64])
+            s := calldataload(add(encodedSignature.offset, 32))
+            // v = uint8(encodedTrade[64])
+            v := shr(248, calldataload(add(encodedSignature.offset, 64)))
+        }
+
+        // NOTE: Solidity allocates, but does not free, memory when:
+        // - calling the ABI encoding methods
+        // - calling the `ecrecover` precompile.
+        // However, we can restore the free memory pointer to before we made
+        // allocations to effectively free the memory. This is safe as the
+        // memory used can be discarded, and the memory pointed to by the free
+        // memory pointer **does not have to point to zero-ed out memory**.
+        // <https://docs.soliditylang.org/en/v0.7.6/internals/layout_in_memory.html>
+        uint256 freeMemoryPointer;
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            freeMemoryPointer := mload(0x40)
+        }
+
+        bytes32 signingDigest;
+        if (v & 0x80 == 0) {
+            // NOTE: The most significant bit **is not set**, so the order
+            // is signed using the EIP-712 sheme, the signing hash is of:
+            // `"\x19\x01" || domainSeparator || orderDigest`.
+            signingDigest = keccak256(
+                abi.encodePacked("\x19\x01", domainSeparator, orderDigest)
+            );
+        } else {
+            // NOTE: The most significant bit **is set**, so the order is
+            // signed using generic message scheme, the signing hash is of:
+            // `"\x19Ethereum Signed Message:\n" || length || data` where
+            // the length is a constant 64 bytes and the data is defined as:
+            // `domainSeparator || orderDigest`.
+            signingDigest = keccak256(
+                abi.encodePacked(
+                    "\x19Ethereum Signed Message:\n64",
+                    domainSeparator,
+                    orderDigest
+                )
+            );
+        }
+
+        owner = ecrecover(signingDigest, v & 0x1f, r, s);
+        require(owner != address(0), "GPv2: invalid eoa signature");
+
+        // NOTE: Restore the free memory pointer to free temporary memory.
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            mstore(0x40, freeMemoryPointer)
+        }
 
         // NOTE: Use assembly to slice the calldata bytes without generating
         // code for bounds checking.
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            remainingEncodedTrades.offset := add(
-                encodedTrade.offset,
-                FIXED_LENGTH_TRADE_STRIDE
+            unusedCalldata.offset := add(
+                encodedSignature.offset,
+                EOA_SIGNATURE_STRIDE
             )
-            remainingEncodedTrades.length := sub(
-                encodedTrade.length,
-                FIXED_LENGTH_TRADE_STRIDE
+            unusedCalldata.length := sub(
+                encodedSignature.length,
+                EOA_SIGNATURE_STRIDE
             )
         }
     }
@@ -431,12 +498,12 @@ library GPv2Encoding {
     ///
     /// @param encodedInteractions The interactions as encoded calldata bytes.
     /// @param interaction The memory location to decode the interaction to.
-    /// @return remainingEncodedInteractions The part of encodedInteractions
-    /// that has not been decoded after this function is executed.
+    /// @return unusedCalldata The part of encodedInteractions that has not been
+    /// decoded after this function is executed.
     function decodeInteraction(
         bytes calldata encodedInteractions,
         Interaction memory interaction
-    ) internal pure returns (bytes calldata remainingEncodedInteractions) {
+    ) internal pure returns (bytes calldata unusedCalldata) {
         bool hasValue;
         uint256 dataLength;
 
@@ -497,11 +564,11 @@ library GPv2Encoding {
                 }
             interactionCallData.length := dataLength
 
-            remainingEncodedInteractions.offset := add(
+            unusedCalldata.offset := add(
                 encodedInteractions.offset,
                 encodedInteractionSize
             )
-            remainingEncodedInteractions.length := sub(
+            unusedCalldata.length := sub(
                 encodedInteractions.length,
                 encodedInteractionSize
             )

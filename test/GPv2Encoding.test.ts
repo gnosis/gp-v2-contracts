@@ -256,7 +256,7 @@ describe("GPv2Encoding", () => {
 
       await expect(
         encoding.decodeTradesTest(encoder.tokens, encodedTradeBytes),
-      ).to.be.revertedWith("invalid signature");
+      ).to.be.revertedWith("invalid eoa signature");
     });
 
     it("should revert for invalid sell token indices", async () => {
@@ -284,7 +284,7 @@ describe("GPv2Encoding", () => {
         .be.reverted;
     });
 
-    it("should revert for invalid sell token indices", async () => {
+    it("should revert for invalid buy token indices", async () => {
       const lastToken = fillBytes(20, 0x03);
 
       const encoder = new SettlementEncoder(testDomain);
@@ -307,6 +307,20 @@ describe("GPv2Encoding", () => {
       expect(tokens.pop()).to.equal(lastToken);
       await expect(encoding.decodeTradesTest(tokens, encoder.encodedTrades)).to
         .be.reverted;
+    });
+
+    it("should revert when encoding a smart contract order", async () => {
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
+        sampleOrder,
+        traders[0],
+        SigningScheme.TYPED_DATA,
+        { contractOrder: true },
+      );
+
+      await expect(
+        encoding.decodeTradesTest(encoder.tokens, encoder.encodedTrades),
+      ).to.be.revertedWith("unimplemented");
     });
 
     describe("invalid encoded trade", () => {
@@ -339,7 +353,7 @@ describe("GPv2Encoding", () => {
           encoder.tokens,
           encoder.encodedTrades.slice(0, -2),
         );
-        await expect(decoding).to.be.revertedWith("GPv2: invalid trade");
+        await expect(decoding).to.be.revertedWith("GPv2: invalid encoding");
       });
 
       it("calldata longer than single trade length", async () => {
