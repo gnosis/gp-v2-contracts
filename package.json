@@ -22,6 +22,7 @@
   },
   "devDependencies": {
     "@0x/contract-artifacts": "=2.2.2",
+    "@0x/contracts-zero-ex": "^0.18.0",
     "@gnosis.pm/util-contracts": "=3.0.1-solc-7",
     "@nomiclabs/hardhat-ethers": "^2.0.1",
     "@nomiclabs/hardhat-waffle": "^2.0.1",

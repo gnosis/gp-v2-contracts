@@ -5,6 +5,48 @@ import { ethers, waffle } from "hardhat";
 import { SimpleOrder } from "..";
 import { TypedDataDomain } from "../../../../src/ts";
 
+export interface Deployment {
+  zrxToken: Contract;
+  exchange: Contract;
+  erc20Proxy: Contract;
+  domainSeparator: TypedDataDomain;
+}
+
+export async function deployExchange(deployer: Wallet): Promise<Deployment> {
+  const zrxToken = await waffle.deployContract(
+    deployer,
+    ZRXToken.compilerOutput,
+  );
+
+  const zrxAssetData = encodeErc20AssetData(zrxToken.address);
+  const exchange = await waffle.deployContract(
+    deployer,
+    Exchange.compilerOutput,
+    [zrxAssetData],
+  );
+
+  const erc20Proxy = await waffle.deployContract(
+    deployer,
+    ERC20Proxy.compilerOutput,
+  );
+
+  await erc20Proxy.addAuthorizedAddress(exchange.address);
+  await exchange.registerAssetProxy(erc20Proxy.address);
+
+  return {
+    zrxToken,
+    exchange,
+    erc20Proxy,
+    // NOTE: Domain separator parameters taken from:
+    // <https://0x.org/docs/guides/v2-specification#eip-712-usage>
+    domainSeparator: {
+      name: "0x Protocol",
+      version: "2",
+      verifyingContract: exchange.address,
+    },
+  };
+}
+
 // NOTE: Order type from:
 // <https://0x.org/docs/guides/v2-specification#order>
 export interface Order {
@@ -108,46 +150,4 @@ export async function signSimpleOrder(
   );
 
   return { order, hash, signature };
-}
-
-export interface Deployment {
-  zrxToken: Contract;
-  exchange: Contract;
-  erc20Proxy: Contract;
-  domainSeparator: TypedDataDomain;
-}
-
-export async function deployExchange(deployer: Wallet): Promise<Deployment> {
-  const zrxToken = await waffle.deployContract(
-    deployer,
-    ZRXToken.compilerOutput,
-  );
-
-  const zrxAssetData = encodeErc20AssetData(zrxToken.address);
-  const exchange = await waffle.deployContract(
-    deployer,
-    Exchange.compilerOutput,
-    [zrxAssetData],
-  );
-
-  const erc20Proxy = await waffle.deployContract(
-    deployer,
-    ERC20Proxy.compilerOutput,
-  );
-
-  await erc20Proxy.addAuthorizedAddress(exchange.address);
-  await exchange.registerAssetProxy(erc20Proxy.address);
-
-  return {
-    zrxToken,
-    exchange,
-    erc20Proxy,
-    // NOTE: Domain separator parameters taken from:
-    // <https://0x.org/docs/guides/v2-specification#eip-712-usage>
-    domainSeparator: {
-      name: "0x Protocol",
-      version: "2",
-      verifyingContract: exchange.address,
-    },
-  };
 }

@@ -17,12 +17,14 @@ import {
 import { deployTestContracts } from "./fixture";
 import { SimpleOrder as ZeroExSimpleOrder } from "./zero-ex";
 import * as ZeroExV2 from "./zero-ex/v2";
+import * as ZeroExV4 from "./zero-ex/v4";
 
 const debug = Debug("test:e2e:0xTrade");
 
 describe("E2E: Can settle a 0x trade", () => {
   let deployer: Wallet;
   let solver: Wallet;
+  let rfqOrigin: Wallet;
   let trader: Wallet;
   let marketMaker: Wallet;
 
@@ -40,7 +42,7 @@ describe("E2E: Can settle a 0x trade", () => {
       deployer,
       settlement,
       allowanceManager,
-      wallets: [solver, trader, marketMaker],
+      wallets: [solver, rfqOrigin, trader, marketMaker],
     } = deployment);
 
     const { authenticator, owner } = deployment;
@@ -53,6 +55,10 @@ describe("E2E: Can settle a 0x trade", () => {
     gno = await waffle.deployContract(deployer, ERC20, ["GNO", 18]);
   });
 
+  /**
+   * Prepares a solution that settles a market order buying 1 GNO for 120 OWL
+   * and get matched with a market maker using 0x orders.
+   */
   function generateSettlementSolution(): {
     gpv2Order: Order;
     zeroExOrder: ZeroExSimpleOrder;
@@ -108,9 +114,6 @@ describe("E2E: Can settle a 0x trade", () => {
 
   describe("0x Protocol v2", () => {
     it("should settle an EOA trade with a 0x trade", async () => {
-      // Settles a market order buying 1 GNO for 120 OWL and get matched with a
-      // market maker using 0x orders.
-
       const {
         gpv2Order,
         zeroExOrder,
@@ -120,12 +123,12 @@ describe("E2E: Can settle a 0x trade", () => {
         zeroExOwlSurplus,
       } = await generateSettlementSolution();
 
+      const zeroEx = await ZeroExV2.deployExchange(deployer);
+
       await owl.mint(trader.address, ethers.utils.parseEther("140"));
       await owl
         .connect(trader)
         .approve(allowanceManager.address, ethers.constants.MaxUint256);
-
-      const zeroEx = await ZeroExV2.deployExchange(deployer);
 
       await gno.mint(marketMaker.address, ethers.utils.parseEther("1000.0"));
       await gno
@@ -175,10 +178,96 @@ describe("E2E: Can settle a 0x trade", () => {
       debug(`gas used: ${gasUsed}`);
 
       expect(await gno.balanceOf(trader.address)).to.deep.equal(
-        ethers.utils.parseEther("1.0"),
+        gpv2Order.buyAmount,
       );
       expect(await gno.balanceOf(marketMaker.address)).to.deep.equal(
-        ethers.utils.parseEther("999.0"),
+        ethers.utils.parseEther("1000.0").sub(gpv2Order.buyAmount),
+      );
+
+      // NOTE: The user keeps the surplus from their trade.
+      expect(await owl.balanceOf(trader.address)).to.deep.equal(gpv2OwlSurplus);
+      // NOTE: The exchange keeps the surplus from the 0x order.
+      expect(await owl.balanceOf(settlement.address)).to.deep.equal(
+        zeroExOwlSurplus.add(gpv2Order.feeAmount),
+      );
+    });
+  });
+
+  describe("0x Protocol v4", () => {
+    it("should settle an EOA trade with a 0x trade", async () => {
+      const {
+        gpv2Order,
+        zeroExOrder,
+        zeroExTakerAmount,
+        clearingPrices,
+        gpv2OwlSurplus,
+        zeroExOwlSurplus,
+      } = await generateSettlementSolution();
+
+      const zeroEx = await ZeroExV4.deployExchange(deployer);
+
+      await owl.mint(trader.address, ethers.utils.parseEther("140"));
+      await owl
+        .connect(trader)
+        .approve(allowanceManager.address, ethers.constants.MaxUint256);
+
+      await gno.mint(marketMaker.address, ethers.utils.parseEther("1000.0"));
+      await gno
+        .connect(marketMaker)
+        .approve(zeroEx.contract.address, ethers.constants.MaxUint256);
+
+      // NOTE: Use RFQ origins to allow the address requesting the quote to be
+      // different from the solver submitting a solution. This allows market
+      // maker integrations to request a single binding quote shared amongst
+      // multiple solvers.
+      await zeroEx.contract
+        .connect(rfqOrigin)
+        .registerAllowedRfqOrigins([solver.address], true);
+
+      const zeroExSignedOrder = await ZeroExV4.signSimpleOrder(
+        marketMaker,
+        rfqOrigin,
+        zeroEx.domainSeparator,
+        zeroExOrder,
+      );
+      expect(
+        await zeroEx.contract.getRfqOrderHash(zeroExSignedOrder.order),
+      ).to.equal(zeroExSignedOrder.hash);
+
+      const encoder = new SettlementEncoder(domainSeparator);
+      await encoder.signEncodeTrade(
+        gpv2Order,
+        trader,
+        SigningScheme.TYPED_DATA,
+      );
+      encoder.encodeInteraction({
+        target: owl.address,
+        callData: owl.interface.encodeFunctionData("approve", [
+          zeroEx.contract.address,
+          zeroExTakerAmount,
+        ]),
+      });
+      encoder.encodeInteraction({
+        target: zeroEx.contract.address,
+        callData: zeroEx.contract.interface.encodeFunctionData("fillRfqOrder", [
+          zeroExSignedOrder.order,
+          zeroExSignedOrder.signature,
+          zeroExTakerAmount,
+        ]),
+      });
+
+      const tx = await settlement
+        .connect(solver)
+        .settle(...encoder.encodedSettlement(clearingPrices));
+
+      const { gasUsed } = await tx.wait();
+      debug(`gas used: ${gasUsed}`);
+
+      expect(await gno.balanceOf(trader.address)).to.deep.equal(
+        gpv2Order.buyAmount,
+      );
+      expect(await gno.balanceOf(marketMaker.address)).to.deep.equal(
+        ethers.utils.parseEther("1000.0").sub(gpv2Order.buyAmount),
       );
 
       // NOTE: The user keeps the surplus from their trade.

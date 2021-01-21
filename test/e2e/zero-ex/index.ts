@@ -1,9 +1,9 @@
-import { BigNumberish, BytesLike } from "ethers";
+import { BigNumberish } from "ethers";
 
 export interface SimpleOrder {
   takerAddress: string;
   makerAssetAmount: BigNumberish;
   takerAssetAmount: BigNumberish;
-  makerAssetAddress: BytesLike;
-  takerAssetAddress: BytesLike;
+  makerAssetAddress: string;
+  takerAssetAddress: string;
 }
