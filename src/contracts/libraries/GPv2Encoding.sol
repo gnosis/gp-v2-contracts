@@ -144,7 +144,7 @@ library GPv2Encoding {
     /// ```
     ///
     /// The signature encoding depends on the scheme used to sign. The owner of
-    /// the order can be derived from the signature. See [`decodeEoaOwner`] for
+    /// the order can be derived from the signature. See [`recoverEoaOwner`] for
     /// encoding signatures originating from externally owned accounts (EOA).
     ///
     /// Trade flags are used to tightly encode information on how to decode
@@ -299,7 +299,7 @@ library GPv2Encoding {
 
         address owner;
         if (flags & 0x80 == 0) {
-            (owner, remainingCalldata) = decodeEoaOwner(
+            (owner, remainingCalldata) = recoverEoaOwner(
                 domainSeparator,
                 orderDigest,
                 signature
@@ -373,7 +373,7 @@ library GPv2Encoding {
     /// @return owner The address of the signer.
     /// @return remainingCalldata Input calldata that has not been used to
     /// decode the current order.
-    function decodeEoaOwner(
+    function recoverEoaOwner(
         bytes32 domainSeparator,
         bytes32 orderDigest,
         bytes calldata encodedSignature
