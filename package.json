@@ -21,7 +21,8 @@
     "ethers": "~5.0.18"
   },
   "devDependencies": {
-    "@gnosis.pm/util-contracts": "3.0.1-solc-7",
+    "@0x/contract-artifacts": "=2.2.2",
+    "@gnosis.pm/util-contracts": "=3.0.1-solc-7",
     "@nomiclabs/hardhat-ethers": "^2.0.1",
     "@nomiclabs/hardhat-waffle": "^2.0.1",
     "@openzeppelin/contracts": "^3.3.0",

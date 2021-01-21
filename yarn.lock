@@ -2,6 +2,11 @@
 # yarn lockfile v1
 
 
+"@0x/contract-artifacts@=2.2.2":
+  version "2.2.2"
+  resolved "https://registry.yarnpkg.com/@0x/contract-artifacts/-/contract-artifacts-2.2.2.tgz#e6d771afb58d0b59c19c5364af5a42a3dfd17219"
+  integrity sha512-sbFnSXE6PlmYsbPXpKtEOR3YdVlSn63HhbPgQB3J5jm27wwQtnZ2Lf21I7BdiRBsHwwbf75C/s2pjNqafaRrgQ==
+
 "@babel/code-frame@^7.0.0":
   version "7.12.11"
   resolved "https://registry.yarnpkg.com/@babel/code-frame/-/code-frame-7.12.11.tgz#f4ad435aa263db935b8f10f2c552d23fb716a63f"
@@ -508,7 +513,7 @@
     "@ethersproject/properties" "^5.0.7"
     "@ethersproject/strings" "^5.0.8"
 
-"@gnosis.pm/util-contracts@3.0.1-solc-7":
+"@gnosis.pm/util-contracts@=3.0.1-solc-7":
   version "3.0.1-solc-7"
   resolved "https://registry.yarnpkg.com/@gnosis.pm/util-contracts/-/util-contracts-3.0.1-solc-7.tgz#453dd78e038bbb4b2db43672a8f1283969ac2ee2"
   integrity sha512-8/dlsGoxxaq9dn+7uBJupZECQJKVuW3H/eGumWuq31FOhWh3J0nTMQjFKxbpkM6CakOZd7VlQKfO4hHhWmtPxQ==
