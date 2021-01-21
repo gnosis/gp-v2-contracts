@@ -105,13 +105,9 @@ describe("E2E: Expired Order Gas Refunds", () => {
       await encoder.signEncodeTrade(
         sellOrder,
         traders[0],
-        SigningScheme.TYPED_DATA,
+        SigningScheme.ERC712,
       );
-      await encoder.signEncodeTrade(
-        buyOrder,
-        traders[1],
-        SigningScheme.TYPED_DATA,
-      );
+      await encoder.signEncodeTrade(buyOrder, traders[1], SigningScheme.ERC712);
 
       const orderUids = [
         computeOrderUid({
