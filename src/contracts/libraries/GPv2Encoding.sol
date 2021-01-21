@@ -99,12 +99,12 @@ library GPv2Encoding {
     ///
     /// @param encodedTrades The encoded trades including the number of trades.
     /// @return count The total number of trades encoded in the specified bytes.
-    /// @return unusedCalldata The remaining calldata storing the encoded
+    /// @return remainingCalldata The remaining calldata storing the encoded
     /// trades.
     function decodeTradeCount(bytes calldata encodedTrades)
         internal
         pure
-        returns (uint256 count, bytes calldata unusedCalldata)
+        returns (uint256 count, bytes calldata remainingCalldata)
     {
         require(encodedTrades.length >= 2, "GPv2: malformed trade data");
 
@@ -114,9 +114,9 @@ library GPv2Encoding {
         assembly {
             // count = uint256(encodedTrades[0:16])
             count := shr(240, calldataload(encodedTrades.offset))
-            // unusedCalldata = encodedTrades[16:]
-            unusedCalldata.offset := add(encodedTrades.offset, 2)
-            unusedCalldata.length := sub(encodedTrades.length, 2)
+            // remainingCalldata = encodedTrades[16:]
+            remainingCalldata.offset := add(encodedTrades.offset, 2)
+            remainingCalldata.length := sub(encodedTrades.length, 2)
         }
     }
 
@@ -178,14 +178,14 @@ library GPv2Encoding {
     /// indices in the encoded order parameters map to tokens in this array.
     /// @param encodedTrade The trade as encoded calldata bytes.
     /// @param trade The memory location to decode trade to.
-    /// @return unusedCalldata Input calldata that has not been used while
+    /// @return remainingCalldata Input calldata that has not been used while
     /// decoding the current order.
     function decodeTrade(
         bytes calldata encodedTrade,
         bytes32 domainSeparator,
         IERC20[] calldata tokens,
         Trade memory trade
-    ) internal pure returns (bytes calldata unusedCalldata) {
+    ) internal pure returns (bytes calldata remainingCalldata) {
         require(
             encodedTrade.length >= FIXED_LENGTH_TRADE_STRIDE,
             "GPv2: invalid trade"
@@ -299,7 +299,7 @@ library GPv2Encoding {
 
         address owner;
         if (flags & 0x80 == 0) {
-            (owner, unusedCalldata) = decodeEoaOwner(
+            (owner, remainingCalldata) = decodeEoaOwner(
                 domainSeparator,
                 orderDigest,
                 signature
@@ -371,13 +371,13 @@ library GPv2Encoding {
     /// @param encodedSignature Calldata pointing to tightly packed signature
     /// bytes.
     /// @return owner The address of the signer.
-    /// @return unusedCalldata Input calldata that has not been used to decode
-    /// the current order.
+    /// @return remainingCalldata Input calldata that has not been used to
+    /// decode the current order.
     function decodeEoaOwner(
         bytes32 domainSeparator,
         bytes32 orderDigest,
         bytes calldata encodedSignature
-    ) internal pure returns (address owner, bytes calldata unusedCalldata) {
+    ) internal pure returns (address owner, bytes calldata remainingCalldata) {
         require(
             encodedSignature.length >= EOA_SIGNATURE_STRIDE,
             "GPv2: invalid encoding"
@@ -447,11 +447,11 @@ library GPv2Encoding {
         // code for bounds checking.
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            unusedCalldata.offset := add(
+            remainingCalldata.offset := add(
                 encodedSignature.offset,
                 EOA_SIGNATURE_STRIDE
             )
-            unusedCalldata.length := sub(
+            remainingCalldata.length := sub(
                 encodedSignature.length,
                 EOA_SIGNATURE_STRIDE
             )
@@ -498,12 +498,12 @@ library GPv2Encoding {
     ///
     /// @param encodedInteractions The interactions as encoded calldata bytes.
     /// @param interaction The memory location to decode the interaction to.
-    /// @return unusedCalldata The part of encodedInteractions that has not been
-    /// decoded after this function is executed.
+    /// @return remainingCalldata The part of encodedInteractions that has not
+    /// been decoded after this function is executed.
     function decodeInteraction(
         bytes calldata encodedInteractions,
         Interaction memory interaction
-    ) internal pure returns (bytes calldata unusedCalldata) {
+    ) internal pure returns (bytes calldata remainingCalldata) {
         bool hasValue;
         uint256 dataLength;
 
@@ -564,11 +564,11 @@ library GPv2Encoding {
                 }
             interactionCallData.length := dataLength
 
-            unusedCalldata.offset := add(
+            remainingCalldata.offset := add(
                 encodedInteractions.offset,
                 encodedInteractionSize
             )
-            unusedCalldata.length := sub(
+            remainingCalldata.length := sub(
                 encodedInteractions.length,
                 encodedInteractionSize
             )
