@@ -110,10 +110,10 @@ export async function signOrder(
  * @param sig The signature to check.
  */
 export function assertValidSignatureLength(sig: Signature): void {
-  const EOA_SIGNATURE_LENGTH = 65;
+  const ECDSA_SIGNATURE_LENGTH = 65;
   if (
     [SigningScheme.EIP712, SigningScheme.ETHSIGN].includes(sig.scheme) &&
-    ethers.utils.hexDataLength(sig.data) !== EOA_SIGNATURE_LENGTH
+    ethers.utils.hexDataLength(sig.data) !== ECDSA_SIGNATURE_LENGTH
   ) {
     throw new Error("invalid signature bytes");
   }
