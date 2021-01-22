@@ -365,7 +365,7 @@ describe("GPv2Encoding", () => {
 
       await verifier1.mock.isValidSignature
         .withArgs(message, eip1271Signature)
-        .returns(EIP1271_MAGICVALUE - 1);
+        .returns(Number.parseInt(EIP1271_MAGICVALUE) - 1);
 
       const encoder1 = new SettlementEncoder(testDomain);
       await encoder1.encodeContractTrade(
@@ -412,6 +412,39 @@ describe("GPv2Encoding", () => {
       await expect(
         encoding.decodeTradesTest(encoder.tokens, encoder.encodedTrades),
       ).to.be.reverted;
+    });
+
+    it("should revert if the EIP-1271 verification function changes the state", async () => {
+      const StateChangingERC1271 = await ethers.getContractFactory(
+        "StateChangingERC1271",
+      );
+
+      const evilVerifier = await StateChangingERC1271.deploy();
+      const message = eip1271Message(testDomain, sampleOrder);
+      const eip1271Signature = "0x";
+
+      expect(await evilVerifier.state()).to.deep.equal(ethers.constants.Zero);
+      await evilVerifier.isValidSignature(message, eip1271Signature);
+      expect(await evilVerifier.state()).to.deep.equal(ethers.constants.One);
+      expect(
+        await evilVerifier.callStatic.isValidSignature(
+          message,
+          eip1271Signature,
+        ),
+      ).to.equal(EIP1271_MAGICVALUE);
+
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.encodeContractTrade(
+        sampleOrder,
+        evilVerifier.address,
+        eip1271Signature,
+      );
+
+      // Transaction reverted and Hardhat couldn't infer the reason.
+      await expect(
+        encoding.decodeTradesTest(encoder.tokens, encoder.encodedTrades),
+      ).to.be.reverted;
+      expect(await evilVerifier.state()).to.deep.equal(ethers.constants.One);
     });
 
     it("should revert when encoding an invalid signing scheme", async () => {
