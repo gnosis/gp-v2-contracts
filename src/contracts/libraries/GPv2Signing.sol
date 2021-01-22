@@ -4,8 +4,8 @@ pragma solidity ^0.7.6;
 /// @title Gnosis Protocol v2 Signing Library.
 /// @author Gnosis Developers
 library GPv2Signing {
-    /// @dev The stride of any signature from an externally owned account.
-    uint256 private constant EOA_SIGNATURE_STRIDE = 65;
+    /// @dev The length of any signature from an externally owned account.
+    uint256 private constant ECDSA_SIGNATURE_LENGTH = 65;
 
     /// @dev Decodes ECDSA signatures from calldata.
     ///
@@ -42,7 +42,7 @@ library GPv2Signing {
         )
     {
         require(
-            encodedSignature.length >= EOA_SIGNATURE_STRIDE,
+            encodedSignature.length >= ECDSA_SIGNATURE_LENGTH,
             "GPv2: invalid encoding"
         );
 
@@ -63,11 +63,11 @@ library GPv2Signing {
         assembly {
             remainingCalldata.offset := add(
                 encodedSignature.offset,
-                EOA_SIGNATURE_STRIDE
+                ECDSA_SIGNATURE_LENGTH
             )
             remainingCalldata.length := sub(
                 encodedSignature.length,
-                EOA_SIGNATURE_STRIDE
+                ECDSA_SIGNATURE_LENGTH
             )
         }
     }

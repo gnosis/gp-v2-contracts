@@ -85,8 +85,8 @@ library GPv2Encoding {
     bytes32 internal constant ORDER_TYPE_HASH =
         hex"b2b38b9dcbdeb41f7ad71dea9aed79fb47f7bbc3436576fe994b43d5b16ecdec";
 
-    /// @dev The stride of the fixed-length components in an encoded trade.
-    uint256 private constant FIXED_LENGTH_TRADE_STRIDE = 141;
+    /// @dev The length of the fixed-length components in an encoded trade.
+    uint256 private constant CONSTANT_SIZE_TRADE_LENGTH = 141;
 
     /// @dev The byte length of an order unique identifier.
     uint256 private constant ORDER_UID_LENGTH = 56;
@@ -194,7 +194,7 @@ library GPv2Encoding {
         Trade memory trade
     ) internal pure returns (bytes calldata remainingCalldata) {
         require(
-            encodedTrade.length >= FIXED_LENGTH_TRADE_STRIDE,
+            encodedTrade.length >= CONSTANT_SIZE_TRADE_LENGTH,
             "GPv2: invalid trade"
         );
 
@@ -296,11 +296,11 @@ library GPv2Encoding {
         assembly {
             signature.offset := add(
                 encodedTrade.offset,
-                FIXED_LENGTH_TRADE_STRIDE
+                CONSTANT_SIZE_TRADE_LENGTH
             )
             signature.length := sub(
                 encodedTrade.length,
-                FIXED_LENGTH_TRADE_STRIDE
+                CONSTANT_SIZE_TRADE_LENGTH
             )
         }
 
