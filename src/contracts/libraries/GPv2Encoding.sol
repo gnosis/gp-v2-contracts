@@ -307,7 +307,7 @@ library GPv2Encoding {
         address owner;
         flags = flags >> 6;
         if (flags == EIP712_SIGNATURE_ID) {
-            (owner, remainingCalldata) = signature.recoverErc712Signer(
+            (owner, remainingCalldata) = signature.recoverEip712Signer(
                 domainSeparator,
                 orderDigest
             );

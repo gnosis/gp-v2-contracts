@@ -92,7 +92,7 @@ library GPv2Signing {
     /// @return owner The address of the signer.
     /// @return remainingCalldata Input calldata that has not been used to
     /// decode the current order.
-    function recoverErc712Signer(
+    function recoverEip712Signer(
         bytes calldata encodedSignature,
         bytes32 domainSeparator,
         bytes32 orderDigest
