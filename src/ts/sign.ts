@@ -14,7 +14,7 @@ export const enum SigningScheme {
    *
    * <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-712.md#definition-of-domainseparator>
    */
-  ERC712,
+  EIP712,
   /**
    * Message signed using eth_sign RPC call.
    */
@@ -43,7 +43,7 @@ function ecdsaSignOrder(
   scheme: SigningScheme,
 ): Promise<string> {
   switch (scheme) {
-    case SigningScheme.ERC712:
+    case SigningScheme.EIP712:
       if (!isTypedDataSigner(owner)) {
         throw new Error("signer does not support signing typed data");
       }
@@ -84,7 +84,7 @@ export async function signOrder(
   owner: Signer,
   scheme: SigningScheme,
 ): Promise<Signature> {
-  if (![SigningScheme.ERC712, SigningScheme.ETHSIGN].includes(scheme)) {
+  if (![SigningScheme.EIP712, SigningScheme.ETHSIGN].includes(scheme)) {
     throw new Error(
       "Cannot create a signature with the specified signing scheme",
     );
@@ -112,7 +112,7 @@ export async function signOrder(
 export function assertValidSignatureLength(sig: Signature): void {
   const EOA_SIGNATURE_LENGTH = 65;
   if (
-    [SigningScheme.ERC712, SigningScheme.ETHSIGN].includes(sig.scheme) &&
+    [SigningScheme.EIP712, SigningScheme.ETHSIGN].includes(sig.scheme) &&
     ethers.utils.hexDataLength(sig.data) !== EOA_SIGNATURE_LENGTH
   ) {
     throw new Error("invalid signature bytes");

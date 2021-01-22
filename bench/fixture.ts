@@ -216,7 +216,7 @@ export class BenchFixture {
       }
       const signingScheme =
         (i + Math.floor(i / 4)) % 2 == 0
-          ? SigningScheme.ERC712
+          ? SigningScheme.EIP712
           : SigningScheme.ETHSIGN;
       const feeDiscount = (i % 3) * (FULL_FEE_DISCOUNT / 2); // 0% | 50% | 100%
 
@@ -225,7 +225,7 @@ export class BenchFixture {
           ? "partially fillable"
           : "fill-or-kill",
         kind: orderSpice.kind == OrderKind.SELL ? "sell" : "buy",
-        sign: signingScheme == SigningScheme.ERC712 ? "erc-712" : "eth_sign",
+        sign: signingScheme == SigningScheme.EIP712 ? "eip-712" : "eth_sign",
         fee: 100 * (1 - feeDiscount / FULL_FEE_DISCOUNT),
       };
       debug(

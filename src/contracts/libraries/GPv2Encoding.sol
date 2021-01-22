@@ -91,8 +91,8 @@ library GPv2Encoding {
     /// @dev The byte length of an order unique identifier.
     uint256 private constant ORDER_UID_LENGTH = 56;
 
-    /// @dev Flag identifying an order signed with ERC-712.
-    uint256 private constant ERC712_SIGNATURE_ID = 0x0;
+    /// @dev Flag identifying an order signed with EIP-712.
+    uint256 private constant EIP712_SIGNATURE_ID = 0x0;
     /// @dev Flag identifying an order signed with eth_sign.
     uint256 private constant ETHSIGN_SIGNATURE_ID = 0x1;
 
@@ -174,9 +174,9 @@ library GPv2Encoding {
     ///       |   |                             fillable order
     ///       |   |
     ///       +---+---------------------------- signature-type bits:
-    ///                                         00: ERC-712
+    ///                                         00: EIP-712
     ///                                         01: eth_sign
-    ///                                         10: ERC-1271 (planned)
+    ///                                         10: EIP-1271 (planned)
     ///                                         11: unused
     /// ```
     ///
@@ -306,7 +306,7 @@ library GPv2Encoding {
 
         address owner;
         flags = flags >> 6;
-        if (flags == ERC712_SIGNATURE_ID) {
+        if (flags == EIP712_SIGNATURE_ID) {
             (owner, remainingCalldata) = signature.recoverErc712Signer(
                 domainSeparator,
                 orderDigest

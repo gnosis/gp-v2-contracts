@@ -72,13 +72,13 @@ library GPv2Signing {
         }
     }
 
-    /// @dev Decodes signature bytes originating from an ERC-712-encoded
+    /// @dev Decodes signature bytes originating from an EIP-712-encoded
     /// signature.
     ///
-    /// ERC-712 signs typed data. The specifications are described in the
+    /// EIP-712 signs typed data. The specifications are described in the
     /// related EIP (<https://eips.ethereum.org/EIPS/eip-712>).
     ///
-    /// ERC-712 signatures are encoded as standard ECDSA signatures as described
+    /// EIP-712 signatures are encoded as standard ECDSA signatures as described
     /// in the corresponding decoding function [`decodeEcdsaSignature`].
     ///
     /// Unused signature data is returned along with the address of the signer.
@@ -122,7 +122,7 @@ library GPv2Signing {
             );
 
         owner = ecrecover(signingDigest, v, r, s);
-        require(owner != address(0), "GPv2: invalid erc712 signature");
+        require(owner != address(0), "GPv2: invalid eip712 signature");
 
         // NOTE: Restore the free memory pointer to free temporary memory.
         // solhint-disable-next-line no-inline-assembly

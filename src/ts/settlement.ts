@@ -113,7 +113,7 @@ export const MAX_TRADES_IN_SETTLEMENT = 2 ** 16 - 1;
 
 function encodeSigningScheme(scheme: SigningScheme): number {
   switch (scheme) {
-    case SigningScheme.ERC712:
+    case SigningScheme.EIP712:
       return 0b00000000;
     case SigningScheme.ETHSIGN:
       return 0b01000000;

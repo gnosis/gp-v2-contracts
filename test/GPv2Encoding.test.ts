@@ -77,7 +77,7 @@ describe("GPv2Encoding", () => {
         await encoder.signEncodeTrade(
           { ...sampleOrder, appData: i },
           traders[0],
-          SigningScheme.ERC712,
+          SigningScheme.EIP712,
         );
       }
 
@@ -95,7 +95,7 @@ describe("GPv2Encoding", () => {
         await encoder.signEncodeTrade(
           { ...sampleOrder, appData: i },
           traders[0],
-          SigningScheme.ERC712,
+          SigningScheme.EIP712,
         );
       }
 
@@ -140,7 +140,7 @@ describe("GPv2Encoding", () => {
       await encoder.signEncodeTrade(
         order,
         traders[0],
-        SigningScheme.ERC712,
+        SigningScheme.EIP712,
         tradeExecution,
       );
 
@@ -165,7 +165,7 @@ describe("GPv2Encoding", () => {
       await encoder.signEncodeTrade(
         sampleOrder,
         traders[0],
-        SigningScheme.ERC712,
+        SigningScheme.EIP712,
       );
 
       const { trades } = await encoding.decodeTradesTest(
@@ -186,7 +186,7 @@ describe("GPv2Encoding", () => {
       await encoder.signEncodeTrade(
         sampleOrder,
         traders[0],
-        SigningScheme.ERC712,
+        SigningScheme.EIP712,
       );
 
       const { trades } = await encoding.decodeTradesTest(
@@ -205,7 +205,7 @@ describe("GPv2Encoding", () => {
       await encoder.signEncodeTrade(
         sampleOrder,
         traders[0],
-        SigningScheme.ERC712,
+        SigningScheme.EIP712,
       );
 
       const { trades } = await encoding.decodeTradesTest(
@@ -225,7 +225,7 @@ describe("GPv2Encoding", () => {
 
     it("should recover signing address for all supported schemes", async () => {
       const encoder = new SettlementEncoder(testDomain);
-      for (const scheme of [SigningScheme.ERC712, SigningScheme.ETHSIGN]) {
+      for (const scheme of [SigningScheme.EIP712, SigningScheme.ETHSIGN]) {
         await encoder.signEncodeTrade(sampleOrder, traders[0], scheme);
       }
 
@@ -241,12 +241,12 @@ describe("GPv2Encoding", () => {
       }
     });
 
-    it("should revert for invalid erc712 order signatures", async () => {
+    it("should revert for invalid eip-712 order signatures", async () => {
       const encoder = new SettlementEncoder(testDomain);
       await encoder.signEncodeTrade(
         sampleOrder,
         traders[0],
-        SigningScheme.ERC712,
+        SigningScheme.EIP712,
       );
 
       // NOTE: `v` must be either `27` or `28`, so just set it to something else
@@ -256,7 +256,7 @@ describe("GPv2Encoding", () => {
 
       await expect(
         encoding.decodeTradesTest(encoder.tokens, encodedTradeBytes),
-      ).to.be.revertedWith("invalid erc712 signature");
+      ).to.be.revertedWith("invalid eip712 signature");
     });
 
     it("should revert for invalid ethsign order signatures", async () => {
@@ -284,7 +284,7 @@ describe("GPv2Encoding", () => {
       await encoder.signEncodeTrade(
         sampleOrder,
         traders[0],
-        SigningScheme.ERC712,
+        SigningScheme.EIP712,
       );
       await encoder.signEncodeTrade(
         {
@@ -292,7 +292,7 @@ describe("GPv2Encoding", () => {
           sellToken: lastToken,
         },
         traders[1],
-        SigningScheme.ERC712,
+        SigningScheme.EIP712,
       );
 
       // NOTE: Remove the last sell token (0x0303...0303).
@@ -309,7 +309,7 @@ describe("GPv2Encoding", () => {
       await encoder.signEncodeTrade(
         sampleOrder,
         traders[0],
-        SigningScheme.ERC712,
+        SigningScheme.EIP712,
       );
       await encoder.signEncodeTrade(
         {
@@ -317,7 +317,7 @@ describe("GPv2Encoding", () => {
           buyToken: lastToken,
         },
         traders[1],
-        SigningScheme.ERC712,
+        SigningScheme.EIP712,
       );
 
       // NOTE: Remove the last buy token (0x0303...0303).
@@ -332,7 +332,7 @@ describe("GPv2Encoding", () => {
       await encoder.signEncodeTrade(
         sampleOrder,
         traders[0],
-        SigningScheme.ERC712,
+        SigningScheme.EIP712,
       );
 
       const encodedTrades = ethers.utils.arrayify(encoder.encodedTrades);
@@ -370,7 +370,7 @@ describe("GPv2Encoding", () => {
         await encoder.signEncodeTrade(
           order,
           traders[0],
-          SigningScheme.ERC712,
+          SigningScheme.EIP712,
           tradeExecution,
         );
 
@@ -402,7 +402,7 @@ describe("GPv2Encoding", () => {
         await encoder.signEncodeTrade(
           order,
           traders[0],
-          SigningScheme.ERC712,
+          SigningScheme.EIP712,
           tradeExecution,
         );
 
@@ -424,7 +424,7 @@ describe("GPv2Encoding", () => {
       await encoder.signEncodeTrade(
         sampleOrder,
         traders[0],
-        SigningScheme.ERC712,
+        SigningScheme.EIP712,
       );
       await encoder.signEncodeTrade(
         sampleOrder,
