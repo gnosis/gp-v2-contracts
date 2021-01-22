@@ -102,19 +102,7 @@ library GPv2Signing {
         uint8 v;
         (r, s, v, remainingCalldata) = decodeEcdsaSignature(encodedSignature);
 
-        // NOTE: Solidity allocates, but does not free, memory when:
-        // - calling the ABI encoding methods
-        // - calling the `ecrecover` precompile.
-        // However, we can restore the free memory pointer to before we made
-        // allocations to effectively free the memory. This is safe as the
-        // memory used can be discarded, and the memory pointed to by the free
-        // memory pointer **does not have to point to zero-ed out memory**.
-        // <https://docs.soliditylang.org/en/v0.7.6/internals/layout_in_memory.html>
-        uint256 freeMemoryPointer;
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            freeMemoryPointer := mload(0x40)
-        }
+        uint256 freeMemoryPointer = getFreeMemoryPointer();
 
         bytes32 signingDigest =
             keccak256(
@@ -124,11 +112,7 @@ library GPv2Signing {
         owner = ecrecover(signingDigest, v, r, s);
         require(owner != address(0), "GPv2: invalid eip712 signature");
 
-        // NOTE: Restore the free memory pointer to free temporary memory.
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            mstore(0x40, freeMemoryPointer)
-        }
+        setFreeMemoryPointer(freeMemoryPointer);
     }
 
     /// @dev Decodes signature bytes originating from the output of the eth_sign
@@ -162,19 +146,7 @@ library GPv2Signing {
         uint8 v;
         (r, s, v, remainingCalldata) = decodeEcdsaSignature(encodedSignature);
 
-        // NOTE: Solidity allocates, but does not free, memory when:
-        // - calling the ABI encoding methods
-        // - calling the `ecrecover` precompile.
-        // However, we can restore the free memory pointer to before we made
-        // allocations to effectively free the memory. This is safe as the
-        // memory used can be discarded, and the memory pointed to by the free
-        // memory pointer **does not have to point to zero-ed out memory**.
-        // <https://docs.soliditylang.org/en/v0.7.6/internals/layout_in_memory.html>
-        uint256 freeMemoryPointer;
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            freeMemoryPointer := mload(0x40)
-        }
+        uint256 freeMemoryPointer = getFreeMemoryPointer();
 
         // The signed message is encoded as:
         // `"\x19Ethereum Signed Message:\n" || length || data`, where
@@ -192,10 +164,42 @@ library GPv2Signing {
         owner = ecrecover(signingDigest, v, r, s);
         require(owner != address(0), "GPv2: invalid ethsign signature");
 
-        // NOTE: Restore the free memory pointer to free temporary memory.
+        setFreeMemoryPointer(freeMemoryPointer);
+    }
+
+    /// @dev Returns a pointer to the first location in memory that has not
+    /// been allocated by the code at this point in the code.
+    ///
+    /// @return pointer A pointer to the first unallocated location in memory.
+    function getFreeMemoryPointer() private pure returns (uint256 pointer) {
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            mstore(0x40, freeMemoryPointer)
+            pointer := mload(0x40)
+        }
+    }
+
+    /// @dev Manually sets the pointer that specifies the first location in
+    /// memory that is available to be allocated. It allows to free unused
+    /// allocated memory, but if used incorrectly it could lead to the same
+    /// address in memory being used twice.
+    ///
+    /// This function exists to deallocate memory for operations that allocate
+    /// memory during their execution but do not free it after use.
+    /// Examples are:
+    /// - calling the ABI encoding methods
+    /// - calling the `ecrecover` precompile.
+    /// If we reset the free memory pointer to what it was before the execution
+    /// of these operations, we effectively deallocated the memory used by them.
+    /// This is safe as the memory used can be discarded, and the memory pointed
+    /// to by the free memory pointer **does not have to point to zero-ed out
+    /// memory**.
+    /// <https://docs.soliditylang.org/en/v0.7.6/internals/layout_in_memory.html>
+    ///
+    /// @param pointer A pointer to a location in memory.
+    function setFreeMemoryPointer(uint256 pointer) private pure {
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            mstore(0x40, pointer)
         }
     }
 }
