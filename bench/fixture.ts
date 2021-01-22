@@ -225,7 +225,7 @@ export class BenchFixture {
           ? "partially fillable"
           : "fill-or-kill",
         kind: orderSpice.kind == OrderKind.SELL ? "sell" : "buy",
-        sign: signingScheme == SigningScheme.ERC712 ? "typed-data" : "message",
+        sign: signingScheme == SigningScheme.ERC712 ? "erc-712" : "eth_sign",
         fee: 100 * (1 - feeDiscount / FULL_FEE_DISCOUNT),
       };
       debug(
