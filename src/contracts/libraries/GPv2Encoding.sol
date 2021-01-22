@@ -2,10 +2,13 @@
 pragma solidity ^0.7.6;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./GPv2Signing.sol";
 
 /// @title Gnosis Protocol v2 Encoding Library.
 /// @author Gnosis Developers
 library GPv2Encoding {
+    using GPv2Signing for bytes;
+
     /// @dev A struct representing an order containing all order parameters that
     /// are signed by a user for submitting to GP.
     struct Order {
@@ -82,14 +85,16 @@ library GPv2Encoding {
     bytes32 internal constant ORDER_TYPE_HASH =
         hex"b2b38b9dcbdeb41f7ad71dea9aed79fb47f7bbc3436576fe994b43d5b16ecdec";
 
-    /// @dev The stride of the fixed-length components in an encoded trade.
-    uint256 private constant FIXED_LENGTH_TRADE_STRIDE = 141;
-
-    /// @dev The stride of any signature from an externally owned account.
-    uint256 private constant EOA_SIGNATURE_STRIDE = 65;
+    /// @dev The length of the fixed-length components in an encoded trade.
+    uint256 private constant CONSTANT_SIZE_TRADE_LENGTH = 141;
 
     /// @dev The byte length of an order unique identifier.
     uint256 private constant ORDER_UID_LENGTH = 56;
+
+    /// @dev Flag identifying an order signed with EIP-712.
+    uint256 private constant EIP712_SIGNATURE_ID = 0x0;
+    /// @dev Flag identifying an order signed with eth_sign.
+    uint256 private constant ETHSIGN_SIGNATURE_ID = 0x1;
 
     /// @dev Returns the number of trades encoded in a calldata byte array.
     ///
@@ -144,33 +149,35 @@ library GPv2Encoding {
     /// ```
     ///
     /// The signature encoding depends on the scheme used to sign. The owner of
-    /// the order can be derived from the signature. See [`recoverEoaOwner`] for
-    /// encoding signatures originating from externally owned accounts (EOA).
+    /// the order can be derived from the signature. See the [`GPv2Signing`]
+    /// library to learn how signatures are encoded for each supported encoding.
     ///
     /// Trade flags are used to tightly encode information on how to decode
     /// an order. Examples that directly affect the structure of an order are
     /// the kind of order (either a sell or a buy order) as well as whether the
     /// order is partially fillable or if it is a "fill-or-kill" order. It also
-    /// encodes whether the order comes from a smart contract or an EOA, in
-    /// order to choose the right signature scheme when decoding. As the most
-    /// likely values are fill-or-kill sell orders by an EOA, the flags are
-    /// chosen such that `0x00` represents this kind of order. The flags byte
-    /// uses the following format:
+    /// encodes the signature scheme used to validate the order. As the most
+    /// likely values are fill-or-kill sell orders by an externally owned
+    /// account, the flags are chosen such that `0x00` represents this kind of
+    /// order. The flags byte uses the following format:
+    ///
     /// ```
     /// bit | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
     /// ----+-----------------------+---+---+
-    ///     | * |      unsused      | * | * |
-    ///       ^                       |   |
-    ///       |                       |   +---- order kind bit, 0 for a sell
-    ///       |                       |         order and 1 for a buy order
-    ///       |                       |
-    ///       |                       +-------- order fill bit, 0 for fill-or-
-    ///       |                                 kill and 1 for a partially
-    ///       |                                 fillable order
-    ///       |
-    ///       +-------------------------------- constract signature bit, 0 for
-    ///                                         smart contract orders and 1 for
-    ///                                         EOA orders.
+    ///     | * | * |    unused     | * | * |
+    ///       |   |                   |   |
+    ///       |   |                   |   +---- order kind bit, 0 for a sell
+    ///       |   |                   |         order and 1 for a buy order
+    ///       |   |                   |
+    ///       |   |                   +-------- order fill bit, 0 for fill-or-
+    ///       |   |                             kill and 1 for a partially
+    ///       |   |                             fillable order
+    ///       |   |
+    ///       +---+---------------------------- signature-type bits:
+    ///                                         00: EIP-712
+    ///                                         01: eth_sign
+    ///                                         10: EIP-1271 (planned)
+    ///                                         11: unused
     /// ```
     ///
     /// @param domainSeparator The domain separator used for signing the order.
@@ -187,7 +194,7 @@ library GPv2Encoding {
         Trade memory trade
     ) internal pure returns (bytes calldata remainingCalldata) {
         require(
-            encodedTrade.length >= FIXED_LENGTH_TRADE_STRIDE,
+            encodedTrade.length >= CONSTANT_SIZE_TRADE_LENGTH,
             "GPv2: invalid trade"
         );
 
@@ -289,20 +296,25 @@ library GPv2Encoding {
         assembly {
             signature.offset := add(
                 encodedTrade.offset,
-                FIXED_LENGTH_TRADE_STRIDE
+                CONSTANT_SIZE_TRADE_LENGTH
             )
             signature.length := sub(
                 encodedTrade.length,
-                FIXED_LENGTH_TRADE_STRIDE
+                CONSTANT_SIZE_TRADE_LENGTH
             )
         }
 
         address owner;
-        if (flags & 0x80 == 0) {
-            (owner, remainingCalldata) = recoverEoaOwner(
+        flags = flags >> 6;
+        if (flags == EIP712_SIGNATURE_ID) {
+            (owner, remainingCalldata) = signature.recoverEip712Signer(
                 domainSeparator,
-                orderDigest,
-                signature
+                orderDigest
+            );
+        } else if (flags == ETHSIGN_SIGNATURE_ID) {
+            (owner, remainingCalldata) = signature.recoverEthsignSigner(
+                domainSeparator,
+                orderDigest
             );
         } else {
             revert("unimplemented");
@@ -338,123 +350,6 @@ library GPv2Encoding {
             mstore(add(orderUid, 24), validTo)
             mstore(add(orderUid, 20), owner)
             mstore(orderUid, orderDigest)
-        }
-    }
-
-    /// @dev Decodes signature bytes originating from EOAs.
-    ///
-    /// Two schemes can be used to sign orders from an EOA:
-    /// - EIP-712 for signing typed data, this is the default scheme that will
-    ///   be used when recovering the signing address from the signature.
-    /// - Generic message signature, this scheme will be used **only** if the
-    ///   `v` signature parameter's most significant bit is set. This is done as
-    ///   there are only two possible values `v` can have: 27 or 28, which only
-    ///   take up the lower 5 bits of the `uint8`.
-    ///
-    /// The first bytes of the signature calldata are supposed to store the
-    /// signature parameters in the following tightly packed struct:
-    ///
-    /// ```
-    /// struct EncodedSignature {
-    ///     bytes32 r;
-    ///     bytes32 s;
-    ///     uint8 v;
-    /// }
-    /// ```
-    ///
-    /// Unused signature data is returned along with the address of the signer.
-    /// If the signature is not valid, the function reverts.
-    ///
-    /// @param domainSeparator The domain separator used for signing the order.
-    /// @param orderDigest The EIP-712 signing digest derived from the order
-    /// parameters.
-    /// @param encodedSignature Calldata pointing to tightly packed signature
-    /// bytes.
-    /// @return owner The address of the signer.
-    /// @return remainingCalldata Input calldata that has not been used to
-    /// decode the current order.
-    function recoverEoaOwner(
-        bytes32 domainSeparator,
-        bytes32 orderDigest,
-        bytes calldata encodedSignature
-    ) internal pure returns (address owner, bytes calldata remainingCalldata) {
-        require(
-            encodedSignature.length >= EOA_SIGNATURE_STRIDE,
-            "GPv2: invalid encoding"
-        );
-
-        bytes32 r;
-        bytes32 s;
-        uint8 v;
-        // NOTE: Use assembly to efficiently decode signature data.
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            // r = uint256(encodedTrade[0:32])
-            r := calldataload(encodedSignature.offset)
-            // s = uint256(encodedTrade[32:64])
-            s := calldataload(add(encodedSignature.offset, 32))
-            // v = uint8(encodedTrade[64])
-            v := shr(248, calldataload(add(encodedSignature.offset, 64)))
-        }
-
-        // NOTE: Solidity allocates, but does not free, memory when:
-        // - calling the ABI encoding methods
-        // - calling the `ecrecover` precompile.
-        // However, we can restore the free memory pointer to before we made
-        // allocations to effectively free the memory. This is safe as the
-        // memory used can be discarded, and the memory pointed to by the free
-        // memory pointer **does not have to point to zero-ed out memory**.
-        // <https://docs.soliditylang.org/en/v0.7.6/internals/layout_in_memory.html>
-        uint256 freeMemoryPointer;
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            freeMemoryPointer := mload(0x40)
-        }
-
-        bytes32 signingDigest;
-        if (v & 0x80 == 0) {
-            // NOTE: The most significant bit **is not set**, so the order
-            // is signed using the EIP-712 sheme, the signing hash is of:
-            // `"\x19\x01" || domainSeparator || orderDigest`.
-            signingDigest = keccak256(
-                abi.encodePacked("\x19\x01", domainSeparator, orderDigest)
-            );
-        } else {
-            // NOTE: The most significant bit **is set**, so the order is
-            // signed using generic message scheme, the signing hash is of:
-            // `"\x19Ethereum Signed Message:\n" || length || data` where
-            // the length is a constant 64 bytes and the data is defined as:
-            // `domainSeparator || orderDigest`.
-            signingDigest = keccak256(
-                abi.encodePacked(
-                    "\x19Ethereum Signed Message:\n64",
-                    domainSeparator,
-                    orderDigest
-                )
-            );
-        }
-
-        owner = ecrecover(signingDigest, v & 0x1f, r, s);
-        require(owner != address(0), "GPv2: invalid eoa signature");
-
-        // NOTE: Restore the free memory pointer to free temporary memory.
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            mstore(0x40, freeMemoryPointer)
-        }
-
-        // NOTE: Use assembly to slice the calldata bytes without generating
-        // code for bounds checking.
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            remainingCalldata.offset := add(
-                encodedSignature.offset,
-                EOA_SIGNATURE_STRIDE
-            )
-            remainingCalldata.length := sub(
-                encodedSignature.length,
-                EOA_SIGNATURE_STRIDE
-            )
         }
     }
 

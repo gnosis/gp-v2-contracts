@@ -6,10 +6,14 @@ import {
   Order,
   OrderFlags,
   OrderKind,
-  SigningScheme,
-  signOrder,
   timestamp,
 } from "./order";
+import {
+  assertValidSignatureLength,
+  Signature,
+  SigningScheme,
+  signOrder,
+} from "./sign";
 import { TypedDataDomain } from "./types/ethers";
 
 /**
@@ -46,9 +50,9 @@ export enum InteractionStage {
  */
 export interface TradeFlags extends OrderFlags {
   /**
-   * True if and only if the owner of the order is a smart contract.
+   * The signing scheme used to encode the signature.
    */
-  contractOrder: boolean;
+  signingScheme: SigningScheme;
 }
 
 /**
@@ -73,13 +77,6 @@ export interface TradeExecution {
    * discount, meaning no fees will be taken.
    */
   feeDiscount: number;
-  /**
-   * Whether the trade was created by a smart contract.
-   *
-   * A smart contract order uses different signing schemes compared to
-   * externally owned accounts.
-   */
-  contractOrder: boolean;
 }
 
 /**
@@ -114,7 +111,18 @@ export const FULL_FEE_DISCOUNT = 10000;
  */
 export const MAX_TRADES_IN_SETTLEMENT = 2 ** 16 - 1;
 
-function encodeTradeFlags(flags: TradeFlags): number {
+function encodeSigningScheme(scheme: SigningScheme): number {
+  switch (scheme) {
+    case SigningScheme.EIP712:
+      return 0b00000000;
+    case SigningScheme.ETHSIGN:
+      return 0b01000000;
+    default:
+      throw new Error("Unsupported signing scheme");
+  }
+}
+
+function encodeOrderFlags(flags: OrderFlags): number {
   let kind;
   switch (flags.kind) {
     case OrderKind.SELL:
@@ -127,9 +135,12 @@ function encodeTradeFlags(flags: TradeFlags): number {
       throw new Error(`invalid error kind '${kind}'`);
   }
   const partiallyFillable = flags.partiallyFillable ? 0x02 : 0x00;
-  const contractOrder = flags.contractOrder ? 0x80 : 0x00;
 
-  return contractOrder | kind | partiallyFillable;
+  return kind | partiallyFillable;
+}
+
+function encodeTradeFlags(flags: TradeFlags): number {
+  return encodeOrderFlags(flags) | encodeSigningScheme(flags.signingScheme);
 }
 
 /**
@@ -249,7 +260,7 @@ export class SettlementEncoder {
    */
   public encodeTrade(
     order: Order,
-    signature: BytesLike,
+    signature: Signature,
     tradeExecution?: Partial<TradeExecution>,
   ): void {
     if (this._tradeCount >= MAX_TRADES_IN_SETTLEMENT) {
@@ -257,23 +268,17 @@ export class SettlementEncoder {
     }
     this._tradeCount++;
 
-    const { executedAmount, feeDiscount, contractOrder } = tradeExecution || {};
+    const { executedAmount, feeDiscount } = tradeExecution || {};
     if (order.partiallyFillable && executedAmount === undefined) {
       throw new Error("missing executed amount for partially fillable trade");
     }
 
+    assertValidSignatureLength(signature);
+
     const tradeFlags = {
       ...order,
-      contractOrder: contractOrder ?? false,
+      signingScheme: signature.scheme,
     };
-
-    const EOA_SIGNATURE_LENGTH = 65;
-    if (
-      !tradeFlags.contractOrder &&
-      ethers.utils.hexDataLength(signature) !== EOA_SIGNATURE_LENGTH
-    ) {
-      throw new Error("invalid eoa signature bytes");
-    }
 
     const encodedTrade = ethers.utils.solidityPack(
       [
@@ -300,7 +305,7 @@ export class SettlementEncoder {
         encodeTradeFlags(tradeFlags),
         executedAmount || 0,
         feeDiscount || 0,
-        signature,
+        signature.data,
       ],
     );
 

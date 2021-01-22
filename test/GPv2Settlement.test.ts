@@ -358,7 +358,7 @@ describe("GPv2Settlement", () => {
             partiallyFillable: true,
           },
           traders[0],
-          SigningScheme.TYPED_DATA,
+          SigningScheme.EIP712,
           { executedAmount: ethers.utils.parseEther("0.7734") },
         );
       }
@@ -385,7 +385,7 @@ describe("GPv2Settlement", () => {
               partiallyFillable: true,
             },
             traders[0],
-            SigningScheme.TYPED_DATA,
+            SigningScheme.EIP712,
             { executedAmount: ethers.utils.parseEther("0.7734") },
           );
         }
@@ -415,7 +415,7 @@ describe("GPv2Settlement", () => {
               partiallyFillable: true,
             },
             traders[0],
-            SigningScheme.TYPED_DATA,
+            SigningScheme.EIP712,
             { executedAmount: ethers.utils.parseEther("0.7734") },
           );
         }
@@ -446,7 +446,7 @@ describe("GPv2Settlement", () => {
           partiallyFillable: false,
         },
         traders[0],
-        SigningScheme.TYPED_DATA,
+        SigningScheme.EIP712,
       );
 
       await expect(
@@ -474,7 +474,7 @@ describe("GPv2Settlement", () => {
           partiallyFillable: false,
         },
         traders[0],
-        SigningScheme.TYPED_DATA,
+        SigningScheme.EIP712,
       );
 
       expect(toNumberLossy(sellAmount.mul(sellPrice))).not.to.be.gte(
@@ -501,7 +501,7 @@ describe("GPv2Settlement", () => {
           partiallyFillable: false,
         },
         traders[0],
-        SigningScheme.TYPED_DATA,
+        SigningScheme.EIP712,
       );
 
       const { sellAmount, buyAmount } = partialOrder;
@@ -536,7 +536,7 @@ describe("GPv2Settlement", () => {
             partiallyFillable,
           },
           traders[0],
-          SigningScheme.TYPED_DATA,
+          SigningScheme.EIP712,
           { executedAmount },
         );
 
@@ -694,7 +694,7 @@ describe("GPv2Settlement", () => {
             partiallyFillable,
           },
           traders[0],
-          SigningScheme.TYPED_DATA,
+          SigningScheme.EIP712,
           tradeExecution,
         );
 
@@ -792,7 +792,7 @@ describe("GPv2Settlement", () => {
         await encoder.signEncodeTrade(
           order,
           traders[0],
-          SigningScheme.TYPED_DATA,
+          SigningScheme.EIP712,
           tradeExecution,
         );
 
@@ -862,12 +862,12 @@ describe("GPv2Settlement", () => {
       await encoder.signEncodeTrade(
         { ...order, appData: 0 },
         traders[0],
-        SigningScheme.TYPED_DATA,
+        SigningScheme.EIP712,
       );
       await encoder.signEncodeTrade(
         { ...order, appData: 1 },
         traders[0],
-        SigningScheme.TYPED_DATA,
+        SigningScheme.EIP712,
         { executedAmount: ethers.utils.parseEther("1.0") },
       );
 
@@ -891,7 +891,7 @@ describe("GPv2Settlement", () => {
           partiallyFillable: false,
         },
         traders[0],
-        SigningScheme.TYPED_DATA,
+        SigningScheme.EIP712,
         { feeDiscount: FULL_FEE_DISCOUNT + 1 },
       );
 
@@ -912,11 +912,7 @@ describe("GPv2Settlement", () => {
       };
 
       const encoder = new SettlementEncoder(testDomain);
-      await encoder.signEncodeTrade(
-        order,
-        traders[0],
-        SigningScheme.TYPED_DATA,
-      );
+      await encoder.signEncodeTrade(order, traders[0], SigningScheme.EIP712);
 
       const executedSellAmount = order.sellAmount.add(order.feeAmount);
       const executedBuyAmount = order.sellAmount

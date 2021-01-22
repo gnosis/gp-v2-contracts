@@ -70,7 +70,7 @@ describe("E2E: Burn fees", () => {
         appData: 1,
       },
       traders[0],
-      SigningScheme.TYPED_DATA,
+      SigningScheme.EIP712,
     );
 
     await dai.mint(traders[1].address, ONE_USD.mul(1000));
@@ -91,7 +91,7 @@ describe("E2E: Burn fees", () => {
         appData: 2,
       },
       traders[1],
-      SigningScheme.TYPED_DATA,
+      SigningScheme.EIP712,
     );
 
     encoder.encodeInteraction(

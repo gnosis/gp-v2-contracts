@@ -81,7 +81,7 @@ describe("E2E: RetrETH Red Wine and Olive Oil Market", () => {
         .connect(trader)
         .approve(allowanceManager.address, ethers.constants.MaxUint256);
 
-      await encoder.signEncodeTrade(order, trader, SigningScheme.TYPED_DATA, {
+      await encoder.signEncodeTrade(order, trader, SigningScheme.EIP712, {
         executedAmount,
       });
     };
