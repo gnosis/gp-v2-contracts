@@ -98,9 +98,9 @@ library GPv2Encoding {
 
     /// @dev Returns the number of trades encoded in a calldata byte array.
     ///
-    /// The number of interactions is encoded in the first two bytes, the
-    /// remaining calldata stores the encoded interactions. If no length is
-    /// found, this method reverts.
+    /// The number of trades is encoded in the first two bytes, the remaining
+    /// calldata stores the encoded trades. If no length is found, this method
+    /// reverts.
     ///
     /// @param encodedTrades The encoded trades including the number of trades.
     /// @return count The total number of trades encoded in the specified bytes.
