@@ -91,6 +91,11 @@ library GPv2Encoding {
     /// @dev The byte length of an order unique identifier.
     uint256 private constant ORDER_UID_LENGTH = 56;
 
+    /// @dev Flag identifying an order signed with ERC-712.
+    uint256 private constant ERC712_SIGNATURE_ID = 0x0;
+    /// @dev Flag identifying an order signed with eth_sign.
+    uint256 private constant ETHSIGN_SIGNATURE_ID = 0x1;
+
     /// @dev Returns the number of trades encoded in a calldata byte array.
     ///
     /// The number of interactions is encoded in the first two bytes, the
@@ -300,18 +305,17 @@ library GPv2Encoding {
         }
 
         address owner;
-        if (flags & 0x80 == 0) {
-            if (flags & 0x40 == 0) {
-                (owner, remainingCalldata) = signature.recoverErc712Signer(
-                    domainSeparator,
-                    orderDigest
-                );
-            } else {
-                (owner, remainingCalldata) = signature.recoverEthsignSigner(
-                    domainSeparator,
-                    orderDigest
-                );
-            }
+        flags = flags >> 6;
+        if (flags == ERC712_SIGNATURE_ID) {
+            (owner, remainingCalldata) = signature.recoverErc712Signer(
+                domainSeparator,
+                orderDigest
+            );
+        } else if (flags == ETHSIGN_SIGNATURE_ID) {
+            (owner, remainingCalldata) = signature.recoverEthsignSigner(
+                domainSeparator,
+                orderDigest
+            );
         } else {
             revert("unimplemented");
         }
