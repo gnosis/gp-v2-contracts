@@ -401,6 +401,19 @@ describe("GPv2Encoding", () => {
       ).to.be.reverted;
     });
 
+    it("should revert for EIP-1271 signatures from externally owned accounts", async () => {
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.encodeContractTrade(
+        sampleOrder,
+        traders[0].address,
+        "0x00",
+      );
+      // Transaction reverted: function call to a non-contract account
+      await expect(
+        encoding.decodeTradesTest(encoder.tokens, encoder.encodedTrades),
+      ).to.be.reverted;
+    });
+
     it("should revert when encoding an invalid signing scheme", async () => {
       const encoder = new SettlementEncoder(testDomain);
       await encoder.signEncodeTrade(
