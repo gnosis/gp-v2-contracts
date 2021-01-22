@@ -149,18 +149,18 @@ library GPv2Encoding {
     /// ```
     ///
     /// The signature encoding depends on the scheme used to sign. The owner of
-    /// the order can be derived from the signature. See [`recoverEoaOwner`] for
-    /// encoding signatures originating from externally owned accounts (EOA).
+    /// the order can be derived from the signature. See the [`GPv2Signing`]
+    /// library to learn how signatures are encoded for each supported encoding.
     ///
     /// Trade flags are used to tightly encode information on how to decode
     /// an order. Examples that directly affect the structure of an order are
     /// the kind of order (either a sell or a buy order) as well as whether the
     /// order is partially fillable or if it is a "fill-or-kill" order. It also
-    /// encodes whether the order comes from a smart contract or an EOA, in
-    /// order to choose the right signature scheme when decoding. As the most
-    /// likely values are fill-or-kill sell orders by an EOA, the flags are
-    /// chosen such that `0x00` represents this kind of order. The flags byte
-    /// uses the following format:
+    /// encodes the signature scheme used to validate the order. As the most
+    /// likely values are fill-or-kill sell orders by an externally owned
+    /// account, the flags are chosen such that `0x00` represents this kind of
+    /// order. The flags byte uses the following format:
+    ///
     /// ```
     /// bit | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
     /// ----+-----------------------+---+---+
