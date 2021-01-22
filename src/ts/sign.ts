@@ -33,7 +33,7 @@ export interface Signature {
   /**
    * The signature bytes as prescribed by the selected signing scheme.
    */
-  digest: BytesLike;
+  data: BytesLike;
 }
 
 function ecdsaSignOrder(
@@ -92,13 +92,13 @@ export async function signOrder(
   const rawEcdsaSignature = await ecdsaSignOrder(domain, order, owner, scheme);
   const ecdsaSignature = ethers.utils.splitSignature(rawEcdsaSignature);
 
-  const digest = ethers.utils.solidityPack(
+  const data = ethers.utils.solidityPack(
     ["bytes32", "bytes32", "uint8"],
     [ecdsaSignature.r, ecdsaSignature.s, ecdsaSignature.v],
   );
 
   return {
-    digest,
+    data,
     scheme,
   };
 }
@@ -113,7 +113,7 @@ export function assertValidSignatureLength(sig: Signature): void {
   const EOA_SIGNATURE_LENGTH = 65;
   if (
     [SigningScheme.ERC712, SigningScheme.ETHSIGN].includes(sig.scheme) &&
-    ethers.utils.hexDataLength(sig.digest) !== EOA_SIGNATURE_LENGTH
+    ethers.utils.hexDataLength(sig.data) !== EOA_SIGNATURE_LENGTH
   ) {
     throw new Error("invalid signature bytes");
   }

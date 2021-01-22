@@ -305,7 +305,7 @@ export class SettlementEncoder {
         encodeTradeFlags(tradeFlags),
         executedAmount || 0,
         feeDiscount || 0,
-        signature.digest,
+        signature.data,
       ],
     );
 
