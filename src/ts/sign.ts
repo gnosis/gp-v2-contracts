@@ -3,9 +3,11 @@ import { BytesLike, ethers, Signer } from "ethers";
 import { hashOrder, Order, ORDER_TYPE_FIELDS, timestamp } from "./order";
 import { isTypedDataSigner, TypedDataDomain } from "./types/ethers";
 
-// Value returned by a call to `isValidSignature` if the signature was verified
-// successfully. The value is defined in the EIP-1271 standard as:
-// bytes4(keccak256("isValidSignature(bytes32,bytes)")
+/**
+ * Value returned by a call to `isValidSignature` if the signature was verified
+ * successfully. The value is defined in the EIP-1271 standard as:
+ * bytes4(keccak256("isValidSignature(bytes32,bytes)")
+ */
 export const EIP1271_MAGICVALUE = "0x1626ba7e";
 
 /**
