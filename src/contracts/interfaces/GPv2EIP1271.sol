@@ -4,7 +4,7 @@ pragma solidity ^0.7.6;
 library GPv2EIP1271 {
     /// @dev Value returned by a call to `isValidSignature` if the signature
     /// was verified successfully. The value is defined in EIP-1271 as:
-    /// bytes4(keccak256("isValidSignature(bytes32,bytes)")
+    /// bytes4(keccak256("isValidSignature(bytes32,bytes)"))
     bytes4 internal constant MAGICVALUE = 0x1626ba7e;
 }
 
