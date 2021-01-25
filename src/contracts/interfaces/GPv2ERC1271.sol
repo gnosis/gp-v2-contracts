@@ -13,7 +13,7 @@ library ERC1271 {
 /// signatures as described in the EIP-1271 standard. The code that follows is
 /// identical to the code in the standard with the exception of formatting and
 /// syntax changes to adapt the code to our Solidity version.
-abstract contract ERC1271Verifier {
+interface ERC1271Verifier {
     /// @dev Should return whether the signature provided is valid for the
     /// provided data
     /// @param _hash      Hash of the data to be signed
@@ -25,8 +25,7 @@ abstract contract ERC1271Verifier {
     /// MUST allow external calls
     ///
     function isValidSignature(bytes32 _hash, bytes memory _signature)
-        public
+        external
         view
-        virtual
         returns (bytes4 magicValue);
 }
