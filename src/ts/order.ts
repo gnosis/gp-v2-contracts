@@ -1,6 +1,4 @@
-import { ethers, BigNumberish, Signer } from "ethers";
-
-import { TypedDataDomain, isTypedDataSigner } from "./types/ethers";
+import { ethers, BigNumberish } from "ethers";
 
 /**
  * Gnosis Protocol v2 order data.
@@ -132,96 +130,6 @@ export function hashOrder(order: Order): string {
     "Order",
     { Order: ORDER_TYPE_FIELDS },
     { ...order, validTo: timestamp(order.validTo) },
-  );
-}
-
-/**
- * The signing scheme used to sign the order.
- */
-export const enum SigningScheme {
-  /**
-   * The EIP-712 typed data signing scheme. This is the preferred scheme as it
-   * provides more infomation to wallets performing the signature on the data
-   * being signed.
-   *
-   * <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-712.md#definition-of-domainseparator>
-   */
-  TYPED_DATA,
-  /**
-   * The generic message signing scheme.
-   */
-  MESSAGE,
-}
-
-function ecdsaSignOrder(
-  domain: TypedDataDomain,
-  order: Order,
-  owner: Signer,
-  scheme: SigningScheme,
-): Promise<string> {
-  switch (scheme) {
-    case SigningScheme.TYPED_DATA:
-      if (!isTypedDataSigner(owner)) {
-        throw new Error("signer does not support signing typed data");
-      }
-      return owner._signTypedData(
-        domain,
-        { Order: ORDER_TYPE_FIELDS },
-        { ...order, validTo: timestamp(order.validTo) },
-      );
-
-    case SigningScheme.MESSAGE:
-      return owner.signMessage(
-        ethers.utils.arrayify(
-          ethers.utils.hexConcat([
-            ethers.utils._TypedDataEncoder.hashDomain(domain),
-            hashOrder(order),
-          ]),
-        ),
-      );
-  }
-}
-
-function encodeSigningScheme(v: number, scheme: SigningScheme): number {
-  const ORDER_MESSAGE_SCHEME_FLAG = 0x80;
-  switch (scheme) {
-    case SigningScheme.TYPED_DATA:
-      return v;
-    case SigningScheme.MESSAGE:
-      return v | ORDER_MESSAGE_SCHEME_FLAG;
-  }
-}
-
-/**
- * Returns the signature for the specified order with the signing scheme encoded
- * into the signature bytes.
- * @param domain The domain to sign the order for. This is used by the smart
- * contract to ensure orders can't be replayed across different applications,
- * but also different deployments (as the contract chain ID and address are
- * mixed into to the domain value).
- * @param order The order to sign.
- * @param owner The owner for the order used to sign.
- * @param scheme The signing scheme to use. See {@link SigningScheme} for more
- * details.
- * @return Hex-encoded signature with encoded signing scheme for the order.
- */
-export async function signOrder(
-  domain: TypedDataDomain,
-  order: Order,
-  owner: Signer,
-  scheme: SigningScheme,
-): Promise<string> {
-  const ecdsaSignature = ethers.utils.splitSignature(
-    await ecdsaSignOrder(domain, order, owner, scheme),
-  );
-
-  return ethers.utils.solidityPack(
-    ["bytes32", "bytes32", "uint8"],
-    [
-      ecdsaSignature.r,
-      ecdsaSignature.s,
-      encodeSigningScheme(ecdsaSignature.v, scheme),
-    ],
   );
 }
 

@@ -6,10 +6,14 @@ import {
   Order,
   OrderFlags,
   OrderKind,
-  SigningScheme,
-  signOrder,
   timestamp,
 } from "./order";
+import {
+  assertValidSignatureLength,
+  Signature,
+  SigningScheme,
+  signOrder,
+} from "./sign";
 import { TypedDataDomain } from "./types/ethers";
 
 /**
@@ -39,6 +43,16 @@ export enum InteractionStage {
    * The interaction will be executed after all trading has completed.
    */
   POST = 2,
+}
+
+/**
+ * Gnosis Protocol v2 trade flags.
+ */
+export interface TradeFlags extends OrderFlags {
+  /**
+   * The signing scheme used to encode the signature.
+   */
+  signingScheme: SigningScheme;
 }
 
 /**
@@ -97,6 +111,17 @@ export const FULL_FEE_DISCOUNT = 10000;
  */
 export const MAX_TRADES_IN_SETTLEMENT = 2 ** 16 - 1;
 
+function encodeSigningScheme(scheme: SigningScheme): number {
+  switch (scheme) {
+    case SigningScheme.EIP712:
+      return 0b00000000;
+    case SigningScheme.ETHSIGN:
+      return 0b01000000;
+    default:
+      throw new Error("Unsupported signing scheme");
+  }
+}
+
 function encodeOrderFlags(flags: OrderFlags): number {
   let kind;
   switch (flags.kind) {
@@ -112,6 +137,10 @@ function encodeOrderFlags(flags: OrderFlags): number {
   const partiallyFillable = flags.partiallyFillable ? 0x02 : 0x00;
 
   return kind | partiallyFillable;
+}
+
+function encodeTradeFlags(flags: TradeFlags): number {
+  return encodeOrderFlags(flags) | encodeSigningScheme(flags.signingScheme);
 }
 
 /**
@@ -231,7 +260,7 @@ export class SettlementEncoder {
    */
   public encodeTrade(
     order: Order,
-    signature: BytesLike,
+    signature: Signature,
     tradeExecution?: Partial<TradeExecution>,
   ): void {
     if (this._tradeCount >= MAX_TRADES_IN_SETTLEMENT) {
@@ -244,10 +273,12 @@ export class SettlementEncoder {
       throw new Error("missing executed amount for partially fillable trade");
     }
 
-    const SIGNATURE_LENGTH = 65;
-    if (ethers.utils.hexDataLength(signature) !== SIGNATURE_LENGTH) {
-      throw new Error("invalid signatuare bytes");
-    }
+    assertValidSignatureLength(signature);
+
+    const tradeFlags = {
+      ...order,
+      signingScheme: signature.scheme,
+    };
 
     const encodedTrade = ethers.utils.solidityPack(
       [
@@ -271,10 +302,10 @@ export class SettlementEncoder {
         timestamp(order.validTo),
         order.appData,
         order.feeAmount,
-        encodeOrderFlags(order),
+        encodeTradeFlags(tradeFlags),
         executedAmount || 0,
         feeDiscount || 0,
-        signature,
+        signature.data,
       ],
     );
 
@@ -287,7 +318,7 @@ export class SettlementEncoder {
   /**
    * Signs an order and encodes a trade with that order.
    * @param order The order to sign for the trade.
-   * @param owner The owner for the order used to sign.
+   * @param owner The externally owned account that should sign the order.
    * @param scheme The signing scheme to use. See {@link SigningScheme} for more
    * details.
    * @param tradeExecution The execution details for the trade.

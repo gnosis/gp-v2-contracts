@@ -120,7 +120,7 @@ describe("E2E: Should Trade Surplus With Uniswap", () => {
         appData: 1,
       },
       traders[0],
-      SigningScheme.TYPED_DATA,
+      SigningScheme.EIP712,
       // NOTE: Only take 50% of fees as the user traded half of their order
       // against Uniswap.
       { feeDiscount: 5000 },
@@ -143,7 +143,7 @@ describe("E2E: Should Trade Surplus With Uniswap", () => {
         appData: 2,
       },
       traders[1],
-      SigningScheme.TYPED_DATA,
+      SigningScheme.EIP712,
     );
 
     encoder.encodeInteraction({

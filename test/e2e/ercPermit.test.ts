@@ -66,7 +66,7 @@ describe("E2E: EIP-2612 Permit", () => {
         appData: 1,
       },
       traders[0],
-      SigningScheme.TYPED_DATA,
+      SigningScheme.EIP712,
     );
 
     await eurs[1].mint(traders[1].address, ONE_EUR);
@@ -140,7 +140,7 @@ describe("E2E: EIP-2612 Permit", () => {
         appData: 2,
       },
       traders[1],
-      SigningScheme.TYPED_DATA,
+      SigningScheme.EIP712,
     );
 
     await settlement.connect(solver).settle(

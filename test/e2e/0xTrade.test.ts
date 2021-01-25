@@ -146,11 +146,7 @@ describe("E2E: Can settle a 0x trade", () => {
       ).to.be.true;
 
       const encoder = new SettlementEncoder(domainSeparator);
-      await encoder.signEncodeTrade(
-        gpv2Order,
-        trader,
-        SigningScheme.TYPED_DATA,
-      );
+      await encoder.signEncodeTrade(gpv2Order, trader, SigningScheme.EIP712);
       encoder.encodeInteraction({
         target: owl.address,
         callData: owl.interface.encodeFunctionData("approve", [
