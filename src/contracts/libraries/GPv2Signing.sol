@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 pragma solidity ^0.7.6;
 
-import "../interfaces/GPv2ERC1271.sol";
+import "../interfaces/GPv2EIP1271.sol";
 
 /// @title Gnosis Protocol v2 Signing Library.
 /// @author Gnosis Developers
@@ -175,7 +175,7 @@ library GPv2Signing {
     /// The encoded signature tightly packs the following struct:
     ///
     /// ```
-    /// struct EncodedErc1271Signature {
+    /// struct EncodedEip1271Signature {
     ///     address verifier;
     ///     uint16 signatureLength;
     ///     bytes signature;
@@ -256,8 +256,8 @@ library GPv2Signing {
         setFreeMemoryPointer(freeMemoryPointer);
 
         require(
-            ERC1271Verifier(owner).isValidSignature(signingDigest, signature) ==
-                GPv2ERC1271.MAGICVALUE,
+            EIP1271Verifier(owner).isValidSignature(signingDigest, signature) ==
+                GPv2EIP1271.MAGICVALUE,
             "GPv2: invalid eip1271 signature"
         );
     }

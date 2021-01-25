@@ -330,7 +330,7 @@ describe("GPv2Encoding", () => {
     });
 
     it("should verify EIP-1271 contract signatures by returning owner", async () => {
-      const artifact = await artifacts.readArtifact("ERC1271Verifier");
+      const artifact = await artifacts.readArtifact("EIP1271Verifier");
       const verifier = await waffle.deployMockContract(deployer, artifact.abi);
 
       const message = eip1271Message(testDomain, sampleOrder);
@@ -360,7 +360,7 @@ describe("GPv2Encoding", () => {
       const message = eip1271Message(testDomain, sampleOrder);
       const eip1271Signature = "0x031337";
 
-      const artifact = await artifacts.readArtifact("ERC1271Verifier");
+      const artifact = await artifacts.readArtifact("EIP1271Verifier");
       const verifier1 = await waffle.deployMockContract(deployer, artifact.abi);
 
       await verifier1.mock.isValidSignature
@@ -377,12 +377,12 @@ describe("GPv2Encoding", () => {
         encoding.decodeTradesTest(encoder1.tokens, encoder1.encodedTrades),
       ).to.be.revertedWith("invalid eip1271 signature");
 
-      const NON_STANDARD_ERC1271_VERIFIER = [
+      const NON_STANDARD_EIP1271_VERIFIER = [
         "function isValidSignature(bytes32 _hash, bytes memory _signature)",
       ]; // no return value
       const verifier2 = await waffle.deployMockContract(
         deployer,
-        NON_STANDARD_ERC1271_VERIFIER,
+        NON_STANDARD_EIP1271_VERIFIER,
       );
 
       await verifier2.mock.isValidSignature
@@ -415,11 +415,11 @@ describe("GPv2Encoding", () => {
     });
 
     it("should revert if the EIP-1271 verification function changes the state", async () => {
-      const StateChangingERC1271 = await ethers.getContractFactory(
-        "StateChangingERC1271",
+      const StateChangingEIP1271 = await ethers.getContractFactory(
+        "StateChangingEIP1271",
       );
 
-      const evilVerifier = await StateChangingERC1271.deploy();
+      const evilVerifier = await StateChangingEIP1271.deploy();
       const message = eip1271Message(testDomain, sampleOrder);
       const eip1271Signature = "0x";
 

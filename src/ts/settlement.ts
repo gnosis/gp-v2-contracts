@@ -145,7 +145,7 @@ function encodeTradeFlags(flags: TradeFlags): number {
   return encodeOrderFlags(flags) | encodeSigningScheme(flags.signingScheme);
 }
 
-function encodeErc1271Signature(
+function encodeEip1271Signature(
   signer: string,
   eip1271Signature: BytesLike,
 ): Signature {
@@ -350,7 +350,7 @@ export class SettlementEncoder {
     eip1271Signature: BytesLike,
     tradeExecution?: Partial<TradeExecution>,
   ): void {
-    const signature = encodeErc1271Signature(owner, eip1271Signature);
+    const signature = encodeEip1271Signature(owner, eip1271Signature);
     this.encodeTrade(order, signature, tradeExecution);
   }
 
