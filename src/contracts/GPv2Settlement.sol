@@ -4,6 +4,7 @@ pragma abicoder v2;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import "./GPv2AllowanceManager.sol";
 import "./interfaces/GPv2Authentication.sol";
@@ -12,7 +13,7 @@ import "./libraries/GPv2TradeExecution.sol";
 
 /// @title Gnosis Protocol v2 Settlement Contract
 /// @author Gnosis Developers
-contract GPv2Settlement {
+contract GPv2Settlement is ReentrancyGuard {
     using GPv2Encoding for bytes;
     using GPv2TradeExecution for GPv2TradeExecution.Data;
     using SafeMath for uint256;
@@ -152,7 +153,7 @@ contract GPv2Settlement {
         bytes calldata encodedTrades,
         bytes[3] calldata encodedInteractions,
         bytes calldata encodedOrderRefunds
-    ) external onlySolver {
+    ) external nonReentrant onlySolver {
         executeInteractions(encodedInteractions[0]);
 
         GPv2TradeExecution.Data[] memory executedTrades =
@@ -196,12 +197,14 @@ contract GPv2Settlement {
         uint256[] calldata clearingPrices,
         bytes calldata encodedTrades
     ) internal returns (GPv2TradeExecution.Data[] memory executedTrades) {
-        uint256 tradeCount = encodedTrades.tradeCount();
+        (uint256 tradeCount, bytes calldata remainingEncodedTrades) =
+            encodedTrades.decodeTradeCount();
         executedTrades = new GPv2TradeExecution.Data[](tradeCount);
 
         GPv2Encoding.Trade memory trade;
-        for (uint256 i = 0; i < tradeCount; i++) {
-            encodedTrades.tradeAtIndex(i).decodeTrade(
+        uint256 i = 0;
+        while (remainingEncodedTrades.length != 0) {
+            remainingEncodedTrades = remainingEncodedTrades.decodeTrade(
                 domainSeparator,
                 tokens,
                 trade
@@ -212,7 +215,10 @@ contract GPv2Settlement {
                 clearingPrices[trade.buyTokenIndex],
                 executedTrades[i]
             );
+            i++;
         }
+
+        require(i == tradeCount, "GPv2: invalid trade encoding");
     }
 
     /// @dev Compute the in and out transfer amounts for a single EOA order
@@ -314,7 +320,7 @@ contract GPv2Settlement {
             );
         }
 
-        require(trade.feeDiscount <= BPS_BASE, "GPv2: invalid fee discount");
+        require(trade.feeDiscount <= BPS_BASE, "GPv2: fee discount too large");
         executedFeeAmount =
             executedFeeAmount.mul(BPS_BASE - trade.feeDiscount) /
             BPS_BASE;

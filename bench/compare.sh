@@ -16,7 +16,7 @@ trades() {
 
 tested_path="$(git branch --show-current)"
 tested_path="${tested_path:-HEAD}"
-comparison_path="${1:-origin/main}"
+comparison_path="${1:-"$(git merge-base origin/main HEAD)"}"
 if ! git rev-parse --verify "$comparison_path" >/dev/null; then
     echo "Invalid git reference $comparison_path" >&2
     exit 1

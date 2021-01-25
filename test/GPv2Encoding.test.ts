@@ -77,28 +77,41 @@ describe("GPv2Encoding", () => {
         await encoder.signEncodeTrade(
           { ...sampleOrder, appData: i },
           traders[0],
-          SigningScheme.TYPED_DATA,
+          SigningScheme.EIP712,
         );
       }
 
       expect(encoder.tradeCount).to.equal(tradeCount);
-      expect(await encoding.tradeCountTest(encoder.encodedTrades)).to.equal(
-        tradeCount,
+      const [computedTradeCount] = await encoding.tradeCountTest(
+        encoder.encodedTrades,
       );
+      expect(computedTradeCount).to.deep.equal(tradeCount);
     });
 
-    it("should revert if trade bytes are too short.", async () => {
-      await expect(encoding.tradeCountTest("0x1337")).to.be.revertedWith(
-        "malformed trade data",
+    it("should return the calldata storing encoded trades", async () => {
+      const tradeCount = 10;
+      const encoder = new SettlementEncoder(testDomain);
+      for (let i = 0; i < tradeCount; i++) {
+        await encoder.signEncodeTrade(
+          { ...sampleOrder, appData: i },
+          traders[0],
+          SigningScheme.EIP712,
+        );
+      }
+
+      const [, encodedTrades] = await encoding.tradeCountTest(
+        encoder.encodedTrades,
       );
+      expect(encodedTrades).to.equal("0x" + encoder.encodedTrades.slice(6));
     });
 
-    it("should revert if trade bytes are too long.", async () => {
-      await expect(
-        encoding.tradeCountTest(
-          ethers.utils.hexlify([...Array(205)].map(() => 42)),
-        ),
-      ).to.be.revertedWith("malformed trade data");
+    it("should revert if length is not specified", async () => {
+      await expect(encoding.tradeCountTest("0x")).to.be.revertedWith(
+        "GPv2: malformed trade data",
+      );
+      await expect(encoding.tradeCountTest("0x00")).to.be.revertedWith(
+        "GPv2: malformed trade data",
+      );
     });
   });
 
@@ -127,21 +140,21 @@ describe("GPv2Encoding", () => {
       await encoder.signEncodeTrade(
         order,
         traders[0],
-        SigningScheme.TYPED_DATA,
+        SigningScheme.EIP712,
         tradeExecution,
       );
 
-      const [decodedTrades] = await encoding.decodeTradesTest(
+      const { trades } = await encoding.decodeTradesTest(
         encoder.tokens,
         encoder.encodedTrades,
       );
 
       // NOTE: Ethers.js returns a tuple and not a struct with named fields for
       // `abicoder v2` structs.
-      expect(decodedTrades.length).to.equal(1);
+      expect(trades.length).to.equal(1);
 
       const { order: decodedOrder, executedAmount, feeDiscount } = decodeTrade(
-        decodedTrades[0],
+        trades[0],
       );
       expect(decodedOrder).to.deep.equal(order);
       expect({ executedAmount, feeDiscount }).to.deep.equal(tradeExecution);
@@ -152,14 +165,14 @@ describe("GPv2Encoding", () => {
       await encoder.signEncodeTrade(
         sampleOrder,
         traders[0],
-        SigningScheme.TYPED_DATA,
+        SigningScheme.EIP712,
       );
 
-      const [decodedTrades] = await encoding.decodeTradesTest(
+      const { trades } = await encoding.decodeTradesTest(
         encoder.tokens,
         encoder.encodedTrades,
       );
-      const { sellTokenIndex, buyTokenIndex } = decodeTrade(decodedTrades[0]);
+      const { sellTokenIndex, buyTokenIndex } = decodeTrade(trades[0]);
       expect(sellTokenIndex).to.equal(
         encoder.tokens.indexOf(sampleOrder.sellToken),
       );
@@ -173,16 +186,16 @@ describe("GPv2Encoding", () => {
       await encoder.signEncodeTrade(
         sampleOrder,
         traders[0],
-        SigningScheme.TYPED_DATA,
+        SigningScheme.EIP712,
       );
 
-      const [decodedTrades] = await encoding.decodeTradesTest(
+      const { trades } = await encoding.decodeTradesTest(
         encoder.tokens,
         encoder.encodedTrades,
       );
 
       const { orderDigest } = extractOrderUidParams(
-        decodeTrade(decodedTrades[0]).orderUid,
+        decodeTrade(trades[0]).orderUid,
       );
       expect(orderDigest).to.equal(hashOrder(sampleOrder));
     });
@@ -192,15 +205,15 @@ describe("GPv2Encoding", () => {
       await encoder.signEncodeTrade(
         sampleOrder,
         traders[0],
-        SigningScheme.TYPED_DATA,
+        SigningScheme.EIP712,
       );
 
-      const [decodedTrades] = await encoding.decodeTradesTest(
+      const { trades } = await encoding.decodeTradesTest(
         encoder.tokens,
         encoder.encodedTrades,
       );
 
-      const { orderUid } = decodeTrade(decodedTrades[0]);
+      const { orderUid } = decodeTrade(trades[0]);
       expect(orderUid).to.equal(
         computeOrderUid({
           orderDigest: hashOrder(sampleOrder),
@@ -212,38 +225,56 @@ describe("GPv2Encoding", () => {
 
     it("should recover signing address for all supported schemes", async () => {
       const encoder = new SettlementEncoder(testDomain);
-      for (const scheme of [SigningScheme.TYPED_DATA, SigningScheme.MESSAGE]) {
+      for (const scheme of [SigningScheme.EIP712, SigningScheme.ETHSIGN]) {
         await encoder.signEncodeTrade(sampleOrder, traders[0], scheme);
       }
 
-      const [decodedTrades] = await encoding.decodeTradesTest(
+      const { trades } = await encoding.decodeTradesTest(
         encoder.tokens,
         encoder.encodedTrades,
       );
 
       const traderAddress = await traders[0].getAddress();
-      for (const decodedTrade of decodedTrades) {
+      for (const decodedTrade of trades) {
         const { owner } = decodeTrade(decodedTrade);
         expect(owner).to.equal(traderAddress);
       }
     });
 
-    it("should revert for invalid order signatures", async () => {
+    it("should revert for invalid eip-712 order signatures", async () => {
       const encoder = new SettlementEncoder(testDomain);
       await encoder.signEncodeTrade(
         sampleOrder,
         traders[0],
-        SigningScheme.TYPED_DATA,
+        SigningScheme.EIP712,
       );
 
       // NOTE: `v` must be either `27` or `28`, so just set it to something else
       // to generate an invalid signature.
       const encodedTradeBytes = ethers.utils.arrayify(encoder.encodedTrades);
-      encodedTradeBytes[205] = 42;
+      encodedTradeBytes[207] = 42;
 
       await expect(
         encoding.decodeTradesTest(encoder.tokens, encodedTradeBytes),
-      ).to.be.revertedWith("invalid signature");
+      ).to.be.revertedWith("invalid eip712 signature");
+    });
+
+    it("should revert for invalid ethsign order signatures", async () => {
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
+        sampleOrder,
+        traders[0],
+        SigningScheme.ETHSIGN,
+      );
+
+      // NOTE: `v` must be either `27` or `28`, so just set it to something else
+      // to generate an invalid signature.
+      const encodedTradeBytes = ethers.utils.arrayify(encoder.encodedTrades);
+      encodedTradeBytes[207] = 42;
+
+      await expect(
+        encoding.decodeTradesTest(encoder.tokens, encodedTradeBytes),
+      ).to.be.revertedWith("invalid ethsign signature");
     });
 
     it("should revert for invalid sell token indices", async () => {
@@ -253,7 +284,7 @@ describe("GPv2Encoding", () => {
       await encoder.signEncodeTrade(
         sampleOrder,
         traders[0],
-        SigningScheme.TYPED_DATA,
+        SigningScheme.EIP712,
       );
       await encoder.signEncodeTrade(
         {
@@ -261,7 +292,7 @@ describe("GPv2Encoding", () => {
           sellToken: lastToken,
         },
         traders[1],
-        SigningScheme.TYPED_DATA,
+        SigningScheme.EIP712,
       );
 
       // NOTE: Remove the last sell token (0x0303...0303).
@@ -271,14 +302,14 @@ describe("GPv2Encoding", () => {
         .be.reverted;
     });
 
-    it("should revert for invalid sell token indices", async () => {
+    it("should revert for invalid buy token indices", async () => {
       const lastToken = fillBytes(20, 0x03);
 
       const encoder = new SettlementEncoder(testDomain);
       await encoder.signEncodeTrade(
         sampleOrder,
         traders[0],
-        SigningScheme.TYPED_DATA,
+        SigningScheme.EIP712,
       );
       await encoder.signEncodeTrade(
         {
@@ -286,7 +317,7 @@ describe("GPv2Encoding", () => {
           buyToken: lastToken,
         },
         traders[1],
-        SigningScheme.TYPED_DATA,
+        SigningScheme.EIP712,
       );
 
       // NOTE: Remove the last buy token (0x0303...0303).
@@ -296,6 +327,96 @@ describe("GPv2Encoding", () => {
         .be.reverted;
     });
 
+    it("should revert when encoding an invalid signing scheme", async () => {
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
+        sampleOrder,
+        traders[0],
+        SigningScheme.EIP712,
+      );
+
+      const encodedTrades = ethers.utils.arrayify(encoder.encodedTrades);
+
+      encodedTrades[2 + 106] |= 0b10000000;
+      await expect(
+        encoding.decodeTradesTest(encoder.tokens, encodedTrades),
+      ).to.be.revertedWith("unimplemented");
+
+      encodedTrades[2 + 106] |= 0b01000000;
+      await expect(
+        encoding.decodeTradesTest(encoder.tokens, encodedTrades),
+      ).to.be.revertedWith("unimplemented");
+    });
+
+    describe("invalid encoded trade", () => {
+      it("calldata shorter than single trade length", async () => {
+        const order = {
+          sellToken: fillBytes(20, 0x01),
+          buyToken: fillBytes(20, 0x02),
+          sellAmount: fillUint(256, 0x03),
+          buyAmount: fillUint(256, 0x04),
+          validTo: fillUint(32, 0x05).toNumber(),
+          appData: fillUint(32, 0x06).toNumber(),
+          feeAmount: fillUint(256, 0x07),
+          kind: OrderKind.BUY,
+          partiallyFillable: true,
+        };
+        const tradeExecution = {
+          executedAmount: fillUint(256, 0x08),
+          feeDiscount: fillUint(16, 0x09).toNumber(),
+        };
+
+        const encoder = new SettlementEncoder(testDomain);
+        await encoder.signEncodeTrade(
+          order,
+          traders[0],
+          SigningScheme.EIP712,
+          tradeExecution,
+        );
+
+        const decoding = encoding.decodeTradesTest(
+          encoder.tokens,
+          encoder.encodedTrades.slice(0, -2),
+        );
+        await expect(decoding).to.be.revertedWith("GPv2: invalid encoding");
+      });
+
+      it("calldata longer than single trade length", async () => {
+        const order = {
+          sellToken: fillBytes(20, 0x01),
+          buyToken: fillBytes(20, 0x02),
+          sellAmount: fillUint(256, 0x03),
+          buyAmount: fillUint(256, 0x04),
+          validTo: fillUint(32, 0x05).toNumber(),
+          appData: fillUint(32, 0x06).toNumber(),
+          feeAmount: fillUint(256, 0x07),
+          kind: OrderKind.BUY,
+          partiallyFillable: true,
+        };
+        const tradeExecution = {
+          executedAmount: fillUint(256, 0x08),
+          feeDiscount: fillUint(16, 0x09).toNumber(),
+        };
+
+        const encoder = new SettlementEncoder(testDomain);
+        await encoder.signEncodeTrade(
+          order,
+          traders[0],
+          SigningScheme.EIP712,
+          tradeExecution,
+        );
+
+        const decoding = encoding.decodeTradesTest(
+          encoder.tokens,
+          encoder.encodedTrades + "00",
+        );
+
+        // Note: decoding reverts with "invalid opcode" since it tries to access
+        // an array at an out-of-bound index.
+        await expect(decoding).to.be.reverted;
+      });
+    });
+
     it("should not allocate additional memory", async () => {
       // NOTE: We want to make sure that calls to `decodeOrder` does not require
       // additional memory allocations to save on memory per orders.
@@ -303,15 +424,15 @@ describe("GPv2Encoding", () => {
       await encoder.signEncodeTrade(
         sampleOrder,
         traders[0],
-        SigningScheme.TYPED_DATA,
+        SigningScheme.EIP712,
       );
       await encoder.signEncodeTrade(
         sampleOrder,
         traders[1],
-        SigningScheme.MESSAGE,
+        SigningScheme.ETHSIGN,
       );
 
-      const [, mem] = await encoding.decodeTradesTest(
+      const { mem } = await encoding.decodeTradesTest(
         encoder.tokens,
         encoder.encodedTrades,
       );
