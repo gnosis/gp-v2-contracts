@@ -16,5 +16,13 @@ contract StateChangingEIP1271 {
     {
         state += 1;
         magicValue = GPv2EIP1271.MAGICVALUE;
+
+        // The following lines are there to suppress no-unused-var compiler-time
+        // warnings when compiling the contracts. The warning is forwarded by
+        // Hardhat from Solc. It is currently not possible to selectively
+        // ignore Solc warinings:
+        // <https://github.com/ethereum/solidity/issues/269>
+        _hash;
+        _signature;
     }
 }
