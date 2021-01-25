@@ -257,7 +257,7 @@ library GPv2Signing {
 
         require(
             ERC1271Verifier(owner).isValidSignature(signingDigest, signature) ==
-                ERC1271.MAGICVALUE,
+                GPv2ERC1271.MAGICVALUE,
             "GPv2: invalid eip1271 signature"
         );
     }

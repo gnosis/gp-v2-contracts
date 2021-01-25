@@ -15,6 +15,6 @@ contract StateChangingERC1271 {
         returns (bytes4 magicValue)
     {
         state += 1;
-        magicValue = ERC1271.MAGICVALUE;
+        magicValue = GPv2ERC1271.MAGICVALUE;
     }
 }

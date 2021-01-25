@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 pragma solidity ^0.7.6;
 
-library ERC1271 {
+library GPv2ERC1271 {
     /// @dev Value returned by a call to `isValidSignature` if the signature
     /// was verified successfully. The value is defined in the EIP-1271 standard
     /// as: bytes4(keccak256("isValidSignature(bytes32,bytes)")
