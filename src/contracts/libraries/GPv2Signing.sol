@@ -45,7 +45,7 @@ library GPv2Signing {
     {
         require(
             encodedSignature.length >= ECDSA_SIGNATURE_LENGTH,
-            "GPv2: invalid encoding"
+            "GPv2: ecdsa signature too long"
         );
 
         // NOTE: Use assembly to efficiently decode signature data.
@@ -221,7 +221,7 @@ library GPv2Signing {
         uint256 usedCalldataStride = 20 + 2 + signatureLength;
         require(
             encodedSignature.length >= usedCalldataStride,
-            "GPv2: invalid signature encoding"
+            "GPv2: eip1271 signature too long"
         );
 
         // NOTE: Use assembly to efficiently decode signature data and assign
