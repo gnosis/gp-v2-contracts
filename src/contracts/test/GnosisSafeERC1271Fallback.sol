@@ -20,7 +20,7 @@ contract GnosisSafeEIP1271Fallback is ISignatureValidatorConstants {
     {
         // The fallback manager invokes this contract with a standard call from
         // the Gnosis Safe context.
-        GnosisSafe safe = GnosisSafe(address(uint160(address(msg.sender))));
+        GnosisSafe safe = GnosisSafe(msg.sender);
         bytes4 value = safe.isValidSignature(abi.encode(_data), _signature);
         return (value == EIP1271_MAGIC_VALUE) ? UPDATED_MAGIC_VALUE : bytes4(0);
     }
