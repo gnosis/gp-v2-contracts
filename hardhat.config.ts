@@ -61,11 +61,6 @@ export default {
       {
         // Compiler for the Gnosis Safe, used for testing.
         version: "0.5.17",
-        settings: {
-          optimizer: {
-            enabled: false,
-          },
-        },
       },
     ],
   },
