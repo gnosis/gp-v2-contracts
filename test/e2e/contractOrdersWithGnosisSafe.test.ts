@@ -201,7 +201,7 @@ describe("E2E: Order From A Gnosis Safe", () => {
       .connect(trader)
       .approve(allowanceManager.address, ethers.constants.MaxUint256);
 
-    await encoder.signEncodeTrade(
+    encoder.signEncodeTrade(
       {
         kind: OrderKind.SELL,
         partiallyFillable: false,
