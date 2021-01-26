@@ -513,7 +513,7 @@
     "@ethersproject/properties" "^5.0.7"
     "@ethersproject/strings" "^5.0.8"
 
-"@gnosis.pm/safe-contracts@v1.2.0":
+"@gnosis.pm/safe-contracts@=1.2.0":
   version "1.2.0"
   resolved "https://registry.yarnpkg.com/@gnosis.pm/safe-contracts/-/safe-contracts-1.2.0.tgz#33e8332e09c19e8822fccb06c7d3eff806d091f6"
   integrity sha512-lcpZodqztDgMICB0kAc8aJdQePwCaLJnbeNjgVTfLAo3fBckVRV06VHXg5IsZ26qLA4JfZ690Cb7TsDVE9ZF3w==
