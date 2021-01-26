@@ -6,6 +6,7 @@ import { ethers, waffle } from "hardhat";
 import {
   Order,
   OrderKind,
+  RECEIVER_SAME_AS_OWNER,
   SettlementEncoder,
   SigningScheme,
   TypedDataDomain,
@@ -61,6 +62,7 @@ describe("E2E: RetrETH Red Wine and Olive Oil Market", () => {
     const wine = await erc20("🍷");
 
     const orderDefaults = {
+      receiver: RECEIVER_SAME_AS_OWNER,
       validTo: 0xffffffff,
       feeAmount: ethers.utils.parseEther("1.0"),
     };

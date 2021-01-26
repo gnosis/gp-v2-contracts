@@ -3,8 +3,8 @@ import { Contract, BigNumber } from "ethers";
 import { artifacts, ethers, waffle } from "hardhat";
 
 import {
-  ORDER_TYPE_HASH,
   EIP1271_MAGICVALUE,
+  ORDER_TYPE_HASH,
   OrderKind,
   SettlementEncoder,
   SigningScheme,
@@ -38,6 +38,7 @@ describe("GPv2Encoding", () => {
   const sampleOrder = {
     sellToken: fillBytes(20, 0x01),
     buyToken: fillBytes(20, 0x02),
+    receiver: fillBytes(20, 0x03),
     sellAmount: ethers.utils.parseEther("42"),
     buyAmount: ethers.utils.parseEther("13.37"),
     validTo: 0xffffffff,
@@ -125,17 +126,18 @@ describe("GPv2Encoding", () => {
       const order = {
         sellToken: fillBytes(20, 0x01),
         buyToken: fillBytes(20, 0x02),
-        sellAmount: fillUint(256, 0x03),
-        buyAmount: fillUint(256, 0x04),
-        validTo: fillUint(32, 0x05).toNumber(),
-        appData: fillUint(32, 0x06).toNumber(),
-        feeAmount: fillUint(256, 0x07),
+        receiver: fillBytes(20, 0x03),
+        sellAmount: fillUint(256, 0x04),
+        buyAmount: fillUint(256, 0x05),
+        validTo: fillUint(32, 0x06).toNumber(),
+        appData: fillUint(32, 0x07).toNumber(),
+        feeAmount: fillUint(256, 0x08),
         kind: OrderKind.BUY,
         partiallyFillable: true,
       };
       const tradeExecution = {
-        executedAmount: fillUint(256, 0x08),
-        feeDiscount: fillUint(16, 0x09).toNumber(),
+        executedAmount: fillUint(256, 0x09),
+        feeDiscount: fillUint(16, 0x0a).toNumber(),
       };
 
       const encoder = new SettlementEncoder(testDomain);
@@ -254,7 +256,7 @@ describe("GPv2Encoding", () => {
       // NOTE: `v` must be either `27` or `28`, so just set it to something else
       // to generate an invalid signature.
       const encodedTradeBytes = ethers.utils.arrayify(encoder.encodedTrades);
-      encodedTradeBytes[207] = 42;
+      encodedTradeBytes[227] = 42;
 
       await expect(
         encoding.decodeTradesTest(encoder.tokens, encodedTradeBytes),
@@ -272,7 +274,7 @@ describe("GPv2Encoding", () => {
       // NOTE: `v` must be either `27` or `28`, so just set it to something else
       // to generate an invalid signature.
       const encodedTradeBytes = ethers.utils.arrayify(encoder.encodedTrades);
-      encodedTradeBytes[207] = 42;
+      encodedTradeBytes[227] = 42;
 
       await expect(
         encoding.decodeTradesTest(encoder.tokens, encodedTradeBytes),
@@ -340,7 +342,7 @@ describe("GPv2Encoding", () => {
         .returns(EIP1271_MAGICVALUE);
 
       const encoder = new SettlementEncoder(testDomain);
-      await encoder.encodeContractTrade(
+      encoder.encodeContractTrade(
         sampleOrder,
         verifier.address,
         eip1271Signature,
@@ -368,7 +370,7 @@ describe("GPv2Encoding", () => {
         .returns("0xbaadc0d3");
 
       const encoder1 = new SettlementEncoder(testDomain);
-      await encoder1.encodeContractTrade(
+      encoder1.encodeContractTrade(
         sampleOrder,
         verifier1.address,
         eip1271Signature,
@@ -390,7 +392,7 @@ describe("GPv2Encoding", () => {
         .returns();
 
       const encoder2 = new SettlementEncoder(testDomain);
-      await encoder2.encodeContractTrade(
+      encoder2.encodeContractTrade(
         sampleOrder,
         verifier2.address,
         eip1271Signature,
@@ -403,11 +405,7 @@ describe("GPv2Encoding", () => {
 
     it("should revert for EIP-1271 signatures from externally owned accounts", async () => {
       const encoder = new SettlementEncoder(testDomain);
-      await encoder.encodeContractTrade(
-        sampleOrder,
-        traders[0].address,
-        "0x00",
-      );
+      encoder.encodeContractTrade(sampleOrder, traders[0].address, "0x00");
       // Transaction reverted: function call to a non-contract account
       await expect(
         encoding.decodeTradesTest(encoder.tokens, encoder.encodedTrades),
@@ -434,7 +432,7 @@ describe("GPv2Encoding", () => {
       ).to.equal(EIP1271_MAGICVALUE);
 
       const encoder = new SettlementEncoder(testDomain);
-      await encoder.encodeContractTrade(
+      encoder.encodeContractTrade(
         sampleOrder,
         evilVerifier.address,
         eip1271Signature,
@@ -457,36 +455,25 @@ describe("GPv2Encoding", () => {
 
       const encodedTrades = ethers.utils.arrayify(encoder.encodedTrades);
 
-      encodedTrades[2 + 106] |= 0b11000000;
+      encodedTrades[2 + 126] |= 0b11000000;
       await expect(
         encoding.decodeTradesTest(encoder.tokens, encodedTrades),
       ).to.be.revertedWith("GPv2: invalid signature scheme");
     });
 
     describe("invalid encoded trade", () => {
-      it("calldata shorter than single trade length", async () => {
-        const order = {
-          sellToken: fillBytes(20, 0x01),
-          buyToken: fillBytes(20, 0x02),
-          sellAmount: fillUint(256, 0x03),
-          buyAmount: fillUint(256, 0x04),
-          validTo: fillUint(32, 0x05).toNumber(),
-          appData: fillUint(32, 0x06).toNumber(),
-          feeAmount: fillUint(256, 0x07),
-          kind: OrderKind.BUY,
-          partiallyFillable: true,
-        };
-        const tradeExecution = {
-          executedAmount: fillUint(256, 0x08),
-          feeDiscount: fillUint(16, 0x09).toNumber(),
-        };
+      const sampleTradeExecution = {
+        executedAmount: fillUint(256, 0x09),
+        feeDiscount: fillUint(16, 0x0a).toNumber(),
+      };
 
+      it("calldata shorter than single trade length", async () => {
         const encoder = new SettlementEncoder(testDomain);
         await encoder.signEncodeTrade(
-          order,
+          sampleOrder,
           traders[0],
           SigningScheme.EIP712,
-          tradeExecution,
+          sampleTradeExecution,
         );
 
         const decoding = encoding.decodeTradesTest(
@@ -497,28 +484,12 @@ describe("GPv2Encoding", () => {
       });
 
       it("calldata longer than single trade length", async () => {
-        const order = {
-          sellToken: fillBytes(20, 0x01),
-          buyToken: fillBytes(20, 0x02),
-          sellAmount: fillUint(256, 0x03),
-          buyAmount: fillUint(256, 0x04),
-          validTo: fillUint(32, 0x05).toNumber(),
-          appData: fillUint(32, 0x06).toNumber(),
-          feeAmount: fillUint(256, 0x07),
-          kind: OrderKind.BUY,
-          partiallyFillable: true,
-        };
-        const tradeExecution = {
-          executedAmount: fillUint(256, 0x08),
-          feeDiscount: fillUint(16, 0x09).toNumber(),
-        };
-
         const encoder = new SettlementEncoder(testDomain);
         await encoder.signEncodeTrade(
-          order,
+          sampleOrder,
           traders[0],
           SigningScheme.EIP712,
-          tradeExecution,
+          sampleTradeExecution,
         );
 
         const decoding = encoding.decodeTradesTest(

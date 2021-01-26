@@ -13,6 +13,12 @@ export interface Order {
    */
   buyToken: string;
   /**
+   * The address to receive the proceeds of the trade. Setting this to address
+   * zero indicates that the proceeds should be sent to the address owner (i.e.
+   * the order signer).
+   */
+  receiver: string;
+  /**
    * The order sell amount.
    *
    * For fill or kill sell orders, this amount represents the exact sell amount
@@ -64,6 +70,12 @@ export interface Order {
 export const BUY_ETH_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 
 /**
+ * Marker address to indicate that the receiver of the trade proceeds should be
+ * the owner of the order.
+ */
+export const RECEIVER_SAME_AS_OWNER = ethers.constants.AddressZero;
+
+/**
  * Gnosis Protocol v2 order flags.
  */
 export type OrderFlags = Pick<Order, "kind" | "partiallyFillable">;
@@ -93,6 +105,7 @@ export enum OrderKind {
 export const ORDER_TYPE_FIELDS = [
   { name: "sellToken", type: "address" },
   { name: "buyToken", type: "address" },
+  { name: "receiver", type: "address" },
   { name: "sellAmount", type: "uint256" },
   { name: "buyAmount", type: "uint256" },
   { name: "validTo", type: "uint32" },

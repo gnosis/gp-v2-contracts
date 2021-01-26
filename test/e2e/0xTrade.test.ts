@@ -8,6 +8,7 @@ import {
   Order,
   OrderKind,
   Prices,
+  RECEIVER_SAME_AS_OWNER,
   SettlementEncoder,
   SigningScheme,
   TypedDataDomain,
@@ -66,6 +67,7 @@ describe("E2E: Can settle a 0x trade", () => {
       partiallyFillable: false,
       buyToken: gno.address,
       sellToken: owl.address,
+      receiver: RECEIVER_SAME_AS_OWNER,
       buyAmount: ethers.utils.parseEther("1.0"),
       sellAmount: ethers.utils.parseEther("130.0"),
       feeAmount: ethers.utils.parseEther("10.0"),
@@ -118,7 +120,7 @@ describe("E2E: Can settle a 0x trade", () => {
         clearingPrices,
         gpv2OwlSurplus,
         zeroExOwlSurplus,
-      } = await generateSettlementSolution();
+      } = generateSettlementSolution();
 
       await owl.mint(trader.address, ethers.utils.parseEther("140"));
       await owl

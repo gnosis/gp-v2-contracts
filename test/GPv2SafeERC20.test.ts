@@ -3,7 +3,7 @@ import { expect } from "chai";
 import { Contract } from "ethers";
 import { ethers, waffle } from "hardhat";
 
-import { NON_STANDARD_ERC20 } from "../ERC20";
+import { NON_STANDARD_ERC20 } from "./ERC20";
 
 describe("GPv2SafeERC20.sol", () => {
   const [deployer, recipient, ...traders] = waffle.provider.getWallets();

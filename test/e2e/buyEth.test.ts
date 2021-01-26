@@ -7,6 +7,7 @@ import { ethers, waffle } from "hardhat";
 import {
   BUY_ETH_ADDRESS,
   OrderKind,
+  RECEIVER_SAME_AS_OWNER,
   SettlementEncoder,
   SigningScheme,
   TypedDataDomain,
@@ -70,6 +71,7 @@ describe("E2E: Buy Ether", () => {
         partiallyFillable: false,
         sellToken: weth.address,
         buyToken: usdt.address,
+        receiver: RECEIVER_SAME_AS_OWNER,
         sellAmount: ethers.utils.parseEther("1.0"),
         buyAmount: ethers.utils.parseUnits("1100.0", 6),
         feeAmount: ethers.utils.parseEther("0.001"),
@@ -90,6 +92,7 @@ describe("E2E: Buy Ether", () => {
         partiallyFillable: false,
         buyToken: BUY_ETH_ADDRESS,
         sellToken: usdt.address,
+        receiver: RECEIVER_SAME_AS_OWNER,
         buyAmount: ethers.utils.parseEther("1.0"),
         sellAmount: ethers.utils.parseUnits("1200.0", 6),
         feeAmount: ethers.utils.parseUnits("1.2", 6),

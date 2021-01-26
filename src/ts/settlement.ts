@@ -303,6 +303,7 @@ export class SettlementEncoder {
       [
         "uint8",
         "uint8",
+        "address",
         "uint256",
         "uint256",
         "uint32",
@@ -316,6 +317,7 @@ export class SettlementEncoder {
       [
         this.tokenIndex(order.sellToken),
         this.tokenIndex(order.buyToken),
+        order.receiver,
         order.sellAmount,
         order.buyAmount,
         timestamp(order.validTo),

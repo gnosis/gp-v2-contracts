@@ -6,6 +6,7 @@ import { ethers, waffle } from "hardhat";
 
 import {
   OrderKind,
+  RECEIVER_SAME_AS_OWNER,
   SettlementEncoder,
   SigningScheme,
   TypedDataDomain,
@@ -82,6 +83,7 @@ describe("E2E: Expired Order Gas Refunds", () => {
         partiallyFillable: false,
         sellToken: owl.address,
         buyToken: dai.address,
+        receiver: RECEIVER_SAME_AS_OWNER,
         sellAmount: ethers.utils.parseEther("100.0"),
         buyAmount: ethers.utils.parseEther("100.0"),
         feeAmount: ethers.utils.parseEther("0.1"),
@@ -94,6 +96,7 @@ describe("E2E: Expired Order Gas Refunds", () => {
         partiallyFillable: false,
         buyToken: owl.address,
         sellToken: dai.address,
+        receiver: RECEIVER_SAME_AS_OWNER,
         buyAmount: ethers.utils.parseEther("100.0"),
         sellAmount: ethers.utils.parseEther("110.0"),
         feeAmount: ethers.utils.parseEther("0.1"),

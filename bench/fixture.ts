@@ -9,6 +9,7 @@ import {
   FULL_FEE_DISCOUNT,
   Order,
   OrderKind,
+  RECEIVER_SAME_AS_OWNER,
   SettlementEncoder,
   SigningScheme,
   TypedDataDomain,
@@ -236,6 +237,7 @@ export class BenchFixture {
         {
           sellToken: tokens.id(i % options.tokens).address,
           buyToken: tokens.id((i + 1) % options.tokens).address,
+          receiver: RECEIVER_SAME_AS_OWNER,
           feeAmount: ethers.utils.parseEther("1"),
           validTo: 0xffffffff,
           appData: this.nonce++,
