@@ -7,22 +7,24 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { CONTRACT_NAMES, SALT } from "../ts/deploy";
 
 const deployAuthenticator: DeployFunction = async function ({
+  deployments,
   getNamedAccounts,
 }: HardhatRuntimeEnvironment) {
   const { owner } = await getNamedAccounts();
-
+  const { deploy } = deployments;
   const { authenticator } = CONTRACT_NAMES;
 
   const AuthenticatorFactory = await ethers.getContractFactory(authenticator);
 
-  const deploymentExecutor: TxExecutor = async (factory: ContractFactory) => {
+  const deploymentExecutor: TxExecutor = async (_factory: ContractFactory) => {
+    // Factory is not actually neededhere... its just part of the TxExecutor spec.
     const options: DeployOptions = {
       from: owner,
       gasLimit: "2000000",
       deterministicDeployment: SALT,
       log: true,
     };
-    const { address, transactionHash } = await factory.deploy(options);
+    const { address, transactionHash } = await deploy(authenticator, options);
     return {
       address,
       transactionHash,
@@ -31,8 +33,6 @@ const deployAuthenticator: DeployFunction = async function ({
 
   await upgrades.deployProxy(AuthenticatorFactory, {
     initializer: "initialize",
-    unsafeAllowCustomTypes: true,
-    unsafeAllowLinkedLibraries: true,
     executor: deploymentExecutor,
   });
 };
