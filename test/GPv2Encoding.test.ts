@@ -365,7 +365,7 @@ describe("GPv2Encoding", () => {
 
       await verifier1.mock.isValidSignature
         .withArgs(message, eip1271Signature)
-        .returns(Number.parseInt(EIP1271_MAGICVALUE) - 1);
+        .returns("0xbaadc0d3");
 
       const encoder1 = new SettlementEncoder(testDomain);
       await encoder1.encodeContractTrade(
