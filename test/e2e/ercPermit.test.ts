@@ -5,7 +5,6 @@ import { ethers } from "hardhat";
 import {
   InteractionStage,
   OrderKind,
-  RECEIVER_SAME_AS_OWNER,
   SettlementEncoder,
   SigningScheme,
   TypedDataDomain,
@@ -60,7 +59,6 @@ describe("E2E: EIP-2612 Permit", () => {
         partiallyFillable: false,
         sellToken: eurs[0].address,
         buyToken: eurs[1].address,
-        receiver: RECEIVER_SAME_AS_OWNER,
         sellAmount: ONE_EUR,
         buyAmount: ONE_EUR,
         feeAmount: ethers.constants.Zero,
@@ -134,7 +132,6 @@ describe("E2E: EIP-2612 Permit", () => {
         kind: OrderKind.BUY,
         partiallyFillable: false,
         buyToken: eurs[0].address,
-        receiver: RECEIVER_SAME_AS_OWNER,
         sellToken: eurs[1].address,
         buyAmount: ONE_EUR,
         sellAmount: ONE_EUR,

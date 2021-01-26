@@ -7,7 +7,6 @@ import { ethers, waffle } from "hardhat";
 
 import {
   OrderKind,
-  RECEIVER_SAME_AS_OWNER,
   SettlementEncoder,
   SigningScheme,
   TypedDataDomain,
@@ -114,7 +113,6 @@ describe("E2E: Should Trade Surplus With Uniswap", () => {
         partiallyFillable: false,
         sellToken: weth.address,
         buyToken: usdt.address,
-        receiver: RECEIVER_SAME_AS_OWNER,
         sellAmount: ethers.utils.parseEther("1.0"),
         buyAmount: ethers.utils.parseUnits("500.0", 6),
         feeAmount: ethers.utils.parseEther("0.001"),
@@ -138,7 +136,6 @@ describe("E2E: Should Trade Surplus With Uniswap", () => {
         partiallyFillable: false,
         buyToken: weth.address,
         sellToken: usdt.address,
-        receiver: RECEIVER_SAME_AS_OWNER,
         buyAmount: ethers.utils.parseEther("0.5"),
         sellAmount: ethers.utils.parseUnits("300.0", 6),
         feeAmount: ethers.utils.parseUnits("0.3", 6),

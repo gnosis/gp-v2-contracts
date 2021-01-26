@@ -9,7 +9,6 @@ import {
   InteractionStage,
   OrderFlags,
   OrderKind,
-  RECEIVER_SAME_AS_OWNER,
   SettlementEncoder,
   SigningScheme,
   TradeExecution,
@@ -341,7 +340,6 @@ describe("GPv2Settlement", () => {
     const partialOrder = {
       sellToken,
       buyToken,
-      receiver: RECEIVER_SAME_AS_OWNER,
       sellAmount: ethers.utils.parseEther("42"),
       buyAmount: ethers.utils.parseEther("13.37"),
       validTo: 0xffffffff,

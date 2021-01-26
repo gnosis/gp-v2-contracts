@@ -13,11 +13,10 @@ export interface Order {
    */
   buyToken: string;
   /**
-   * The address to receive the proceeds of the trade. Setting this to address
-   * zero indicates that the proceeds should be sent to the address owner (i.e.
-   * the order signer).
+   * An optional address to receive the proceeds of the trade instead of the
+   * owner (i.e. the order signer).
    */
-  receiver: string;
+  receiver?: string;
   /**
    * The order sell amount.
    *
@@ -68,12 +67,6 @@ export interface Order {
  * settlement to revert.
  */
 export const BUY_ETH_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
-
-/**
- * Marker address to indicate that the receiver of the trade proceeds should be
- * the owner of the order.
- */
-export const RECEIVER_SAME_AS_OWNER = ethers.constants.AddressZero;
 
 /**
  * Gnosis Protocol v2 order flags.
@@ -142,7 +135,11 @@ export function hashOrder(order: Order): string {
   return ethers.utils._TypedDataEncoder.hashStruct(
     "Order",
     { Order: ORDER_TYPE_FIELDS },
-    { ...order, validTo: timestamp(order.validTo) },
+    {
+      ...order,
+      receiver: order.receiver || ethers.constants.AddressZero,
+      validTo: timestamp(order.validTo),
+    },
   );
 }
 

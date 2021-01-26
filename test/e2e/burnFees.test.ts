@@ -6,7 +6,6 @@ import { ethers, waffle } from "hardhat";
 import {
   InteractionStage,
   OrderKind,
-  RECEIVER_SAME_AS_OWNER,
   SettlementEncoder,
   SigningScheme,
   TypedDataDomain,
@@ -64,7 +63,6 @@ describe("E2E: Burn fees", () => {
         partiallyFillable: false,
         sellToken: owl.address,
         buyToken: dai.address,
-        receiver: RECEIVER_SAME_AS_OWNER,
         sellAmount: ONE_USD.mul(1000),
         buyAmount: ONE_USD.mul(1000),
         feeAmount: ONE_USD,
@@ -86,7 +84,6 @@ describe("E2E: Burn fees", () => {
         partiallyFillable: false,
         buyToken: owl.address,
         sellToken: dai.address,
-        receiver: RECEIVER_SAME_AS_OWNER,
         buyAmount: ONE_USD.mul(1000),
         sellAmount: ONE_USD.mul(1000),
         feeAmount: ethers.constants.Zero,
