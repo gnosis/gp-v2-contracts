@@ -493,7 +493,7 @@ describe("GPv2Encoding", () => {
           encoder.tokens,
           encoder.encodedTrades.slice(0, -2),
         );
-        await expect(decoding).to.be.revertedWith("GPv2: invalid encoding");
+        await expect(decoding).to.be.revertedWith("signature too long");
       });
 
       it("calldata longer than single trade length", async () => {
