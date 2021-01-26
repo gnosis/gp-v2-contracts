@@ -48,13 +48,26 @@ export default {
     sources: "src/contracts",
   },
   solidity: {
-    version: "0.7.6",
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 1000000,
+    compilers: [
+      {
+        version: "0.7.6",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 1000000,
+          },
+        },
       },
-    },
+      {
+        // Compiler for the Gnosis Safe, used for testing.
+        version: "0.5.17",
+        settings: {
+          optimizer: {
+            enabled: false,
+          },
+        },
+      },
+    ],
   },
   networks: {
     mainnet: {
