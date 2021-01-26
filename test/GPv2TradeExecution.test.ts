@@ -3,7 +3,7 @@ import { expect } from "chai";
 import { Contract } from "ethers";
 import { ethers, waffle } from "hardhat";
 
-import { BUY_ETH_ADDRESS } from "../src/ts";
+import { BUY_ETH_ADDRESS, RECEIVER_SAME_AS_OWNER } from "../src/ts";
 
 import { NON_STANDARD_ERC20 } from "./ERC20";
 import { encodeExecutedTrade } from "./encoding";
@@ -24,6 +24,7 @@ describe("GPv2TradeExecution", () => {
 
   describe("transferSellAmountToRecipient", () => {
     const withoutBuy = {
+      receiver: ethers.constants.AddressZero,
       buyToken: ethers.constants.AddressZero,
       buyAmount: ethers.constants.Zero,
     };
@@ -152,7 +153,30 @@ describe("GPv2TradeExecution", () => {
       sellAmount: ethers.constants.Zero,
     };
 
-    it("should transfer buy amount to sender", async () => {
+    it("should transfer buy amount to receiver", async () => {
+      const [owner, receiver] = traders;
+
+      const amount = ethers.utils.parseEther("13.37");
+
+      const buyToken = await waffle.deployMockContract(deployer, IERC20.abi);
+      await buyToken.mock.transfer
+        .withArgs(receiver.address, amount)
+        .returns(true);
+
+      await expect(
+        tradeExecution.transferBuyAmountToOwnerTest(
+          encodeExecutedTrade({
+            owner: owner.address,
+            receiver: receiver.address,
+            buyToken: buyToken.address,
+            buyAmount: amount,
+            ...withoutSell,
+          }),
+        ),
+      ).to.not.be.reverted;
+    });
+
+    it("should transfer buy amount to owner when receiver is not set", async () => {
       const amount = ethers.utils.parseEther("13.37");
 
       const buyToken = await waffle.deployMockContract(deployer, IERC20.abi);
@@ -164,6 +188,7 @@ describe("GPv2TradeExecution", () => {
         tradeExecution.transferBuyAmountToOwnerTest(
           encodeExecutedTrade({
             owner: traders[0].address,
+            receiver: RECEIVER_SAME_AS_OWNER,
             buyToken: buyToken.address,
             buyAmount: amount,
             ...withoutSell,
@@ -184,6 +209,7 @@ describe("GPv2TradeExecution", () => {
         tradeExecution.transferBuyAmountToOwnerTest(
           encodeExecutedTrade({
             owner: traders[0].address,
+            receiver: RECEIVER_SAME_AS_OWNER,
             buyToken: buyToken.address,
             buyAmount: amount,
             ...withoutSell,
@@ -192,11 +218,12 @@ describe("GPv2TradeExecution", () => {
       ).to.be.revertedWith("test error");
     });
 
-    it("should revert when transfering from a token with no contract at its address", async () => {
+    it("should not revert when transfering from a token with no contract at its address", async () => {
       await expect(
         tradeExecution.transferBuyAmountToOwnerTest(
           encodeExecutedTrade({
             owner: traders[0].address,
+            receiver: RECEIVER_SAME_AS_OWNER,
             buyToken: traders[1].address,
             buyAmount: ethers.utils.parseEther("1.0"),
             ...withoutSell,
@@ -205,7 +232,33 @@ describe("GPv2TradeExecution", () => {
       ).not.to.be.reverted;
     });
 
-    it("should transfer Ether if the marker address is used", async () => {
+    it("should transfer Ether to receiver if the marker address is used", async () => {
+      const [owner, receiver] = traders;
+
+      const amount = ethers.utils.parseEther("1.0");
+      const initialBalance = await receiver.getBalance();
+
+      await deployer.sendTransaction({
+        to: tradeExecution.address,
+        value: amount,
+      });
+
+      await tradeExecution.transferBuyAmountToOwnerTest(
+        encodeExecutedTrade({
+          owner: owner.address,
+          receiver: receiver.address,
+          buyToken: BUY_ETH_ADDRESS,
+          buyAmount: amount,
+          ...withoutSell,
+        }),
+      );
+
+      expect(await receiver.getBalance()).to.deep.equal(
+        initialBalance.add(amount),
+      );
+    });
+
+    it("should transfer Ether if to owner the marker address is used when receiver is not set", async () => {
       const amount = ethers.utils.parseEther("1.0");
       const initialBalance = await traders[0].getBalance();
 
@@ -217,6 +270,7 @@ describe("GPv2TradeExecution", () => {
       await tradeExecution.transferBuyAmountToOwnerTest(
         encodeExecutedTrade({
           owner: traders[0].address,
+          receiver: RECEIVER_SAME_AS_OWNER,
           buyToken: BUY_ETH_ADDRESS,
           buyAmount: amount,
           ...withoutSell,
@@ -244,6 +298,7 @@ describe("GPv2TradeExecution", () => {
           tradeExecution.transferBuyAmountToOwnerTest(
             encodeExecutedTrade({
               owner: traders[0].address,
+              receiver: RECEIVER_SAME_AS_OWNER,
               buyToken: buyToken.address,
               buyAmount: amount,
               ...withoutSell,
@@ -264,6 +319,7 @@ describe("GPv2TradeExecution", () => {
           tradeExecution.transferBuyAmountToOwnerTest(
             encodeExecutedTrade({
               owner: traders[0].address,
+              receiver: RECEIVER_SAME_AS_OWNER,
               buyToken: buyToken.address,
               buyAmount: amount,
               ...withoutSell,
