@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 pragma solidity ^0.7.6;
 
+import "../interfaces/GPv2EIP1271.sol";
+
 /// @title Gnosis Protocol v2 Signing Library.
 /// @author Gnosis Developers
 library GPv2Signing {
@@ -43,7 +45,7 @@ library GPv2Signing {
     {
         require(
             encodedSignature.length >= ECDSA_SIGNATURE_LENGTH,
-            "GPv2: invalid encoding"
+            "GPv2: ecdsa signature too long"
         );
 
         // NOTE: Use assembly to efficiently decode signature data.
@@ -165,6 +167,99 @@ library GPv2Signing {
         require(owner != address(0), "GPv2: invalid ethsign signature");
 
         setFreeMemoryPointer(freeMemoryPointer);
+    }
+
+    /// @dev Verifies the input calldata as an EIP-1271 contract signature and
+    /// returns the address of the signer.
+    ///
+    /// The encoded signature tightly packs the following struct:
+    ///
+    /// ```
+    /// struct EncodedEip1271Signature {
+    ///     address verifier;
+    ///     uint16 signatureLength;
+    ///     bytes signature;
+    /// }
+    /// ```
+    ///
+    /// All entries are tightly packed together in this order in the encoded
+    /// calldata. `signatureLength` encodes the length of the signature bytes
+    /// in bytes. Example:
+    ///
+    /// input:    0x73c14081446bd1e4eb165250e826e80c5a523783000a00010203040506070809
+    /// decoding:   [..............verifier................][sL][.......data.......]
+    /// stride:                                          20   2         10 (0x000a)
+    ///
+    /// This function enforces that the encoded data stores enough bytes to
+    /// cover the full length of the decoded interaction.
+    ///
+    /// The size of `dataLength` limits the maximum calldata that can be used in
+    /// a signature to 2**16 ≈ 65 kB.
+    function recoverEip1271Signer(
+        bytes calldata encodedSignature,
+        bytes32 domainSeparator,
+        bytes32 orderDigest
+    ) internal view returns (address owner, bytes calldata remainingCalldata) {
+        uint256 signatureLength;
+        bytes calldata signature;
+
+        // NOTE: Use assembly to efficiently decode signature data.
+        // If reading calldata out of bound, the extra bytes are set to zero.
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            // owner = address(encodedSignature[0:20])
+            owner := shr(96, calldataload(encodedSignature.offset))
+            // signatureLength = uint256(encodedSignature[20:22])
+            signatureLength := shr(
+                240,
+                calldataload(add(encodedSignature.offset, 20))
+            )
+        }
+
+        // Safety: dataLength fits a uint16 by construction, no overflow is
+        // possible.
+        uint256 usedCalldataStride = 20 + 2 + signatureLength;
+        require(
+            encodedSignature.length >= usedCalldataStride,
+            "GPv2: eip1271 signature too long"
+        );
+
+        // NOTE: Use assembly to efficiently decode signature data and assign
+        // calldata skipping bounds checks.
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            // signature = bytes(encodedTrade[22:22+signatureLength])
+            signature.offset := add(encodedSignature.offset, 22)
+            signature.length := signatureLength
+            // remainingCalldata = bytes(encodedTrade[22+signatureLength:])
+            remainingCalldata.offset := add(
+                encodedSignature.offset,
+                usedCalldataStride
+            )
+            remainingCalldata.length := sub(
+                encodedSignature.length,
+                usedCalldataStride
+            )
+        }
+
+        uint256 freeMemoryPointer = getFreeMemoryPointer();
+
+        // The digest is chosen to be consistent with EIP-191. Its format is:
+        // 0x19 <1 byte version> <version specific data> <data to sign>.
+        // Version number 0x2a is chosen arbitrarily so that it does not
+        // overlaps already assigned version numbers.
+        bytes32 signingDigest =
+            keccak256(
+                abi.encodePacked("\x19\x2a", domainSeparator, orderDigest)
+            );
+
+        setFreeMemoryPointer(freeMemoryPointer);
+
+        require(
+            EIP1271Verifier(owner).isValidSignature(signingDigest, signature) ==
+                GPv2EIP1271.MAGICVALUE,
+            "GPv2: invalid eip1271 signature"
+        );
     }
 
     /// @dev Returns a pointer to the first location in memory that has not

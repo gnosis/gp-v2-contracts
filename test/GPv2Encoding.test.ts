@@ -1,9 +1,10 @@
 import { expect } from "chai";
 import { Contract, BigNumber } from "ethers";
-import { ethers, waffle } from "hardhat";
+import { artifacts, ethers, waffle } from "hardhat";
 
 import {
   ORDER_TYPE_HASH,
+  EIP1271_MAGICVALUE,
   OrderKind,
   SettlementEncoder,
   SigningScheme,
@@ -11,6 +12,7 @@ import {
   extractOrderUidParams,
   hashOrder,
   packInteractions,
+  eip1271Message,
 } from "../src/ts";
 
 import { decodeTrade } from "./encoding";
@@ -30,7 +32,7 @@ function fillUint(bits: number, byte: number): BigNumber {
 }
 
 describe("GPv2Encoding", () => {
-  const [, ...traders] = waffle.provider.getWallets();
+  const [, deployer, ...traders] = waffle.provider.getWallets();
 
   const testDomain = { name: "test" };
   const sampleOrder = {
@@ -223,7 +225,7 @@ describe("GPv2Encoding", () => {
       );
     });
 
-    it("should recover signing address for all supported schemes", async () => {
+    it("should recover signing address for all supported ECDSA-based schemes", async () => {
       const encoder = new SettlementEncoder(testDomain);
       for (const scheme of [SigningScheme.EIP712, SigningScheme.ETHSIGN]) {
         await encoder.signEncodeTrade(sampleOrder, traders[0], scheme);
@@ -327,6 +329,124 @@ describe("GPv2Encoding", () => {
         .be.reverted;
     });
 
+    it("should verify EIP-1271 contract signatures by returning owner", async () => {
+      const artifact = await artifacts.readArtifact("EIP1271Verifier");
+      const verifier = await waffle.deployMockContract(deployer, artifact.abi);
+
+      const message = eip1271Message(testDomain, sampleOrder);
+      const eip1271Signature = "0x031337";
+      await verifier.mock.isValidSignature
+        .withArgs(message, eip1271Signature)
+        .returns(EIP1271_MAGICVALUE);
+
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.encodeContractTrade(
+        sampleOrder,
+        verifier.address,
+        eip1271Signature,
+      );
+
+      const { trades } = await encoding.decodeTradesTest(
+        encoder.tokens,
+        encoder.encodedTrades,
+      );
+
+      expect(trades.length).to.equal(1);
+      const { owner } = decodeTrade(trades[0]);
+      expect(owner).to.equal(verifier.address);
+    });
+
+    it("should revert on an invalid EIP-1271 signature", async () => {
+      const message = eip1271Message(testDomain, sampleOrder);
+      const eip1271Signature = "0x031337";
+
+      const artifact = await artifacts.readArtifact("EIP1271Verifier");
+      const verifier1 = await waffle.deployMockContract(deployer, artifact.abi);
+
+      await verifier1.mock.isValidSignature
+        .withArgs(message, eip1271Signature)
+        .returns("0xbaadc0d3");
+
+      const encoder1 = new SettlementEncoder(testDomain);
+      await encoder1.encodeContractTrade(
+        sampleOrder,
+        verifier1.address,
+        eip1271Signature,
+      );
+      await expect(
+        encoding.decodeTradesTest(encoder1.tokens, encoder1.encodedTrades),
+      ).to.be.revertedWith("invalid eip1271 signature");
+
+      const NON_STANDARD_EIP1271_VERIFIER = [
+        "function isValidSignature(bytes32 _hash, bytes memory _signature)",
+      ]; // no return value
+      const verifier2 = await waffle.deployMockContract(
+        deployer,
+        NON_STANDARD_EIP1271_VERIFIER,
+      );
+
+      await verifier2.mock.isValidSignature
+        .withArgs(message, eip1271Signature)
+        .returns();
+
+      const encoder2 = new SettlementEncoder(testDomain);
+      await encoder2.encodeContractTrade(
+        sampleOrder,
+        verifier2.address,
+        eip1271Signature,
+      );
+      // Transaction reverted: function returned an unexpected amount of data
+      await expect(
+        encoding.decodeTradesTest(encoder2.tokens, encoder2.encodedTrades),
+      ).to.be.reverted;
+    });
+
+    it("should revert for EIP-1271 signatures from externally owned accounts", async () => {
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.encodeContractTrade(
+        sampleOrder,
+        traders[0].address,
+        "0x00",
+      );
+      // Transaction reverted: function call to a non-contract account
+      await expect(
+        encoding.decodeTradesTest(encoder.tokens, encoder.encodedTrades),
+      ).to.be.reverted;
+    });
+
+    it("should revert if the EIP-1271 verification function changes the state", async () => {
+      const StateChangingEIP1271 = await ethers.getContractFactory(
+        "StateChangingEIP1271",
+      );
+
+      const evilVerifier = await StateChangingEIP1271.deploy();
+      const message = eip1271Message(testDomain, sampleOrder);
+      const eip1271Signature = "0x";
+
+      expect(await evilVerifier.state()).to.deep.equal(ethers.constants.Zero);
+      await evilVerifier.isValidSignature(message, eip1271Signature);
+      expect(await evilVerifier.state()).to.deep.equal(ethers.constants.One);
+      expect(
+        await evilVerifier.callStatic.isValidSignature(
+          message,
+          eip1271Signature,
+        ),
+      ).to.equal(EIP1271_MAGICVALUE);
+
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.encodeContractTrade(
+        sampleOrder,
+        evilVerifier.address,
+        eip1271Signature,
+      );
+
+      // Transaction reverted and Hardhat couldn't infer the reason.
+      await expect(
+        encoding.decodeTradesTest(encoder.tokens, encoder.encodedTrades),
+      ).to.be.reverted;
+      expect(await evilVerifier.state()).to.deep.equal(ethers.constants.One);
+    });
+
     it("should revert when encoding an invalid signing scheme", async () => {
       const encoder = new SettlementEncoder(testDomain);
       await encoder.signEncodeTrade(
@@ -337,15 +457,10 @@ describe("GPv2Encoding", () => {
 
       const encodedTrades = ethers.utils.arrayify(encoder.encodedTrades);
 
-      encodedTrades[2 + 106] |= 0b10000000;
+      encodedTrades[2 + 106] |= 0b11000000;
       await expect(
         encoding.decodeTradesTest(encoder.tokens, encodedTrades),
-      ).to.be.revertedWith("unimplemented");
-
-      encodedTrades[2 + 106] |= 0b01000000;
-      await expect(
-        encoding.decodeTradesTest(encoder.tokens, encodedTrades),
-      ).to.be.revertedWith("unimplemented");
+      ).to.be.revertedWith("GPv2: invalid signature scheme");
     });
 
     describe("invalid encoded trade", () => {
@@ -378,7 +493,7 @@ describe("GPv2Encoding", () => {
           encoder.tokens,
           encoder.encodedTrades.slice(0, -2),
         );
-        await expect(decoding).to.be.revertedWith("GPv2: invalid encoding");
+        await expect(decoding).to.be.revertedWith("signature too long");
       });
 
       it("calldata longer than single trade length", async () => {

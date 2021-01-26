@@ -373,7 +373,7 @@ describe("GPv2Settlement", () => {
       expect(trades.length).to.equal(tradeCount);
     });
 
-    describe("bad trade encoding", () => {
+    describe("Bad Trade Encoding", () => {
       it("should revert if encoded length is larger than number of encoded trades", async () => {
         const tradeCount = 10;
         const encoder = new SettlementEncoder(testDomain);

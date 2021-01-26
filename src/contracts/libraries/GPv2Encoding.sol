@@ -95,6 +95,8 @@ library GPv2Encoding {
     uint256 private constant EIP712_SIGNATURE_ID = 0x0;
     /// @dev Flag identifying an order signed with eth_sign.
     uint256 private constant ETHSIGN_SIGNATURE_ID = 0x1;
+    /// @dev Flag identifying an order signed with EIP-1271.
+    uint256 private constant EIP1271_SIGNATURE_ID = 0x2;
 
     /// @dev Returns the number of trades encoded in a calldata byte array.
     ///
@@ -176,7 +178,7 @@ library GPv2Encoding {
     ///       +---+---------------------------- signature-type bits:
     ///                                         00: EIP-712
     ///                                         01: eth_sign
-    ///                                         10: EIP-1271 (planned)
+    ///                                         10: EIP-1271
     ///                                         11: unused
     /// ```
     ///
@@ -192,7 +194,7 @@ library GPv2Encoding {
         bytes32 domainSeparator,
         IERC20[] calldata tokens,
         Trade memory trade
-    ) internal pure returns (bytes calldata remainingCalldata) {
+    ) internal view returns (bytes calldata remainingCalldata) {
         require(
             encodedTrade.length >= CONSTANT_SIZE_TRADE_LENGTH,
             "GPv2: invalid trade"
@@ -316,8 +318,13 @@ library GPv2Encoding {
                 domainSeparator,
                 orderDigest
             );
+        } else if (flags == EIP1271_SIGNATURE_ID) {
+            (owner, remainingCalldata) = signature.recoverEip1271Signer(
+                domainSeparator,
+                orderDigest
+            );
         } else {
-            revert("unimplemented");
+            revert("GPv2: invalid signature scheme");
         }
         trade.owner = owner;
 

@@ -117,6 +117,8 @@ function encodeSigningScheme(scheme: SigningScheme): number {
       return 0b00000000;
     case SigningScheme.ETHSIGN:
       return 0b01000000;
+    case SigningScheme.EIP1271:
+      return 0b10000000;
     default:
       throw new Error("Unsupported signing scheme");
   }
@@ -141,6 +143,21 @@ function encodeOrderFlags(flags: OrderFlags): number {
 
 function encodeTradeFlags(flags: TradeFlags): number {
   return encodeOrderFlags(flags) | encodeSigningScheme(flags.signingScheme);
+}
+
+function encodeEip1271Signature(
+  signer: string,
+  eip1271Signature: BytesLike,
+): Signature {
+  const length = ethers.utils.hexDataLength(eip1271Signature);
+  const data = ethers.utils.solidityPack(
+    ["address", "uint16", "bytes"],
+    [signer, length, eip1271Signature],
+  );
+  return {
+    scheme: SigningScheme.EIP1271,
+    data,
+  };
 }
 
 /**
@@ -235,6 +252,7 @@ export class SettlementEncoder {
   /**
    * Returns a clearing price vector for the current settlement tokens from the
    * provided price map.
+   *
    * @param prices The price map from token address to price.
    * @return The price vector.
    */
@@ -254,6 +272,7 @@ export class SettlementEncoder {
    *
    * Additionally, if the order references new tokens that the encoder has not
    * yet seen, they are added to the tokens array.
+   *
    * @param order The order of the trade to encode.
    * @param signature The signature for the order data.
    * @param tradeExecution The execution details for the trade.
@@ -316,7 +335,28 @@ export class SettlementEncoder {
   }
 
   /**
+   * Encodes a trade from a smart contract given a valid EIP-1271 signature.
+   *
+   * Additionally, if the order references new tokens that the encoder has not
+   * yet seen, they are added to the tokens array.
+   *
+   * @param order The order of the trade to encode.
+   * @param signature The signature for the order data.
+   * @param tradeExecution The execution details for the trade.
+   */
+  public encodeContractTrade(
+    order: Order,
+    owner: string,
+    eip1271Signature: BytesLike,
+    tradeExecution?: Partial<TradeExecution>,
+  ): void {
+    const signature = encodeEip1271Signature(owner, eip1271Signature);
+    this.encodeTrade(order, signature, tradeExecution);
+  }
+
+  /**
    * Signs an order and encodes a trade with that order.
+   *
    * @param order The order to sign for the trade.
    * @param owner The externally owned account that should sign the order.
    * @param scheme The signing scheme to use. See {@link SigningScheme} for more

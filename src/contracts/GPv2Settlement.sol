@@ -47,7 +47,7 @@ contract GPv2Settlement is ReentrancyGuard {
     /// modifier below.
     GPv2Authentication public immutable authenticator;
 
-    /// @dev The allowance manager which has access to EOA order funds. This
+    /// @dev The allowance manager which has access to order funds. This
     /// contract is created during deployment
     GPv2AllowanceManager public immutable allowanceManager;
 
@@ -141,7 +141,7 @@ contract GPv2Settlement is ReentrancyGuard {
     /// Orders and interactions encode tokens as indices into this array.
     /// @param clearingPrices An array of clearing prices where the `i`-th price
     /// is for the `i`-th token in the [`tokens`] array.
-    /// @param encodedTrades Encoded trades for signed EOA orders.
+    /// @param encodedTrades Encoded trades for signed orders.
     /// @param encodedInteractions Encoded smart contract interactions split
     /// into three separate chunks to be run before the settlement, during the
     /// settlement and after the settlement respectively.
@@ -183,14 +183,14 @@ contract GPv2Settlement is ReentrancyGuard {
         emit OrderInvalidated(owner, orderUid);
     }
 
-    /// @dev Process all trades for EOA orders one at a time returning the
-    /// computed net in and out transfers for the trades.
+    /// @dev Process all trades one at a time returning the computed net in and
+    /// out transfers for the trades.
     ///
     /// This method reverts if processing of any single trade fails. See
     /// [`computeTradeExecution`] for more details.
     /// @param tokens An array of ERC20 tokens to be traded in the settlement.
     /// @param clearingPrices An array of token clearing prices.
-    /// @param encodedTrades Encoded trades for signed EOA orders.
+    /// @param encodedTrades Encoded trades for signed orders.
     /// @return executedTrades Array of executed trades.
     function computeTradeExecutions(
         IERC20[] calldata tokens,
@@ -221,8 +221,8 @@ contract GPv2Settlement is ReentrancyGuard {
         require(i == tradeCount, "GPv2: invalid trade encoding");
     }
 
-    /// @dev Compute the in and out transfer amounts for a single EOA order
-    /// trade. This function reverts if:
+    /// @dev Compute the in and out transfer amounts for a single trade.
+    /// This function reverts if:
     /// - The order has expired
     /// - The order's limit price is not respected.
     ///

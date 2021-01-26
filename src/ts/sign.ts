@@ -4,6 +4,17 @@ import { hashOrder, Order, ORDER_TYPE_FIELDS, timestamp } from "./order";
 import { isTypedDataSigner, TypedDataDomain } from "./types/ethers";
 
 /**
+ * Value returned by a call to `isValidSignature` if the signature was verified
+ * successfully. The value is defined in the EIP-1271 standard as:
+ * bytes4(keccak256("isValidSignature(bytes32,bytes)"))
+ */
+export const EIP1271_MAGICVALUE = ethers.utils.hexDataSlice(
+  ethers.utils.id("isValidSignature(bytes32,bytes)"),
+  0,
+  4,
+);
+
+/**
  * The signing scheme used to sign the order.
  */
 export const enum SigningScheme {
@@ -19,6 +30,12 @@ export const enum SigningScheme {
    * Message signed using eth_sign RPC call.
    */
   ETHSIGN,
+  /**
+   * Smart contract signatures as defined in EIP-1271.
+   *
+   * <https://eips.ethereum.org/EIPS/eip-1271>
+   */
+  EIP1271,
 }
 
 /**
@@ -62,6 +79,9 @@ function ecdsaSignOrder(
           ]),
         ),
       );
+
+    case SigningScheme.EIP1271:
+      throw new Error("EIP-1271 signatures are not supported by signer");
   }
 }
 
@@ -101,6 +121,31 @@ export async function signOrder(
     data,
     scheme,
   };
+}
+
+/**
+ * Returns the message that a contract should sign to authorize the input order
+ * in GPv2.
+ *
+ * @param domain The domain to sign the order for. This is used by the smart
+ * contract to ensure orders can't be replayed across different applications,
+ * but also different deployments (as the contract chain ID and address are
+ * mixed into to the domain value).
+ * @param order The order to sign.
+ * @returns The message that needs to be EIP-1271 signed to authorize the input
+ * order.
+ */
+export function eip1271Message(
+  domain: TypedDataDomain,
+  order: Order,
+): BytesLike {
+  return ethers.utils.keccak256(
+    ethers.utils.hexConcat([
+      "0x192a",
+      ethers.utils._TypedDataEncoder.hashDomain(domain),
+      hashOrder(order),
+    ]),
+  );
 }
 
 /**
