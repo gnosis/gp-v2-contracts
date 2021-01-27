@@ -137,7 +137,7 @@ export function hashOrder(order: Order): string {
     { Order: ORDER_TYPE_FIELDS },
     {
       ...order,
-      receiver: order.receiver || ethers.constants.AddressZero,
+      receiver: order.receiver ?? ethers.constants.AddressZero,
       validTo: timestamp(order.validTo),
     },
   );

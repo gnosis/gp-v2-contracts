@@ -320,7 +320,7 @@ export class SettlementEncoder {
       [
         this.tokenIndex(order.sellToken),
         this.tokenIndex(order.buyToken),
-        order.receiver || ethers.constants.AddressZero,
+        order.receiver ?? ethers.constants.AddressZero,
         order.sellAmount,
         order.buyAmount,
         timestamp(order.validTo),
