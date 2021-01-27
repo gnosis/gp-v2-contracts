@@ -17,7 +17,7 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
     function computeTradeExecutionsTest(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
-        bytes calldata encodedTrades
+        GPv2Encoding.TradeData[] calldata encodedTrades
     ) external returns (GPv2TradeExecution.Data[] memory executedTrades) {
         executedTrades = computeTradeExecutions(
             tokens,

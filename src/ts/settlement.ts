@@ -92,7 +92,7 @@ export type EncodedSettlement = [
   /** Clearing prices. */
   BigNumberish[],
   /** Encoded trades. */
-  BytesLike,
+  TradeData[],
   /** Encoded interactions. */
   [BytesLike, BytesLike, BytesLike],
   /** Encoded order refunds. */
@@ -154,6 +154,21 @@ function encodeEip1271Signature(
   };
 }
 
+interface TradeData {
+  sellTokenIndex: number;
+  buyTokenIndex: number;
+  receiver: string;
+  sellAmount: BigNumberish;
+  buyAmount: BigNumberish;
+  validTo: number;
+  appData: string;
+  feeAmount: BigNumberish;
+  flags: number;
+  executedAmount: BigNumberish;
+  feeDiscount: BigNumberish;
+  signature: BytesLike;
+}
+
 /**
  * A class for building calldata for a settlement.
  *
@@ -164,8 +179,7 @@ function encodeEip1271Signature(
 export class SettlementEncoder {
   private readonly _tokens: string[] = [];
   private readonly _tokenMap: Record<string, number | undefined> = {};
-  private _encodedTrades = "0x";
-  private _tradeCount = 0;
+  private _trades: TradeData[] = [];
   private _encodedInteractions = {
     [InteractionStage.PRE]: "0x",
     [InteractionStage.INTRA]: "0x",
@@ -198,14 +212,8 @@ export class SettlementEncoder {
   /**
    * Gets the encoded trades as a hex-encoded string.
    */
-  public get encodedTrades(): string {
-    if (this._tradeCount > MAX_TRADES_IN_SETTLEMENT) {
-      throw new Error("too many orders to encode in a single settlement");
-    }
-    return ethers.utils.hexConcat([
-      ethers.utils.solidityPack(["uint16"], [this._tradeCount]),
-      this._encodedTrades,
-    ]);
+  public get trades(): TradeData[] {
+    return this._trades.slice();
   }
 
   /**
@@ -225,13 +233,6 @@ export class SettlementEncoder {
    */
   public get encodedOrderRefunds(): string {
     return this._encodedOrderRefunds;
-  }
-
-  /**
-   * Gets the number of trades currently encoded.
-   */
-  public get tradeCount(): number {
-    return this._tradeCount;
   }
 
   /**
@@ -276,10 +277,6 @@ export class SettlementEncoder {
     signature: Signature,
     tradeExecution?: Partial<TradeExecution>,
   ): void {
-    if (this._tradeCount >= MAX_TRADES_IN_SETTLEMENT) {
-      throw new Error("too many orders for a single settlement");
-    }
-
     const { executedAmount, feeDiscount } = tradeExecution || {};
     if (order.partiallyFillable && executedAmount === undefined) {
       throw new Error("missing executed amount for partially fillable trade");
@@ -296,42 +293,20 @@ export class SettlementEncoder {
       signingScheme: signature.scheme,
     };
     const { receiver, validTo, appData } = normalizeOrder(order);
-    const encodedTrade = ethers.utils.solidityPack(
-      [
-        "uint8",
-        "uint8",
-        "address",
-        "uint256",
-        "uint256",
-        "uint32",
-        "bytes32",
-        "uint256",
-        "uint8",
-        "uint256",
-        "uint256",
-        "bytes",
-      ],
-      [
-        this.tokenIndex(order.sellToken),
-        this.tokenIndex(order.buyToken),
-        receiver,
-        order.sellAmount,
-        order.buyAmount,
-        validTo,
-        appData,
-        order.feeAmount,
-        encodeTradeFlags(tradeFlags),
-        executedAmount || 0,
-        feeDiscount || 0,
-        signature.data,
-      ],
-    );
-
-    this._encodedTrades = ethers.utils.hexConcat([
-      this._encodedTrades,
-      encodedTrade,
-    ]);
-    this._tradeCount++;
+    this._trades.push({
+      sellTokenIndex: this.tokenIndex(order.sellToken),
+      buyTokenIndex: this.tokenIndex(order.buyToken),
+      receiver: receiver as string,
+      sellAmount: order.sellAmount,
+      buyAmount: order.buyAmount,
+      validTo: validTo as number,
+      appData: appData as string,
+      feeAmount: order.feeAmount,
+      flags: encodeTradeFlags(tradeFlags),
+      executedAmount: executedAmount || 0,
+      feeDiscount: feeDiscount || 0,
+      signature: signature.data,
+    });
   }
 
   /**
@@ -417,7 +392,7 @@ export class SettlementEncoder {
     return [
       this.tokens,
       this.clearingPrices(prices),
-      this.encodedTrades,
+      this.trades,
       this.encodedInteractions,
       this.encodedOrderRefunds,
     ];

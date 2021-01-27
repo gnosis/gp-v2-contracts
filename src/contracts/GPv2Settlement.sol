@@ -138,7 +138,7 @@ contract GPv2Settlement is ReentrancyGuard {
     /// Orders and interactions encode tokens as indices into this array.
     /// @param clearingPrices An array of clearing prices where the `i`-th price
     /// is for the `i`-th token in the [`tokens`] array.
-    /// @param encodedTrades Encoded trades for signed orders.
+    /// @param trades Encoded trades for signed orders.
     /// @param encodedInteractions Encoded smart contract interactions split
     /// into three separate chunks to be run before the settlement, during the
     /// settlement and after the settlement respectively.
@@ -147,14 +147,14 @@ contract GPv2Settlement is ReentrancyGuard {
     function settle(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
-        bytes calldata encodedTrades,
+        GPv2Encoding.TradeData[] calldata trades,
         bytes[3] calldata encodedInteractions,
         bytes calldata encodedOrderRefunds
     ) external nonReentrant onlySolver {
         executeInteractions(encodedInteractions[0]);
 
         GPv2TradeExecution.Data[] memory executedTrades =
-            computeTradeExecutions(tokens, clearingPrices, encodedTrades);
+            computeTradeExecutions(tokens, clearingPrices, trades);
         allowanceManager.transferIn(executedTrades);
 
         executeInteractions(encodedInteractions[1]);
@@ -187,35 +187,25 @@ contract GPv2Settlement is ReentrancyGuard {
     /// [`computeTradeExecution`] for more details.
     /// @param tokens An array of ERC20 tokens to be traded in the settlement.
     /// @param clearingPrices An array of token clearing prices.
-    /// @param encodedTrades Encoded trades for signed orders.
+    /// @param trades Encoded trades for signed orders.
     /// @return executedTrades Array of executed trades.
     function computeTradeExecutions(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
-        bytes calldata encodedTrades
+        GPv2Encoding.TradeData[] calldata trades
     ) internal returns (GPv2TradeExecution.Data[] memory executedTrades) {
-        (uint256 tradeCount, bytes calldata remainingEncodedTrades) =
-            encodedTrades.decodeTradeCount();
-        executedTrades = new GPv2TradeExecution.Data[](tradeCount);
+        executedTrades = new GPv2TradeExecution.Data[](trades.length);
 
         GPv2Encoding.Trade memory trade;
-        uint256 i = 0;
-        while (remainingEncodedTrades.length != 0) {
-            remainingEncodedTrades = remainingEncodedTrades.decodeTrade(
-                domainSeparator,
-                tokens,
-                trade
-            );
+        for (uint256 i = 0; i < trades.length; i++) {
+            GPv2Encoding.decodeTrade(trades[i], domainSeparator, tokens, trade);
             computeTradeExecution(
                 trade,
                 clearingPrices[trade.sellTokenIndex],
                 clearingPrices[trade.buyTokenIndex],
                 executedTrades[i]
             );
-            i++;
         }
-
-        require(i == tradeCount, "GPv2: invalid trade encoding");
     }
 
     /// @dev Compute the in and out transfer amounts for a single trade.

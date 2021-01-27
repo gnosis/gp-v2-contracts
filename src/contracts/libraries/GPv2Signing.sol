@@ -31,7 +31,6 @@ library GPv2Signing {
     /// @return r r parameter of the ECDSA signature.
     /// @return s s parameter of the ECDSA signature.
     /// @return v v parameter of the ECDSA signature.
-    /// @return remainingCalldata Input calldata that has not been used to
     /// decode the signature.
     function decodeEcdsaSignature(bytes calldata encodedSignature)
         internal
@@ -39,16 +38,15 @@ library GPv2Signing {
         returns (
             bytes32 r,
             bytes32 s,
-            uint8 v,
-            bytes calldata remainingCalldata
+            uint8 v
         )
     {
         require(
-            encodedSignature.length >= ECDSA_SIGNATURE_LENGTH,
-            "GPv2: ecdsa signature too long"
+            encodedSignature.length == ECDSA_SIGNATURE_LENGTH,
+            "GPv2: invalid ecdsa signature"
         );
 
-        // NOTE: Use assembly to efficiently decode signature data.
+        // NOTE: Use assembly to efficiently decode signature packed data.
         // solhint-disable-next-line no-inline-assembly
         assembly {
             // r = uint256(encodedSignature[0:32])
@@ -56,21 +54,7 @@ library GPv2Signing {
             // s = uint256(encodedSignature[32:64])
             s := calldataload(add(encodedSignature.offset, 32))
             // v = uint8(encodedSignature[64])
-            v := shr(248, calldataload(add(encodedSignature.offset, 64)))
-        }
-
-        // NOTE: Use assembly to slice the calldata bytes without generating
-        // code for bounds checking.
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            remainingCalldata.offset := add(
-                encodedSignature.offset,
-                ECDSA_SIGNATURE_LENGTH
-            )
-            remainingCalldata.length := sub(
-                encodedSignature.length,
-                ECDSA_SIGNATURE_LENGTH
-            )
+            v := byte(0, calldataload(add(encodedSignature.offset, 64)))
         }
     }
 
@@ -92,17 +76,14 @@ library GPv2Signing {
     /// @param orderDigest The EIP-712 signing digest derived from the order
     /// parameters.
     /// @return owner The address of the signer.
-    /// @return remainingCalldata Input calldata that has not been used to
     /// decode the current order.
     function recoverEip712Signer(
         bytes calldata encodedSignature,
         bytes32 domainSeparator,
         bytes32 orderDigest
-    ) internal pure returns (address owner, bytes calldata remainingCalldata) {
-        bytes32 r;
-        bytes32 s;
-        uint8 v;
-        (r, s, v, remainingCalldata) = decodeEcdsaSignature(encodedSignature);
+    ) internal pure returns (address owner) {
+        (bytes32 r, bytes32 s, uint8 v) =
+            decodeEcdsaSignature(encodedSignature);
 
         uint256 freeMemoryPointer = getFreeMemoryPointer();
 
@@ -136,17 +117,14 @@ library GPv2Signing {
     /// @param orderDigest The EIP-712 signing digest derived from the order
     /// parameters.
     /// @return owner The address of the signer.
-    /// @return remainingCalldata Input calldata that has not been used to
     /// decode the current order.
     function recoverEthsignSigner(
         bytes calldata encodedSignature,
         bytes32 domainSeparator,
         bytes32 orderDigest
-    ) internal pure returns (address owner, bytes calldata remainingCalldata) {
-        bytes32 r;
-        bytes32 s;
-        uint8 v;
-        (r, s, v, remainingCalldata) = decodeEcdsaSignature(encodedSignature);
+    ) internal pure returns (address owner) {
+        (bytes32 r, bytes32 s, uint8 v) =
+            decodeEcdsaSignature(encodedSignature);
 
         uint256 freeMemoryPointer = getFreeMemoryPointer();
 
@@ -199,7 +177,7 @@ library GPv2Signing {
         bytes calldata encodedSignature,
         bytes32 domainSeparator,
         bytes32 orderDigest
-    ) internal view returns (address owner, bytes calldata remainingCalldata) {
+    ) internal view returns (address owner) {
         uint256 signatureLength;
         bytes calldata signature;
 
@@ -220,8 +198,8 @@ library GPv2Signing {
         // possible.
         uint256 usedCalldataStride = 20 + 2 + signatureLength;
         require(
-            encodedSignature.length >= usedCalldataStride,
-            "GPv2: eip1271 signature too long"
+            encodedSignature.length == usedCalldataStride,
+            "GPv2: invalid eip1271 signature"
         );
 
         // NOTE: Use assembly to efficiently decode signature data and assign
@@ -231,15 +209,6 @@ library GPv2Signing {
             // signature = bytes(encodedTrade[22:22+signatureLength])
             signature.offset := add(encodedSignature.offset, 22)
             signature.length := signatureLength
-            // remainingCalldata = bytes(encodedTrade[22+signatureLength:])
-            remainingCalldata.offset := add(
-                encodedSignature.offset,
-                usedCalldataStride
-            )
-            remainingCalldata.length := sub(
-                encodedSignature.length,
-                usedCalldataStride
-            )
         }
 
         uint256 freeMemoryPointer = getFreeMemoryPointer();

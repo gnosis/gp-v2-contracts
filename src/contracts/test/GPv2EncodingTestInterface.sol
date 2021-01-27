@@ -19,22 +19,13 @@ contract GPv2EncodingTestInterface {
         return (GPv2Encoding.ORDER_TYPE_HASH);
     }
 
-    function tradeCountTest(bytes calldata encodedTrades)
-        external
-        pure
-        returns (uint256 count, bytes calldata encodedTradesWithoutLength)
-    {
-        (count, encodedTradesWithoutLength) = encodedTrades.decodeTradeCount();
-    }
-
     function decodeTradesTest(
         IERC20[] calldata tokens,
-        bytes calldata encodedTrades
+        GPv2Encoding.TradeData[] calldata encodedTrades
     )
         external
         view
         returns (
-            uint256 tradeCount,
             GPv2Encoding.Trade[] memory trades,
             uint256 mem,
             uint256 gas_
@@ -42,12 +33,9 @@ contract GPv2EncodingTestInterface {
     {
         bytes32 domainSeparator = DOMAIN_SEPARATOR;
 
-        bytes calldata remainingEncodedTrades;
-        (tradeCount, remainingEncodedTrades) = encodedTrades.decodeTradeCount();
-
-        trades = new GPv2Encoding.Trade[](tradeCount);
+        trades = new GPv2Encoding.Trade[](encodedTrades.length);
         uint256 i;
-        for (i = 0; i < tradeCount; i++) {
+        for (i = 0; i < encodedTrades.length; i++) {
             trades[i].orderUid = new bytes(56);
         }
 
@@ -62,14 +50,13 @@ contract GPv2EncodingTestInterface {
         }
         gas_ = gasleft();
 
-        i = 0;
-        while (remainingEncodedTrades.length != 0) {
-            remainingEncodedTrades = remainingEncodedTrades.decodeTrade(
+        for (i = 0; i < encodedTrades.length; i++) {
+            GPv2Encoding.decodeTrade(
+                encodedTrades[i],
                 domainSeparator,
                 tokens,
                 trades[i]
             );
-            i++;
         }
 
         // solhint-disable-next-line no-inline-assembly
