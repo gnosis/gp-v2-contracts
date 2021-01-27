@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { Contract } from "ethers";
 import { ethers, waffle } from "hardhat";
 
-describe.only("GPv2AllowListAuthentication", () => {
+describe("GPv2AllowListAuthentication", () => {
   const [deployer, owner, nonOwner, solver] = waffle.provider.getWallets();
   let authenticator: Contract;
 
@@ -16,7 +16,7 @@ describe.only("GPv2AllowListAuthentication", () => {
   });
 
   describe("constructor", () => {
-    it.only("should set the owner", async () => {
+    it("should set the owner", async () => {
       expect(await authenticator.owner()).to.equal(owner.address);
     });
     it("deployer is not the owner", async () => {
