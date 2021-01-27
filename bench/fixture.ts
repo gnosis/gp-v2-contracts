@@ -247,6 +247,8 @@ export class BenchFixture {
         orderSpice.partiallyFillable
           ? {
               executedAmount: ethers.utils.parseEther("100.0"),
+              // NOTE: Order is exactly half executed, so adjust fee discount as
+              // well so that it doesn't execeed the executed fee amount.
               feeDiscount: feeDiscount.div(2),
             }
           : {
