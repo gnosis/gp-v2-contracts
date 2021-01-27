@@ -31,6 +31,7 @@ export const deployTestContracts: () => Promise<TestDeployment> = deployments.cr
       "GPv2AllowListAuthentication",
       GPv2AllowListAuthentication.address,
     );
+
     const settlement = await ethers.getContractAt(
       "GPv2Settlement",
       GPv2Settlement.address,

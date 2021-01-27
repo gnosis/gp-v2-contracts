@@ -86,7 +86,7 @@ describe("E2E: Deployment", () => {
 
   describe("ownership", () => {
     it("authenticator has dedicated owner", async () => {
-      expect(await authenticator.owner()).to.equal(owner.address);
+      expect(await authenticator.manager()).to.equal(owner.address);
     });
   });
 });
