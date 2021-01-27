@@ -13,14 +13,15 @@ describe("GPv2AllowListAuthentication", () => {
     );
 
     authenticator = await GPv2AllowListAuthentication.deploy();
+    await authenticator.setManager(owner.address);
   });
 
   describe("constructor", () => {
     it("should set the owner", async () => {
-      expect(await authenticator.owner()).to.equal(owner.address);
+      expect(await authenticator.manager()).to.equal(owner.address);
     });
     it("deployer is not the owner", async () => {
-      expect(await authenticator.owner()).not.to.be.equal(deployer.address);
+      expect(await authenticator.manager()).not.to.be.equal(deployer.address);
     });
   });
 
@@ -33,7 +34,7 @@ describe("GPv2AllowListAuthentication", () => {
     it("should not allow non-owner to add solver", async () => {
       await expect(
         authenticator.connect(nonOwner).addSolver(solver.address),
-      ).to.be.revertedWith("caller is not the owner");
+      ).to.be.revertedWith("caller is not the manager");
     });
   });
 
@@ -46,7 +47,7 @@ describe("GPv2AllowListAuthentication", () => {
     it("should not allow non-owner to remove solver", async () => {
       await expect(
         authenticator.connect(nonOwner).removeSolver(solver.address),
-      ).to.be.revertedWith("caller is not the owner");
+      ).to.be.revertedWith("caller is not the manager");
     });
   });
 
