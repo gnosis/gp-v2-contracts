@@ -42,7 +42,7 @@ describe("GPv2Encoding", () => {
     sellAmount: ethers.utils.parseEther("42"),
     buyAmount: ethers.utils.parseEther("13.37"),
     validTo: 0xffffffff,
-    appData: 0,
+    appData: ethers.constants.HashZero,
     feeAmount: ethers.utils.parseEther("1.0"),
     kind: OrderKind.SELL,
     partiallyFillable: false,
@@ -130,14 +130,14 @@ describe("GPv2Encoding", () => {
         sellAmount: fillUint(256, 0x04),
         buyAmount: fillUint(256, 0x05),
         validTo: fillUint(32, 0x06).toNumber(),
-        appData: fillUint(32, 0x07).toNumber(),
+        appData: fillBytes(32, 0x07),
         feeAmount: fillUint(256, 0x08),
         kind: OrderKind.BUY,
         partiallyFillable: true,
       };
       const tradeExecution = {
         executedAmount: fillUint(256, 0x09),
-        feeDiscount: fillUint(16, 0x0a).toNumber(),
+        feeDiscount: fillUint(256, 0x0a),
       };
 
       const encoder = new SettlementEncoder(testDomain);
@@ -256,7 +256,7 @@ describe("GPv2Encoding", () => {
       // NOTE: `v` must be either `27` or `28`, so just set it to something else
       // to generate an invalid signature.
       const encodedTradeBytes = ethers.utils.arrayify(encoder.encodedTrades);
-      encodedTradeBytes[227] = 42;
+      encodedTradeBytes[285] = 42;
 
       await expect(
         encoding.decodeTradesTest(encoder.tokens, encodedTradeBytes),
@@ -274,7 +274,7 @@ describe("GPv2Encoding", () => {
       // NOTE: `v` must be either `27` or `28`, so just set it to something else
       // to generate an invalid signature.
       const encodedTradeBytes = ethers.utils.arrayify(encoder.encodedTrades);
-      encodedTradeBytes[227] = 42;
+      encodedTradeBytes[285] = 42;
 
       await expect(
         encoding.decodeTradesTest(encoder.tokens, encodedTradeBytes),
@@ -455,7 +455,7 @@ describe("GPv2Encoding", () => {
 
       const encodedTrades = ethers.utils.arrayify(encoder.encodedTrades);
 
-      encodedTrades[2 + 126] |= 0b11000000;
+      encodedTrades[2 + 154] |= 0b11000000;
       await expect(
         encoding.decodeTradesTest(encoder.tokens, encodedTrades),
       ).to.be.revertedWith("GPv2: invalid signature scheme");
@@ -464,7 +464,7 @@ describe("GPv2Encoding", () => {
     describe("invalid encoded trade", () => {
       const sampleTradeExecution = {
         executedAmount: fillUint(256, 0x09),
-        feeDiscount: fillUint(16, 0x0a).toNumber(),
+        feeDiscount: fillUint(256, 0x0a),
       };
 
       it("calldata shorter than single trade length", async () => {

@@ -1,4 +1,4 @@
-import { ethers, BigNumberish } from "ethers";
+import { BigNumberish, BytesLike, ethers } from "ethers";
 
 /**
  * Gnosis Protocol v2 order data.
@@ -44,7 +44,7 @@ export interface Order {
    * also be used to ensure uniqueness between two orders with otherwise the
    * exact same parameters.
    */
-  appData: number;
+  appData: HashLike;
   /**
    * Fee to give to the protocol.
    */
@@ -79,6 +79,11 @@ export type OrderFlags = Pick<Order, "kind" | "partiallyFillable">;
 export type Timestamp = number | Date;
 
 /**
+ * A hash-like app data value.
+ */
+export type HashLike = BytesLike | number;
+
+/**
  * Order kind.
  */
 export enum OrderKind {
@@ -102,7 +107,7 @@ export const ORDER_TYPE_FIELDS = [
   { name: "sellAmount", type: "uint256" },
   { name: "buyAmount", type: "uint256" },
   { name: "validTo", type: "uint32" },
-  { name: "appData", type: "uint32" },
+  { name: "appData", type: "bytes32" },
   { name: "feeAmount", type: "uint256" },
   { name: "kind", type: "string" },
   { name: "partiallyFillable", type: "bool" },
@@ -127,6 +132,32 @@ export function timestamp(t: Timestamp): number {
 }
 
 /**
+ * Normalizes an app data value to a 32-byte hash.
+ * @param hashLike A hash-like value to normalize.
+ * @returns A 32-byte hash encoded as a hex-string.
+ */
+export function hashify(h: HashLike): string {
+  return typeof h === "number"
+    ? `0x${h.toString(16).padStart(64, "0")}`
+    : ethers.utils.hexZeroPad(h, 32);
+}
+
+/**
+ * Normalizes an order for hashing and signing, so that it can be used with
+ * Ethers.js for EIP-712 operations.
+ * @param hashLike A hash-like value to normalize.
+ * @returns A 32-byte hash encoded as a hex-string.
+ */
+export function normalizeOrder(order: Order): Record<string, unknown> {
+  return {
+    ...order,
+    receiver: order.receiver ?? ethers.constants.AddressZero,
+    appData: hashify(order.appData),
+    validTo: timestamp(order.validTo),
+  };
+}
+
+/**
  * Compute the 32-byte digest for the specified order.
  * @param order The order to compute the digest for.
  * @return Hex-encoded 32-byte order digest.
@@ -135,11 +166,7 @@ export function hashOrder(order: Order): string {
   return ethers.utils._TypedDataEncoder.hashStruct(
     "Order",
     { Order: ORDER_TYPE_FIELDS },
-    {
-      ...order,
-      receiver: order.receiver ?? ethers.constants.AddressZero,
-      validTo: timestamp(order.validTo),
-    },
+    normalizeOrder(order),
   );
 }
 

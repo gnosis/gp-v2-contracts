@@ -18,7 +18,7 @@ library GPv2Encoding {
         uint256 sellAmount;
         uint256 buyAmount;
         uint32 validTo;
-        uint32 appData;
+        bytes32 appData;
         uint256 feeAmount;
         bytes32 kind;
         bool partiallyFillable;
@@ -31,7 +31,7 @@ library GPv2Encoding {
         uint8 sellTokenIndex;
         uint8 buyTokenIndex;
         uint256 executedAmount;
-        uint16 feeDiscount;
+        uint256 feeDiscount;
         address owner;
         bytes orderUid;
     }
@@ -77,7 +77,7 @@ library GPv2Encoding {
     ///         "uint256 sellAmount," +
     ///         "uint256 buyAmount," +
     ///         "uint32 validTo," +
-    ///         "uint32 appData," +
+    ///         "bytes32 appData," +
     ///         "uint256 feeAmount," +
     ///         "string kind," +
     ///         "bool partiallyFillable" +
@@ -85,10 +85,10 @@ library GPv2Encoding {
     /// )
     /// ```
     bytes32 internal constant ORDER_TYPE_HASH =
-        hex"906c1132531c772bcf45dc92778a19b6a4ce75b2d6ed52f8547c4af9e5476bae";
+        hex"d604be04a8c6d2df582ec82eba9b65ce714008acbf9122dd95e499569c8f1a80";
 
     /// @dev The length of the fixed-length components in an encoded trade.
-    uint256 private constant CONSTANT_SIZE_TRADE_LENGTH = 161;
+    uint256 private constant CONSTANT_SIZE_TRADE_LENGTH = 219;
 
     /// @dev The byte length of an order unique identifier.
     uint256 private constant ORDER_UID_LENGTH = 56;
@@ -144,11 +144,11 @@ library GPv2Encoding {
     ///     uint256 sellAmount;
     ///     uint256 buyAmount;
     ///     uint32 validTo;
-    ///     uint32 appData;
+    ///     bytes32 appData;
     ///     uint256 feeAmount;
     ///     uint8 flags;
     ///     uint256 executedAmount;
-    ///     uint16 feeDiscount;
+    ///     uint256 feeDiscount;
     ///     bytes signature;
     /// }
     /// ```
@@ -244,27 +244,27 @@ library GPv2Encoding {
                 )
                 // validTo = uint32(encodedTrade[86:90])
                 validTo := shr(224, calldataload(add(encodedTrade.offset, 86)))
-                // order.appData = uint32(encodedTrade[90:94])
+                // order.appData = uint32(encodedTrade[90:122])
                 mstore(
                     add(order, 192),
-                    shr(224, calldataload(add(encodedTrade.offset, 90)))
+                    calldataload(add(encodedTrade.offset, 90))
                 )
-                // order.feeAmount = uint256(encodedTrade[94:126])
+                // order.feeAmount = uint256(encodedTrade[122:154])
                 mstore(
                     add(order, 224),
-                    calldataload(add(encodedTrade.offset, 94))
+                    calldataload(add(encodedTrade.offset, 122))
                 )
-                // flags = uint8(encodedTrade[126])
-                flags := shr(248, calldataload(add(encodedTrade.offset, 126)))
-                // trade.executedAmount = uint256(encodedTrade[127:159])
+                // flags = uint8(encodedTrade[154])
+                flags := shr(248, calldataload(add(encodedTrade.offset, 154)))
+                // trade.executedAmount = uint256(encodedTrade[155:187])
                 mstore(
                     add(trade, 96),
-                    calldataload(add(encodedTrade.offset, 127))
+                    calldataload(add(encodedTrade.offset, 155))
                 )
-                // trade.feeDiscount = uint256(encodedTrade[159:161])
+                // trade.feeDiscount = uint256(encodedTrade[187:219])
                 mstore(
                     add(trade, 128),
-                    shr(240, calldataload(add(encodedTrade.offset, 159)))
+                    calldataload(add(encodedTrade.offset, 187))
                 )
             }
 
@@ -291,7 +291,7 @@ library GPv2Encoding {
             // order data.
             // solhint-disable-next-line no-inline-assembly
             assembly {
-                let dataStart := sub(mload(trade), 32)
+                let dataStart := sub(order, 32)
                 let temp := mload(dataStart)
                 mstore(dataStart, ORDER_TYPE_HASH)
                 orderDigest := keccak256(dataStart, 352)

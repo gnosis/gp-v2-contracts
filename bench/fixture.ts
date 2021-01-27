@@ -6,7 +6,6 @@ import { Contract, ContractReceipt, Wallet } from "ethers";
 import { ethers, waffle } from "hardhat";
 
 import {
-  FULL_FEE_DISCOUNT,
   Order,
   OrderKind,
   SettlementEncoder,
@@ -218,7 +217,9 @@ export class BenchFixture {
         (i + Math.floor(i / 4)) % 2 == 0
           ? SigningScheme.EIP712
           : SigningScheme.ETHSIGN;
-      const feeDiscount = (i % 3) * (FULL_FEE_DISCOUNT / 2); // 0% | 50% | 100%
+
+      const feeAmount = ethers.utils.parseEther("1.0");
+      const feeDiscount = feeAmount.mul(i % 3).div(2); // 0% | 50% | 100%
 
       const dbg = {
         fill: orderSpice.partiallyFillable
@@ -226,7 +227,7 @@ export class BenchFixture {
           : "fill-or-kill",
         kind: orderSpice.kind == OrderKind.SELL ? "sell" : "buy",
         sign: signingScheme == SigningScheme.EIP712 ? "eip-712" : "eth_sign",
-        fee: 100 * (1 - feeDiscount / FULL_FEE_DISCOUNT),
+        fee: feeAmount.sub(feeDiscount).mul(100).div(feeAmount).toNumber(),
       };
       debug(
         `encoding ${dbg.fill} ${dbg.kind} order with ${dbg.sign} signature and ${dbg.fee}% fees`,
@@ -236,17 +237,23 @@ export class BenchFixture {
         {
           sellToken: tokens.id(i % options.tokens).address,
           buyToken: tokens.id((i + 1) % options.tokens).address,
-          feeAmount: ethers.utils.parseEther("1"),
+          feeAmount,
           validTo: 0xffffffff,
           appData: this.nonce++,
           ...orderSpice,
         },
         traders[i % traders.length],
         signingScheme,
-        {
-          executedAmount: ethers.utils.parseEther("100.0"),
-          feeDiscount,
-        },
+        orderSpice.partiallyFillable
+          ? {
+              executedAmount: ethers.utils.parseEther("100.0"),
+              // NOTE: Order is exactly half executed, so adjust fee discount as
+              // well so that it doesn't execeed the executed fee amount.
+              feeDiscount: feeDiscount.div(2),
+            }
+          : {
+              feeDiscount,
+            },
       );
     }
 
