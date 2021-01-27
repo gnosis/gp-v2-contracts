@@ -3,7 +3,7 @@ pragma solidity ^0.7.6;
 
 import "@gnosis.pm/util-contracts/contracts/StorageAccessible.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
-import "@openzeppelin-upgradable/contracts/access/OwnableUpgradable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./interfaces/GPv2Authentication.sol";
 
 /// @title Gnosis Protocol v2 Access Control Contract
@@ -11,18 +11,9 @@ import "./interfaces/GPv2Authentication.sol";
 contract GPv2AllowListAuthentication is
     GPv2Authentication,
     StorageAccessible,
-    OwnableUpgradable
+    OwnableUpgradeable
 {
     using EnumerableSet for EnumerableSet.AddressSet;
-    address private _owner;
-    bool private initialized;
-
-    EnumerableSet.AddressSet private solvers;
-
-    event OwnershipTransferred(
-        address indexed previousOwner,
-        address indexed newOwner
-    );
 
     EnumerableSet.AddressSet private solvers;
 
