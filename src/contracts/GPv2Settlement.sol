@@ -4,6 +4,7 @@ pragma abicoder v2;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import "./GPv2AllowanceManager.sol";
 import "./interfaces/GPv2Authentication.sol";
@@ -12,7 +13,7 @@ import "./libraries/GPv2TradeExecution.sol";
 
 /// @title Gnosis Protocol v2 Settlement Contract
 /// @author Gnosis Developers
-contract GPv2Settlement {
+contract GPv2Settlement is ReentrancyGuard {
     using GPv2Encoding for bytes;
     using GPv2TradeExecution for GPv2TradeExecution.Data;
     using SafeMath for uint256;
@@ -46,7 +47,7 @@ contract GPv2Settlement {
     /// modifier below.
     GPv2Authentication public immutable authenticator;
 
-    /// @dev The allowance manager which has access to EOA order funds. This
+    /// @dev The allowance manager which has access to order funds. This
     /// contract is created during deployment
     GPv2AllowanceManager public immutable allowanceManager;
 
@@ -140,7 +141,7 @@ contract GPv2Settlement {
     /// Orders and interactions encode tokens as indices into this array.
     /// @param clearingPrices An array of clearing prices where the `i`-th price
     /// is for the `i`-th token in the [`tokens`] array.
-    /// @param encodedTrades Encoded trades for signed EOA orders.
+    /// @param encodedTrades Encoded trades for signed orders.
     /// @param encodedInteractions Encoded smart contract interactions split
     /// into three separate chunks to be run before the settlement, during the
     /// settlement and after the settlement respectively.
@@ -152,7 +153,7 @@ contract GPv2Settlement {
         bytes calldata encodedTrades,
         bytes[3] calldata encodedInteractions,
         bytes calldata encodedOrderRefunds
-    ) external onlySolver {
+    ) external nonReentrant onlySolver {
         executeInteractions(encodedInteractions[0]);
 
         GPv2TradeExecution.Data[] memory executedTrades =
@@ -182,26 +183,28 @@ contract GPv2Settlement {
         emit OrderInvalidated(owner, orderUid);
     }
 
-    /// @dev Process all trades for EOA orders one at a time returning the
-    /// computed net in and out transfers for the trades.
+    /// @dev Process all trades one at a time returning the computed net in and
+    /// out transfers for the trades.
     ///
     /// This method reverts if processing of any single trade fails. See
     /// [`computeTradeExecution`] for more details.
     /// @param tokens An array of ERC20 tokens to be traded in the settlement.
     /// @param clearingPrices An array of token clearing prices.
-    /// @param encodedTrades Encoded trades for signed EOA orders.
+    /// @param encodedTrades Encoded trades for signed orders.
     /// @return executedTrades Array of executed trades.
     function computeTradeExecutions(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
         bytes calldata encodedTrades
     ) internal returns (GPv2TradeExecution.Data[] memory executedTrades) {
-        uint256 tradeCount = encodedTrades.tradeCount();
+        (uint256 tradeCount, bytes calldata remainingEncodedTrades) =
+            encodedTrades.decodeTradeCount();
         executedTrades = new GPv2TradeExecution.Data[](tradeCount);
 
         GPv2Encoding.Trade memory trade;
-        for (uint256 i = 0; i < tradeCount; i++) {
-            encodedTrades.tradeAtIndex(i).decodeTrade(
+        uint256 i = 0;
+        while (remainingEncodedTrades.length != 0) {
+            remainingEncodedTrades = remainingEncodedTrades.decodeTrade(
                 domainSeparator,
                 tokens,
                 trade
@@ -212,11 +215,14 @@ contract GPv2Settlement {
                 clearingPrices[trade.buyTokenIndex],
                 executedTrades[i]
             );
+            i++;
         }
+
+        require(i == tradeCount, "GPv2: invalid trade encoding");
     }
 
-    /// @dev Compute the in and out transfer amounts for a single EOA order
-    /// trade. This function reverts if:
+    /// @dev Compute the in and out transfer amounts for a single trade.
+    /// This function reverts if:
     /// - The order has expired
     /// - The order's limit price is not respected.
     ///

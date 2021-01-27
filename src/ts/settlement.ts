@@ -6,10 +6,14 @@ import {
   Order,
   OrderFlags,
   OrderKind,
-  SigningScheme,
-  signOrder,
   timestamp,
 } from "./order";
+import {
+  assertValidSignatureLength,
+  Signature,
+  SigningScheme,
+  signOrder,
+} from "./sign";
 import { TypedDataDomain } from "./types/ethers";
 
 /**
@@ -39,6 +43,16 @@ export enum InteractionStage {
    * The interaction will be executed after all trading has completed.
    */
   POST = 2,
+}
+
+/**
+ * Gnosis Protocol v2 trade flags.
+ */
+export interface TradeFlags extends OrderFlags {
+  /**
+   * The signing scheme used to encode the signature.
+   */
+  signingScheme: SigningScheme;
 }
 
 /**
@@ -91,6 +105,25 @@ export type EncodedSettlement = [
  */
 export const FULL_FEE_DISCOUNT = 10000;
 
+/**
+ * Maximum number of trades that can be included in a single call to the settle
+ * function.
+ */
+export const MAX_TRADES_IN_SETTLEMENT = 2 ** 16 - 1;
+
+function encodeSigningScheme(scheme: SigningScheme): number {
+  switch (scheme) {
+    case SigningScheme.EIP712:
+      return 0b00000000;
+    case SigningScheme.ETHSIGN:
+      return 0b01000000;
+    case SigningScheme.EIP1271:
+      return 0b10000000;
+    default:
+      throw new Error("Unsupported signing scheme");
+  }
+}
+
 function encodeOrderFlags(flags: OrderFlags): number {
   let kind;
   switch (flags.kind) {
@@ -108,6 +141,25 @@ function encodeOrderFlags(flags: OrderFlags): number {
   return kind | partiallyFillable;
 }
 
+function encodeTradeFlags(flags: TradeFlags): number {
+  return encodeOrderFlags(flags) | encodeSigningScheme(flags.signingScheme);
+}
+
+function encodeEip1271Signature(
+  signer: string,
+  eip1271Signature: BytesLike,
+): Signature {
+  const length = ethers.utils.hexDataLength(eip1271Signature);
+  const data = ethers.utils.solidityPack(
+    ["address", "uint16", "bytes"],
+    [signer, length, eip1271Signature],
+  );
+  return {
+    scheme: SigningScheme.EIP1271,
+    data,
+  };
+}
+
 /**
  * A class for building calldata for a settlement.
  *
@@ -119,6 +171,7 @@ export class SettlementEncoder {
   private readonly _tokens: string[] = [];
   private readonly _tokenMap: Record<string, number | undefined> = {};
   private _encodedTrades = "0x";
+  private _tradeCount = 0;
   private _encodedInteractions = {
     [InteractionStage.PRE]: "0x",
     [InteractionStage.INTRA]: "0x",
@@ -152,7 +205,13 @@ export class SettlementEncoder {
    * Gets the encoded trades as a hex-encoded string.
    */
   public get encodedTrades(): string {
-    return this._encodedTrades;
+    if (this._tradeCount > MAX_TRADES_IN_SETTLEMENT) {
+      throw new Error("too many orders to encode in a single settlement");
+    }
+    return ethers.utils.hexConcat([
+      ethers.utils.solidityPack(["uint16"], [this._tradeCount]),
+      this._encodedTrades,
+    ]);
   }
 
   /**
@@ -178,8 +237,7 @@ export class SettlementEncoder {
    * Gets the number of trades currently encoded.
    */
   public get tradeCount(): number {
-    const TRADE_STRIDE = 206;
-    return ethers.utils.hexDataLength(this._encodedTrades) / TRADE_STRIDE;
+    return this._tradeCount;
   }
 
   /**
@@ -194,6 +252,7 @@ export class SettlementEncoder {
   /**
    * Returns a clearing price vector for the current settlement tokens from the
    * provided price map.
+   *
    * @param prices The price map from token address to price.
    * @return The price vector.
    */
@@ -213,26 +272,32 @@ export class SettlementEncoder {
    *
    * Additionally, if the order references new tokens that the encoder has not
    * yet seen, they are added to the tokens array.
+   *
    * @param order The order of the trade to encode.
    * @param signature The signature for the order data.
-   * @param scheme The signing scheme to used to generate the specified
-   * signature. See {@link SigningScheme} for more details.
    * @param tradeExecution The execution details for the trade.
    */
   public encodeTrade(
     order: Order,
-    signature: BytesLike,
+    signature: Signature,
     tradeExecution?: Partial<TradeExecution>,
   ): void {
+    if (this._tradeCount >= MAX_TRADES_IN_SETTLEMENT) {
+      throw new Error("too many orders for a single settlement");
+    }
+    this._tradeCount++;
+
     const { executedAmount, feeDiscount } = tradeExecution || {};
     if (order.partiallyFillable && executedAmount === undefined) {
       throw new Error("missing executed amount for partially fillable trade");
     }
 
-    const SIGNATURE_LENGTH = 65;
-    if (ethers.utils.hexDataLength(signature) !== SIGNATURE_LENGTH) {
-      throw new Error("invalid signatuare bytes");
-    }
+    assertValidSignatureLength(signature);
+
+    const tradeFlags = {
+      ...order,
+      signingScheme: signature.scheme,
+    };
 
     const encodedTrade = ethers.utils.solidityPack(
       [
@@ -256,10 +321,10 @@ export class SettlementEncoder {
         timestamp(order.validTo),
         order.appData,
         order.feeAmount,
-        encodeOrderFlags(order),
+        encodeTradeFlags(tradeFlags),
         executedAmount || 0,
         feeDiscount || 0,
-        signature,
+        signature.data,
       ],
     );
 
@@ -270,9 +335,30 @@ export class SettlementEncoder {
   }
 
   /**
+   * Encodes a trade from a smart contract given a valid EIP-1271 signature.
+   *
+   * Additionally, if the order references new tokens that the encoder has not
+   * yet seen, they are added to the tokens array.
+   *
+   * @param order The order of the trade to encode.
+   * @param signature The signature for the order data.
+   * @param tradeExecution The execution details for the trade.
+   */
+  public encodeContractTrade(
+    order: Order,
+    owner: string,
+    eip1271Signature: BytesLike,
+    tradeExecution?: Partial<TradeExecution>,
+  ): void {
+    const signature = encodeEip1271Signature(owner, eip1271Signature);
+    this.encodeTrade(order, signature, tradeExecution);
+  }
+
+  /**
    * Signs an order and encodes a trade with that order.
+   *
    * @param order The order to sign for the trade.
-   * @param owner The owner for the order used to sign.
+   * @param owner The externally owned account that should sign the order.
    * @param scheme The signing scheme to use. See {@link SigningScheme} for more
    * details.
    * @param tradeExecution The execution details for the trade.

@@ -77,7 +77,7 @@ describe("E2E: Buy Ether", () => {
         appData: 1,
       },
       traders[0],
-      SigningScheme.TYPED_DATA,
+      SigningScheme.EIP712,
     );
 
     await usdt.mint(traders[1].address, ethers.utils.parseUnits("1201.2", 6));
@@ -97,7 +97,7 @@ describe("E2E: Buy Ether", () => {
         appData: 2,
       },
       traders[1],
-      SigningScheme.TYPED_DATA,
+      SigningScheme.EIP712,
     );
 
     encoder.encodeInteraction({

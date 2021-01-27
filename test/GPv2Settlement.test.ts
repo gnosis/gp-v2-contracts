@@ -160,6 +160,34 @@ describe("GPv2Settlement", () => {
       );
     });
 
+    it("rejects reentrancy attempts via interactions", async () => {
+      await authenticator.connect(owner).addSolver(solver.address);
+      const encoder = new SettlementEncoder(testDomain);
+      encoder.encodeInteraction({
+        target: settlement.address,
+        callData: settlement.interface.encodeFunctionData("settle", empty),
+      });
+
+      await expect(
+        settlement.connect(solver).settle(...encoder.encodedSettlement({})),
+      ).to.be.revertedWith("ReentrancyGuard: reentrant call");
+    });
+
+    it("rejects reentrancy attempt even if settlement contract is registered solver", async () => {
+      await authenticator.connect(owner).addSolver(solver.address);
+      // Add settlement contract address as registered solver
+      await authenticator.connect(owner).addSolver(settlement.address);
+      const encoder = new SettlementEncoder(testDomain);
+      encoder.encodeInteraction({
+        target: settlement.address,
+        callData: settlement.interface.encodeFunctionData("settle", empty),
+      });
+
+      await expect(
+        settlement.connect(solver).settle(...encoder.encodedSettlement({})),
+      ).to.be.revertedWith("ReentrancyGuard: reentrant call");
+    });
+
     it("accepts transactions from solvers", async () => {
       await authenticator.connect(owner).addSolver(solver.address);
       await expect(settlement.connect(solver).settle(...empty)).to.not.be
@@ -330,7 +358,7 @@ describe("GPv2Settlement", () => {
             partiallyFillable: true,
           },
           traders[0],
-          SigningScheme.TYPED_DATA,
+          SigningScheme.EIP712,
           { executedAmount: ethers.utils.parseEther("0.7734") },
         );
       }
@@ -345,6 +373,68 @@ describe("GPv2Settlement", () => {
       expect(trades.length).to.equal(tradeCount);
     });
 
+    describe("Bad Trade Encoding", () => {
+      it("should revert if encoded length is larger than number of encoded trades", async () => {
+        const tradeCount = 10;
+        const encoder = new SettlementEncoder(testDomain);
+        for (let i = 0; i < tradeCount; i++) {
+          await encoder.signEncodeTrade(
+            {
+              ...partialOrder,
+              kind: OrderKind.BUY,
+              partiallyFillable: true,
+            },
+            traders[0],
+            SigningScheme.EIP712,
+            { executedAmount: ethers.utils.parseEther("0.7734") },
+          );
+        }
+
+        const encodedBytes = ethers.utils.arrayify(encoder.encodedTrades);
+        expect(encodedBytes.slice(0, 2)).to.deep.equal(
+          Uint8Array.from([0, tradeCount]),
+        );
+        encodedBytes[1] = tradeCount + 1;
+        await expect(
+          settlement.computeTradeExecutionsTest(
+            encoder.tokens,
+            encoder.clearingPrices(prices),
+            ethers.utils.hexlify(encodedBytes),
+          ),
+        ).to.be.revertedWith("GPv2: invalid trade encoding");
+      });
+
+      it("should revert if encoded length is smaller than number of encoded trades", async () => {
+        const tradeCount = 10;
+        const encoder = new SettlementEncoder(testDomain);
+        for (let i = 0; i < tradeCount; i++) {
+          await encoder.signEncodeTrade(
+            {
+              ...partialOrder,
+              kind: OrderKind.BUY,
+              partiallyFillable: true,
+            },
+            traders[0],
+            SigningScheme.EIP712,
+            { executedAmount: ethers.utils.parseEther("0.7734") },
+          );
+        }
+
+        const encodedBytes = ethers.utils.arrayify(encoder.encodedTrades);
+        expect(encodedBytes.slice(0, 2)).to.deep.equal(
+          Uint8Array.from([0, tradeCount]),
+        );
+        encodedBytes[1] = tradeCount - 1;
+        await expect(
+          settlement.computeTradeExecutionsTest(
+            encoder.tokens,
+            encoder.clearingPrices(prices),
+            ethers.utils.hexlify(encodedBytes),
+          ),
+        ).to.be.reverted;
+      });
+    });
+
     it("should revert if the order expired", async () => {
       const { timestamp } = await ethers.provider.getBlock("latest");
       const encoder = new SettlementEncoder(testDomain);
@@ -356,7 +446,7 @@ describe("GPv2Settlement", () => {
           partiallyFillable: false,
         },
         traders[0],
-        SigningScheme.TYPED_DATA,
+        SigningScheme.EIP712,
       );
 
       await expect(
@@ -384,7 +474,7 @@ describe("GPv2Settlement", () => {
           partiallyFillable: false,
         },
         traders[0],
-        SigningScheme.TYPED_DATA,
+        SigningScheme.EIP712,
       );
 
       expect(toNumberLossy(sellAmount.mul(sellPrice))).not.to.be.gte(
@@ -411,7 +501,7 @@ describe("GPv2Settlement", () => {
           partiallyFillable: false,
         },
         traders[0],
-        SigningScheme.TYPED_DATA,
+        SigningScheme.EIP712,
       );
 
       const { sellAmount, buyAmount } = partialOrder;
@@ -446,7 +536,7 @@ describe("GPv2Settlement", () => {
             partiallyFillable,
           },
           traders[0],
-          SigningScheme.TYPED_DATA,
+          SigningScheme.EIP712,
           { executedAmount },
         );
 
@@ -604,7 +694,7 @@ describe("GPv2Settlement", () => {
             partiallyFillable,
           },
           traders[0],
-          SigningScheme.TYPED_DATA,
+          SigningScheme.EIP712,
           tradeExecution,
         );
 
@@ -702,7 +792,7 @@ describe("GPv2Settlement", () => {
         await encoder.signEncodeTrade(
           order,
           traders[0],
-          SigningScheme.TYPED_DATA,
+          SigningScheme.EIP712,
           tradeExecution,
         );
 
@@ -772,12 +862,12 @@ describe("GPv2Settlement", () => {
       await encoder.signEncodeTrade(
         { ...order, appData: 0 },
         traders[0],
-        SigningScheme.TYPED_DATA,
+        SigningScheme.EIP712,
       );
       await encoder.signEncodeTrade(
         { ...order, appData: 1 },
         traders[0],
-        SigningScheme.TYPED_DATA,
+        SigningScheme.EIP712,
         { executedAmount: ethers.utils.parseEther("1.0") },
       );
 
@@ -801,7 +891,7 @@ describe("GPv2Settlement", () => {
           partiallyFillable: false,
         },
         traders[0],
-        SigningScheme.TYPED_DATA,
+        SigningScheme.EIP712,
         { feeDiscount: FULL_FEE_DISCOUNT + 1 },
       );
 
@@ -822,11 +912,7 @@ describe("GPv2Settlement", () => {
       };
 
       const encoder = new SettlementEncoder(testDomain);
-      await encoder.signEncodeTrade(
-        order,
-        traders[0],
-        SigningScheme.TYPED_DATA,
-      );
+      await encoder.signEncodeTrade(order, traders[0], SigningScheme.EIP712);
 
       const executedSellAmount = order.sellAmount.add(order.feeAmount);
       const executedBuyAmount = order.sellAmount
