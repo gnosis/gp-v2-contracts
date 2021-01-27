@@ -48,7 +48,7 @@ library GPv2TradeExecution {
     /// receiver from the caller's address.
     function transferBuyAmountToOwner(Data memory trade) internal {
         address receiver = trade.receiver;
-        if (trade.receiver == RECEIVER_SAME_AS_OWNER) {
+        if (receiver == RECEIVER_SAME_AS_OWNER) {
             receiver = trade.owner;
         }
 
