@@ -31,9 +31,6 @@ contract GPv2Settlement is ReentrancyGuard {
     /// @dev The EIP-712 domain version used for computing the domain separator.
     bytes32 private constant DOMAIN_VERSION = keccak256("v2");
 
-    /// @dev The number of basis points to make up 100%.
-    uint256 private constant BPS_BASE = 10000;
-
     /// @dev The domain separator used for signing orders that gets mixed in
     /// making signatures for different domains incompatible. This domain
     /// separator is computed following the EIP-712 standard and has replay
@@ -321,10 +318,11 @@ contract GPv2Settlement is ReentrancyGuard {
             );
         }
 
-        require(trade.feeDiscount <= BPS_BASE, "GPv2: fee discount too large");
-        executedFeeAmount =
-            executedFeeAmount.mul(BPS_BASE - trade.feeDiscount) /
-            BPS_BASE;
+        require(
+            trade.feeDiscount <= executedFeeAmount,
+            "GPv2: fee discount too large"
+        );
+        executedFeeAmount = executedFeeAmount - trade.feeDiscount;
 
         executedTrade.sellAmount = executedSellAmount.add(executedFeeAmount);
         executedTrade.buyAmount = executedBuyAmount;

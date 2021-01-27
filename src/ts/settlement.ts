@@ -6,7 +6,7 @@ import {
   Order,
   OrderFlags,
   OrderKind,
-  timestamp,
+  normalizeOrder,
 } from "./order";
 import {
   assertValidSignatureLength,
@@ -70,13 +70,12 @@ export interface TradeExecution {
    */
   executedAmount: BigNumberish;
   /**
-   * Optional fee discount to use in basis points (1/100th of 1%).
+   * Optional fee discount to use.
    *
    * If this value is `0`, then there is no discount and the full fee will be
-   * taken for the order. A value of `10000` is used to indicate a full
-   * discount, meaning no fees will be taken.
+   * taken for the order.
    */
-  feeDiscount: number;
+  feeDiscount: BigNumberish;
 }
 
 /**
@@ -99,11 +98,6 @@ export type EncodedSettlement = [
   /** Encoded order refunds. */
   BytesLike,
 ];
-
-/**
- * Fee discount value used to indicate that all fees should be waived.
- */
-export const FULL_FEE_DISCOUNT = 10000;
 
 /**
  * Maximum number of trades that can be included in a single call to the settle
@@ -301,7 +295,7 @@ export class SettlementEncoder {
       ...order,
       signingScheme: signature.scheme,
     };
-
+    const { receiver, validTo, appData } = normalizeOrder(order);
     const encodedTrade = ethers.utils.solidityPack(
       [
         "uint8",
@@ -310,21 +304,21 @@ export class SettlementEncoder {
         "uint256",
         "uint256",
         "uint32",
-        "uint32",
+        "bytes32",
         "uint256",
         "uint8",
         "uint256",
-        "uint16",
+        "uint256",
         "bytes",
       ],
       [
         this.tokenIndex(order.sellToken),
         this.tokenIndex(order.buyToken),
-        order.receiver ?? ethers.constants.AddressZero,
+        receiver,
         order.sellAmount,
         order.buyAmount,
-        timestamp(order.validTo),
-        order.appData,
+        validTo,
+        appData,
         order.feeAmount,
         encodeTradeFlags(tradeFlags),
         executedAmount || 0,

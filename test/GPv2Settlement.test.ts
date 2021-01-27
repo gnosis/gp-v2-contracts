@@ -4,7 +4,6 @@ import { BigNumber, Contract, ContractReceipt, Event } from "ethers";
 import { artifacts, ethers, waffle } from "hardhat";
 
 import {
-  FULL_FEE_DISCOUNT,
   Interaction,
   InteractionStage,
   OrderFlags,
@@ -762,17 +761,17 @@ describe("GPv2Settlement", () => {
       });
 
       it("should apply the fee discount to the executed fees", async () => {
+        const feeDiscount = feeAmount.div(100); // 1% discount.
         const trade = await computeExecutedTradeForOrderVariant(
           {
             kind: OrderKind.SELL,
             partiallyFillable: false,
           },
-          { feeDiscount: 100 }, // 1% discount.
+          { feeDiscount },
         );
 
-        const executedFeeAmount = feeAmount.mul(99).div(100);
         expect(trade.sellAmount).to.deep.equal(
-          sellAmount.add(executedFeeAmount),
+          sellAmount.add(feeAmount.sub(feeDiscount)),
         );
       });
     });
@@ -883,16 +882,19 @@ describe("GPv2Settlement", () => {
     });
 
     it("should revert on invalid fee discount values", async () => {
+      const feeAmount = ethers.utils.parseEther("1.0");
+
       const encoder = new SettlementEncoder(testDomain);
       await encoder.signEncodeTrade(
         {
           ...partialOrder,
           kind: OrderKind.BUY,
           partiallyFillable: false,
+          feeAmount,
         },
         traders[0],
         SigningScheme.EIP712,
-        { feeDiscount: FULL_FEE_DISCOUNT + 1 },
+        { feeDiscount: feeAmount.add(1) },
       );
 
       await expect(

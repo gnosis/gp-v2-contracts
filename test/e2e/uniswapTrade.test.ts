@@ -123,7 +123,7 @@ describe("E2E: Should Trade Surplus With Uniswap", () => {
       SigningScheme.EIP712,
       // NOTE: Only take 50% of fees as the user traded half of their order
       // against Uniswap.
-      { feeDiscount: 5000 },
+      { feeDiscount: ethers.utils.parseEther("0.0005") },
     );
 
     await usdt.mint(traders[1].address, ethers.utils.parseUnits("300.3", 6));

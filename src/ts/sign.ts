@@ -1,6 +1,6 @@
 import { BytesLike, ethers, Signer } from "ethers";
 
-import { hashOrder, Order, ORDER_TYPE_FIELDS, timestamp } from "./order";
+import { ORDER_TYPE_FIELDS, Order, hashOrder, normalizeOrder } from "./order";
 import { isTypedDataSigner, TypedDataDomain } from "./types/ethers";
 
 /**
@@ -67,11 +67,7 @@ function ecdsaSignOrder(
       return owner._signTypedData(
         domain,
         { Order: ORDER_TYPE_FIELDS },
-        {
-          ...order,
-          receiver: order.receiver ?? ethers.constants.AddressZero,
-          validTo: timestamp(order.validTo),
-        },
+        normalizeOrder(order),
       );
 
     case SigningScheme.ETHSIGN:

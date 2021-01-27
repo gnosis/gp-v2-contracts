@@ -21,7 +21,7 @@ export type AbiTrade = [
   number,
   number,
   BigNumber,
-  number,
+  BigNumber,
   string,
   string,
 ];
@@ -31,7 +31,7 @@ export interface Trade {
   sellTokenIndex: number;
   buyTokenIndex: number;
   executedAmount: BigNumber;
-  feeDiscount: number;
+  feeDiscount: BigNumber;
   owner: string;
   orderUid: string;
 }
