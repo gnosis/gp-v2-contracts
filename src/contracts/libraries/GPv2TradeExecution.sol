@@ -12,6 +12,7 @@ library GPv2TradeExecution {
     /// @dev Executed trade data.
     struct Data {
         address owner;
+        address receiver;
         IERC20 sellToken;
         IERC20 buyToken;
         uint256 sellAmount;
@@ -21,6 +22,10 @@ library GPv2TradeExecution {
     /// @dev Ether marker address used to indicate an order is buying Ether.
     address internal constant BUY_ETH_ADDRESS =
         0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+
+    /// @dev Marker address used to indicate that the receiver of the trade
+    /// proceeds should the owner of the order.
+    address internal constant RECEIVER_SAME_AS_OWNER = address(0);
 
     /// @dev Executes the trade's sell amount, transferring it from the trade's
     /// owner to the specified recipient.
@@ -40,12 +45,17 @@ library GPv2TradeExecution {
     }
 
     /// @dev Executes the trade's buy amount, transferring it to the trade's
-    /// owner from the caller's address.
+    /// receiver from the caller's address.
     function transferBuyAmountToOwner(Data memory trade) internal {
+        address receiver = trade.receiver;
+        if (receiver == RECEIVER_SAME_AS_OWNER) {
+            receiver = trade.owner;
+        }
+
         if (address(trade.buyToken) == BUY_ETH_ADDRESS) {
-            payable(trade.owner).transfer(trade.buyAmount);
+            payable(receiver).transfer(trade.buyAmount);
         } else {
-            trade.buyToken.safeTransfer(trade.owner, trade.buyAmount);
+            trade.buyToken.safeTransfer(receiver, trade.buyAmount);
         }
     }
 }

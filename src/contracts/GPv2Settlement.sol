@@ -242,6 +242,7 @@ contract GPv2Settlement is ReentrancyGuard {
         require(order.validTo >= block.timestamp, "GPv2: order expired");
 
         executedTrade.owner = trade.owner;
+        executedTrade.receiver = order.receiver;
         executedTrade.sellToken = order.sellToken;
         executedTrade.buyToken = order.buyToken;
 

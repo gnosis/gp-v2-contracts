@@ -1221,7 +1221,7 @@ describe("GPv2Settlement", () => {
         .withArgs(traders[0].address, amount)
         .returns(true);
       await tokens[1].mock.transfer
-        .withArgs(traders[1].address, amount)
+        .withArgs(traders[2].address, amount)
         .returns(true);
 
       await expect(
@@ -1229,11 +1229,13 @@ describe("GPv2Settlement", () => {
           encodeOutTransfers([
             {
               owner: traders[0].address,
+              receiver: ethers.constants.AddressZero,
               buyToken: tokens[0].address,
               buyAmount: amount,
             },
             {
               owner: traders[1].address,
+              receiver: traders[2].address,
               buyToken: tokens[1].address,
               buyAmount: amount,
             },

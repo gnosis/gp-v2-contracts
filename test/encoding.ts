@@ -68,10 +68,18 @@ export function decodeTrade(trade: AbiTrade): Trade {
   };
 }
 
-export type AbiExecutedTrade = [string, string, string, BigNumber, BigNumber];
+export type AbiExecutedTrade = [
+  string,
+  string,
+  string,
+  string,
+  BigNumber,
+  BigNumber,
+];
 
 export interface ExecutedTrade {
   owner: string;
+  receiver: string;
   sellToken: string;
   buyToken: string;
   sellAmount: BigNumber;
@@ -81,6 +89,7 @@ export interface ExecutedTrade {
 export function encodeExecutedTrade(trade: ExecutedTrade): AbiExecutedTrade {
   return [
     trade.owner,
+    trade.receiver,
     trade.sellToken,
     trade.buyToken,
     trade.sellAmount,
@@ -93,10 +102,11 @@ export function decodeExecutedTrades(
 ): ExecutedTrade[] {
   return trades.map((trade) => ({
     owner: trade[0],
-    sellToken: trade[1],
-    buyToken: trade[2],
-    sellAmount: trade[3],
-    buyAmount: trade[4],
+    receiver: trade[1],
+    sellToken: trade[2],
+    buyToken: trade[3],
+    sellAmount: trade[4],
+    buyAmount: trade[5],
   }));
 }
 
@@ -109,6 +119,7 @@ export function encodeInTransfers(transfers: InTransfer[]): AbiExecutedTrade[] {
   return transfers.map((transfer) =>
     encodeExecutedTrade({
       ...transfer,
+      receiver: ethers.constants.AddressZero,
       buyToken: ethers.constants.AddressZero,
       buyAmount: ethers.constants.Zero,
     }),
@@ -117,7 +128,7 @@ export function encodeInTransfers(transfers: InTransfer[]): AbiExecutedTrade[] {
 
 export type OutTransfer = Pick<
   ExecutedTrade,
-  "owner" | "buyToken" | "buyAmount"
+  "owner" | "receiver" | "buyToken" | "buyAmount"
 >;
 
 export function encodeOutTransfers(
