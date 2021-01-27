@@ -67,7 +67,11 @@ function ecdsaSignOrder(
       return owner._signTypedData(
         domain,
         { Order: ORDER_TYPE_FIELDS },
-        { ...order, validTo: timestamp(order.validTo) },
+        {
+          ...order,
+          receiver: order.receiver ?? ethers.constants.AddressZero,
+          validTo: timestamp(order.validTo),
+        },
       );
 
     case SigningScheme.ETHSIGN:

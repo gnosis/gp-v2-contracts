@@ -118,7 +118,7 @@ describe("E2E: Can settle a 0x trade", () => {
         clearingPrices,
         gpv2OwlSurplus,
         zeroExOwlSurplus,
-      } = await generateSettlementSolution();
+      } = generateSettlementSolution();
 
       await owl.mint(trader.address, ethers.utils.parseEther("140"));
       await owl

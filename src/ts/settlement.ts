@@ -285,11 +285,14 @@ export class SettlementEncoder {
     if (this._tradeCount >= MAX_TRADES_IN_SETTLEMENT) {
       throw new Error("too many orders for a single settlement");
     }
-    this._tradeCount++;
 
     const { executedAmount, feeDiscount } = tradeExecution || {};
     if (order.partiallyFillable && executedAmount === undefined) {
       throw new Error("missing executed amount for partially fillable trade");
+    }
+
+    if (order.receiver === ethers.constants.AddressZero) {
+      throw new Error("receiver cannot be address(0)");
     }
 
     assertValidSignatureLength(signature);
@@ -303,6 +306,7 @@ export class SettlementEncoder {
       [
         "uint8",
         "uint8",
+        "address",
         "uint256",
         "uint256",
         "uint32",
@@ -316,6 +320,7 @@ export class SettlementEncoder {
       [
         this.tokenIndex(order.sellToken),
         this.tokenIndex(order.buyToken),
+        order.receiver ?? ethers.constants.AddressZero,
         order.sellAmount,
         order.buyAmount,
         timestamp(order.validTo),
@@ -332,6 +337,7 @@ export class SettlementEncoder {
       this._encodedTrades,
       encodedTrade,
     ]);
+    this._tradeCount++;
   }
 
   /**

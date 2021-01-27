@@ -14,6 +14,7 @@ library GPv2Encoding {
     struct Order {
         IERC20 sellToken;
         IERC20 buyToken;
+        address receiver;
         uint256 sellAmount;
         uint256 buyAmount;
         uint32 validTo;
@@ -72,6 +73,7 @@ library GPv2Encoding {
     ///     "Order(" +
     ///         "address sellToken," +
     ///         "address buyToken," +
+    ///         "address receiver," +
     ///         "uint256 sellAmount," +
     ///         "uint256 buyAmount," +
     ///         "uint32 validTo," +
@@ -83,10 +85,10 @@ library GPv2Encoding {
     /// )
     /// ```
     bytes32 internal constant ORDER_TYPE_HASH =
-        hex"b2b38b9dcbdeb41f7ad71dea9aed79fb47f7bbc3436576fe994b43d5b16ecdec";
+        hex"906c1132531c772bcf45dc92778a19b6a4ce75b2d6ed52f8547c4af9e5476bae";
 
     /// @dev The length of the fixed-length components in an encoded trade.
-    uint256 private constant CONSTANT_SIZE_TRADE_LENGTH = 141;
+    uint256 private constant CONSTANT_SIZE_TRADE_LENGTH = 161;
 
     /// @dev The byte length of an order unique identifier.
     uint256 private constant ORDER_UID_LENGTH = 56;
@@ -138,6 +140,7 @@ library GPv2Encoding {
     /// struct EncodedTrade {
     ///     uint8 sellTokenIndex;
     ///     uint8 buyTokenIndex;
+    ///     address receiver;
     ///     uint256 sellAmount;
     ///     uint256 buyAmount;
     ///     uint32 validTo;
@@ -224,39 +227,44 @@ library GPv2Encoding {
                     248,
                     calldataload(add(encodedTrade.offset, 1))
                 )
-                // order.sellAmount = uint256(encodedTrade[2:34])
+                // order.receiver = uint256(encodedTrade[2:22])
                 mstore(
                     add(order, 64),
-                    calldataload(add(encodedTrade.offset, 2))
+                    shr(96, calldataload(add(encodedTrade.offset, 2)))
                 )
-                // order.buyAmount = uint256(encodedTrade[34:66])
+                // order.sellAmount = uint256(encodedTrade[22:54])
                 mstore(
                     add(order, 96),
-                    calldataload(add(encodedTrade.offset, 34))
+                    calldataload(add(encodedTrade.offset, 22))
                 )
-                // order.validTo = uint32(encodedTrade[66:70])
-                validTo := shr(224, calldataload(add(encodedTrade.offset, 66)))
-                // order.appData = uint32(encodedTrade[70:74])
+                // order.buyAmount = uint256(encodedTrade[54:86])
                 mstore(
-                    add(order, 160),
-                    shr(224, calldataload(add(encodedTrade.offset, 70)))
+                    add(order, 128),
+                    calldataload(add(encodedTrade.offset, 54))
                 )
-                // order.feeAmount = uint256(encodedTrade[74:106])
+                // validTo = uint32(encodedTrade[86:90])
+                validTo := shr(224, calldataload(add(encodedTrade.offset, 86)))
+                // order.appData = uint32(encodedTrade[90:94])
                 mstore(
                     add(order, 192),
-                    calldataload(add(encodedTrade.offset, 74))
+                    shr(224, calldataload(add(encodedTrade.offset, 90)))
                 )
-                // flags = uint8(encodedTrade[106])
-                flags := shr(248, calldataload(add(encodedTrade.offset, 106)))
-                // trade.executedAmount = uint256(encodedTrade[107:139])
+                // order.feeAmount = uint256(encodedTrade[94:126])
+                mstore(
+                    add(order, 224),
+                    calldataload(add(encodedTrade.offset, 94))
+                )
+                // flags = uint8(encodedTrade[126])
+                flags := shr(248, calldataload(add(encodedTrade.offset, 126)))
+                // trade.executedAmount = uint256(encodedTrade[127:159])
                 mstore(
                     add(trade, 96),
-                    calldataload(add(encodedTrade.offset, 107))
+                    calldataload(add(encodedTrade.offset, 127))
                 )
-                // trade.feeDiscount = uint256(encodedTrade[139:141])
+                // trade.feeDiscount = uint256(encodedTrade[159:161])
                 mstore(
                     add(trade, 128),
-                    shr(240, calldataload(add(encodedTrade.offset, 139)))
+                    shr(240, calldataload(add(encodedTrade.offset, 159)))
                 )
             }
 
@@ -275,7 +283,7 @@ library GPv2Encoding {
 
             // NOTE: Compute the EIP-712 order struct hash in place. The hash is
             // computed from the order type hash concatenated with the ABI
-            // encoded order fields for a total of `10 * sizeof(uint) = 320`
+            // encoded order fields for a total of `11 * sizeof(uint) = 352`
             // bytes. Fortunately, since Solidity memory structs **are not**
             // packed, they are already laid out in memory exactly as is needed
             // to compute the struct hash, just requiring the order type hash to
@@ -286,7 +294,7 @@ library GPv2Encoding {
                 let dataStart := sub(mload(trade), 32)
                 let temp := mload(dataStart)
                 mstore(dataStart, ORDER_TYPE_HASH)
-                orderDigest := keccak256(dataStart, 320)
+                orderDigest := keccak256(dataStart, 352)
                 mstore(dataStart, temp)
             }
         }

@@ -13,6 +13,11 @@ export interface Order {
    */
   buyToken: string;
   /**
+   * An optional address to receive the proceeds of the trade instead of the
+   * owner (i.e. the order signer).
+   */
+  receiver?: string;
+  /**
    * The order sell amount.
    *
    * For fill or kill sell orders, this amount represents the exact sell amount
@@ -93,6 +98,7 @@ export enum OrderKind {
 export const ORDER_TYPE_FIELDS = [
   { name: "sellToken", type: "address" },
   { name: "buyToken", type: "address" },
+  { name: "receiver", type: "address" },
   { name: "sellAmount", type: "uint256" },
   { name: "buyAmount", type: "uint256" },
   { name: "validTo", type: "uint32" },
@@ -129,7 +135,11 @@ export function hashOrder(order: Order): string {
   return ethers.utils._TypedDataEncoder.hashStruct(
     "Order",
     { Order: ORDER_TYPE_FIELDS },
-    { ...order, validTo: timestamp(order.validTo) },
+    {
+      ...order,
+      receiver: order.receiver ?? ethers.constants.AddressZero,
+      validTo: timestamp(order.validTo),
+    },
   );
 }
 
