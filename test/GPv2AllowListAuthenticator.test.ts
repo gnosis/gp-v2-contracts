@@ -16,7 +16,8 @@ describe.only("GPv2AllowListAuthentication", () => {
   });
 
   describe("constructor", () => {
-    it("should set the owner", async () => {
+    it.only("should set the owner", async () => {
+      console.log(authenticator);
       expect(await authenticator.owner()).to.equal(owner.address);
     });
     it("deployer is not the owner", async () => {

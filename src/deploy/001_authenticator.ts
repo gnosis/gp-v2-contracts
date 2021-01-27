@@ -52,7 +52,7 @@ const deployAuthenticator: DeployFunction = async function ({
   const { deploy } = deployments;
 
   const { authenticator } = CONTRACT_NAMES;
-
+  // TODO - use intended owner here somehow, maybe with transferOwnership call at deploy time.
   await deploy(authenticator, {
     from: deployer,
     gasLimit: 2000000,
@@ -60,7 +60,6 @@ const deployAuthenticator: DeployFunction = async function ({
     log: true,
     proxy: true,
   });
-  
 };
 
 export default deployAuthenticator;
