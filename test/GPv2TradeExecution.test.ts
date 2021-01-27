@@ -3,10 +3,12 @@ import { expect } from "chai";
 import { Contract } from "ethers";
 import { ethers, waffle } from "hardhat";
 
-import { BUY_ETH_ADDRESS, RECEIVER_SAME_AS_OWNER } from "../src/ts";
+import { BUY_ETH_ADDRESS } from "../src/ts";
 
 import { NON_STANDARD_ERC20 } from "./ERC20";
 import { encodeExecutedTrade } from "./encoding";
+
+const RECEIVER_SAME_AS_OWNER = ethers.constants.AddressZero;
 
 describe("GPv2TradeExecution", () => {
   const [deployer, recipient, ...traders] = waffle.provider.getWallets();

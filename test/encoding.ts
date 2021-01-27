@@ -1,7 +1,7 @@
 import type { BigNumber } from "ethers";
 import { ethers } from "hardhat";
 
-import { Order, OrderKind, RECEIVER_SAME_AS_OWNER } from "../src/ts";
+import { Order, OrderKind } from "../src/ts";
 
 export type AbiOrder = [
   string,
@@ -119,7 +119,7 @@ export function encodeInTransfers(transfers: InTransfer[]): AbiExecutedTrade[] {
   return transfers.map((transfer) =>
     encodeExecutedTrade({
       ...transfer,
-      receiver: RECEIVER_SAME_AS_OWNER,
+      receiver: ethers.constants.AddressZero,
       buyToken: ethers.constants.AddressZero,
       buyAmount: ethers.constants.Zero,
     }),
