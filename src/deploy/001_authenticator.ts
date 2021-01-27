@@ -58,7 +58,9 @@ const deployAuthenticator: DeployFunction = async function ({
     gasLimit: 2000000,
     deterministicDeployment: SALT,
     log: true,
-    proxy: true,
+    // proxy: {
+    //   owner: owner,
+    // },
   });
 };
 
