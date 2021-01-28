@@ -50,6 +50,11 @@ export enum InteractionStage {
  */
 export interface TradeFlags extends OrderFlags {
   /**
+   * Encodes whether the proceeds of the trade should go to an address different
+   * from the order.
+   */
+  hasReceiver: boolean;
+  /**
    * The signing scheme used to encode the signature.
    */
   signingScheme: SigningScheme;
@@ -122,21 +127,27 @@ function encodeOrderFlags(flags: OrderFlags): number {
   let kind;
   switch (flags.kind) {
     case OrderKind.SELL:
-      kind = 0;
+      kind = 0b00000000;
       break;
     case OrderKind.BUY:
-      kind = 1;
+      kind = 0b00000001;
       break;
     default:
       throw new Error(`invalid error kind '${kind}'`);
   }
-  const partiallyFillable = flags.partiallyFillable ? 0x02 : 0x00;
+  const partiallyFillable = flags.partiallyFillable ? 0b00000010 : 0b00000000;
 
   return kind | partiallyFillable;
 }
 
 function encodeTradeFlags(flags: TradeFlags): number {
-  return encodeOrderFlags(flags) | encodeSigningScheme(flags.signingScheme);
+  const receiver = flags.hasReceiver ? 0b00000100 : 0b00000000;
+
+  return (
+    encodeOrderFlags(flags) |
+    encodeSigningScheme(flags.signingScheme) |
+    receiver
+  );
 }
 
 function encodeEip1271Signature(
@@ -291,40 +302,54 @@ export class SettlementEncoder {
 
     assertValidSignatureLength(signature);
 
+    const hasReceiver = order.receiver !== undefined;
     const tradeFlags = {
       ...order,
       signingScheme: signature.scheme,
+      hasReceiver,
     };
     const { receiver, validTo, appData } = normalizeOrder(order);
+
+    const shortenedAppData = ethers.utils.stripZeros(
+      ethers.utils.arrayify(order.appData),
+    );
+    const shortenedFeeDiscount = ethers.utils.stripZeros(
+      ethers.utils.arrayify(feeDiscount || 0),
+    );
+
     const encodedTrade = ethers.utils.solidityPack(
       [
         "uint8",
         "uint8",
-        "address",
+        "uint8",
+        hasReceiver ? ["address"] : [],
         "uint256",
         "uint256",
         "uint32",
-        "bytes32",
-        "uint256",
         "uint8",
-        "uint256",
-        "uint256",
         "bytes",
-      ],
+        "uint256",
+        order.partiallyFillable ? ["uint256"] : [],
+        "uint8",
+        "bytes",
+        "bytes",
+      ].flat(),
       [
+        encodeTradeFlags(tradeFlags),
         this.tokenIndex(order.sellToken),
         this.tokenIndex(order.buyToken),
-        receiver,
+        hasReceiver ? [order.receiver] : [],
         order.sellAmount,
         order.buyAmount,
         validTo,
-        appData,
+        shortenedAppData.length,
+        ethers.utils.hexlify(shortenedAppData),
         order.feeAmount,
-        encodeTradeFlags(tradeFlags),
-        executedAmount || 0,
-        feeDiscount || 0,
-        signature.data,
-      ],
+        order.partiallyFillable ? [executedAmount] : [],
+        shortenedFeeDiscount.length,
+        ethers.utils.hexlify(shortenedFeeDiscount),
+        ethers.utils.hexlify(signature.data),
+      ].flat(),
     );
 
     this._encodedTrades = ethers.utils.hexConcat([

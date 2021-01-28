@@ -256,7 +256,7 @@ describe("GPv2Encoding", () => {
       // NOTE: `v` must be either `27` or `28`, so just set it to something else
       // to generate an invalid signature.
       const encodedTradeBytes = ethers.utils.arrayify(encoder.encodedTrades);
-      encodedTradeBytes[285] = 42;
+      encodedTradeBytes[191] = 42;
 
       await expect(
         encoding.decodeTradesTest(encoder.tokens, encodedTradeBytes),
@@ -274,7 +274,7 @@ describe("GPv2Encoding", () => {
       // NOTE: `v` must be either `27` or `28`, so just set it to something else
       // to generate an invalid signature.
       const encodedTradeBytes = ethers.utils.arrayify(encoder.encodedTrades);
-      encodedTradeBytes[285] = 42;
+      encodedTradeBytes[191] = 42;
 
       await expect(
         encoding.decodeTradesTest(encoder.tokens, encodedTradeBytes),
@@ -329,6 +329,25 @@ describe("GPv2Encoding", () => {
       expect(tokens.pop()).to.equal(lastToken);
       await expect(encoding.decodeTradesTest(tokens, encoder.encodedTrades)).to
         .be.reverted;
+    });
+
+    it("should revert if appData does not fit a bytes32", async () => {
+      const encoder = new SettlementEncoder(testDomain);
+
+      await encoder.signEncodeTrade(
+        {
+          ...sampleOrder,
+          appData: 2 ** 25 - 1,
+        },
+        traders[0],
+        SigningScheme.ETHSIGN,
+      );
+
+      const encodedTradeBytes = ethers.utils.arrayify(encoder.encodedTrades);
+      encodedTradeBytes[2 + 91] = 42;
+
+      await expect(encoding.decodeTradesTest(encoder.tokens, encodedTradeBytes))
+        .to.be.reverted;
     });
 
     it("should verify EIP-1271 contract signatures by returning owner", async () => {
@@ -455,7 +474,7 @@ describe("GPv2Encoding", () => {
 
       const encodedTrades = ethers.utils.arrayify(encoder.encodedTrades);
 
-      encodedTrades[2 + 154] |= 0b11000000;
+      encodedTrades[2 + 0] |= 0b11000000;
       await expect(
         encoding.decodeTradesTest(encoder.tokens, encodedTrades),
       ).to.be.revertedWith("GPv2: invalid signature scheme");
