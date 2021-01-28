@@ -527,15 +527,19 @@ describe("GPv2Encoding", () => {
 
     describe("uid uniqueness", () => {
       it("invalid EVM transaction encoding does not change order hash", async () => {
-        // When calling a contract with an array as input value, the data is
-        // encoded in multiples of 32 bytes, regardless of type. Computing
-        // GPv2's orderUid requires copying an address from an encoded array to
-        // memory in a 32-byte slot, then hashing the order. If the data were
-        // copied directly from the calldata, then the hashing would include the
-        // extra 12 bytes of padding as presented by the caller, which might not
-        // be zero without changing the address. In particular, the same order
-        // would have two different uid. This test shows that this is not the
-        // case.
+        // The variables for an EVM transaction are encoded in multiples of 32
+        // bytes for all types except `string` and `bytes`. This extra padding
+        // is usually filled with zeroes by the library that creates the
+        // transaction. It can however be manually messed with, still producing
+        // a valid transaction.
+        // Computing GPv2's orderUid requires copying 32-byte-encoded addresses
+        // from calldata to memory (buy and sell tokens), which are then hashed
+        // together with the rest of the order. This copying procedure may keep
+        // the padding bytes as they are in the (manipulated) calldata, since
+        // Solidity does not make any guarantees on the padding bits of a
+        // variable during execution. If these 12 padding bits were not zero
+        // after copying, then the same order would end up with two different
+        // uids. This test shows that this is not the case.
 
         const encoder = new SettlementEncoder(testDomain);
         await encoder.signEncodeTrade(
