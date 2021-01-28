@@ -524,6 +524,70 @@ describe("GPv2Encoding", () => {
       );
       expect(mem.toNumber()).to.equal(0);
     });
+
+    describe("uid uniqueness", () => {
+      it("invalid EVM transaction encoding does not change order hash", async () => {
+        // When calling a contract with an array as input value, the data is
+        // encoded in multiples of 32 bytes, regardless of type. Computing
+        // GPv2's orderUid requires copying an address from an encoded array to
+        // memory in a 32-byte slot, then hashing the order. If the data were
+        // copied directly from the calldata, then the hashing would include the
+        // extra 12 bytes of padding as presented by the caller, which might not
+        // be zero without changing the address. In particular, the same order
+        // would have two different uid. This test shows that this is not the
+        // case.
+
+        const encoder = new SettlementEncoder(testDomain);
+        await encoder.signEncodeTrade(
+          sampleOrder,
+          traders[0],
+          SigningScheme.EIP712,
+        );
+
+        const { trades } = await encoding.decodeTradesTest(
+          encoder.tokens,
+          encoder.encodedTrades,
+        );
+
+        const { orderUid } = decodeTrade(trades[0]);
+        const encodedTransactionData = ethers.utils.arrayify(
+          encoding.interface.encodeFunctionData("decodeTradesTest", [
+            encoder.tokens,
+            encoder.encodedTrades,
+          ]),
+        );
+
+        // calldata encoding:
+        //  -  4 bytes: signature
+        //  - 32 bytes: pointer to first input value
+        //  - 32 bytes: pointer to second input value
+        //  - 32 bytes: first input value, array -> token array length
+        //  - 32 bytes: first token address
+        const encodedNumTokens = BigNumber.from(
+          encodedTransactionData.slice(4 + 2 * 32, 4 + 3 * 32),
+        );
+        expect(encodedNumTokens).to.equal(2);
+        const startTokenWord = 4 + 3 * 32;
+        const encodedFirstToken = encodedTransactionData.slice(
+          startTokenWord,
+          startTokenWord + 32,
+        );
+        expect(encodedFirstToken.slice(0, 12).every((byte) => byte === 0)).to.be
+          .true;
+        expect(ethers.utils.hexlify(encodedFirstToken.slice(-20))).to.equal(
+          encoder.tokens[0],
+        );
+
+        for (let i = startTokenWord; i < startTokenWord + 12; i++) {
+          encodedTransactionData[i] = 42;
+        }
+        const encodedOutput = await ethers.provider.call({
+          data: ethers.utils.hexlify(encodedTransactionData),
+          to: encoding.address,
+        });
+        expect(encodedOutput).to.contain(orderUid.slice(2));
+      });
+    });
   });
 
   describe("decodeInteraction", () => {
