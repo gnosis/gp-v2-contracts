@@ -4,6 +4,7 @@ pragma abicoder v2;
 
 import "../GPv2Settlement.sol";
 import "../libraries/GPv2Encoding.sol";
+import "../libraries/GPv2Interaction.sol";
 import "../libraries/GPv2TradeExecution.sol";
 
 contract GPv2SettlementTestInterface is GPv2Settlement {
@@ -52,16 +53,10 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
         transferOut(trades);
     }
 
-    function executeInteractionsTest(bytes calldata encodedInteractions)
-        external
-    {
-        executeInteractions(encodedInteractions);
-    }
-
-    function executeInteractionTest(GPv2Encoding.Interaction memory interaction)
-        external
-    {
-        executeInteraction(interaction);
+    function executeInteractionsTest(
+        GPv2Interaction.Data[] calldata interactions
+    ) external {
+        executeInteractions(interactions);
     }
 
     function claimOrderRefundsTest(bytes calldata encodedOrderRefunds)

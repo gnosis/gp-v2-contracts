@@ -11,30 +11,48 @@ export interface Interaction {
   /**
    * Call value in wei for the interaction, allowing Ether to be sent.
    */
-  value?: BigNumberish;
+  value: BigNumberish;
   /**
    * Call data used in the interaction with a smart contract.
    */
-  callData?: BytesLike;
+  callData: BytesLike;
 }
 
-export function encodeInteraction(interaction: Interaction): string {
-  const value = BigNumber.from(interaction.value || 0);
-  const callData = interaction.callData || "0x";
+export type InteractionLike = Pick<Interaction, "target"> &
+  Partial<Interaction>;
+
+export function normalizeInteraction(
+  interaction: InteractionLike,
+): Interaction {
+  return {
+    value: 0,
+    callData: "0x",
+    ...interaction,
+  };
+}
+
+export function normalizeInteractions(
+  interactions: InteractionLike[],
+): Interaction[] {
+  return interactions.map(normalizeInteraction);
+}
+
+export function encodeInteraction(interaction: InteractionLike): string {
+  const { target, value, callData } = normalizeInteraction(interaction);
   const callDataLength = ethers.utils.hexDataLength(callData);
 
-  const encodedInteraction = value.isZero()
+  const encodedInteraction = BigNumber.from(value).isZero()
     ? ethers.utils.solidityPack(
         ["address", "bool", "uint24", "bytes"],
-        [interaction.target, false, callDataLength, callData],
+        [target, false, callDataLength, callData],
       )
     : ethers.utils.solidityPack(
         ["address", "bool", "uint24", "uint256", "bytes"],
-        [interaction.target, true, callDataLength, value, callData],
+        [target, true, callDataLength, value, callData],
       );
   return encodedInteraction;
 }
 
-export function packInteractions(interactions: Interaction[]): string {
+export function packInteractions(interactions: InteractionLike[]): string {
   return ethers.utils.hexConcat(interactions.map(encodeInteraction));
 }
