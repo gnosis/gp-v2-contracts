@@ -308,6 +308,7 @@ export class SettlementEncoder {
       signingScheme: signature.scheme,
       hasReceiver,
     };
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { receiver, validTo, appData } = normalizeOrder(order);
 
     const shortenedAppData = ethers.utils.stripZeros(
