@@ -48,7 +48,7 @@ library GPv2Interaction {
         if (callData.length >= 4) {
             // NOTE: Read the first word of the interaction's calldata. The
             // value does not need to be shifted since `bytesN` values are left
-            // aligned, and the valud does not need to be masked since masking
+            // aligned, and the value does not need to be masked since masking
             // occurs when the value is accessed and not stored:
             // <https://docs.soliditylang.org/en/v0.7.6/abi-spec.html#encoding-of-indexed-event-parameters>
             // <https://docs.soliditylang.org/en/v0.7.6/assembly.html#access-to-external-variables-functions-and-libraries>
