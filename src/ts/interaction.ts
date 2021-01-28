@@ -1,4 +1,4 @@
-import { BigNumber, BigNumberish, BytesLike, ethers } from "ethers";
+import type { BigNumberish, BytesLike } from "ethers";
 
 /**
  * Gnosis Protocol v2 interaction data.
@@ -48,24 +48,4 @@ export function normalizeInteractions(
   interactions: InteractionLike[],
 ): Interaction[] {
   return interactions.map(normalizeInteraction);
-}
-
-export function encodeInteraction(interaction: InteractionLike): string {
-  const { target, value, callData } = normalizeInteraction(interaction);
-  const callDataLength = ethers.utils.hexDataLength(callData);
-
-  const encodedInteraction = BigNumber.from(value).isZero()
-    ? ethers.utils.solidityPack(
-        ["address", "bool", "uint24", "bytes"],
-        [target, false, callDataLength, callData],
-      )
-    : ethers.utils.solidityPack(
-        ["address", "bool", "uint24", "uint256", "bytes"],
-        [target, true, callDataLength, value, callData],
-      );
-  return encodedInteraction;
-}
-
-export function packInteractions(interactions: InteractionLike[]): string {
-  return ethers.utils.hexConcat(interactions.map(encodeInteraction));
 }
