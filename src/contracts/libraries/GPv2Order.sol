@@ -97,6 +97,14 @@ library GPv2Order {
     /// @dev Packs order UID parameters into the specified memory location. The
     /// result is equivalent to `abi.encodePacked(...)` with the difference that
     /// it allows re-using the memory for packing the order UID.
+    ///
+    /// This function reverts if the order UID buffer is not the correct size.
+    ///
+    /// @param orderUid The buffer pack the order UID parameters into.
+    /// @param orderDigest The EIP-712 struct digest derived from the order
+    /// parameters.
+    /// @param owner The address of the user who owns this order.
+    /// @param validTo The epoch time at which the order will stop being valid.
     function packOrderUidParams(
         bytes memory orderUid,
         bytes32 orderDigest,
