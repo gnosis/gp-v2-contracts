@@ -524,6 +524,74 @@ describe("GPv2Encoding", () => {
       );
       expect(mem.toNumber()).to.equal(0);
     });
+
+    describe("uid uniqueness", () => {
+      it("invalid EVM transaction encoding does not change order hash", async () => {
+        // The variables for an EVM transaction are encoded in multiples of 32
+        // bytes for all types except `string` and `bytes`. This extra padding
+        // is usually filled with zeroes by the library that creates the
+        // transaction. It can however be manually messed with, still producing
+        // a valid transaction.
+        // Computing GPv2's orderUid requires copying 32-byte-encoded addresses
+        // from calldata to memory (buy and sell tokens), which are then hashed
+        // together with the rest of the order. This copying procedure may keep
+        // the padding bytes as they are in the (manipulated) calldata, since
+        // Solidity does not make any guarantees on the padding bits of a
+        // variable during execution. If these 12 padding bits were not zero
+        // after copying, then the same order would end up with two different
+        // uids. This test shows that this is not the case.
+
+        const encoder = new SettlementEncoder(testDomain);
+        await encoder.signEncodeTrade(
+          sampleOrder,
+          traders[0],
+          SigningScheme.EIP712,
+        );
+
+        const { trades } = await encoding.decodeTradesTest(
+          encoder.tokens,
+          encoder.encodedTrades,
+        );
+
+        const { orderUid } = decodeTrade(trades[0]);
+        const encodedTransactionData = ethers.utils.arrayify(
+          encoding.interface.encodeFunctionData("decodeTradesTest", [
+            encoder.tokens,
+            encoder.encodedTrades,
+          ]),
+        );
+
+        // calldata encoding:
+        //  -  4 bytes: signature
+        //  - 32 bytes: pointer to first input value
+        //  - 32 bytes: pointer to second input value
+        //  - 32 bytes: first input value, array -> token array length
+        //  - 32 bytes: first token address
+        const encodedNumTokens = BigNumber.from(
+          encodedTransactionData.slice(4 + 2 * 32, 4 + 3 * 32),
+        );
+        expect(encodedNumTokens).to.equal(2);
+        const startTokenWord = 4 + 3 * 32;
+        const encodedFirstToken = encodedTransactionData.slice(
+          startTokenWord,
+          startTokenWord + 32,
+        );
+        expect(encodedFirstToken.slice(0, 12).every((byte) => byte === 0)).to.be
+          .true;
+        expect(ethers.utils.hexlify(encodedFirstToken.slice(-20))).to.equal(
+          encoder.tokens[0],
+        );
+
+        for (let i = startTokenWord; i < startTokenWord + 12; i++) {
+          encodedTransactionData[i] = 42;
+        }
+        const encodedOutput = await ethers.provider.call({
+          data: ethers.utils.hexlify(encodedTransactionData),
+          to: encoding.address,
+        });
+        expect(encodedOutput).to.contain(orderUid.slice(2));
+      });
+    });
   });
 
   describe("decodeInteraction", () => {
