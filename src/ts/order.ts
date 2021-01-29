@@ -143,17 +143,27 @@ export function hashify(h: HashLike): string {
 }
 
 /**
+ * Normalized representation of an [`Order`] for EIP-712 operations.
+ */
+export type NormalizedOrder = Omit<Order, "validTo" | "appData" | "kind"> & {
+  receiver: string;
+  validTo: number;
+  appData: string;
+  kind: string;
+};
+
+/**
  * Normalizes an order for hashing and signing, so that it can be used with
  * Ethers.js for EIP-712 operations.
  * @param hashLike A hash-like value to normalize.
  * @returns A 32-byte hash encoded as a hex-string.
  */
-export function normalizeOrder(order: Order): Record<string, unknown> {
+export function normalizeOrder(order: Order): NormalizedOrder {
   return {
+    receiver: ethers.constants.AddressZero,
     ...order,
-    receiver: order.receiver ?? ethers.constants.AddressZero,
-    appData: hashify(order.appData),
     validTo: timestamp(order.validTo),
+    appData: hashify(order.appData),
   };
 }
 

@@ -2,32 +2,20 @@
 pragma solidity ^0.7.6;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./GPv2Order.sol";
 import "./GPv2Signing.sol";
 
 /// @title Gnosis Protocol v2 Encoding Library.
 /// @author Gnosis Developers
 library GPv2Encoding {
+    using GPv2Order for GPv2Order.Data;
+    using GPv2Order for bytes;
     using GPv2Signing for bytes;
-
-    /// @dev A struct representing an order containing all order parameters that
-    /// are signed by a user for submitting to GP.
-    struct Order {
-        IERC20 sellToken;
-        IERC20 buyToken;
-        address receiver;
-        uint256 sellAmount;
-        uint256 buyAmount;
-        uint32 validTo;
-        bytes32 appData;
-        uint256 feeAmount;
-        bytes32 kind;
-        bool partiallyFillable;
-    }
 
     /// @dev A struct representing a trade to be executed as part a batch
     /// settlement.
     struct Trade {
-        Order order;
+        GPv2Order.Data order;
         uint8 sellTokenIndex;
         uint8 buyTokenIndex;
         uint256 executedAmount;
@@ -36,54 +24,8 @@ library GPv2Encoding {
         bytes orderUid;
     }
 
-    /// @dev The marker value for a sell order for computing the order struct
-    /// hash. This allows the EIP-712 compatible wallets to display a
-    /// descriptive string for the order kind (instead of 0 or 1).
-    ///
-    /// This value is pre-computed from the following expression:
-    /// ```
-    /// keccak256("sell")
-    /// ```
-    bytes32 internal constant ORDER_KIND_SELL =
-        hex"f3b277728b3fee749481eb3e0b3b48980dbbab78658fc419025cb16eee346775";
-
-    /// @dev The OrderKind marker value for a buy order for computing the order
-    /// struct hash.
-    ///
-    /// This value is pre-computed from the following expression:
-    /// ```
-    /// keccak256("buy")
-    /// ```
-    bytes32 internal constant ORDER_KIND_BUY =
-        hex"6ed88e868af0a1983e3886d5f3e95a2fafbd6c3450bc229e27342283dc429ccc";
-
-    /// @dev The order EIP-712 type hash for the [`Order`] struct.
-    ///
-    /// This value is pre-computed from the following expression:
-    /// ```
-    /// keccak256(
-    ///     "Order(" +
-    ///         "address sellToken," +
-    ///         "address buyToken," +
-    ///         "address receiver," +
-    ///         "uint256 sellAmount," +
-    ///         "uint256 buyAmount," +
-    ///         "uint32 validTo," +
-    ///         "bytes32 appData," +
-    ///         "uint256 feeAmount," +
-    ///         "string kind," +
-    ///         "bool partiallyFillable" +
-    ///     ")"
-    /// )
-    /// ```
-    bytes32 internal constant ORDER_TYPE_HASH =
-        hex"d604be04a8c6d2df582ec82eba9b65ce714008acbf9122dd95e499569c8f1a80";
-
     /// @dev The length of the fixed-length components in an encoded trade.
     uint256 private constant CONSTANT_SIZE_TRADE_LENGTH = 219;
-
-    /// @dev The byte length of an order unique identifier.
-    uint256 private constant ORDER_UID_LENGTH = 56;
 
     /// @dev Flag identifying an order signed with EIP-712.
     uint256 private constant EIP712_SIGNATURE_ID = 0x0;
@@ -205,7 +147,7 @@ library GPv2Encoding {
             uint8 sellTokenIndex;
             uint8 buyTokenIndex;
 
-            GPv2Encoding.Order memory order = trade.order;
+            GPv2Order.Data memory order = trade.order;
 
             // NOTE: Use assembly to efficiently decode packed data. Memory
             // structs in Solidity aren't packed, so the `Order` fields are in
@@ -264,31 +206,16 @@ library GPv2Encoding {
             order.buyToken = tokens[buyTokenIndex];
             order.validTo = validTo;
             if (flags & 0x01 == 0) {
-                order.kind = ORDER_KIND_SELL;
+                order.kind = GPv2Order.SELL;
             } else {
-                order.kind = ORDER_KIND_BUY;
+                order.kind = GPv2Order.BUY;
             }
             order.partiallyFillable = flags & 0x02 != 0;
 
             trade.sellTokenIndex = sellTokenIndex;
             trade.buyTokenIndex = buyTokenIndex;
 
-            // NOTE: Compute the EIP-712 order struct hash in place. The hash is
-            // computed from the order type hash concatenated with the ABI
-            // encoded order fields for a total of `11 * sizeof(uint) = 352`
-            // bytes. Fortunately, since Solidity memory structs **are not**
-            // packed, they are already laid out in memory exactly as is needed
-            // to compute the struct hash, just requiring the order type hash to
-            // be temporarily written to the memory slot coming right before the
-            // order data.
-            // solhint-disable-next-line no-inline-assembly
-            assembly {
-                let dataStart := sub(order, 32)
-                let temp := mload(dataStart)
-                mstore(dataStart, ORDER_TYPE_HASH)
-                orderDigest := keccak256(dataStart, 352)
-                mstore(dataStart, temp)
-            }
+            orderDigest = order.hash();
         }
 
         bytes calldata signature;
@@ -329,34 +256,9 @@ library GPv2Encoding {
         trade.owner = owner;
 
         // NOTE: Initialize the memory for the order UID if required.
-        if (trade.orderUid.length != ORDER_UID_LENGTH) {
-            trade.orderUid = new bytes(ORDER_UID_LENGTH);
+        if (trade.orderUid.length != GPv2Order.UID_LENGTH) {
+            trade.orderUid = new bytes(GPv2Order.UID_LENGTH);
         }
-
-        // NOTE: Write the order UID to the allocated memory buffer. The order
-        // parameters are written to memory in **reverse order** as memory
-        // operations write 32-bytes at a time and we want to use a packed
-        // encoding. This means, for example, that after writing the value of
-        // `owner` to bytes `20:52`, writing the `orderDigest` to bytes `0:32`
-        // will **overwrite** bytes `20:32`. This is desirable as addresses are
-        // only 20 bytes and `20:32` should be `0`s:
-        //
-        //        |           1111111111222222222233333333334444444444555555
-        //   byte | 01234567890123456789012345678901234567890123456789012345
-        // -------+---------------------------------------------------------
-        //  field | [.........orderDigest..........][......owner.......][vT]
-        // -------+---------------------------------------------------------
-        // mstore |                         [000000000000000000000000000.vT]
-        //        |                     [00000000000.......owner.......]
-        //        | [.........orderDigest..........]
-        //
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            // orderUid = trade.orderUid.dataOffset
-            let orderUid := add(mload(add(trade, 192)), 32)
-            mstore(add(orderUid, 24), validTo)
-            mstore(add(orderUid, 20), owner)
-            mstore(orderUid, orderDigest)
-        }
+        trade.orderUid.packOrderUidParams(orderDigest, owner, validTo);
     }
 }

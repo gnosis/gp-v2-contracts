@@ -237,7 +237,7 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
         uint256 buyPrice,
         GPv2TradeExecution.Data memory executedTrade
     ) internal {
-        GPv2Encoding.Order memory order = trade.order;
+        GPv2Order.Data memory order = trade.order;
 
         // solhint-disable-next-line not-rely-on-time
         require(order.validTo >= block.timestamp, "GPv2: order expired");
@@ -280,7 +280,7 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
         // instead of consuming all of the remaining transaction gas when
         // dividing by zero, so no extra checks are needed for those operations.
 
-        if (order.kind == GPv2Encoding.ORDER_KIND_SELL) {
+        if (order.kind == GPv2Order.SELL) {
             if (order.partiallyFillable) {
                 executedSellAmount = trade.executedAmount;
                 executedFeeAmount =
