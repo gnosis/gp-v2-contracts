@@ -9,16 +9,16 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import "./GPv2AllowanceManager.sol";
 import "./interfaces/GPv2Authentication.sol";
-import "./libraries/GPv2Encoding.sol";
 import "./libraries/GPv2Interaction.sol";
 import "./libraries/GPv2Order.sol";
+import "./libraries/GPv2Trade.sol";
 import "./libraries/GPv2TradeExecution.sol";
 
 /// @title Gnosis Protocol v2 Settlement Contract
 /// @author Gnosis Developers
 contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
-    using GPv2Encoding for bytes;
     using GPv2Order for bytes;
+    using GPv2Trade for GPv2Trade.Recovered;
     using GPv2TradeExecution for GPv2TradeExecution.Data;
     using SafeMath for uint256;
 
@@ -142,7 +142,7 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
     /// Orders and interactions encode tokens as indices into this array.
     /// @param clearingPrices An array of clearing prices where the `i`-th price
     /// is for the `i`-th token in the [`tokens`] array.
-    /// @param encodedTrades Encoded trades for signed orders.
+    /// @param trades Trades for signed orders.
     /// @param interactions Smart contract interactions split into three
     /// separate lists to be run before the settlement, during the settlement
     /// and after the settlement respectively.
@@ -151,14 +151,14 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
     function settle(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
-        bytes calldata encodedTrades,
+        GPv2Trade.Data[] calldata trades,
         GPv2Interaction.Data[][3] calldata interactions,
         bytes[] calldata orderRefunds
     ) external nonReentrant onlySolver {
         executeInteractions(interactions[0]);
 
         GPv2TradeExecution.Data[] memory executedTrades =
-            computeTradeExecutions(tokens, clearingPrices, encodedTrades);
+            computeTradeExecutions(tokens, clearingPrices, trades);
         allowanceManager.transferIn(executedTrades);
 
         executeInteractions(interactions[1]);
@@ -191,35 +191,27 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
     /// [`computeTradeExecution`] for more details.
     /// @param tokens An array of ERC20 tokens to be traded in the settlement.
     /// @param clearingPrices An array of token clearing prices.
-    /// @param encodedTrades Encoded trades for signed orders.
+    /// @param trades Trades for signed orders.
     /// @return executedTrades Array of executed trades.
     function computeTradeExecutions(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
-        bytes calldata encodedTrades
+        GPv2Trade.Data[] calldata trades
     ) internal returns (GPv2TradeExecution.Data[] memory executedTrades) {
-        (uint256 tradeCount, bytes calldata remainingEncodedTrades) =
-            encodedTrades.decodeTradeCount();
-        executedTrades = new GPv2TradeExecution.Data[](tradeCount);
+        GPv2Trade.Recovered memory trade = GPv2Trade.newRecovered();
 
-        GPv2Encoding.Trade memory trade;
-        uint256 i = 0;
-        while (remainingEncodedTrades.length != 0) {
-            remainingEncodedTrades = remainingEncodedTrades.decodeTrade(
-                domainSeparator,
-                tokens,
-                trade
-            );
+        executedTrades = new GPv2TradeExecution.Data[](trades.length);
+        for (uint256 i = 0; i < trades.length; i++) {
+            GPv2Trade.Data calldata input = trades[i];
+
+            trade.recoverTrade(domainSeparator, tokens, input);
             computeTradeExecution(
                 trade,
-                clearingPrices[trade.sellTokenIndex],
-                clearingPrices[trade.buyTokenIndex],
+                clearingPrices[input.sellTokenIndex],
+                clearingPrices[input.buyTokenIndex],
                 executedTrades[i]
             );
-            i++;
         }
-
-        require(i == tradeCount, "GPv2: invalid trade encoding");
     }
 
     /// @dev Compute the in and out transfer amounts for a single trade.
@@ -232,7 +224,7 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
     /// @param buyPrice The price of the order's buy token.
     /// @param executedTrade Memory location for computed executed trade data.
     function computeTradeExecution(
-        GPv2Encoding.Trade memory trade,
+        GPv2Trade.Recovered memory trade,
         uint256 sellPrice,
         uint256 buyPrice,
         GPv2TradeExecution.Data memory executedTrade

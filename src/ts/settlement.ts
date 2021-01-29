@@ -6,6 +6,7 @@ import {
   normalizeInteraction,
 } from "./interaction";
 import {
+  NormalizedOrder,
   ORDER_UID_LENGTH,
   Order,
   OrderFlags,
@@ -13,9 +14,10 @@ import {
   normalizeOrder,
 } from "./order";
 import {
-  assertValidSignatureLength,
+  EcdsaSigningScheme,
   Signature,
   SigningScheme,
+  encodeEip1271SignatureData,
   signOrder,
 } from "./sign";
 import { TypedDataDomain } from "./types/ethers";
@@ -60,6 +62,32 @@ export interface TradeFlags extends OrderFlags {
 }
 
 /**
+ * Trade parameters used in a settlement.
+ */
+export type Trade = TradeExecution &
+  Omit<
+    NormalizedOrder,
+    "sellToken" | "buyToken" | "kind" | "partiallyFillable"
+  > & {
+    /**
+     * The index of the sell token in the settlement.
+     */
+    sellTokenIndex: number;
+    /**
+     * The index of the buy token in the settlement.
+     */
+    buyTokenIndex: number;
+    /**
+     * Encoded order flags.
+     */
+    flags: number;
+    /**
+     * Signature data.
+     */
+    signature: BytesLike;
+  };
+
+/**
  * Details representing how an order was executed.
  */
 export interface TradeExecution {
@@ -96,7 +124,7 @@ export type EncodedSettlement = [
   /** Clearing prices. */
   BigNumberish[],
   /** Encoded trades. */
-  BytesLike,
+  Trade[],
   /** Encoded interactions. */
   [Interaction[], Interaction[], Interaction[]],
   /** Encoded order refunds. */
@@ -112,11 +140,11 @@ export const MAX_TRADES_IN_SETTLEMENT = 2 ** 16 - 1;
 function encodeSigningScheme(scheme: SigningScheme): number {
   switch (scheme) {
     case SigningScheme.EIP712:
-      return 0b00000000;
+      return 0b0000;
     case SigningScheme.ETHSIGN:
-      return 0b01000000;
+      return 0b0100;
     case SigningScheme.EIP1271:
-      return 0b10000000;
+      return 0b1000;
     default:
       throw new Error("Unsupported signing scheme");
   }
@@ -143,19 +171,16 @@ function encodeTradeFlags(flags: TradeFlags): number {
   return encodeOrderFlags(flags) | encodeSigningScheme(flags.signingScheme);
 }
 
-function encodeEip1271Signature(
-  signer: string,
-  eip1271Signature: BytesLike,
-): Signature {
-  const length = ethers.utils.hexDataLength(eip1271Signature);
-  const data = ethers.utils.solidityPack(
-    ["address", "uint16", "bytes"],
-    [signer, length, eip1271Signature],
-  );
-  return {
-    scheme: SigningScheme.EIP1271,
-    data,
-  };
+function encodeSignatureData(sig: Signature): string {
+  switch (sig.scheme) {
+    case SigningScheme.EIP712:
+    case SigningScheme.ETHSIGN:
+      return ethers.utils.joinSignature(sig.data);
+    case SigningScheme.EIP1271:
+      return encodeEip1271SignatureData(sig.data);
+    default:
+      throw new Error("invalid signing scheme");
+  }
 }
 
 /**
@@ -168,8 +193,7 @@ function encodeEip1271Signature(
 export class SettlementEncoder {
   private readonly _tokens: string[] = [];
   private readonly _tokenMap: Record<string, number | undefined> = {};
-  private _encodedTrades = "0x";
-  private _tradeCount = 0;
+  private _trades: Trade[] = [];
   private _interactions: Record<InteractionStage, Interaction[]> = {
     [InteractionStage.PRE]: [],
     [InteractionStage.INTRA]: [],
@@ -202,14 +226,8 @@ export class SettlementEncoder {
   /**
    * Gets the encoded trades as a hex-encoded string.
    */
-  public get encodedTrades(): string {
-    if (this._tradeCount > MAX_TRADES_IN_SETTLEMENT) {
-      throw new Error("too many orders to encode in a single settlement");
-    }
-    return ethers.utils.hexConcat([
-      ethers.utils.solidityPack(["uint16"], [this._tradeCount]),
-      this._encodedTrades,
-    ]);
+  public get trades(): Trade[] {
+    return this._trades.slice();
   }
 
   /**
@@ -229,13 +247,6 @@ export class SettlementEncoder {
    */
   public get orderRefunds(): string[] {
     return this._orderRefunds.slice();
-  }
-
-  /**
-   * Gets the number of trades currently encoded.
-   */
-  public get tradeCount(): number {
-    return this._tradeCount;
   }
 
   /**
@@ -271,10 +282,6 @@ export class SettlementEncoder {
     signature: Signature,
     tradeExecution?: Partial<TradeExecution>,
   ): void {
-    if (this._tradeCount >= MAX_TRADES_IN_SETTLEMENT) {
-      throw new Error("too many orders for a single settlement");
-    }
-
     const { executedAmount, feeDiscount } = tradeExecution || {};
     if (order.partiallyFillable && executedAmount === undefined) {
       throw new Error("missing executed amount for partially fillable trade");
@@ -284,69 +291,26 @@ export class SettlementEncoder {
       throw new Error("receiver cannot be address(0)");
     }
 
-    assertValidSignatureLength(signature);
-
     const tradeFlags = {
       ...order,
       signingScheme: signature.scheme,
     };
-    const { receiver, validTo, appData } = normalizeOrder(order);
-    const encodedTrade = ethers.utils.solidityPack(
-      [
-        "uint8",
-        "uint8",
-        "address",
-        "uint256",
-        "uint256",
-        "uint32",
-        "bytes32",
-        "uint256",
-        "uint8",
-        "uint256",
-        "uint256",
-        "bytes",
-      ],
-      [
-        this.tokenIndex(order.sellToken),
-        this.tokenIndex(order.buyToken),
-        receiver,
-        order.sellAmount,
-        order.buyAmount,
-        validTo,
-        appData,
-        order.feeAmount,
-        encodeTradeFlags(tradeFlags),
-        executedAmount || 0,
-        feeDiscount || 0,
-        signature.data,
-      ],
-    );
+    const o = normalizeOrder(order);
 
-    this._encodedTrades = ethers.utils.hexConcat([
-      this._encodedTrades,
-      encodedTrade,
-    ]);
-    this._tradeCount++;
-  }
-
-  /**
-   * Encodes a trade from a smart contract given a valid EIP-1271 signature.
-   *
-   * Additionally, if the order references new tokens that the encoder has not
-   * yet seen, they are added to the tokens array.
-   *
-   * @param order The order of the trade to encode.
-   * @param signature The signature for the order data.
-   * @param tradeExecution The execution details for the trade.
-   */
-  public encodeContractTrade(
-    order: Order,
-    owner: string,
-    eip1271Signature: BytesLike,
-    tradeExecution?: Partial<TradeExecution>,
-  ): void {
-    const signature = encodeEip1271Signature(owner, eip1271Signature);
-    this.encodeTrade(order, signature, tradeExecution);
+    this._trades.push({
+      sellTokenIndex: this.tokenIndex(o.sellToken),
+      buyTokenIndex: this.tokenIndex(o.buyToken),
+      receiver: o.receiver,
+      sellAmount: o.sellAmount,
+      buyAmount: o.buyAmount,
+      validTo: o.validTo,
+      appData: o.appData,
+      feeAmount: o.feeAmount,
+      flags: encodeTradeFlags(tradeFlags),
+      executedAmount: executedAmount || 0,
+      feeDiscount: feeDiscount || 0,
+      signature: encodeSignatureData(signature),
+    });
   }
 
   /**
@@ -361,7 +325,7 @@ export class SettlementEncoder {
   public async signEncodeTrade(
     order: Order,
     owner: Signer,
-    scheme: SigningScheme,
+    scheme: EcdsaSigningScheme,
     tradeExecution?: Partial<TradeExecution>,
   ): Promise<void> {
     const signature = await signOrder(this.domain, order, owner, scheme);
@@ -406,7 +370,7 @@ export class SettlementEncoder {
     return [
       this.tokens,
       this.clearingPrices(prices),
-      this.encodedTrades,
+      this.trades,
       this.interactions,
       this.orderRefunds,
     ];

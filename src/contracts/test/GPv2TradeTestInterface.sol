@@ -2,10 +2,11 @@
 pragma solidity ^0.7.6;
 pragma abicoder v2;
 
-import "../libraries/GPv2Encoding.sol";
+import "../libraries/GPv2Order.sol";
+import "../libraries/GPv2Trade.sol";
 
-contract GPv2EncodingTestInterface {
-    using GPv2Encoding for bytes;
+contract GPv2TradeTestInterface {
+    using GPv2Trade for GPv2Trade.Recovered;
 
     bytes32 public constant DOMAIN_SEPARATOR =
         keccak256(
@@ -15,36 +16,23 @@ contract GPv2EncodingTestInterface {
             )
         );
 
-    function tradeCountTest(bytes calldata encodedTrades)
-        external
-        pure
-        returns (uint256 count, bytes calldata encodedTradesWithoutLength)
-    {
-        (count, encodedTradesWithoutLength) = encodedTrades.decodeTradeCount();
-    }
-
-    function decodeTradesTest(
+    function recoverTradeTest(
         IERC20[] calldata tokens,
-        bytes calldata encodedTrades
+        GPv2Trade.Data[] calldata inputTrades
     )
         external
         view
         returns (
-            uint256 tradeCount,
-            GPv2Encoding.Trade[] memory trades,
+            GPv2Trade.Recovered[] memory trades,
             uint256 mem,
             uint256 gas_
         )
     {
         bytes32 domainSeparator = DOMAIN_SEPARATOR;
 
-        bytes calldata remainingEncodedTrades;
-        (tradeCount, remainingEncodedTrades) = encodedTrades.decodeTradeCount();
-
-        trades = new GPv2Encoding.Trade[](tradeCount);
-        uint256 i;
-        for (i = 0; i < tradeCount; i++) {
-            trades[i].orderUid = new bytes(56);
+        trades = new GPv2Trade.Recovered[](inputTrades.length);
+        for (uint256 i = 0; i < trades.length; i++) {
+            trades[i].orderUid = new bytes(GPv2Order.UID_LENGTH);
         }
 
         // NOTE: Solidity keeps a total memory count at address 0x40. Check
@@ -58,14 +46,8 @@ contract GPv2EncodingTestInterface {
         }
         gas_ = gasleft();
 
-        i = 0;
-        while (remainingEncodedTrades.length != 0) {
-            remainingEncodedTrades = remainingEncodedTrades.decodeTrade(
-                domainSeparator,
-                tokens,
-                trades[i]
-            );
-            i++;
+        for (uint256 i = 0; i < trades.length; i++) {
+            trades[i].recoverTrade(domainSeparator, tokens, inputTrades[i]);
         }
 
         // solhint-disable-next-line no-inline-assembly
@@ -73,5 +55,24 @@ contract GPv2EncodingTestInterface {
             mem := sub(mload(0x40), mem)
         }
         gas_ = gas_ - gasleft();
+    }
+
+    function extractOrder(
+        IERC20[] calldata tokens,
+        GPv2Trade.Data calldata trade
+    ) external pure returns (GPv2Order.Data memory order) {
+        GPv2Trade.extractOrder(trade, tokens, order);
+    }
+
+    function extractFlagsTest(uint256 flags)
+        external
+        pure
+        returns (
+            bytes32 kind,
+            bool partiallyFillable,
+            GPv2Signing.Scheme signingScheme
+        )
+    {
+        return GPv2Trade.extractFlags(flags);
     }
 }

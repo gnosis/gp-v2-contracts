@@ -3,8 +3,8 @@ pragma solidity ^0.7.6;
 pragma abicoder v2;
 
 import "../GPv2Settlement.sol";
-import "../libraries/GPv2Encoding.sol";
 import "../libraries/GPv2Interaction.sol";
+import "../libraries/GPv2Trade.sol";
 import "../libraries/GPv2TradeExecution.sol";
 
 contract GPv2SettlementTestInterface is GPv2Settlement {
@@ -18,17 +18,13 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
     function computeTradeExecutionsTest(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
-        bytes calldata encodedTrades
+        GPv2Trade.Data[] calldata trades
     ) external returns (GPv2TradeExecution.Data[] memory executedTrades) {
-        executedTrades = computeTradeExecutions(
-            tokens,
-            clearingPrices,
-            encodedTrades
-        );
+        executedTrades = computeTradeExecutions(tokens, clearingPrices, trades);
     }
 
     function computeTradeExecutionMemoryTest() external returns (uint256 mem) {
-        GPv2Encoding.Trade memory trade;
+        GPv2Trade.Recovered memory trade;
         GPv2TradeExecution.Data memory executedTrade;
 
         // NOTE: Solidity stores the free memory pointer at address 0x40. Read
