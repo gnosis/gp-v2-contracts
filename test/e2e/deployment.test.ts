@@ -73,9 +73,9 @@ describe("E2E: Deployment", () => {
 
   describe("deterministic addresses", () => {
     it("authenticator", async () => {
-      expect(
-        await contractAddress("GPv2AllowListAuthentication", owner.address),
-      ).to.equal(authenticator.address);
+      expect(await contractAddress("GPv2AllowListAuthentication")).to.equal(
+        await implementationAddress(authenticator.address),
+      );
     });
 
     it("settlement", async () => {
