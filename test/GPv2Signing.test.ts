@@ -12,6 +12,7 @@ import {
   domain,
   encodeEip1271SignatureData,
   orderSigningHash,
+  packOrderUidParams,
   signOrder,
 } from "../src/ts";
 
@@ -128,11 +129,7 @@ describe("GPv2Signing", () => {
         encoder.trades[0],
       );
       expect(orderUid).to.equal(
-        computeOrderUid({
-          orderDigest: orderSigningHash(testDomain, sampleOrder),
-          owner: traders[0].address,
-          validTo: sampleOrder.validTo,
-        }),
+        computeOrderUid(testDomain, sampleOrder, traders[0].address),
       );
     });
 
@@ -140,6 +137,13 @@ describe("GPv2Signing", () => {
       const artifact = await artifacts.readArtifact("EIP1271Verifier");
       const verifier = await waffle.deployMockContract(deployer, artifact.abi);
       await verifier.mock.isValidSignature.returns(EIP1271_MAGICVALUE);
+
+      const sampleOrderUid = computeOrderUid(
+        testDomain,
+        sampleOrder,
+        traders[2].address,
+      );
+      await signing.connect(traders[2]).setPreSignature(sampleOrderUid, true);
 
       const encoder = new SettlementEncoder(testDomain);
       await encoder.signEncodeTrade(
@@ -159,13 +163,23 @@ describe("GPv2Signing", () => {
           signature: "0x",
         },
       });
+      encoder.encodeTrade(sampleOrder, {
+        scheme: SigningScheme.PRESIGN,
+        data: sampleOrderUid,
+      });
 
-      const owners = [traders[0].address, traders[1].address, verifier.address];
+      const owners = [
+        traders[0].address,
+        traders[1].address,
+        verifier.address,
+        traders[2].address,
+      ];
 
       for (const [i, trade] of encoder.trades.entries()) {
-        const {
-          recoveredOrder: { owner },
-        } = await signing.recoverOrderFromTradeTest(encoder.tokens, trade);
+        const { owner } = await signing.recoverOrderFromTradeTest(
+          encoder.tokens,
+          trade,
+        );
         expect(owner).to.equal(owners[i]);
       }
     });
@@ -459,6 +473,67 @@ describe("GPv2Signing", () => {
         ),
       ).to.be.reverted;
       expect(await evilVerifier.state()).to.equal(ethers.constants.One);
+    });
+
+    it("should verify pre-signed order", async () => {
+      const orderUid = computeOrderUid(
+        testDomain,
+        sampleOrder,
+        traders[0].address,
+      );
+
+      await signing.connect(traders[0]).setPreSignature(orderUid, true);
+      expect(
+        await signing.recoverOrderSignerTest(
+          encodeOrder(sampleOrder),
+          SigningScheme.PRESIGN,
+          orderUid,
+        ),
+      ).to.equal(traders[0].address);
+    });
+
+    it("should revert if order parameters don't match", async () => {
+      for (const uidParams of [
+        {
+          orderDigest: orderSigningHash(testDomain, sampleOrder),
+          validTo: 0xbaadc0de,
+        },
+        {
+          orderDigest: ethers.constants.HashZero,
+          validTo: sampleOrder.validTo,
+        },
+      ]) {
+        await expect(
+          signing.recoverOrderSignerTest(
+            encodeOrder(sampleOrder),
+            SigningScheme.PRESIGN,
+            packOrderUidParams({
+              ...uidParams,
+              owner: ethers.constants.AddressZero,
+            }),
+          ),
+        ).to.be.revertedWith("invalid presign signature");
+      }
+    });
+
+    it("should revert if order doesn't have pre-signature set", async () => {
+      await expect(
+        signing.recoverOrderSignerTest(
+          encodeOrder(sampleOrder),
+          SigningScheme.PRESIGN,
+          computeOrderUid(testDomain, sampleOrder, traders[0].address),
+        ),
+      ).to.be.revertedWith("order not presigned");
+    });
+
+    it("should revert for malformed pre-sign order UID", async () => {
+      await expect(
+        signing.recoverOrderSignerTest(
+          encodeOrder(sampleOrder),
+          SigningScheme.PRESIGN,
+          "0x",
+        ),
+      ).to.be.revertedWith("invalid uid");
     });
   });
 

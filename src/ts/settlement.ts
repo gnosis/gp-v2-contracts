@@ -11,7 +11,9 @@ import {
   Order,
   OrderFlags,
   OrderKind,
+  extractOrderUidParams,
   normalizeOrder,
+  packOrderUidParams,
 } from "./order";
 import {
   EcdsaSigningScheme,
@@ -151,6 +153,8 @@ export function encodeSigningScheme(scheme: SigningScheme): number {
       return 0b0100;
     case SigningScheme.EIP1271:
       return 0b1000;
+    case SigningScheme.PRESIGN:
+      return 0b1100;
     default:
       throw new Error("Unsupported signing scheme");
   }
@@ -196,8 +200,12 @@ function encodeSignatureData(sig: Signature): string {
       return ethers.utils.joinSignature(sig.data);
     case SigningScheme.EIP1271:
       return encodeEip1271SignatureData(sig.data);
+    case SigningScheme.PRESIGN:
+      return packOrderUidParams(
+        extractOrderUidParams(ethers.utils.hexlify(sig.data)),
+      );
     default:
-      throw new Error("invalid signing scheme");
+      throw new Error("unsupported signing scheme");
   }
 }
 

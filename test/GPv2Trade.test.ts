@@ -137,16 +137,13 @@ describe("GPv2Trade", () => {
         SigningScheme.EIP712,
         SigningScheme.ETHSIGN,
         SigningScheme.EIP1271,
+        SigningScheme.PRESIGN,
       ]) {
         const {
           signingScheme: extractedScheme,
         } = await tradeLib.extractFlagsTest(encodeSigningScheme(scheme));
         expect(extractedScheme).to.deep.equal(scheme);
       }
-    });
-
-    it("should revert when encoding an invalid signing scheme", async () => {
-      await expect(tradeLib.extractFlagsTest(0b1100)).to.be.reverted;
     });
 
     it("should revert when encoding invalid flags", async () => {

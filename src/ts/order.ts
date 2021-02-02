@@ -211,6 +211,21 @@ export interface OrderUidParams {
 }
 
 /**
+ * Computes the order UID for an order and the given owner.
+ */
+export function computeOrderUid(
+  domain: TypedDataDomain,
+  order: Order,
+  owner: string,
+): string {
+  return packOrderUidParams({
+    orderDigest: orderSigningHash(domain, order),
+    owner,
+    validTo: order.validTo,
+  });
+}
+
+/**
  * Compute the unique identifier describing a user order in the settlement
  * contract.
  *
@@ -218,7 +233,7 @@ export interface OrderUidParams {
  * identifier.
  * @returns A string that unequivocally identifies the order of the user.
  */
-export function computeOrderUid({
+export function packOrderUidParams({
   orderDigest,
   owner,
   validTo,
