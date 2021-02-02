@@ -11,9 +11,12 @@ describe("Upgrade Authenticator", () => {
   let solver: Wallet;
 
   beforeEach(async () => {
-    ({ authenticator, deployer, owner } = await deployTestContracts());
-    // Solver isn't a named account
-    solver = waffle.provider.getWallets()[2];
+    ({
+      authenticator,
+      deployer,
+      owner,
+      wallets: [solver],
+    } = await deployTestContracts());
   });
 
   it("should upgrade authenticator", async () => {
