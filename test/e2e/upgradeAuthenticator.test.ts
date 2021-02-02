@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { Contract, Wallet } from "ethers";
-import { deployments, ethers, waffle } from "hardhat";
+import { deployments, ethers } from "hardhat";
 
 import { deployTestContracts } from "./fixture";
 
@@ -11,9 +11,12 @@ describe("Upgrade Authenticator", () => {
   let solver: Wallet;
 
   beforeEach(async () => {
-    ({ authenticator, deployer, owner } = await deployTestContracts());
-    // Solver isn't a named account
-    solver = waffle.provider.getWallets()[2];
+    ({
+      authenticator,
+      deployer,
+      owner,
+      wallets: [solver],
+    } = await deployTestContracts());
   });
 
   it("should upgrade authenticator", async () => {
