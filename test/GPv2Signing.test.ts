@@ -116,6 +116,41 @@ describe("GPv2Signing", () => {
         }),
       );
     });
+
+    it("should recover the owner for all signing schemes", async () => {
+      const artifact = await artifacts.readArtifact("EIP1271Verifier");
+      const verifier = await waffle.deployMockContract(deployer, artifact.abi);
+      await verifier.mock.isValidSignature.returns(EIP1271_MAGICVALUE);
+
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
+        sampleOrder,
+        traders[0],
+        SigningScheme.EIP712,
+      );
+      await encoder.signEncodeTrade(
+        sampleOrder,
+        traders[1],
+        SigningScheme.ETHSIGN,
+      );
+      encoder.encodeTrade(sampleOrder, {
+        scheme: SigningScheme.EIP1271,
+        data: {
+          verifier: verifier.address,
+          signature: "0x",
+        },
+      });
+
+      const owners = [traders[0].address, traders[1].address, verifier.address];
+
+      for (const [i, trade] of encoder.trades.entries()) {
+        const { owner } = await signing.recoverOrderFromTradeTest(
+          encoder.tokens,
+          trade,
+        );
+        expect(owner).to.equal(owners[i]);
+      }
+    });
   });
 
   describe("recoverOrderSigner", () => {
