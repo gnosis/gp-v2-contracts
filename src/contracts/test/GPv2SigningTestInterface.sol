@@ -22,7 +22,7 @@ contract GPv2SigningTestInterface {
         IERC20[] calldata tokens,
         GPv2Trade.Data calldata trade
     ) external view returns (GPv2Signing.RecoveredOrder memory recoveredOrder) {
-        recoveredOrder.uid = new bytes(GPv2Order.UID_LENGTH);
+        recoveredOrder = GPv2Signing.allocateRecoveredOrder();
         recoveredOrder.recoverOrderFromTrade(DOMAIN_SEPARATOR, tokens, trade);
     }
 
