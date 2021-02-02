@@ -100,7 +100,7 @@ library GPv2Trade {
         // NOTE: Take advantage of the fact that Solidity will revert if the
         // following expression does not produce a valid enum value. This means
         // we simultaneously check here that the leading reserved bits must be
-        // 0 and that the resrved `0b11` scheme value is not used.
+        // 0 and that the reserved `0b11` scheme value is not used.
         signingScheme = GPv2Signing.Scheme(flags >> 2);
     }
 }
