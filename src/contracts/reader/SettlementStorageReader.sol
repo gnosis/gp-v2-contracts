@@ -5,7 +5,7 @@ pragma abicoder v2;
 /// @title Gnosis Protocol v2 Settlement Storage Reader
 /// @author Gnosis Developers
 contract SettlementStorageReader {
-    // Note that Storage Reader must have the same storage layout as the contract it reads.
+    // Storage Reader must have the same storage layout as the contract it reads.
     // This sneaky storage member is inherited through ReentrancyGuard
     uint256 private _status;
 
