@@ -111,12 +111,12 @@ describe("E2E: Expired Order Gas Refunds", () => {
 
       const orderUids = [
         computeOrderUid({
-          orderDigest: hashOrder(sellOrder),
+          orderDigest: hashOrder(domainSeparator, sellOrder),
           owner: traders[0].address,
           validTo,
         }),
         computeOrderUid({
-          orderDigest: hashOrder(buyOrder),
+          orderDigest: hashOrder(domainSeparator, buyOrder),
           owner: traders[1].address,
           validTo,
         }),

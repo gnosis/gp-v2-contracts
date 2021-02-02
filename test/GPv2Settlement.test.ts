@@ -707,7 +707,7 @@ describe("GPv2Settlement", () => {
         );
 
         const orderUid = computeOrderUid({
-          orderDigest: hashOrder(order),
+          orderDigest: hashOrder(testDomain, order),
           owner: traders[0].address,
           validTo: order.validTo,
         });
@@ -839,7 +839,7 @@ describe("GPv2Settlement", () => {
           executedBuyAmount,
           order.feeAmount,
           computeOrderUid({
-            orderDigest: hashOrder(order),
+            orderDigest: hashOrder(testDomain, order),
             owner: traders[0].address,
             validTo: order.validTo,
           }),

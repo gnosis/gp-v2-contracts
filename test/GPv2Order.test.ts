@@ -4,10 +4,10 @@ import { ethers } from "hardhat";
 
 import {
   ORDER_TYPE_HASH,
+  ORDER_TYPE_FIELDS,
   ORDER_UID_LENGTH,
   OrderKind,
   computeOrderUid,
-  hashOrder,
 } from "../src/ts";
 
 import { encodeOrder } from "./encoding";
@@ -36,7 +36,7 @@ describe("GPv2Order", () => {
     });
   });
 
-  describe("hash", () => {
+  describe("structHash", () => {
     it("computes EIP-712 order struct hash", async () => {
       const order = {
         sellToken: fillBytes(20, 0x01),
@@ -50,8 +50,12 @@ describe("GPv2Order", () => {
         kind: OrderKind.SELL,
         partiallyFillable: false,
       };
-      expect(await orders.hashTest(encodeOrder(order))).to.equal(
-        hashOrder(order),
+      expect(await orders.structHashTest(encodeOrder(order))).to.equal(
+        ethers.utils._TypedDataEncoder.hashStruct(
+          "Order",
+          { Order: ORDER_TYPE_FIELDS },
+          order,
+        ),
       );
     });
   });
