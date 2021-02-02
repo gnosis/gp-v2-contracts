@@ -16,7 +16,7 @@ contract GPv2TradeTestInterface {
             )
         );
 
-    function recoverTradeTest(
+    function recoverTradesTest(
         IERC20[] calldata tokens,
         GPv2Trade.Data[] calldata inputTrades
     )
