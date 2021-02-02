@@ -2,15 +2,14 @@
 pragma solidity ^0.7.6;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "../mixins/GPv2Signing.sol";
 import "./GPv2Order.sol";
-import "./GPv2Signing.sol";
 
 /// @title Gnosis Protocol v2 Trade Library.
 /// @author Gnosis Developers
 library GPv2Trade {
     using GPv2Order for GPv2Order.Data;
     using GPv2Order for bytes;
-    using GPv2Signing for GPv2Order.Data;
 
     /// @dev A struct representing a trade to be executed as part a batch
     /// settlement.
