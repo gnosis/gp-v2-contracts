@@ -65,6 +65,9 @@ export default {
     ],
   },
   networks: {
+    hardhat: {
+      blockGasLimit: 12.5e6,
+    },
     mainnet: {
       ...sharedNetworkConfig,
       url: `https://mainnet.infura.io/v3/${INFURA_KEY}`,
