@@ -39,25 +39,25 @@ describe("GPv2Trade+GPv2Signing", () => {
     partiallyFillable: false,
   };
 
-  let tradeLibrary: Contract;
+  let signing: Contract;
 
   beforeEach(async () => {
-    const GPv2Encoding = await ethers.getContractFactory(
-      "GPv2TradeTestInterface",
+    const GPv2Signing = await ethers.getContractFactory(
+      "GPv2SigningTestInterface",
     );
 
-    tradeLibrary = await GPv2Encoding.deploy();
+    signing = await GPv2Signing.deploy();
   });
 
   describe("DOMAIN_SEPARATOR", () => {
     it("should match the test domain hash", async () => {
-      expect(await tradeLibrary.DOMAIN_SEPARATOR()).to.equal(
+      expect(await signing.DOMAIN_SEPARATOR()).to.equal(
         ethers.utils._TypedDataEncoder.hashDomain(testDomain),
       );
     });
   });
 
-  describe("recoverTradeTest", () => {
+  describe("recoverOrderFromTrade", () => {
     it("should round-trip encode order data", async () => {
       // NOTE: Pay extra attention to use all bytes for each field, and that
       // they all have different values to make sure the are correctly
@@ -87,19 +87,15 @@ describe("GPv2Trade+GPv2Signing", () => {
         tradeExecution,
       );
 
-      const { trades } = await tradeLibrary.recoverTradesTest(
+      const { recoveredOrders } = await signing.recoverOrdersFromTradesTest(
         encoder.tokens,
         encoder.trades,
       );
 
-      expect(trades.length).to.equal(1);
-
-      const { order: encodedOrder, executedAmount, feeDiscount } = trades[0];
-
+      expect(recoveredOrders.length).to.equal(1);
       // NOTE: Ethers.js returns a tuple and not a struct with named fields for
       // `abicoder v2` nested structs.
-      expect(decodeOrder(encodedOrder)).to.deep.equal(order);
-      expect({ executedAmount, feeDiscount }).to.deep.equal(tradeExecution);
+      expect(decodeOrder(recoveredOrders[0].data)).to.deep.equal(order);
     });
 
     it("should compute order unique identifier", async () => {
@@ -110,12 +106,12 @@ describe("GPv2Trade+GPv2Signing", () => {
         SigningScheme.EIP712,
       );
 
-      const { trades } = await tradeLibrary.recoverTradesTest(
+      const { recoveredOrders } = await signing.recoverOrdersFromTradesTest(
         encoder.tokens,
         encoder.trades,
       );
 
-      const { orderUid } = trades[0];
+      const { uid: orderUid } = recoveredOrders[0];
       expect(orderUid).to.equal(
         computeOrderUid({
           orderDigest: hashOrder(sampleOrder),
@@ -134,13 +130,13 @@ describe("GPv2Trade+GPv2Signing", () => {
         await encoder.signEncodeTrade(sampleOrder, traders[0], scheme);
       }
 
-      const { trades } = await tradeLibrary.recoverTradesTest(
+      const { recoveredOrders } = await signing.recoverOrdersFromTradesTest(
         encoder.tokens,
         encoder.trades,
       );
 
       const traderAddress = await traders[0].getAddress();
-      for (const decodedTrade of trades) {
+      for (const decodedTrade of recoveredOrders) {
         const { owner } = decodedTrade;
         expect(owner).to.equal(traderAddress);
       }
@@ -162,7 +158,7 @@ describe("GPv2Trade+GPv2Signing", () => {
       trades[0].signature = signature;
 
       await expect(
-        tradeLibrary.recoverTradesTest(encoder.tokens, trades),
+        signing.recoverOrdersFromTradesTest(encoder.tokens, trades),
       ).to.be.revertedWith("invalid eip712 signature");
     });
 
@@ -182,7 +178,7 @@ describe("GPv2Trade+GPv2Signing", () => {
       trades[0].signature = signature;
 
       await expect(
-        tradeLibrary.recoverTradesTest(encoder.tokens, trades),
+        signing.recoverOrdersFromTradesTest(encoder.tokens, trades),
       ).to.be.revertedWith("invalid ethsign signature");
     });
 
@@ -207,8 +203,8 @@ describe("GPv2Trade+GPv2Signing", () => {
       // NOTE: Remove the last sell token (0x0303...0303).
       const tokens = encoder.tokens;
       expect(tokens.pop()).to.equal(lastToken);
-      await expect(tradeLibrary.recoverTradesTest(tokens, encoder.trades)).to.be
-        .reverted;
+      await expect(signing.recoverOrdersFromTradesTest(tokens, encoder.trades))
+        .to.be.reverted;
     });
 
     it("should revert for invalid buy token indices", async () => {
@@ -232,8 +228,8 @@ describe("GPv2Trade+GPv2Signing", () => {
       // NOTE: Remove the last buy token (0x0303...0303).
       const tokens = encoder.tokens;
       expect(tokens.pop()).to.equal(lastToken);
-      await expect(tradeLibrary.recoverTradesTest(tokens, encoder.trades)).to.be
-        .reverted;
+      await expect(signing.recoverOrdersFromTradesTest(tokens, encoder.trades))
+        .to.be.reverted;
     });
 
     it("should verify EIP-1271 contract signatures by returning owner", async () => {
@@ -255,13 +251,13 @@ describe("GPv2Trade+GPv2Signing", () => {
         },
       });
 
-      const { trades } = await tradeLibrary.recoverTradesTest(
+      const { recoveredOrders } = await signing.recoverOrdersFromTradesTest(
         encoder.tokens,
         encoder.trades,
       );
 
-      expect(trades.length).to.equal(1);
-      const { owner } = trades[0];
+      expect(recoveredOrders.length).to.equal(1);
+      const { owner } = recoveredOrders[0];
       expect(owner).to.equal(verifier.address);
     });
 
@@ -286,7 +282,7 @@ describe("GPv2Trade+GPv2Signing", () => {
       });
 
       await expect(
-        tradeLibrary.recoverTradesTest(encoder1.tokens, encoder1.trades),
+        signing.recoverOrdersFromTradesTest(encoder1.tokens, encoder1.trades),
       ).to.be.revertedWith("invalid eip1271 signature");
 
       const NON_STANDARD_EIP1271_VERIFIER = [
@@ -312,7 +308,7 @@ describe("GPv2Trade+GPv2Signing", () => {
 
       // Transaction reverted: function returned an unexpected amount of data
       await expect(
-        tradeLibrary.recoverTradesTest(encoder2.tokens, encoder2.trades),
+        signing.recoverOrdersFromTradesTest(encoder2.tokens, encoder2.trades),
       ).to.be.reverted;
     });
 
@@ -328,7 +324,7 @@ describe("GPv2Trade+GPv2Signing", () => {
 
       // Transaction reverted: function call to a non-contract account
       await expect(
-        tradeLibrary.recoverTradesTest(encoder.tokens, encoder.trades),
+        signing.recoverOrdersFromTradesTest(encoder.tokens, encoder.trades),
       ).to.be.reverted;
     });
 
@@ -362,7 +358,7 @@ describe("GPv2Trade+GPv2Signing", () => {
 
       // Transaction reverted and Hardhat couldn't infer the reason.
       await expect(
-        tradeLibrary.recoverTradesTest(encoder.tokens, encoder.trades),
+        signing.recoverOrdersFromTradesTest(encoder.tokens, encoder.trades),
       ).to.be.reverted;
       expect(await evilVerifier.state()).to.deep.equal(ethers.constants.One);
     });
@@ -378,8 +374,8 @@ describe("GPv2Trade+GPv2Signing", () => {
       const trades = encoder.trades;
       trades[0].flags |= 0b1100;
 
-      await expect(tradeLibrary.recoverTradesTest(encoder.tokens, trades)).to.be
-        .reverted;
+      await expect(signing.recoverOrdersFromTradesTest(encoder.tokens, trades))
+        .to.be.reverted;
     });
 
     it("should not allocate additional memory", async () => {
@@ -397,7 +393,7 @@ describe("GPv2Trade+GPv2Signing", () => {
         SigningScheme.ETHSIGN,
       );
 
-      const { mem } = await tradeLibrary.recoverTradesTest(
+      const { mem } = await signing.recoverOrdersFromTradesTest(
         encoder.tokens,
         encoder.trades,
       );

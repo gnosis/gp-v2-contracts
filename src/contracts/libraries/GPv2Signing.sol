@@ -3,14 +3,70 @@ pragma solidity ^0.7.6;
 
 import "../interfaces/GPv2EIP1271.sol";
 import "./GPv2Order.sol";
+import "./GPv2Trade.sol";
 
 /// @title Gnosis Protocol v2 Signing Library.
 /// @author Gnosis Developers
 library GPv2Signing {
     using GPv2Order for GPv2Order.Data;
+    using GPv2Order for bytes;
+
+    /// @dev Recovered trade data containing the extracted order and the
+    /// recovered owner address.
+    struct RecoveredOrder {
+        GPv2Order.Data data;
+        bytes uid;
+        address owner;
+    }
 
     /// @dev Signing scheme used for recovery.
     enum Scheme {Eip712, EthSign, Eip1271}
+
+    /// @dev Returns an empty recovered order with a pre-allocated buffer for
+    /// packing the unique identifier.
+    ///
+    /// @return recoveredOrder The empty recovered order data.
+    function allocateRecoveredOrder()
+        internal
+        pure
+        returns (RecoveredOrder memory recoveredOrder)
+    {
+        recoveredOrder.uid = new bytes(GPv2Order.UID_LENGTH);
+    }
+
+    /// @dev Extracts order data and recovers the signer from the specified
+    /// trade.
+    ///
+    /// @param recoveredOrder Memory location used for writing the recovered order data.
+    /// @param domainSeparator The domain separator used for signing the order.
+    /// @param tokens The list of tokens included in the settlement. The token
+    /// indices in the trade parameters map to tokens in this array.
+    /// @param trade The trade data to recover the order data from.
+    function recoverOrderFromTrade(
+        RecoveredOrder memory recoveredOrder,
+        bytes32 domainSeparator,
+        IERC20[] calldata tokens,
+        GPv2Trade.Data calldata trade
+    ) internal view {
+        GPv2Order.Data memory order = recoveredOrder.data;
+
+        GPv2Signing.Scheme signingScheme =
+            GPv2Trade.extractOrder(trade, tokens, order);
+        (bytes32 orderDigest, address owner) =
+            recoverOrderSigner(
+                order,
+                domainSeparator,
+                signingScheme,
+                trade.signature
+            );
+
+        recoveredOrder.uid.packOrderUidParams(
+            orderDigest,
+            owner,
+            order.validTo
+        );
+        recoveredOrder.owner = owner;
+    }
 
     /// @dev The length of any signature from an externally owned account.
     uint256 private constant ECDSA_SIGNATURE_LENGTH = 65;

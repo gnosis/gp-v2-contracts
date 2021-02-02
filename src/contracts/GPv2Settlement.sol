@@ -16,9 +16,9 @@ import "./libraries/GPv2TradeExecution.sol";
 
 /// @title Gnosis Protocol v2 Settlement Contract
 /// @author Gnosis Developers
-contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
+contract GPv2Settlement is ReentrancyGuard {
     using GPv2Order for bytes;
-    using GPv2Trade for GPv2Trade.Recovered;
+    using GPv2Signing for GPv2Signing.RecoveredOrder;
     using GPv2TradeExecution for GPv2TradeExecution.Data;
     using SafeMath for uint256;
 
@@ -198,17 +198,24 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
         uint256[] calldata clearingPrices,
         GPv2Trade.Data[] calldata trades
     ) internal returns (GPv2TradeExecution.Data[] memory executedTrades) {
-        GPv2Trade.Recovered memory trade = GPv2Trade.newRecovered();
+        GPv2Signing.RecoveredOrder memory recoveredOrder =
+            GPv2Signing.allocateRecoveredOrder();
 
         executedTrades = new GPv2TradeExecution.Data[](trades.length);
         for (uint256 i = 0; i < trades.length; i++) {
-            GPv2Trade.Data calldata input = trades[i];
+            GPv2Trade.Data calldata trade = trades[i];
 
-            trade.recoverTrade(domainSeparator, tokens, input);
+            recoveredOrder.recoverOrderFromTrade(
+                domainSeparator,
+                tokens,
+                trade
+            );
             computeTradeExecution(
-                trade,
-                clearingPrices[input.sellTokenIndex],
-                clearingPrices[input.buyTokenIndex],
+                recoveredOrder,
+                clearingPrices[trade.sellTokenIndex],
+                clearingPrices[trade.buyTokenIndex],
+                trade.executedAmount,
+                trade.feeDiscount,
                 executedTrades[i]
             );
         }
@@ -219,22 +226,28 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
     /// - The order has expired
     /// - The order's limit price is not respected.
     ///
-    /// @param trade The trade to process.
+    /// @param recoveredOrder The recovered order to process.
     /// @param sellPrice The price of the order's sell token.
     /// @param buyPrice The price of the order's buy token.
+    /// @param executedAmount The portion of the order to execute. This will be
+    /// ignored for fill-or-kill orders.
+    /// @param feeDiscount The discount to apply to the final executed fees.
     /// @param executedTrade Memory location for computed executed trade data.
     function computeTradeExecution(
-        GPv2Trade.Recovered memory trade,
+        GPv2Signing.RecoveredOrder memory recoveredOrder,
         uint256 sellPrice,
         uint256 buyPrice,
+        uint256 executedAmount,
+        uint256 feeDiscount,
         GPv2TradeExecution.Data memory executedTrade
     ) internal {
-        GPv2Order.Data memory order = trade.order;
+        GPv2Order.Data memory order = recoveredOrder.data;
+        bytes memory orderUid = recoveredOrder.uid;
 
         // solhint-disable-next-line not-rely-on-time
         require(order.validTo >= block.timestamp, "GPv2: order expired");
 
-        executedTrade.owner = trade.owner;
+        executedTrade.owner = recoveredOrder.owner;
         executedTrade.receiver = order.receiver;
         executedTrade.sellToken = order.sellToken;
         executedTrade.buyToken = order.buyToken;
@@ -274,7 +287,7 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
 
         if (order.kind == GPv2Order.SELL) {
             if (order.partiallyFillable) {
-                executedSellAmount = trade.executedAmount;
+                executedSellAmount = executedAmount;
                 executedFeeAmount =
                     order.feeAmount.mul(executedSellAmount) /
                     order.sellAmount;
@@ -285,7 +298,7 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
 
             executedBuyAmount = executedSellAmount.mul(sellPrice) / buyPrice;
 
-            currentFilledAmount = filledAmount[trade.orderUid].add(
+            currentFilledAmount = filledAmount[orderUid].add(
                 executedSellAmount
             );
             require(
@@ -294,7 +307,7 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
             );
         } else {
             if (order.partiallyFillable) {
-                executedBuyAmount = trade.executedAmount;
+                executedBuyAmount = executedAmount;
                 executedFeeAmount =
                     order.feeAmount.mul(executedBuyAmount) /
                     order.buyAmount;
@@ -305,9 +318,7 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
 
             executedSellAmount = executedBuyAmount.mul(buyPrice) / sellPrice;
 
-            currentFilledAmount = filledAmount[trade.orderUid].add(
-                executedBuyAmount
-            );
+            currentFilledAmount = filledAmount[orderUid].add(executedBuyAmount);
             require(
                 currentFilledAmount <= order.buyAmount,
                 "GPv2: order filled"
@@ -315,15 +326,15 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
         }
 
         require(
-            trade.feeDiscount <= executedFeeAmount,
+            feeDiscount <= executedFeeAmount,
             "GPv2: fee discount too large"
         );
-        executedFeeAmount = executedFeeAmount - trade.feeDiscount;
+        executedFeeAmount = executedFeeAmount - feeDiscount;
 
         executedTrade.sellAmount = executedSellAmount.add(executedFeeAmount);
         executedTrade.buyAmount = executedBuyAmount;
 
-        filledAmount[trade.orderUid] = currentFilledAmount;
+        filledAmount[orderUid] = currentFilledAmount;
         emit Trade(
             executedTrade.owner,
             executedTrade.sellToken,
@@ -331,7 +342,7 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
             executedTrade.sellAmount,
             executedTrade.buyAmount,
             executedFeeAmount,
-            trade.orderUid
+            orderUid
         );
     }
 

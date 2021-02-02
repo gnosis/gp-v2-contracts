@@ -29,53 +29,6 @@ library GPv2Trade {
         bytes signature;
     }
 
-    /// @dev Recovered trade data containing the extracted order and the
-    /// recovered owner address.
-    struct Recovered {
-        GPv2Order.Data order;
-        bytes orderUid;
-        address owner;
-        uint256 executedAmount;
-        uint256 feeDiscount;
-    }
-
-    /// @dev Returns a new recovered trade with a pre-allocated buffer for
-    /// packing the order unique identifier.
-    function newRecovered() internal pure returns (Recovered memory trade) {
-        trade.orderUid = new bytes(GPv2Order.UID_LENGTH);
-    }
-
-    /// @dev Recovers trade data from the specified settlement trade input.
-    ///
-    /// @param trade Memory location used for writing the recovered trade data.
-    /// @param domainSeparator The domain separator used for signing the order.
-    /// @param tokens The list of tokens included in the settlement. The token
-    /// indices in the trade parameters map to tokens in this array.
-    /// @param input The input settlement trade data to recover the order and
-    /// signer from.
-    function recoverTrade(
-        Recovered memory trade,
-        bytes32 domainSeparator,
-        IERC20[] calldata tokens,
-        GPv2Trade.Data calldata input
-    ) internal view {
-        GPv2Order.Data memory order = trade.order;
-
-        GPv2Signing.Scheme signingScheme =
-            GPv2Trade.extractOrder(input, tokens, order);
-        (bytes32 orderDigest, address owner) =
-            order.recoverOrderSigner(
-                domainSeparator,
-                signingScheme,
-                input.signature
-            );
-
-        trade.orderUid.packOrderUidParams(orderDigest, owner, order.validTo);
-        trade.owner = owner;
-        trade.executedAmount = input.executedAmount;
-        trade.feeDiscount = input.feeDiscount;
-    }
-
     /// @dev Extracts the order data and signing scheme for the specified trade.
     ///
     /// @param trade The trade.
@@ -114,7 +67,7 @@ library GPv2Trade {
     /// ```
     /// bit | 31 ... 4 | 3 | 2 | 1 | 0 |
     /// ----+-----------------------+---+---+
-    ///     |  unused  | *   * | * | * |
+    ///     | reserved | *   * | * | * |
     ///                  |   |   |   |
     ///                  |   |   |   +---- order kind bit, 0 for a sell order
     ///                  |   |   |         and 1 for a buy order
@@ -126,7 +79,7 @@ library GPv2Trade {
     ///                                    00: EIP-712
     ///                                    01: eth_sign
     ///                                    10: EIP-1271
-    ///                                    11: unused
+    ///                                    11: reserved
     /// ```
     function extractFlags(uint256 flags)
         internal
@@ -143,6 +96,11 @@ library GPv2Trade {
             kind = GPv2Order.BUY;
         }
         partiallyFillable = flags & 0x02 != 0;
+
+        // NOTE: Take advantage of the fact that Solidity will revert if the
+        // following expression does not produce a valid enum value. This means
+        // we simultaneously check here that the leading reserved bits must be
+        // 0 and that the resrved `0b11` scheme value is not used.
         signingScheme = GPv2Signing.Scheme(flags >> 2);
     }
 }
