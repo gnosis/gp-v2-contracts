@@ -132,7 +132,7 @@ describe("GPv2Trade", () => {
       }
     });
 
-    it("should extract all supported signing scheme", async () => {
+    it("should extract all supported signing schemes", async () => {
       for (const scheme of [
         SigningScheme.EIP712,
         SigningScheme.ETHSIGN,
