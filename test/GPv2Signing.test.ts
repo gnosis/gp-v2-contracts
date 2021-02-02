@@ -75,6 +75,32 @@ describe("GPv2Signing", () => {
     });
   });
 
+  describe("setPreSignature", () => {
+    const [owner, nonOwner] = traders;
+    const orderUid = packOrderUidParams({
+      orderDigest: ethers.constants.HashZero,
+      owner: owner.address,
+      validTo: 0xffffffff,
+    });
+
+    it("should set the pre-signature", async () => {
+      await signing.connect(owner).setPreSignature(orderUid, true);
+      expect(await signing.preSignature(orderUid)).to.be.true;
+    });
+
+    it("should unset the pre-signature", async () => {
+      await signing.connect(owner).setPreSignature(orderUid, true);
+      await signing.connect(owner).setPreSignature(orderUid, false);
+      expect(await signing.preSignature(orderUid)).to.be.false;
+    });
+
+    it("should revert if the order owner is not the transaction sender", async () => {
+      await expect(
+        signing.connect(nonOwner).setPreSignature(orderUid, true),
+      ).to.be.revertedWith("cannot presign order");
+    });
+  });
+
   describe("recoverOrderFromTrade", () => {
     it("should round-trip encode order data", async () => {
       // NOTE: Pay extra attention to use all bytes for each field, and that

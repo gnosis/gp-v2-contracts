@@ -1083,6 +1083,19 @@ describe("GPv2Settlement", () => {
       }
     });
 
+    it("should clear pre-signatures", async () => {
+      const orderUid = packOrderUidParams({
+        orderDigest: `0x${"11".repeat(32)}`,
+        owner: traders[0].address,
+        validTo: 0,
+      });
+
+      await settlement.connect(traders[0]).setPreSignature(orderUid, true);
+      await settlement.claimOrderRefundsTest([orderUid]);
+
+      expect(await settlement.preSignature(orderUid)).to.be.false;
+    });
+
     it("should revert if the encoded order UIDs are malformed", async () => {
       const orderUid = packOrderUidParams({
         orderDigest: ethers.constants.HashZero,
