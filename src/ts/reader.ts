@@ -1,8 +1,10 @@
 import { BigNumberish, Contract } from "ethers";
 
-type ReaderMethods = "getSolverAt" | "numSolvers";
+type ReaderMethods = "getSolverAt" | "numSolvers" | "filledAmountsForOrders";
 type ReaderParameters<M> = M extends "getSolverAt"
   ? [BigNumberish]
+  : M extends "filledAmountsForOrders"
+  ? [string[]]
   : M extends "numSolvers"
   ? []
   : never;
@@ -46,5 +48,25 @@ export class AllowListReader {
    */
   public numSolvers(): Promise<number> {
     return readStorage(this.allowList, this.reader, "numSolvers", []);
+  }
+}
+
+/**
+ * A class for attaching the storage reader contract to the GPv2Settlement contract
+ * for providing additional storage reading methods.
+ */
+export class SettlementReader {
+  constructor(
+    public readonly settlement: Contract,
+    public readonly reader: Contract,
+  ) {}
+
+  /**
+   * Read and return filled amounts for a list of orders
+   */
+  public filledAmountsForOrders(orderUids: string[]): Promise<number> {
+    return readStorage(this.settlement, this.reader, "filledAmountsForOrders", [
+      orderUids,
+    ]);
   }
 }
