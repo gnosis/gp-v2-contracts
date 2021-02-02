@@ -356,6 +356,7 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
             // solhint-disable-next-line not-rely-on-time
             require(validTo < block.timestamp, "GPv2: order still valid");
             filledAmount[orderUid] = 0;
+            preSignature[orderUid] = false;
         }
     }
 }

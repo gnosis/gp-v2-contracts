@@ -101,23 +101,30 @@ describe("E2E: Expired Order Gas Refunds", () => {
       };
 
       const encoder = new SettlementEncoder(domainSeparator);
+
+      const sellOrderUid = computeOrderUid(
+        domainSeparator,
+        sellOrder,
+        traders[0].address,
+      );
       await encoder.signEncodeTrade(
         sellOrder,
         traders[0],
         SigningScheme.EIP712,
       );
-      await encoder.signEncodeTrade(
+
+      const buyOrderUid = computeOrderUid(
+        domainSeparator,
         buyOrder,
-        traders[1],
-        SigningScheme.ETHSIGN,
+        traders[1].address,
       );
+      await settlement.connect(traders[1]).setPreSignature(buyOrderUid, true);
+      encoder.encodeTrade(buyOrder, {
+        scheme: SigningScheme.PRESIGN,
+        data: buyOrderUid,
+      });
 
-      const orderUids = [
-        computeOrderUid(domainSeparator, sellOrder, traders[0].address),
-        computeOrderUid(domainSeparator, buyOrder, traders[1].address),
-      ];
-
-      return [encoder, orderUids] as const;
+      return [encoder, [sellOrderUid, buyOrderUid]] as const;
     };
 
     const [encoder1, orderUids] = await prepareBatch();
@@ -149,6 +156,6 @@ describe("E2E: Expired Order Gas Refunds", () => {
       .div(orderUids.length);
     debug(`Gas savings per order: ${gasSavingsPerOrderRefund}`);
 
-    expect(gasSavingsPerOrderRefund.gt(0)).to.be.true;
+    expect(gasSavingsPerOrderRefund.gt(8000)).to.be.true;
   });
 });
