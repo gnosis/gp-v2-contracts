@@ -1,13 +1,21 @@
-import { BigNumberish, Contract } from "ethers";
+import { BigNumber, BigNumberish, BytesLike, Contract } from "ethers";
 
-type ReaderMethods = "getSolverAt" | "numSolvers" | "filledAmountsForOrders";
-type ReaderParameters<M> = M extends "getSolverAt"
+type AllowListReaderMethods = "getSolverAt" | "numSolvers";
+type AllowListReaderParameters<M> = M extends "getSolverAt"
   ? [BigNumberish]
-  : M extends "filledAmountsForOrders"
-  ? [string[]]
   : M extends "numSolvers"
   ? []
   : never;
+
+type SettlementReaderMethods = "filledAmountsForOrders";
+type SettlementReaderParameters<M> = M extends "filledAmountsForOrders"
+  ? [BytesLike[]]
+  : never;
+
+type ReaderMethods = AllowListReaderMethods | SettlementReaderMethods;
+type ReaderParameters<M> =
+  | AllowListReaderParameters<M>
+  | SettlementReaderParameters<M>;
 
 async function readStorage<M extends ReaderMethods>(
   base: Contract,
@@ -64,7 +72,7 @@ export class SettlementReader {
   /**
    * Read and return filled amounts for a list of orders
    */
-  public filledAmountsForOrders(orderUids: string[]): Promise<number> {
+  public filledAmountsForOrders(orderUids: BytesLike[]): Promise<BigNumber[]> {
     return readStorage(this.settlement, this.reader, "filledAmountsForOrders", [
       orderUids,
     ]);
