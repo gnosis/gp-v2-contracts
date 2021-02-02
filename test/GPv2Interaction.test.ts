@@ -3,7 +3,7 @@ import { Contract } from "ethers";
 import { ethers, waffle } from "hardhat";
 
 describe("GPv2Interaction", () => {
-  const [deployer] = waffle.provider.getWallets();
+  const [deployer, trader] = waffle.provider.getWallets();
   let interactions: Contract;
 
   beforeEach(async () => {
@@ -67,6 +67,61 @@ describe("GPv2Interaction", () => {
       expect(await getBalance(interactions.address)).to.equal(
         ethers.constants.Zero,
       );
+    });
+
+    it("should send Ether to EOAs", async () => {
+      const { getBalance } = ethers.provider;
+
+      const initialBalance = await getBalance(trader.address);
+
+      const value = ethers.utils.parseEther("1.0");
+      await deployer.sendTransaction({
+        to: interactions.address,
+        value,
+      });
+      expect(await getBalance(interactions.address)).to.equal(value);
+
+      await interactions.executeTest({
+        target: trader.address,
+        value,
+        callData: "0x",
+      });
+
+      expect(await getBalance(trader.address)).to.equal(
+        initialBalance.add(value),
+      );
+      expect(await getBalance(interactions.address)).to.equal(
+        ethers.constants.Zero,
+      );
+    });
+
+    it("should revert when sending Ether to non-payable contracts", async () => {
+      const NonPayable = await ethers.getContractFactory("NonPayable");
+      const target = await NonPayable.deploy();
+
+      await expect(
+        interactions.executeTest({
+          target: target.address,
+          value: 0,
+          callData: "0x",
+        }),
+      ).to.not.be.reverted;
+
+      const value = ethers.utils.parseEther("1.0");
+      await deployer.sendTransaction({
+        to: interactions.address,
+        value,
+      });
+      expect(await ethers.provider.getBalance(interactions.address)).to.equal(
+        value,
+      );
+      await expect(
+        interactions.executeTest({
+          target: target.address,
+          value,
+          callData: "0x",
+        }),
+      ).to.be.reverted;
     });
   });
 
