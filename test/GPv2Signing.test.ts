@@ -89,7 +89,9 @@ describe("GPv2Signing", () => {
         tradeExecution,
       );
 
-      const { data: encodedOrder } = await signing.recoverOrderFromTradeTest(
+      const {
+        recoveredOrder: { data: encodedOrder },
+      } = await signing.recoverOrderFromTradeTest(
         encoder.tokens,
         encoder.trades[0],
       );
@@ -104,7 +106,9 @@ describe("GPv2Signing", () => {
         SigningScheme.EIP712,
       );
 
-      const { uid: orderUid } = await signing.recoverOrderFromTradeTest(
+      const {
+        recoveredOrder: { uid: orderUid },
+      } = await signing.recoverOrderFromTradeTest(
         encoder.tokens,
         encoder.trades[0],
       );
@@ -144,12 +148,26 @@ describe("GPv2Signing", () => {
       const owners = [traders[0].address, traders[1].address, verifier.address];
 
       for (const [i, trade] of encoder.trades.entries()) {
-        const { owner } = await signing.recoverOrderFromTradeTest(
-          encoder.tokens,
-          trade,
-        );
+        const {
+          recoveredOrder: { owner },
+        } = await signing.recoverOrderFromTradeTest(encoder.tokens, trade);
         expect(owner).to.equal(owners[i]);
       }
+    });
+
+    it("should not allocated additional memory", async () => {
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
+        sampleOrder,
+        traders[0],
+        SigningScheme.EIP712,
+      );
+
+      const { mem } = await signing.recoverOrderFromTradeTest(
+        encoder.tokens,
+        encoder.trades[0],
+      );
+      expect(mem).to.equal(0);
     });
   });
 
