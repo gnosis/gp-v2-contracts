@@ -2,8 +2,6 @@ import { expect } from "chai";
 import { Contract, Wallet } from "ethers";
 import { deployments, ethers, waffle } from "hardhat";
 
-import { SALT } from "../../src/ts";
-
 import { deployTestContracts } from "./fixture";
 
 describe("Upgrade Authenticator", () => {
@@ -60,11 +58,10 @@ describe("Upgrade Authenticator", () => {
   });
 
   async function upgrade(contractName: string, newContractName: string) {
+    // Note that deterministic deployment and gasLimit are not needed/used here as deployment args.
     await deployments.deploy(contractName, {
       contract: newContractName,
-      gasLimit: 2000000,
       from: owner.address,
-      // deterministicDeployment: SALT,
       proxy: true,
     });
   }
