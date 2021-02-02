@@ -17,6 +17,13 @@ type ReaderParameters<M> =
   | AllowListReaderParameters<M>
   | SettlementReaderParameters<M>;
 
+/**
+ * A generic method used to obfuscate the complexity of reading storage
+ * of any StorageAccessible contract. That is, this method does the work of
+ * 1. Encoding the function call on the reader
+ * 2. Simulates delegatecall of storage read with encoded calldata
+ * 3. Decodes the returned bytes from the storage read into expected return value.
+ */
 async function readStorage<M extends ReaderMethods>(
   base: Contract,
   reader: Contract,
