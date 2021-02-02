@@ -8,11 +8,7 @@ import { ethers } from "hardhat";
 function slot(string: string) {
   return ethers.utils.defaultAbiCoder.encode(
     ["bytes32"],
-    [
-      BigNumber.from(
-        ethers.utils.id(string),
-      ).sub(1),
-    ],
+    [BigNumber.from(ethers.utils.id(string)).sub(1)],
   );
 }
 const IMPLEMENTATION_STORAGE_SLOT = slot("eip1967.proxy.implementation");

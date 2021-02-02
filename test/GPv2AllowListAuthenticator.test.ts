@@ -13,14 +13,21 @@ describe("GPv2AllowListAuthentication", () => {
     );
 
     authenticator = await GPv2AllowListAuthentication.deploy();
-    await authenticator.setManager(owner.address);
+    await authenticator.initializeManager(owner.address);
   });
 
   describe("constructor", () => {
-    it("should set the owner", async () => {
+    it("should initialize the manager", async () => {
       expect(await authenticator.manager()).to.equal(owner.address);
     });
-    it("deployer is not the owner", async () => {
+
+    it("ensures initializeManager is idempotent", async () => {
+      await expect(
+        authenticator.initializeManager(nonOwner.address),
+      ).to.revertedWith("GPv2: already initialized");
+    });
+
+    it("deployer is not the manager", async () => {
       expect(await authenticator.manager()).not.to.be.equal(deployer.address);
     });
   });
