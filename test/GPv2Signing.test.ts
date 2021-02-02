@@ -175,6 +175,12 @@ describe("GPv2Signing", () => {
       }
     });
 
+    it("should revert for invalid signing schemes", async () => {
+      await expect(
+        signing.recoverOrderSignerTest(encodeOrder(sampleOrder), 42, "0x"),
+      ).to.be.reverted;
+    });
+
     it("should revert for malformed ECDSA signatures", async () => {
       for (const scheme of [SigningScheme.EIP712, SigningScheme.ETHSIGN]) {
         await expect(
