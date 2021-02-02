@@ -11,12 +11,9 @@ describe("Upgrade Authenticator", () => {
   let solver: Wallet;
 
   beforeEach(async () => {
-    ({
-      authenticator,
-      deployer,
-      owner,
-      wallets: [solver],
-    } = await deployTestContracts());
+    ({ authenticator, deployer, owner } = await deployTestContracts());
+    // Solver isn't a named account
+    solver = waffle.provider.getWallets()[2];
   });
 
   it("should upgrade authenticator", async () => {
@@ -64,6 +61,7 @@ describe("Upgrade Authenticator", () => {
     // Note that deterministic deployment and gasLimit are not needed/used here as deployment args.
     await deployments.deploy(contractName, {
       contract: newContractName,
+      // From differs from initial deployment here since the proxy owner is the Authenticator manager.
       from: owner.address,
       proxy: true,
     });
