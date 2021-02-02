@@ -2,6 +2,7 @@
 pragma solidity ^0.7.6;
 pragma abicoder v2;
 
+import "@gnosis.pm/util-contracts/contracts/StorageAccessible.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -13,7 +14,7 @@ import "./libraries/GPv2TradeExecution.sol";
 
 /// @title Gnosis Protocol v2 Settlement Contract
 /// @author Gnosis Developers
-contract GPv2Settlement is ReentrancyGuard {
+contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
     using GPv2Encoding for bytes;
     using GPv2TradeExecution for GPv2TradeExecution.Data;
     using SafeMath for uint256;
