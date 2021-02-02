@@ -10,7 +10,7 @@ function slot(string: string) {
     ["bytes32"],
     [
       BigNumber.from(
-        ethers.utils.keccak256(ethers.utils.toUtf8Bytes(string)),
+        ethers.utils.id(string),
       ).sub(1),
     ],
   );
