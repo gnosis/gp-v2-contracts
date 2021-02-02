@@ -244,7 +244,7 @@ describe("GPv2Signing", () => {
       ).to.be.revertedWith("invalid eip1271 signature");
     });
 
-    it("should revert on with non-standard EIP-1271 verifiers", async () => {
+    it("should revert with non-standard EIP-1271 verifiers", async () => {
       const message = eip1271Message(testDomain, sampleOrder);
       const eip1271Signature = "0x031337";
 
