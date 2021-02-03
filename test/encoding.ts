@@ -32,26 +32,6 @@ export function encodeOrder(order: Order): AbiOrder {
   ];
 }
 
-export type AbiTrade = [
-  AbiOrder,
-  number,
-  number,
-  BigNumber,
-  BigNumber,
-  string,
-  string,
-];
-
-export interface Trade {
-  order: Order;
-  sellTokenIndex: number;
-  buyTokenIndex: number;
-  executedAmount: BigNumber;
-  feeDiscount: BigNumber;
-  owner: string;
-  orderUid: string;
-}
-
 export function decodeOrderKind(kindHash: string): OrderKind {
   for (const kind of [OrderKind.SELL, OrderKind.BUY]) {
     if (kindHash == ethers.utils.id(kind)) {
@@ -61,26 +41,18 @@ export function decodeOrderKind(kindHash: string): OrderKind {
   throw new Error(`invalid order kind hash '${kindHash}'`);
 }
 
-export function decodeTrade(trade: AbiTrade): Trade {
+export function decodeOrder(order: AbiOrder): Order {
   return {
-    order: {
-      sellToken: trade[0][0],
-      buyToken: trade[0][1],
-      receiver: trade[0][2],
-      sellAmount: trade[0][3],
-      buyAmount: trade[0][4],
-      validTo: trade[0][5],
-      appData: trade[0][6],
-      feeAmount: trade[0][7],
-      kind: decodeOrderKind(trade[0][8]),
-      partiallyFillable: trade[0][9],
-    },
-    sellTokenIndex: trade[1],
-    buyTokenIndex: trade[2],
-    executedAmount: trade[3],
-    feeDiscount: trade[4],
-    owner: trade[5],
-    orderUid: trade[6],
+    sellToken: order[0],
+    buyToken: order[1],
+    receiver: order[2],
+    sellAmount: order[3],
+    buyAmount: order[4],
+    validTo: order[5],
+    appData: order[6],
+    feeAmount: order[7],
+    kind: decodeOrderKind(order[8]),
+    partiallyFillable: order[9],
   };
 }
 
