@@ -2,12 +2,110 @@
 pragma solidity ^0.7.6;
 
 import "../interfaces/GPv2EIP1271.sol";
+import "./GPv2Order.sol";
+import "./GPv2Trade.sol";
 
 /// @title Gnosis Protocol v2 Signing Library.
 /// @author Gnosis Developers
 library GPv2Signing {
+    using GPv2Order for GPv2Order.Data;
+    using GPv2Order for bytes;
+
+    /// @dev Recovered trade data containing the extracted order and the
+    /// recovered owner address.
+    struct RecoveredOrder {
+        GPv2Order.Data data;
+        bytes uid;
+        address owner;
+    }
+
+    /// @dev Signing scheme used for recovery.
+    enum Scheme {Eip712, EthSign, Eip1271}
+
+    /// @dev Returns an empty recovered order with a pre-allocated buffer for
+    /// packing the unique identifier.
+    ///
+    /// @return recoveredOrder The empty recovered order data.
+    function allocateRecoveredOrder()
+        internal
+        pure
+        returns (RecoveredOrder memory recoveredOrder)
+    {
+        recoveredOrder.uid = new bytes(GPv2Order.UID_LENGTH);
+    }
+
+    /// @dev Extracts order data and recovers the signer from the specified
+    /// trade.
+    ///
+    /// @param recoveredOrder Memory location used for writing the recovered order data.
+    /// @param domainSeparator The domain separator used for signing the order.
+    /// @param tokens The list of tokens included in the settlement. The token
+    /// indices in the trade parameters map to tokens in this array.
+    /// @param trade The trade data to recover the order data from.
+    function recoverOrderFromTrade(
+        RecoveredOrder memory recoveredOrder,
+        bytes32 domainSeparator,
+        IERC20[] calldata tokens,
+        GPv2Trade.Data calldata trade
+    ) internal view {
+        GPv2Order.Data memory order = recoveredOrder.data;
+
+        GPv2Signing.Scheme signingScheme =
+            GPv2Trade.extractOrder(trade, tokens, order);
+        (bytes32 orderDigest, address owner) =
+            recoverOrderSigner(
+                order,
+                domainSeparator,
+                signingScheme,
+                trade.signature
+            );
+
+        recoveredOrder.uid.packOrderUidParams(
+            orderDigest,
+            owner,
+            order.validTo
+        );
+        recoveredOrder.owner = owner;
+    }
+
     /// @dev The length of any signature from an externally owned account.
     uint256 private constant ECDSA_SIGNATURE_LENGTH = 65;
+
+    /// @dev Recovers an order's signer from the specified order and signature.
+    ///
+    /// @param order The order to recover a signature for.
+    /// @param domainSeparator The domain separator used for signing the order.
+    /// @param signingScheme The signing scheme.
+    /// @param signature The signature bytes.
+    /// @return orderDigest The computed order hash.
+    /// @return owner The recovered address from the specified signature.
+    function recoverOrderSigner(
+        GPv2Order.Data memory order,
+        bytes32 domainSeparator,
+        Scheme signingScheme,
+        bytes calldata signature
+    ) internal view returns (bytes32 orderDigest, address owner) {
+        orderDigest = order.hash();
+        if (signingScheme == Scheme.Eip712) {
+            owner = recoverEip712Signer(
+                signature,
+                domainSeparator,
+                orderDigest
+            );
+        } else if (signingScheme == Scheme.EthSign) {
+            owner = recoverEthsignSigner(
+                signature,
+                domainSeparator,
+                orderDigest
+            );
+        } else if (signingScheme == Scheme.Eip1271) {
+            owner = recoverEip1271Signer(
+                signature,
+                domainSeparator,
+                orderDigest
+            );
+        }
+    }
 
     /// @dev Decodes ECDSA signatures from calldata.
     ///
@@ -31,21 +129,18 @@ library GPv2Signing {
     /// @return r r parameter of the ECDSA signature.
     /// @return s s parameter of the ECDSA signature.
     /// @return v v parameter of the ECDSA signature.
-    /// @return remainingCalldata Input calldata that has not been used to
-    /// decode the signature.
     function decodeEcdsaSignature(bytes calldata encodedSignature)
         internal
         pure
         returns (
             bytes32 r,
             bytes32 s,
-            uint8 v,
-            bytes calldata remainingCalldata
+            uint8 v
         )
     {
         require(
-            encodedSignature.length >= ECDSA_SIGNATURE_LENGTH,
-            "GPv2: ecdsa signature too long"
+            encodedSignature.length == ECDSA_SIGNATURE_LENGTH,
+            "GPv2: malformed ecdsa signature"
         );
 
         // NOTE: Use assembly to efficiently decode signature data.
@@ -57,20 +152,6 @@ library GPv2Signing {
             s := calldataload(add(encodedSignature.offset, 32))
             // v = uint8(encodedSignature[64])
             v := shr(248, calldataload(add(encodedSignature.offset, 64)))
-        }
-
-        // NOTE: Use assembly to slice the calldata bytes without generating
-        // code for bounds checking.
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            remainingCalldata.offset := add(
-                encodedSignature.offset,
-                ECDSA_SIGNATURE_LENGTH
-            )
-            remainingCalldata.length := sub(
-                encodedSignature.length,
-                ECDSA_SIGNATURE_LENGTH
-            )
         }
     }
 
@@ -92,17 +173,13 @@ library GPv2Signing {
     /// @param orderDigest The EIP-712 signing digest derived from the order
     /// parameters.
     /// @return owner The address of the signer.
-    /// @return remainingCalldata Input calldata that has not been used to
-    /// decode the current order.
     function recoverEip712Signer(
         bytes calldata encodedSignature,
         bytes32 domainSeparator,
         bytes32 orderDigest
-    ) internal pure returns (address owner, bytes calldata remainingCalldata) {
-        bytes32 r;
-        bytes32 s;
-        uint8 v;
-        (r, s, v, remainingCalldata) = decodeEcdsaSignature(encodedSignature);
+    ) internal pure returns (address owner) {
+        (bytes32 r, bytes32 s, uint8 v) =
+            decodeEcdsaSignature(encodedSignature);
 
         uint256 freeMemoryPointer = getFreeMemoryPointer();
 
@@ -136,17 +213,13 @@ library GPv2Signing {
     /// @param orderDigest The EIP-712 signing digest derived from the order
     /// parameters.
     /// @return owner The address of the signer.
-    /// @return remainingCalldata Input calldata that has not been used to
-    /// decode the current order.
     function recoverEthsignSigner(
         bytes calldata encodedSignature,
         bytes32 domainSeparator,
         bytes32 orderDigest
-    ) internal pure returns (address owner, bytes calldata remainingCalldata) {
-        bytes32 r;
-        bytes32 s;
-        uint8 v;
-        (r, s, v, remainingCalldata) = decodeEcdsaSignature(encodedSignature);
+    ) internal pure returns (address owner) {
+        (bytes32 r, bytes32 s, uint8 v) =
+            decodeEcdsaSignature(encodedSignature);
 
         uint256 freeMemoryPointer = getFreeMemoryPointer();
 
@@ -176,71 +249,30 @@ library GPv2Signing {
     ///
     /// ```
     /// struct EncodedEip1271Signature {
-    ///     address verifier;
-    ///     uint16 signatureLength;
+    ///     address owner;
     ///     bytes signature;
     /// }
     /// ```
     ///
-    /// All entries are tightly packed together in this order in the encoded
-    /// calldata. `signatureLength` encodes the length of the signature bytes
-    /// in bytes. Example:
-    ///
-    /// input:    0x73c14081446bd1e4eb165250e826e80c5a523783000a00010203040506070809
-    /// decoding:   [..............verifier................][sL][.......data.......]
-    /// stride:                                          20   2         10 (0x000a)
-    ///
     /// This function enforces that the encoded data stores enough bytes to
-    /// cover the full length of the decoded interaction.
-    ///
-    /// The size of `dataLength` limits the maximum calldata that can be used in
-    /// a signature to 2**16 ≈ 65 kB.
+    /// cover the full length of the decoded signature.
     function recoverEip1271Signer(
         bytes calldata encodedSignature,
         bytes32 domainSeparator,
         bytes32 orderDigest
-    ) internal view returns (address owner, bytes calldata remainingCalldata) {
-        uint256 signatureLength;
-        bytes calldata signature;
-
-        // NOTE: Use assembly to efficiently decode signature data.
-        // If reading calldata out of bound, the extra bytes are set to zero.
+    ) internal view returns (address owner) {
+        // NOTE: Use assembly to read the verifier address from the encoded
+        // signature bytes.
         // solhint-disable-next-line no-inline-assembly
         assembly {
             // owner = address(encodedSignature[0:20])
             owner := shr(96, calldataload(encodedSignature.offset))
-            // signatureLength = uint256(encodedSignature[20:22])
-            signatureLength := shr(
-                240,
-                calldataload(add(encodedSignature.offset, 20))
-            )
         }
 
-        // Safety: dataLength fits a uint16 by construction, no overflow is
-        // possible.
-        uint256 usedCalldataStride = 20 + 2 + signatureLength;
-        require(
-            encodedSignature.length >= usedCalldataStride,
-            "GPv2: eip1271 signature too long"
-        );
-
-        // NOTE: Use assembly to efficiently decode signature data and assign
-        // calldata skipping bounds checks.
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            // signature = bytes(encodedTrade[22:22+signatureLength])
-            signature.offset := add(encodedSignature.offset, 22)
-            signature.length := signatureLength
-            // remainingCalldata = bytes(encodedTrade[22+signatureLength:])
-            remainingCalldata.offset := add(
-                encodedSignature.offset,
-                usedCalldataStride
-            )
-            remainingCalldata.length := sub(
-                encodedSignature.length,
-                usedCalldataStride
-            )
-        }
+        // NOTE: Configure prettier to ignore the following line as it causes
+        // a panic in the Solidity plugin.
+        // prettier-ignore
+        bytes calldata signature = encodedSignature[20:];
 
         uint256 freeMemoryPointer = getFreeMemoryPointer();
 

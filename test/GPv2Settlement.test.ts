@@ -19,7 +19,7 @@ import {
 } from "../src/ts";
 
 import { builtAndDeployedMetadataCoincide } from "./bytecode";
-import { decodeExecutedTrades, encodeOutTransfers } from "./encoding";
+import { encodeOutTransfers } from "./encoding";
 
 function toNumberLossy(value: BigNumber): number {
   // NOTE: BigNumber throws an exception when if is outside the range of
@@ -248,20 +248,14 @@ describe("GPv2Settlement", () => {
     it("reverts if encoded interactions has incorrect number of stages", async () => {
       await authenticator.connect(owner).addSolver(solver.address);
 
-      const [
-        tokens,
-        clearingPrices,
-        encodedTrades,
-        ,
-        encodedOrderRefunds,
-      ] = empty;
+      const [tokens, clearingPrices, trades, , encodedOrderRefunds] = empty;
       await expect(
         settlement
           .connect(solver)
           .settle([
             tokens,
             clearingPrices,
-            encodedTrades,
+            trades,
             ["0x", "0x"],
             encodedOrderRefunds,
           ]),
@@ -272,7 +266,7 @@ describe("GPv2Settlement", () => {
           .settle([
             tokens,
             clearingPrices,
-            encodedTrades,
+            trades,
             ["0x", "0x", "0x", "0x"],
             encodedOrderRefunds,
           ]),
@@ -363,76 +357,12 @@ describe("GPv2Settlement", () => {
         );
       }
 
-      const trades = decodeExecutedTrades(
-        await settlement.callStatic.computeTradeExecutionsTest(
-          encoder.tokens,
-          encoder.clearingPrices(prices),
-          encoder.encodedTrades,
-        ),
+      const trades = await settlement.callStatic.computeTradeExecutionsTest(
+        encoder.tokens,
+        encoder.clearingPrices(prices),
+        encoder.trades,
       );
       expect(trades.length).to.equal(tradeCount);
-    });
-
-    describe("Bad Trade Encoding", () => {
-      it("should revert if encoded length is larger than number of encoded trades", async () => {
-        const tradeCount = 10;
-        const encoder = new SettlementEncoder(testDomain);
-        for (let i = 0; i < tradeCount; i++) {
-          await encoder.signEncodeTrade(
-            {
-              ...partialOrder,
-              kind: OrderKind.BUY,
-              partiallyFillable: true,
-            },
-            traders[0],
-            SigningScheme.EIP712,
-            { executedAmount: ethers.utils.parseEther("0.7734") },
-          );
-        }
-
-        const encodedBytes = ethers.utils.arrayify(encoder.encodedTrades);
-        expect(encodedBytes.slice(0, 2)).to.deep.equal(
-          Uint8Array.from([0, tradeCount]),
-        );
-        encodedBytes[1] = tradeCount + 1;
-        await expect(
-          settlement.computeTradeExecutionsTest(
-            encoder.tokens,
-            encoder.clearingPrices(prices),
-            ethers.utils.hexlify(encodedBytes),
-          ),
-        ).to.be.revertedWith("GPv2: invalid trade encoding");
-      });
-
-      it("should revert if encoded length is smaller than number of encoded trades", async () => {
-        const tradeCount = 10;
-        const encoder = new SettlementEncoder(testDomain);
-        for (let i = 0; i < tradeCount; i++) {
-          await encoder.signEncodeTrade(
-            {
-              ...partialOrder,
-              kind: OrderKind.BUY,
-              partiallyFillable: true,
-            },
-            traders[0],
-            SigningScheme.EIP712,
-            { executedAmount: ethers.utils.parseEther("0.7734") },
-          );
-        }
-
-        const encodedBytes = ethers.utils.arrayify(encoder.encodedTrades);
-        expect(encodedBytes.slice(0, 2)).to.deep.equal(
-          Uint8Array.from([0, tradeCount]),
-        );
-        encodedBytes[1] = tradeCount - 1;
-        await expect(
-          settlement.computeTradeExecutionsTest(
-            encoder.tokens,
-            encoder.clearingPrices(prices),
-            ethers.utils.hexlify(encodedBytes),
-          ),
-        ).to.be.reverted;
-      });
     });
 
     it("should revert if the order expired", async () => {
@@ -453,7 +383,7 @@ describe("GPv2Settlement", () => {
         settlement.computeTradeExecutionsTest(
           encoder.tokens,
           encoder.clearingPrices(prices),
-          encoder.encodedTrades,
+          encoder.trades,
         ),
       ).to.be.revertedWith("order expired");
     });
@@ -487,7 +417,7 @@ describe("GPv2Settlement", () => {
             [sellToken]: sellPrice,
             [buyToken]: buyPrice,
           }),
-          encoder.encodedTrades,
+          encoder.trades,
         ),
       ).to.be.revertedWith("limit price not respected");
     });
@@ -511,13 +441,11 @@ describe("GPv2Settlement", () => {
           [sellToken]: buyAmount,
           [buyToken]: sellAmount,
         }),
-        encoder.encodedTrades,
+        encoder.trades,
       );
       await expect(executions).to.not.be.reverted;
 
-      const [{ buyAmount: executedBuyAmount }] = decodeExecutedTrades(
-        await executions,
-      );
+      const [{ buyAmount: executedBuyAmount }] = await executions;
       expect(executedBuyAmount).to.deep.equal(buyAmount);
     });
 
@@ -542,12 +470,10 @@ describe("GPv2Settlement", () => {
 
         const [
           { sellAmount: executedSellAmount, buyAmount: executedBuyAmount },
-        ] = decodeExecutedTrades(
-          await settlement.callStatic.computeTradeExecutionsTest(
-            encoder.tokens,
-            encoder.clearingPrices(prices),
-            encoder.encodedTrades,
-          ),
+        ] = await settlement.callStatic.computeTradeExecutionsTest(
+          encoder.tokens,
+          encoder.clearingPrices(prices),
+          encoder.trades,
         );
 
         const [sellPrice, buyPrice] = [
@@ -698,12 +624,10 @@ describe("GPv2Settlement", () => {
           tradeExecution,
         );
 
-        const [trade] = decodeExecutedTrades(
-          await settlement.callStatic.computeTradeExecutionsTest(
-            encoder.tokens,
-            encoder.clearingPrices(prices),
-            encoder.encodedTrades,
-          ),
+        const [trade] = await settlement.callStatic.computeTradeExecutionsTest(
+          encoder.tokens,
+          encoder.clearingPrices(prices),
+          encoder.trades,
         );
 
         return trade;
@@ -799,7 +723,7 @@ describe("GPv2Settlement", () => {
         await settlement.computeTradeExecutionsTest(
           encoder.tokens,
           encoder.clearingPrices(prices),
-          encoder.encodedTrades,
+          encoder.trades,
         );
 
         const orderUid = computeOrderUid({
@@ -871,12 +795,10 @@ describe("GPv2Settlement", () => {
         { executedAmount: ethers.utils.parseEther("1.0") },
       );
 
-      const trades = decodeExecutedTrades(
-        await settlement.callStatic.computeTradeExecutionsTest(
-          encoder.tokens,
-          encoder.clearingPrices(prices),
-          encoder.encodedTrades,
-        ),
+      const trades = await settlement.callStatic.computeTradeExecutionsTest(
+        encoder.tokens,
+        encoder.clearingPrices(prices),
+        encoder.trades,
       );
 
       expect(trades[0]).to.deep.equal(trades[1]);
@@ -902,7 +824,7 @@ describe("GPv2Settlement", () => {
         settlement.computeTradeExecutionsTest(
           encoder.tokens,
           encoder.clearingPrices(prices),
-          encoder.encodedTrades,
+          encoder.trades,
         ),
       ).to.be.revertedWith("fee discount too large");
     });
@@ -925,7 +847,7 @@ describe("GPv2Settlement", () => {
       const tx = settlement.computeTradeExecutionsTest(
         encoder.tokens,
         encoder.clearingPrices(prices),
-        encoder.encodedTrades,
+        encoder.trades,
       );
       await expect(tx)
         .to.emit(settlement, "Trade")
