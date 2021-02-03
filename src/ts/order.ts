@@ -170,13 +170,16 @@ export function normalizeOrder(order: Order): NormalizedOrder {
 }
 
 /**
- * Compute the 32-byte signing has for the specified order.
+ * Compute the 32-byte signing hash for the specified order.
  *
  * @param domain The EIP-712 domain separator to compute the hash for.
  * @param order The order to compute the digest for.
  * @return Hex-encoded 32-byte order digest.
  */
-export function hashOrder(domain: TypedDataDomain, order: Order): string {
+export function orderSigningHash(
+  domain: TypedDataDomain,
+  order: Order,
+): string {
   return ethers.utils._TypedDataEncoder.hash(
     domain,
     { Order: ORDER_TYPE_FIELDS },

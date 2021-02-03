@@ -71,7 +71,7 @@ library GPv2Order {
     ///
     /// @param order The order to compute the EIP-712 struct hash for.
     /// @return orderDigest The 32 byte EIP-712 struct hash.
-    function structHash(Data memory order)
+    function hash(Data memory order)
         internal
         pure
         returns (bytes32 orderDigest)

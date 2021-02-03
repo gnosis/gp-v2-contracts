@@ -148,7 +148,7 @@ abstract contract GPv2Signing {
         }
     }
 
-    /// @dev Returns the order hash, defined as the EIP-712 signing hash.
+    /// @dev Returns the EIP-712 signing hash for the specified order.
     ///
     /// @param order The order to hash.
     /// @return orderDigest The EIP-712 signing hash for the order.
@@ -158,7 +158,7 @@ abstract contract GPv2Signing {
         returns (bytes32 orderDigest)
     {
         orderDigest = keccak256(
-            abi.encodePacked("\x19\x01", domainSeparator, order.structHash())
+            abi.encodePacked("\x19\x01", domainSeparator, order.hash())
         );
     }
 

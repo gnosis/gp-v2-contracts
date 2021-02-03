@@ -11,7 +11,7 @@ import {
   computeOrderUid,
   domain,
   encodeEip1271SignatureData,
-  hashOrder,
+  orderSigningHash,
   signOrder,
 } from "../src/ts";
 
@@ -129,7 +129,7 @@ describe("GPv2Signing", () => {
       );
       expect(orderUid).to.equal(
         computeOrderUid({
-          orderDigest: hashOrder(testDomain, sampleOrder),
+          orderDigest: orderSigningHash(testDomain, sampleOrder),
           owner: traders[0].address,
           validTo: sampleOrder.validTo,
         }),
@@ -347,7 +347,7 @@ describe("GPv2Signing", () => {
       const artifact = await artifacts.readArtifact("EIP1271Verifier");
       const verifier = await waffle.deployMockContract(deployer, artifact.abi);
 
-      const message = hashOrder(testDomain, sampleOrder);
+      const message = orderSigningHash(testDomain, sampleOrder);
       const eip1271Signature = "0x031337";
       await verifier.mock.isValidSignature
         .withArgs(message, eip1271Signature)
@@ -366,7 +366,7 @@ describe("GPv2Signing", () => {
     });
 
     it("should revert on an invalid EIP-1271 signature", async () => {
-      const message = hashOrder(testDomain, sampleOrder);
+      const message = orderSigningHash(testDomain, sampleOrder);
       const eip1271Signature = "0x031337";
 
       const artifact = await artifacts.readArtifact("EIP1271Verifier");
@@ -388,7 +388,7 @@ describe("GPv2Signing", () => {
     });
 
     it("should revert with non-standard EIP-1271 verifiers", async () => {
-      const message = hashOrder(testDomain, sampleOrder);
+      const message = orderSigningHash(testDomain, sampleOrder);
       const eip1271Signature = "0x031337";
 
       const NON_STANDARD_EIP1271_VERIFIER = [
@@ -434,7 +434,7 @@ describe("GPv2Signing", () => {
       );
 
       const evilVerifier = await StateChangingEIP1271.deploy();
-      const message = hashOrder(testDomain, sampleOrder);
+      const message = orderSigningHash(testDomain, sampleOrder);
       const eip1271Signature = "0x";
 
       expect(await evilVerifier.state()).to.equal(ethers.constants.Zero);
@@ -466,7 +466,7 @@ describe("GPv2Signing", () => {
     it("computes EIP-712 order signing hash", async () => {
       expect(
         await signing.orderSigningHashTest(encodeOrder(sampleOrder)),
-      ).to.equal(hashOrder(testDomain, sampleOrder));
+      ).to.equal(orderSigningHash(testDomain, sampleOrder));
     });
   });
 });
