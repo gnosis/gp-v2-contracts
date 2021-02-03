@@ -2,6 +2,6 @@
 pragma solidity ^0.7.6;
 
 contract NonPayable {
-    // solhint-disable-next-line no-empty-blocks
+    // solhint-disable-next-line no-empty-blocks, payable-fallback
     fallback() external {}
 }
