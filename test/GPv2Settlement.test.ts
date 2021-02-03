@@ -1154,7 +1154,7 @@ describe("GPv2Settlement", () => {
   });
 
   describe("claimOrderRefunds", () => {
-    it("should free storage for all orders", async () => {
+    it("should set filled amount to 0 for all orders", async () => {
       const orderUids = [
         computeOrderUid({
           orderDigest: `0x${"11".repeat(32)}`,
@@ -1180,7 +1180,7 @@ describe("GPv2Settlement", () => {
         );
       }
 
-      await settlement.claimOrderRefundsTest(ethers.utils.hexConcat(orderUids));
+      await settlement.claimOrderRefundsTest(orderUids);
       for (const orderUid of orderUids) {
         expect(await settlement.filledAmount(orderUid)).to.deep.equal(
           ethers.constants.Zero,
@@ -1189,38 +1189,19 @@ describe("GPv2Settlement", () => {
     });
 
     it("should revert if the encoded order UIDs are malformed", async () => {
-      const malformedOrderUids = ethers.utils.hexConcat([
-        computeOrderUid({
-          orderDigest: ethers.constants.HashZero,
-          owner: ethers.constants.AddressZero,
-          validTo: 0,
-        }),
-        "0x00",
-      ]);
-      await expect(settlement.claimOrderRefundsTest(malformedOrderUids)).to.be
-        .reverted;
-    });
-  });
-
-  describe("freeOrderStorage", () => {
-    it("should set filled amount to 0", async () => {
-      const orderDigest = `0x${"11".repeat(32)}`;
-      const { timestamp } = await ethers.provider.getBlock("latest");
       const orderUid = computeOrderUid({
-        orderDigest,
-        owner: traders[0].address,
-        validTo: timestamp - 1,
+        orderDigest: ethers.constants.HashZero,
+        owner: ethers.constants.AddressZero,
+        validTo: 0,
       });
 
-      await settlement.connect(traders[0]).invalidateOrder(orderUid);
-      expect(await settlement.filledAmount(orderUid)).to.not.deep.equal(
-        ethers.constants.Zero,
-      );
-
-      await settlement.freeOrderStorageTest(orderUid);
-      expect(await settlement.filledAmount(orderUid)).to.deep.equal(
-        ethers.constants.Zero,
-      );
+      for (const malformedOrderUid of [
+        ethers.utils.hexDataSlice(orderUid, 0, 55),
+        ethers.utils.hexZeroPad(orderUid, 57),
+      ]) {
+        await expect(settlement.claimOrderRefundsTest([malformedOrderUid])).to
+          .be.reverted;
+      }
     });
 
     it("should revert if the order is still valid", async () => {
@@ -1231,7 +1212,7 @@ describe("GPv2Settlement", () => {
         validTo: 0xffffffff,
       });
       await expect(
-        settlement.freeOrderStorageTest(orderUid),
+        settlement.claimOrderRefundsTest([orderUid]),
       ).to.be.revertedWith("order still valid");
     });
   });

@@ -20,12 +20,6 @@ function fillBytes(count: number, byte: number): string {
   return ethers.utils.hexlify([...Array(count)].map(() => byte));
 }
 
-function fillDistinctBytes(count: number, start: number): string {
-  return ethers.utils.hexlify(
-    [...Array(count)].map((_, i) => (start + i) % 256),
-  );
-}
-
 function fillUint(bits: number, byte: number): BigNumber {
   return BigNumber.from(fillBytes(bits / 8, byte));
 }
@@ -590,81 +584,6 @@ describe("GPv2Encoding", () => {
         });
         expect(encodedOutput).to.contain(orderUid.slice(2));
       });
-    });
-  });
-
-  describe("extractOrderUidParams", () => {
-    it("round trip encode/decode", async () => {
-      // Start from 17 (0x11) so that the first byte has no zeroes.
-      const orderDigest = fillDistinctBytes(32, 17);
-      const address = ethers.utils.getAddress(fillDistinctBytes(20, 17 + 32));
-      const validTo = BigNumber.from(fillDistinctBytes(4, 17 + 32 + 20));
-
-      const orderUid = computeOrderUid({
-        orderDigest,
-        owner: address,
-        validTo: validTo.toNumber(),
-      });
-      expect(orderUid).to.equal(fillDistinctBytes(32 + 20 + 4, 17));
-
-      const {
-        orderDigest: extractedOrderDigest,
-        owner: extractedAddress,
-        validTo: extractedValidTo,
-      } = await encoding.extractOrderUidParamsTest(orderUid);
-      expect(extractedOrderDigest).to.equal(orderDigest);
-      expect(extractedValidTo).to.equal(validTo);
-      expect(extractedAddress).to.equal(address);
-    });
-
-    describe("fails on uid", () => {
-      const uidStride = 32 + 20 + 4;
-
-      it("longer than expected", async () => {
-        const invalidUid = "0x" + "00".repeat(uidStride + 1);
-
-        await expect(
-          encoding.extractOrderUidParamsTest(invalidUid),
-        ).to.be.revertedWith("GPv2: invalid uid");
-      });
-
-      it("shorter than expected", async () => {
-        const invalidUid = "0x" + "00".repeat(uidStride - 1);
-
-        await expect(
-          encoding.extractOrderUidParamsTest(invalidUid),
-        ).to.be.revertedWith("GPv2: invalid uid");
-      });
-    });
-  });
-
-  describe("decodeOrderUidsTest", () => {
-    it("should round trip encode/decode", async () => {
-      // Start from 17 (0x11) so that the first byte has no zeroes.
-      const orderUids = [
-        fillDistinctBytes(56, 17),
-        fillDistinctBytes(56, 17 + 56),
-        fillDistinctBytes(56, 17 + 56 * 2),
-      ];
-
-      const decodedOrderUids = await encoding.decodeOrderUidsTest(
-        ethers.utils.solidityPack(
-          orderUids.map(() => "bytes"),
-          orderUids,
-        ),
-      );
-      expect(decodedOrderUids).to.deep.equal(orderUids);
-    });
-
-    it("should accept empty order UIDs", async () => {
-      expect(await encoding.decodeOrderUidsTest("0x")).to.deep.equal([]);
-    });
-
-    it("should revert on malformed order UIDs", async () => {
-      const invalidUids = "0x00";
-      await expect(
-        encoding.decodeOrderUidsTest(invalidUids),
-      ).to.be.revertedWith("malformed order UIDs");
     });
   });
 });

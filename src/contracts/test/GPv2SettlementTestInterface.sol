@@ -59,13 +59,7 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
         executeInteractions(interactions);
     }
 
-    function claimOrderRefundsTest(bytes calldata encodedOrderRefunds)
-        external
-    {
-        claimOrderRefunds(encodedOrderRefunds);
-    }
-
-    function freeOrderStorageTest(bytes calldata orderUid) external {
-        freeOrderStorage(orderUid);
+    function claimOrderRefundsTest(bytes[] calldata orderRefunds) external {
+        claimOrderRefunds(orderRefunds);
     }
 }
