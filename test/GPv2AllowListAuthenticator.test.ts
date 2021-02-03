@@ -23,7 +23,7 @@ describe("GPv2AllowListAuthentication", () => {
 
     it("ensures initializeManager is idempotent", async () => {
       await expect(
-        authenticator.initializeManager(nonOwner.address),
+        authenticator.connect(owner).initializeManager(nonOwner.address),
       ).to.revertedWith("GPv2: already initialized");
     });
 
