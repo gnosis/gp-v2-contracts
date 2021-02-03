@@ -143,7 +143,7 @@ export async function signOrder(
 }
 
 /**
- * Encodes the necessary data required fir the Gnosis Protocol contracts to
+ * Encodes the necessary data required for the Gnosis Protocol contracts to
  * verify an EIP-1271 signature.
  *
  * @param signature The EIP-1271 signature data to encode.
