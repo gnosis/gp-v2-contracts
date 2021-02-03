@@ -11,13 +11,16 @@ const deployAuthenticator: DeployFunction = async function ({
   const { deploy } = deployments;
 
   const { authenticator } = CONTRACT_NAMES;
-
   await deploy(authenticator, {
     from: deployer,
     gasLimit: 2000000,
-    args: [owner],
     deterministicDeployment: SALT,
     log: true,
+    proxy: {
+      owner,
+      methodName: "initializeManager",
+    },
+    args: [owner],
   });
 };
 

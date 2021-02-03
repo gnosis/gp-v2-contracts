@@ -4,27 +4,31 @@ pragma solidity ^0.7.6;
 import "@gnosis.pm/util-contracts/contracts/StorageAccessible.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "./interfaces/GPv2Authentication.sol";
-import "./ownership/CustomInitiallyOwnable.sol";
 
 /// @title Gnosis Protocol v2 Access Control Contract
 /// @author Gnosis Developers
-contract GPv2AllowListAuthentication is
-    CustomInitiallyOwnable,
-    GPv2Authentication,
-    StorageAccessible
-{
+contract GPv2AllowListAuthentication is GPv2Authentication, StorageAccessible {
     using EnumerableSet for EnumerableSet.AddressSet;
+
+    address public manager;
 
     EnumerableSet.AddressSet private solvers;
 
-    // solhint-disable-next-line no-empty-blocks
-    constructor(address initialOwner) CustomInitiallyOwnable(initialOwner) {}
+    function initializeManager(address manager_) external {
+        require(manager == address(0), "GPv2: already initialized");
+        manager = manager_;
+    }
 
-    function addSolver(address solver) external onlyOwner {
+    modifier onlyManager() {
+        require(manager == msg.sender, "GPv2: caller not manager");
+        _;
+    }
+
+    function addSolver(address solver) external onlyManager {
         solvers.add(solver);
     }
 
-    function removeSolver(address solver) external onlyOwner {
+    function removeSolver(address solver) external onlyManager {
         solvers.remove(solver);
     }
 

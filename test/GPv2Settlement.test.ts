@@ -40,7 +40,8 @@ describe("GPv2Settlement", () => {
       "GPv2AllowListAuthentication",
       deployer,
     );
-    authenticator = await GPv2AllowListAuthentication.deploy(owner.address);
+    authenticator = await GPv2AllowListAuthentication.deploy();
+    await authenticator.initializeManager(owner.address);
 
     const GPv2Settlement = await ethers.getContractFactory(
       "GPv2SettlementTestInterface",

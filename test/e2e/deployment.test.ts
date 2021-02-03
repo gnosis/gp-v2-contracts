@@ -6,6 +6,7 @@ import {
   ContractName,
   DeploymentArguments,
   deterministicDeploymentAddress,
+  implementationAddress,
 } from "../../src/ts";
 import { builtAndDeployedMetadataCoincide } from "../bytecode";
 
@@ -45,7 +46,7 @@ describe("E2E: Deployment", () => {
     it("authenticator", async () => {
       expect(
         await builtAndDeployedMetadataCoincide(
-          authenticator.address,
+          await implementationAddress(authenticator.address),
           "GPv2AllowListAuthentication",
         ),
       ).to.be.true;
@@ -72,9 +73,9 @@ describe("E2E: Deployment", () => {
 
   describe("deterministic addresses", () => {
     it("authenticator", async () => {
-      expect(
-        await contractAddress("GPv2AllowListAuthentication", owner.address),
-      ).to.equal(authenticator.address);
+      expect(await contractAddress("GPv2AllowListAuthentication")).to.equal(
+        await implementationAddress(authenticator.address),
+      );
     });
 
     it("settlement", async () => {
@@ -86,7 +87,7 @@ describe("E2E: Deployment", () => {
 
   describe("ownership", () => {
     it("authenticator has dedicated owner", async () => {
-      expect(await authenticator.owner()).to.equal(owner.address);
+      expect(await authenticator.manager()).to.equal(owner.address);
     });
   });
 });

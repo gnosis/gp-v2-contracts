@@ -12,15 +12,28 @@ describe("GPv2AllowListAuthentication", () => {
       deployer,
     );
 
-    authenticator = await GPv2AllowListAuthentication.deploy(owner.address);
+    authenticator = await GPv2AllowListAuthentication.deploy();
+    await authenticator.initializeManager(owner.address);
   });
 
   describe("constructor", () => {
-    it("should set the owner", async () => {
-      expect(await authenticator.owner()).to.equal(owner.address);
+    it("should initialize the manager", async () => {
+      expect(await authenticator.manager()).to.equal(owner.address);
     });
-    it("deployer is not the owner", async () => {
-      expect(await authenticator.owner()).not.to.be.equal(deployer.address);
+
+    it("ensures initializeManager is idempotent", async () => {
+      await expect(
+        authenticator.initializeManager(nonOwner.address),
+      ).to.revertedWith("GPv2: already initialized");
+
+      // Also reverts when called by owner.
+      await expect(
+        authenticator.connect(owner).initializeManager(nonOwner.address),
+      ).to.revertedWith("GPv2: already initialized");
+    });
+
+    it("deployer is not the manager", async () => {
+      expect(await authenticator.manager()).not.to.be.equal(deployer.address);
     });
   });
 
@@ -33,7 +46,7 @@ describe("GPv2AllowListAuthentication", () => {
     it("should not allow non-owner to add solver", async () => {
       await expect(
         authenticator.connect(nonOwner).addSolver(solver.address),
-      ).to.be.revertedWith("caller is not the owner");
+      ).to.be.revertedWith("GPv2: caller not manager");
     });
   });
 
@@ -46,7 +59,7 @@ describe("GPv2AllowListAuthentication", () => {
     it("should not allow non-owner to remove solver", async () => {
       await expect(
         authenticator.connect(nonOwner).removeSolver(solver.address),
-      ).to.be.revertedWith("caller is not the owner");
+      ).to.be.revertedWith("GPv2: caller not manager");
     });
   });
 
