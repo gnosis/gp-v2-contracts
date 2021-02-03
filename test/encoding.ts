@@ -56,15 +56,6 @@ export function decodeOrder(order: AbiOrder): Order {
   };
 }
 
-export type AbiExecutedTrade = [
-  string,
-  string,
-  string,
-  string,
-  BigNumber,
-  BigNumber,
-];
-
 export interface ExecutedTrade {
   owner: string;
   receiver: string;
@@ -74,44 +65,18 @@ export interface ExecutedTrade {
   buyAmount: BigNumber;
 }
 
-export function encodeExecutedTrade(trade: ExecutedTrade): AbiExecutedTrade {
-  return [
-    trade.owner,
-    trade.receiver,
-    trade.sellToken,
-    trade.buyToken,
-    trade.sellAmount,
-    trade.buyAmount,
-  ];
-}
-
-export function decodeExecutedTrades(
-  trades: AbiExecutedTrade[],
-): ExecutedTrade[] {
-  return trades.map((trade) => ({
-    owner: trade[0],
-    receiver: trade[1],
-    sellToken: trade[2],
-    buyToken: trade[3],
-    sellAmount: trade[4],
-    buyAmount: trade[5],
-  }));
-}
-
 export type InTransfer = Pick<
   ExecutedTrade,
   "owner" | "sellToken" | "sellAmount"
 >;
 
-export function encodeInTransfers(transfers: InTransfer[]): AbiExecutedTrade[] {
-  return transfers.map((transfer) =>
-    encodeExecutedTrade({
-      ...transfer,
-      receiver: ethers.constants.AddressZero,
-      buyToken: ethers.constants.AddressZero,
-      buyAmount: ethers.constants.Zero,
-    }),
-  );
+export function encodeInTransfers(transfers: InTransfer[]): ExecutedTrade[] {
+  return transfers.map((transfer) => ({
+    ...transfer,
+    receiver: ethers.constants.AddressZero,
+    buyToken: ethers.constants.AddressZero,
+    buyAmount: ethers.constants.Zero,
+  }));
 }
 
 export type OutTransfer = Pick<
@@ -119,14 +84,10 @@ export type OutTransfer = Pick<
   "owner" | "receiver" | "buyToken" | "buyAmount"
 >;
 
-export function encodeOutTransfers(
-  transfers: OutTransfer[],
-): AbiExecutedTrade[] {
-  return transfers.map((transfer) =>
-    encodeExecutedTrade({
-      ...transfer,
-      sellToken: ethers.constants.AddressZero,
-      sellAmount: ethers.constants.Zero,
-    }),
-  );
+export function encodeOutTransfers(transfers: OutTransfer[]): ExecutedTrade[] {
+  return transfers.map((transfer) => ({
+    ...transfer,
+    sellToken: ethers.constants.AddressZero,
+    sellAmount: ethers.constants.Zero,
+  }));
 }

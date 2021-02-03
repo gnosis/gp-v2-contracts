@@ -137,7 +137,13 @@ export type EncodedSettlement = [
  */
 export const MAX_TRADES_IN_SETTLEMENT = 2 ** 16 - 1;
 
-function encodeSigningScheme(scheme: SigningScheme): number {
+/**
+ * Encodes signing scheme as a bitfield.
+ *
+ * @param scheme The signing scheme to encode.
+ * @return The bitfield result.
+ */
+export function encodeSigningScheme(scheme: SigningScheme): number {
   switch (scheme) {
     case SigningScheme.EIP712:
       return 0b0000;
@@ -150,7 +156,13 @@ function encodeSigningScheme(scheme: SigningScheme): number {
   }
 }
 
-function encodeOrderFlags(flags: OrderFlags): number {
+/**
+ * Encodes order flags as a bitfield.
+ *
+ * @param flags The order flags to encode.
+ * @return The bitfield result.
+ */
+export function encodeOrderFlags(flags: OrderFlags): number {
   let kind;
   switch (flags.kind) {
     case OrderKind.SELL:
@@ -167,7 +179,13 @@ function encodeOrderFlags(flags: OrderFlags): number {
   return kind | partiallyFillable;
 }
 
-function encodeTradeFlags(flags: TradeFlags): number {
+/**
+ * Encodes trade flags as a bitfield.
+ *
+ * @param flags The trade flags to encode.
+ * @return The bitfield result.
+ */
+export function encodeTradeFlags(flags: TradeFlags): number {
   return encodeOrderFlags(flags) | encodeSigningScheme(flags.signingScheme);
 }
 
