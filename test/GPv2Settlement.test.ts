@@ -15,7 +15,7 @@ import {
   computeOrderUid,
   domain,
   hashOrder,
-  packInteractions,
+  normalizeInteractions,
 } from "../src/ts";
 
 import { builtAndDeployedMetadataCoincide } from "./bytecode";
@@ -987,12 +987,12 @@ describe("GPv2Settlement", () => {
         interactionParameters.length,
       );
 
-      const encodedInteractions = packInteractions(
-        interactionParameters.map(({ target, value, number }) => ({
+      const interactions = interactionParameters.map(
+        ({ target, value, number }) => ({
           target: target.address,
           value,
           callData: target.interface.encodeFunctionData("emitEvent", [number]),
-        })),
+        }),
       );
 
       // Note: make sure to send some Ether to the settlement contract so that
@@ -1002,7 +1002,7 @@ describe("GPv2Settlement", () => {
         value: ethers.utils.parseEther("1.0"),
       });
 
-      const settled = settlement.executeInteractionsTest(encodedInteractions);
+      const settled = settlement.executeInteractionsTest(interactions);
       const { events }: ContractReceipt = await (await settled).wait();
 
       // Note: all contracts were touched.
@@ -1043,7 +1043,7 @@ describe("GPv2Settlement", () => {
       // test error"
       await expect(
         settlement.executeInteractionsTest(
-          packInteractions([
+          normalizeInteractions([
             {
               target: mockPass.address,
               callData: mockPass.interface.encodeFunctionData("alwaysPasses"),
@@ -1058,9 +1058,7 @@ describe("GPv2Settlement", () => {
         ),
       ).to.be.revertedWith("test error");
     });
-  });
 
-  describe("executeInteraction", () => {
     it("should revert when target is allowanceManager", async () => {
       const invalidInteraction: Interaction = {
         target: await settlement.allowanceManager(),
@@ -1069,28 +1067,8 @@ describe("GPv2Settlement", () => {
       };
 
       await expect(
-        settlement.executeInteractionTest(invalidInteraction),
+        settlement.executeInteractionsTest([invalidInteraction]),
       ).to.be.revertedWith("GPv2: forbidden interaction");
-    });
-
-    it("should revert when interaction reverts", async () => {
-      const reverter = await waffle.deployMockContract(deployer, [
-        "function alwaysReverts()",
-      ]);
-      await reverter.mock.alwaysReverts.revertsWithReason("test error");
-      const revertingCallData = reverter.interface.encodeFunctionData(
-        "alwaysReverts",
-      );
-      const failingInteraction: Interaction = {
-        target: reverter.address,
-        callData: revertingCallData,
-        value: 0,
-      };
-
-      // TODO - update this error with concatenated version "GPv2 Interaction: test error"
-      await expect(
-        settlement.executeInteractionTest(failingInteraction),
-      ).to.be.revertedWith("test error");
     });
 
     it("reverts if the settlement contract does not have sufficient Ether balance", async () => {
@@ -1100,7 +1078,7 @@ describe("GPv2Settlement", () => {
 
       await expect(
         settlement.executeInteractionsTest(
-          packInteractions([
+          normalizeInteractions([
             {
               target: ethers.constants.AddressZero,
               value,
@@ -1108,16 +1086,6 @@ describe("GPv2Settlement", () => {
           ]),
         ),
       ).to.be.reverted;
-    });
-
-    it("should pass on successful execution", async () => {
-      const passingInteraction: Interaction = {
-        target: ethers.constants.AddressZero,
-        callData: "0x",
-        value: 0,
-      };
-      await expect(settlement.executeInteractionTest(passingInteraction)).to.not
-        .be.reverted;
     });
 
     it("emits an Interaction event", async () => {
@@ -1131,13 +1099,15 @@ describe("GPv2Settlement", () => {
       await deployer.sendTransaction({ to: settlement.address, value });
       await contract.mock.someFunction.withArgs(parameter).returns();
 
-      const tx = settlement.executeInteractionTest({
-        target: contract.address,
-        value,
-        callData: contract.interface.encodeFunctionData("someFunction", [
-          parameter,
-        ]),
-      });
+      const tx = settlement.executeInteractionsTest([
+        {
+          target: contract.address,
+          value,
+          callData: contract.interface.encodeFunctionData("someFunction", [
+            parameter,
+          ]),
+        },
+      ]);
       await expect(tx)
         .to.emit(settlement, "Interaction")
         .withArgs(
@@ -1145,70 +1115,6 @@ describe("GPv2Settlement", () => {
           value,
           contract.interface.getSighash("someFunction"),
         );
-    });
-
-    it("masks the function selector to the first 4 bytes for the emitted event", async () => {
-      const abi = new ethers.utils.Interface([
-        "function someFunction(bytes32 parameter)",
-      ]);
-
-      const tx = await settlement.executeInteractionTest({
-        target: ethers.constants.AddressZero,
-        value: 0,
-        callData: abi.encodeFunctionData("someFunction", [
-          `0x${"ff".repeat(32)}`,
-        ]),
-      });
-
-      const {
-        events: [{ data }],
-      } = await tx.wait();
-      expect(data).to.equal(
-        ethers.utils.defaultAbiCoder.encode(
-          ["uint256", "bytes4"],
-          [0, abi.getSighash("someFunction")],
-        ),
-      );
-    });
-
-    it("computes selector for parameterless functions", async () => {
-      const contract = await waffle.deployMockContract(deployer, [
-        "function someFunction()",
-      ]);
-
-      await contract.mock.someFunction.returns();
-
-      const callData = contract.interface.encodeFunctionData(
-        "someFunction",
-        [],
-      );
-      expect(callData).to.equal(contract.interface.getSighash("someFunction"));
-
-      const tx = settlement.executeInteractionTest({
-        target: contract.address,
-        value: 0,
-        callData,
-      });
-      await expect(tx)
-        .to.emit(settlement, "Interaction")
-        .withArgs(contract.address, ethers.constants.Zero, callData);
-    });
-
-    it("uses 0 selector for empty or short calldata", async () => {
-      for (const callData of ["0x", "0xabcdef"]) {
-        const tx = settlement.executeInteractionTest({
-          target: ethers.constants.AddressZero,
-          value: ethers.constants.Zero,
-          callData,
-        });
-        await expect(tx)
-          .to.emit(settlement, "Interaction")
-          .withArgs(
-            ethers.constants.AddressZero,
-            ethers.constants.Zero,
-            "0x00000000",
-          );
-      }
     });
   });
 
@@ -1249,7 +1155,7 @@ describe("GPv2Settlement", () => {
   });
 
   describe("claimOrderRefunds", () => {
-    it("should free storage for all orders", async () => {
+    it("should set filled amount to 0 for all orders", async () => {
       const orderUids = [
         computeOrderUid({
           orderDigest: `0x${"11".repeat(32)}`,
@@ -1275,7 +1181,7 @@ describe("GPv2Settlement", () => {
         );
       }
 
-      await settlement.claimOrderRefundsTest(ethers.utils.hexConcat(orderUids));
+      await settlement.claimOrderRefundsTest(orderUids);
       for (const orderUid of orderUids) {
         expect(await settlement.filledAmount(orderUid)).to.deep.equal(
           ethers.constants.Zero,
@@ -1284,38 +1190,19 @@ describe("GPv2Settlement", () => {
     });
 
     it("should revert if the encoded order UIDs are malformed", async () => {
-      const malformedOrderUids = ethers.utils.hexConcat([
-        computeOrderUid({
-          orderDigest: ethers.constants.HashZero,
-          owner: ethers.constants.AddressZero,
-          validTo: 0,
-        }),
-        "0x00",
-      ]);
-      await expect(settlement.claimOrderRefundsTest(malformedOrderUids)).to.be
-        .reverted;
-    });
-  });
-
-  describe("freeOrderStorage", () => {
-    it("should set filled amount to 0", async () => {
-      const orderDigest = `0x${"11".repeat(32)}`;
-      const { timestamp } = await ethers.provider.getBlock("latest");
       const orderUid = computeOrderUid({
-        orderDigest,
-        owner: traders[0].address,
-        validTo: timestamp - 1,
+        orderDigest: ethers.constants.HashZero,
+        owner: ethers.constants.AddressZero,
+        validTo: 0,
       });
 
-      await settlement.connect(traders[0]).invalidateOrder(orderUid);
-      expect(await settlement.filledAmount(orderUid)).to.not.deep.equal(
-        ethers.constants.Zero,
-      );
-
-      await settlement.freeOrderStorageTest(orderUid);
-      expect(await settlement.filledAmount(orderUid)).to.deep.equal(
-        ethers.constants.Zero,
-      );
+      for (const malformedOrderUid of [
+        ethers.utils.hexDataSlice(orderUid, 0, 55),
+        ethers.utils.hexZeroPad(orderUid, 57),
+      ]) {
+        await expect(settlement.claimOrderRefundsTest([malformedOrderUid])).to
+          .be.reverted;
+      }
     });
 
     it("should revert if the order is still valid", async () => {
@@ -1326,7 +1213,7 @@ describe("GPv2Settlement", () => {
         validTo: 0xffffffff,
       });
       await expect(
-        settlement.freeOrderStorageTest(orderUid),
+        settlement.claimOrderRefundsTest([orderUid]),
       ).to.be.revertedWith("order still valid");
     });
   });

@@ -15,10 +15,6 @@ contract GPv2EncodingTestInterface {
             )
         );
 
-    function orderTypeHashTest() external pure returns (bytes32) {
-        return (GPv2Encoding.ORDER_TYPE_HASH);
-    }
-
     function tradeCountTest(bytes calldata encodedTrades)
         external
         pure
@@ -77,53 +73,5 @@ contract GPv2EncodingTestInterface {
             mem := sub(mload(0x40), mem)
         }
         gas_ = gas_ - gasleft();
-    }
-
-    function decodeInteractionsTest(
-        bytes calldata encodedInteractions,
-        uint256 expectedInteractionCount
-    ) external pure returns (GPv2Encoding.Interaction[] memory interactions) {
-        interactions = new GPv2Encoding.Interaction[](expectedInteractionCount);
-
-        uint256 interactionCount = 0;
-        bytes calldata remainingInteractions = encodedInteractions;
-        while (remainingInteractions.length != 0) {
-            remainingInteractions = remainingInteractions.decodeInteraction(
-                interactions[interactionCount]
-            );
-            interactionCount += 1;
-        }
-
-        // Note: expectedInteractionCount is only used to preallocate the memory
-        // needed to store all interactions in advance. It is not needed in the
-        // the settlement contract since an interaction does not need to be
-        // stored in memory after its execution.
-        require(
-            interactionCount == expectedInteractionCount,
-            "bad interaction count"
-        );
-    }
-
-    function extractOrderUidParamsTest(bytes calldata orderUid)
-        external
-        pure
-        returns (
-            bytes32 orderDigest,
-            address owner,
-            uint32 validTo
-        )
-    {
-        return orderUid.extractOrderUidParams();
-    }
-
-    function decodeOrderUidsTest(bytes calldata encodedOrderUids)
-        external
-        pure
-        returns (bytes[] memory orderUids)
-    {
-        orderUids = new bytes[](encodedOrderUids.orderUidCount());
-        for (uint256 i = 0; i < orderUids.length; i++) {
-            orderUids[i] = encodedOrderUids.orderUidAtIndex(i);
-        }
     }
 }

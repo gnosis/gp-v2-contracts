@@ -4,14 +4,11 @@ import { artifacts, ethers, waffle } from "hardhat";
 
 import {
   EIP1271_MAGICVALUE,
-  ORDER_TYPE_HASH,
   OrderKind,
   SettlementEncoder,
   SigningScheme,
   computeOrderUid,
-  extractOrderUidParams,
   hashOrder,
-  packInteractions,
   eip1271Message,
 } from "../src/ts";
 
@@ -19,12 +16,6 @@ import { decodeTrade } from "./encoding";
 
 function fillBytes(count: number, byte: number): string {
   return ethers.utils.hexlify([...Array(count)].map(() => byte));
-}
-
-function fillDistinctBytes(count: number, start: number): string {
-  return ethers.utils.hexlify(
-    [...Array(count)].map((_, i) => (start + i) % 256),
-  );
 }
 
 function fillUint(bits: number, byte: number): BigNumber {
@@ -63,12 +54,6 @@ describe("GPv2Encoding", () => {
       expect(await encoding.DOMAIN_SEPARATOR()).to.equal(
         ethers.utils._TypedDataEncoder.hashDomain(testDomain),
       );
-    });
-  });
-
-  describe("ORDER_TYPE_HASH", () => {
-    it("should be match the EIP-712 order type hash", async () => {
-      expect(await encoding.orderTypeHashTest()).to.equal(ORDER_TYPE_HASH);
     });
   });
 
@@ -183,25 +168,6 @@ describe("GPv2Encoding", () => {
       expect(buyTokenIndex).to.equal(
         encoder.tokens.indexOf(sampleOrder.buyToken),
       );
-    });
-
-    it("should compute EIP-712 order struct hash", async () => {
-      const encoder = new SettlementEncoder(testDomain);
-      await encoder.signEncodeTrade(
-        sampleOrder,
-        traders[0],
-        SigningScheme.EIP712,
-      );
-
-      const { trades } = await encoding.decodeTradesTest(
-        encoder.tokens,
-        encoder.encodedTrades,
-      );
-
-      const { orderDigest } = extractOrderUidParams(
-        decodeTrade(trades[0]).orderUid,
-      );
-      expect(orderDigest).to.equal(hashOrder(sampleOrder));
     });
 
     it("should compute order unique identifier", async () => {
@@ -591,262 +557,6 @@ describe("GPv2Encoding", () => {
         });
         expect(encodedOutput).to.contain(orderUid.slice(2));
       });
-    });
-  });
-
-  describe("decodeInteraction", () => {
-    it("decodes sample encoded interactions", async () => {
-      // Examples from the documentation describing `decodeInteraction` in the
-      // [`GPv2Encoding`] library.
-      for (const sample of [
-        {
-          encodedInteraction:
-            "0x73c14081446bd1e4eb165250e826e80c5a52378300000010000102030405060708090a0b0c0d0e0f",
-          target: ethers.utils.getAddress(
-            "0x73c14081446bd1e4eb165250e826e80c5a523783",
-          ),
-          value: ethers.constants.Zero,
-          callData: "0x000102030405060708090a0b0c0d0e0f",
-        },
-        {
-          encodedInteraction:
-            "0x0000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000de0b6b3a7640000",
-          target: ethers.constants.AddressZero,
-          value: ethers.utils.parseEther("1.0"),
-          callData: "0x",
-        },
-      ]) {
-        // Note: the number of interactions is a convenience input used to
-        // preallocate the memory needed to store all interactions simultaneously.
-        // If this number does not correspond exactly to the amount recovered
-        // after decoding, then the test call reverts.
-        const numInteractions = 1;
-        const interactions = await encoding.decodeInteractionsTest(
-          sample.encodedInteraction,
-          numInteractions,
-        );
-
-        expect(interactions.length).to.equal(1);
-        expect(interactions[0].target).to.equal(sample.target);
-        expect(interactions[0].callData).to.equal(sample.callData);
-        expect(interactions[0].value).to.deep.equal(sample.value);
-      }
-    });
-
-    it("should round-trip encode a single interaction", async () => {
-      // Note: all fields should use distinct bytes to make decoding errors
-      // easier to spot. 0x11 is used to avoid having bytes with zeroes in their
-      // hex representation.
-      const interaction = {
-        target: ethers.utils.getAddress(fillDistinctBytes(20, 0x11)),
-        value: BigNumber.from(fillDistinctBytes(32, 0x11 + 20)),
-        callData: fillDistinctBytes(42, 0x11 + 52),
-      };
-
-      const numInteractions = 1;
-      const decodedInteractions = await encoding.decodeInteractionsTest(
-        packInteractions([interaction]),
-        numInteractions,
-      );
-
-      expect(decodedInteractions.length).to.equal(1);
-      expect(decodedInteractions[0].target).to.equal(interaction.target);
-      expect(decodedInteractions[0].callData).to.equal(interaction.callData);
-    });
-
-    it("should round-trip encode multiple interactions", async () => {
-      // Note: all fields should use distinct bytes as much as possible to make
-      // decoding errors easier to spot. 0x01 is used to avoid having bytes with
-      // zeroes in their hex representation.
-      let seed = 0x01;
-      const nextBytes = (n: number) => fillDistinctBytes(n, (seed += n) - n);
-      const nextAddress = () => ethers.utils.getAddress(nextBytes(20));
-      const nextUint = () => BigNumber.from(nextBytes(32));
-      const interactions = [
-        {
-          target: nextAddress(),
-          value: nextUint(),
-          callData: nextBytes(42),
-        },
-        {
-          target: nextAddress(),
-          value: nextUint(),
-        },
-        {
-          target: nextAddress(),
-          // Note: if the interaction decoding becomes significantly more
-          // inefficient, this test might fail with "tx has a higher gas limit
-          // than the block". In this case, the number of bytes below should be
-          // reduced.
-          callData: nextBytes(12000),
-        },
-        {
-          target: nextAddress(),
-        },
-      ];
-
-      const decodedInteractions = await encoding.decodeInteractionsTest(
-        packInteractions(interactions),
-        interactions.length,
-      );
-
-      expect(decodedInteractions.length).to.equal(interactions.length);
-      for (let i = 0; i < interactions.length; i++) {
-        const decodedInteraction = decodedInteractions[0];
-        const interaction = interactions[0];
-
-        expect(decodedInteraction.target).to.equal(interaction.target);
-        expect(decodedInteraction.value).to.equal(
-          interaction.value || ethers.constants.Zero,
-        );
-        expect(decodedInteraction.callData).to.equal(
-          interaction.callData || "0x",
-        );
-      }
-    });
-
-    it("encoder fails to add interactions with too much calldata", async () => {
-      const interaction = {
-        target: ethers.utils.getAddress(fillBytes(20, 0x00)),
-        callData: new Uint8Array(2 ** 24),
-      };
-
-      const encoder = new SettlementEncoder(testDomain);
-      expect(() => encoder.encodeInteraction(interaction)).to.throw;
-    });
-
-    it("should round-trip encode an empty interaction", async () => {
-      const interaction = {
-        target: ethers.utils.getAddress(
-          "0x73c14081446bd1e4eb165250e826e80c5a523783",
-        ),
-      };
-
-      const numInteractions = 1;
-      const decodedInteractions = await encoding.decodeInteractionsTest(
-        packInteractions([interaction]),
-        numInteractions,
-      );
-
-      expect(decodedInteractions.length).to.equal(1);
-      expect(decodedInteractions[0].target).to.equal(interaction.target);
-      expect(decodedInteractions[0].value).to.deep.equal(ethers.constants.Zero);
-      expect(decodedInteractions[0].callData).to.equal("0x");
-    });
-
-    describe("invalid encoded interaction", () => {
-      it("calldata shorter than length", async () => {
-        const interaction = {
-          target: ethers.utils.getAddress(fillBytes(20, 0x00)),
-          value: ethers.utils.parseEther("42.1337"),
-          callData: fillDistinctBytes(10, 0x00),
-        };
-
-        const numInteractions = 1;
-        const decoding = encoding.decodeInteractionsTest(
-          packInteractions([interaction]).slice(0, -2),
-          numInteractions,
-        );
-
-        await expect(decoding).to.be.revertedWith("GPv2: invalid interaction");
-      });
-
-      it("calldata longer than length", async () => {
-        const interaction = {
-          target: ethers.utils.getAddress(fillBytes(20, 0x00)),
-          value: ethers.utils.parseEther("42.1337"),
-          callData: fillDistinctBytes(10, 0x00),
-        };
-
-        const numInteractions = 1;
-        const decoding = encoding.decodeInteractionsTest(
-          packInteractions([interaction]) + "00",
-          numInteractions,
-        );
-
-        // Note: this call does not revert with "GPv2: invalid interaction", as
-        // it would appear intuitive, but with "invalid opcode". This is because
-        // of how `decodeInteractionsTest` works: since there is some calldata
-        // left, it tries to parse it as another interaction. But the array used
-        // to store the decoded interactions has size 1, so the function is
-        // accessing an out-of-bound element.
-        await expect(decoding).to.be.reverted;
-      });
-    });
-  });
-
-  describe("extractOrderUidParams", () => {
-    it("round trip encode/decode", async () => {
-      // Start from 17 (0x11) so that the first byte has no zeroes.
-      const orderDigest = fillDistinctBytes(32, 17);
-      const address = ethers.utils.getAddress(fillDistinctBytes(20, 17 + 32));
-      const validTo = BigNumber.from(fillDistinctBytes(4, 17 + 32 + 20));
-
-      const orderUid = computeOrderUid({
-        orderDigest,
-        owner: address,
-        validTo: validTo.toNumber(),
-      });
-      expect(orderUid).to.equal(fillDistinctBytes(32 + 20 + 4, 17));
-
-      const {
-        orderDigest: extractedOrderDigest,
-        owner: extractedAddress,
-        validTo: extractedValidTo,
-      } = await encoding.extractOrderUidParamsTest(orderUid);
-      expect(extractedOrderDigest).to.equal(orderDigest);
-      expect(extractedValidTo).to.equal(validTo);
-      expect(extractedAddress).to.equal(address);
-    });
-
-    describe("fails on uid", () => {
-      const uidStride = 32 + 20 + 4;
-
-      it("longer than expected", async () => {
-        const invalidUid = "0x" + "00".repeat(uidStride + 1);
-
-        await expect(
-          encoding.extractOrderUidParamsTest(invalidUid),
-        ).to.be.revertedWith("GPv2: invalid uid");
-      });
-
-      it("shorter than expected", async () => {
-        const invalidUid = "0x" + "00".repeat(uidStride - 1);
-
-        await expect(
-          encoding.extractOrderUidParamsTest(invalidUid),
-        ).to.be.revertedWith("GPv2: invalid uid");
-      });
-    });
-  });
-
-  describe("decodeOrderUidsTest", () => {
-    it("should round trip encode/decode", async () => {
-      // Start from 17 (0x11) so that the first byte has no zeroes.
-      const orderUids = [
-        fillDistinctBytes(56, 17),
-        fillDistinctBytes(56, 17 + 56),
-        fillDistinctBytes(56, 17 + 56 * 2),
-      ];
-
-      const decodedOrderUids = await encoding.decodeOrderUidsTest(
-        ethers.utils.solidityPack(
-          orderUids.map(() => "bytes"),
-          orderUids,
-        ),
-      );
-      expect(decodedOrderUids).to.deep.equal(orderUids);
-    });
-
-    it("should accept empty order UIDs", async () => {
-      expect(await encoding.decodeOrderUidsTest("0x")).to.deep.equal([]);
-    });
-
-    it("should revert on malformed order UIDs", async () => {
-      const invalidUids = "0x00";
-      await expect(
-        encoding.decodeOrderUidsTest(invalidUids),
-      ).to.be.revertedWith("malformed order UIDs");
     });
   });
 });

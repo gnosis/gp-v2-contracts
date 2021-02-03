@@ -4,7 +4,7 @@ import { ethers, waffle } from "hardhat";
 
 import { AllowListReader } from "../src/ts/reader";
 
-describe("GPv2AllowListAuthentication", () => {
+describe("AllowListStorageReader", () => {
   const [deployer, owner, solver] = waffle.provider.getWallets();
   let authenticator: Contract;
   let reader: Contract;

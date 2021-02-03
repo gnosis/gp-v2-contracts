@@ -2,6 +2,7 @@
 pragma solidity ^0.7.6;
 pragma abicoder v2;
 
+import "@gnosis.pm/util-contracts/contracts/StorageAccessible.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -9,12 +10,15 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./GPv2AllowanceManager.sol";
 import "./interfaces/GPv2Authentication.sol";
 import "./libraries/GPv2Encoding.sol";
+import "./libraries/GPv2Interaction.sol";
+import "./libraries/GPv2Order.sol";
 import "./libraries/GPv2TradeExecution.sol";
 
 /// @title Gnosis Protocol v2 Settlement Contract
 /// @author Gnosis Developers
-contract GPv2Settlement is ReentrancyGuard {
+contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
     using GPv2Encoding for bytes;
+    using GPv2Order for bytes;
     using GPv2TradeExecution for GPv2TradeExecution.Data;
     using SafeMath for uint256;
 
@@ -139,31 +143,31 @@ contract GPv2Settlement is ReentrancyGuard {
     /// @param clearingPrices An array of clearing prices where the `i`-th price
     /// is for the `i`-th token in the [`tokens`] array.
     /// @param encodedTrades Encoded trades for signed orders.
-    /// @param encodedInteractions Encoded smart contract interactions split
-    /// into three separate chunks to be run before the settlement, during the
-    /// settlement and after the settlement respectively.
-    /// @param encodedOrderRefunds Encoded order refunds for clearing storage
+    /// @param interactions Smart contract interactions split into three
+    /// separate lists to be run before the settlement, during the settlement
+    /// and after the settlement respectively.
+    /// @param orderRefunds Encoded order refunds for clearing storage
     /// related to invalid orders.
     function settle(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
         bytes calldata encodedTrades,
-        bytes[3] calldata encodedInteractions,
-        bytes calldata encodedOrderRefunds
+        GPv2Interaction.Data[][3] calldata interactions,
+        bytes[] calldata orderRefunds
     ) external nonReentrant onlySolver {
-        executeInteractions(encodedInteractions[0]);
+        executeInteractions(interactions[0]);
 
         GPv2TradeExecution.Data[] memory executedTrades =
             computeTradeExecutions(tokens, clearingPrices, encodedTrades);
         allowanceManager.transferIn(executedTrades);
 
-        executeInteractions(encodedInteractions[1]);
+        executeInteractions(interactions[1]);
 
         transferOut(executedTrades);
 
-        executeInteractions(encodedInteractions[2]);
+        executeInteractions(interactions[2]);
 
-        claimOrderRefunds(encodedOrderRefunds);
+        claimOrderRefunds(orderRefunds);
 
         emit Settlement(msg.sender);
     }
@@ -233,7 +237,7 @@ contract GPv2Settlement is ReentrancyGuard {
         uint256 buyPrice,
         GPv2TradeExecution.Data memory executedTrade
     ) internal {
-        GPv2Encoding.Order memory order = trade.order;
+        GPv2Order.Data memory order = trade.order;
 
         // solhint-disable-next-line not-rely-on-time
         require(order.validTo >= block.timestamp, "GPv2: order expired");
@@ -276,7 +280,7 @@ contract GPv2Settlement is ReentrancyGuard {
         // instead of consuming all of the remaining transaction gas when
         // dividing by zero, so no extra checks are needed for those operations.
 
-        if (order.kind == GPv2Encoding.ORDER_KIND_SELL) {
+        if (order.kind == GPv2Order.SELL) {
             if (order.partiallyFillable) {
                 executedSellAmount = trade.executedAmount;
                 executedFeeAmount =
@@ -340,62 +344,28 @@ contract GPv2Settlement is ReentrancyGuard {
     }
 
     /// @dev Execute a list of arbitrary contract calls from this contract.
-    /// @param encodedInteractions The encoded list of interactions that will be
-    /// executed.
-    function executeInteractions(bytes calldata encodedInteractions) internal {
-        // Note: at every decoding step, the content of this variable is
-        // replaced with the latest decoded interaction.
-        GPv2Encoding.Interaction memory interaction;
-
-        bytes calldata remainingEncodedInteractions = encodedInteractions;
-        while (remainingEncodedInteractions.length != 0) {
-            remainingEncodedInteractions = remainingEncodedInteractions
-                .decodeInteraction(interaction);
-            executeInteraction(interaction);
-        }
-    }
-
-    /// @dev Allows settlement function to make arbitrary contract executions.
-    /// @param interaction contains address and calldata of the contract interaction.
-    function executeInteraction(GPv2Encoding.Interaction memory interaction)
+    /// @param interactions The list of interactions to execute.
+    function executeInteractions(GPv2Interaction.Data[] calldata interactions)
         internal
     {
-        // To prevent possible attack on user funds, we explicitly disable
-        // interactions with AllowanceManager contract.
-        require(
-            interaction.target != address(allowanceManager),
-            "GPv2: forbidden interaction"
-        );
+        GPv2Interaction.Data calldata interaction;
+        for (uint256 i; i < interactions.length; i++) {
+            interaction = interactions[i];
 
-        // solhint-disable avoid-low-level-calls
-        (bool success, bytes memory response) =
-            (interaction.target).call{value: interaction.value}(
-                interaction.callData
+            // To prevent possible attack on user funds, we explicitly disable
+            // any interactions with AllowanceManager contract.
+            require(
+                interaction.target != address(allowanceManager),
+                "GPv2: forbidden interaction"
             );
-        // solhint-enable avoid-low-level-calls
+            GPv2Interaction.execute(interaction);
 
-        // TODO - concatenate the following reponse "GPv2: Failed Interaction"
-        // This is the topic of https://github.com/gnosis/gp-v2-contracts/issues/240
-        if (!success) {
-            // Assembly used to revert with correctly encoded error message.
-            // solhint-disable-next-line no-inline-assembly
-            assembly {
-                revert(add(response, 0x20), mload(response))
-            }
+            emit Interaction(
+                interaction.target,
+                interaction.value,
+                GPv2Interaction.selector(interaction)
+            );
         }
-
-        bytes4 selector;
-        if (interaction.callData.length >= 4) {
-            bytes memory callData = interaction.callData;
-            // Assembly used to read selector with a single `mload`. Note that
-            // we read offset by 32 bytes, as the first word in a `bytes memory`
-            // is the length.
-            // solhint-disable-next-line no-inline-assembly
-            assembly {
-                selector := mload(add(callData, 32))
-            }
-        }
-        emit Interaction(interaction.target, interaction.value, selector);
     }
 
     /// @dev Transfers all buy amounts for the executed trades from the
@@ -413,25 +383,17 @@ contract GPv2Settlement is ReentrancyGuard {
     /// @dev Claims order gas refunds by freeing storage for all encoded order
     /// gas refunds.
     ///
-    /// @param encodedOrderRefunds Packed encoded order unique identifiers for
-    /// which to claim gas refunds.
-    function claimOrderRefunds(bytes calldata encodedOrderRefunds) internal {
-        uint256 refundCount = encodedOrderRefunds.orderUidCount();
-        for (uint256 i = 0; i < refundCount; i++) {
-            freeOrderStorage(encodedOrderRefunds.orderUidAtIndex(i));
+    /// This method reverts if any of the orders are still valid.
+    ///
+    /// @param orderRefunds Unique identifiers of orders to get a gas refund for
+    /// by freeing storage.
+    function claimOrderRefunds(bytes[] calldata orderRefunds) internal {
+        for (uint256 i = 0; i < orderRefunds.length; i++) {
+            bytes calldata orderUid = orderRefunds[i];
+            (, , uint32 validTo) = orderUid.extractOrderUidParams();
+            // solhint-disable-next-line not-rely-on-time
+            require(validTo < block.timestamp, "GPv2: order still valid");
+            filledAmount[orderUid] = 0;
         }
-    }
-
-    /// @dev Frees the storage for an order that is no longer valid granting a
-    /// gas refund.
-    ///
-    /// This method reverts if the order is still valid.
-    ///
-    /// @param orderUid The unique identifier of the order to free.
-    function freeOrderStorage(bytes calldata orderUid) internal {
-        (, , uint32 validTo) = orderUid.extractOrderUidParams();
-        // solhint-disable-next-line not-rely-on-time
-        require(validTo < block.timestamp, "GPv2: order still valid");
-        filledAmount[orderUid] = 0;
     }
 }

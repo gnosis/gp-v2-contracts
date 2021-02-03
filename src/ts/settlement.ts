@@ -1,6 +1,10 @@
 import { BigNumberish, BytesLike, Signer, ethers } from "ethers";
 
-import { Interaction, encodeInteraction } from "./interaction";
+import {
+  Interaction,
+  InteractionLike,
+  normalizeInteraction,
+} from "./interaction";
 import {
   ORDER_UID_LENGTH,
   Order,
@@ -94,9 +98,9 @@ export type EncodedSettlement = [
   /** Encoded trades. */
   BytesLike,
   /** Encoded interactions. */
-  [BytesLike, BytesLike, BytesLike],
+  [Interaction[], Interaction[], Interaction[]],
   /** Encoded order refunds. */
-  BytesLike,
+  BytesLike[],
 ];
 
 /**
@@ -166,12 +170,12 @@ export class SettlementEncoder {
   private readonly _tokenMap: Record<string, number | undefined> = {};
   private _encodedTrades = "0x";
   private _tradeCount = 0;
-  private _encodedInteractions = {
-    [InteractionStage.PRE]: "0x",
-    [InteractionStage.INTRA]: "0x",
-    [InteractionStage.POST]: "0x",
+  private _interactions: Record<InteractionStage, Interaction[]> = {
+    [InteractionStage.PRE]: [],
+    [InteractionStage.INTRA]: [],
+    [InteractionStage.POST]: [],
   };
-  private _encodedOrderRefunds = "0x";
+  private _orderRefunds: string[] = [];
 
   /**
    * Creates a new settlement encoder instance.
@@ -212,19 +216,19 @@ export class SettlementEncoder {
    * Gets the encoded interactions for the specified stage as a hex-encoded
    * string.
    */
-  public get encodedInteractions(): [string, string, string] {
+  public get interactions(): [Interaction[], Interaction[], Interaction[]] {
     return [
-      this._encodedInteractions[InteractionStage.PRE],
-      this._encodedInteractions[InteractionStage.INTRA],
-      this._encodedInteractions[InteractionStage.POST],
+      this._interactions[InteractionStage.PRE].slice(),
+      this._interactions[InteractionStage.INTRA].slice(),
+      this._interactions[InteractionStage.POST].slice(),
     ];
   }
 
   /**
    * Gets the currently encoded order UIDs for gas refunds.
    */
-  public get encodedOrderRefunds(): string {
-    return this._encodedOrderRefunds;
+  public get orderRefunds(): string[] {
+    return this._orderRefunds.slice();
   }
 
   /**
@@ -232,15 +236,6 @@ export class SettlementEncoder {
    */
   public get tradeCount(): number {
     return this._tradeCount;
-  }
-
-  /**
-   * Gets the number of order refunds currently encoded.
-   */
-  public get orderRefundCount(): number {
-    return (
-      ethers.utils.hexDataLength(this._encodedOrderRefunds) / ORDER_UID_LENGTH
-    );
   }
 
   /**
@@ -381,13 +376,10 @@ export class SettlementEncoder {
    * @param interaction The interaction to encode.
    */
   public encodeInteraction(
-    interaction: Interaction,
+    interaction: InteractionLike,
     stage: InteractionStage = InteractionStage.INTRA,
   ): void {
-    this._encodedInteractions[stage] = ethers.utils.hexConcat([
-      this._encodedInteractions[stage],
-      encodeInteraction(interaction),
-    ]);
+    this._interactions[stage].push(normalizeInteraction(interaction));
   }
 
   /**
@@ -404,10 +396,7 @@ export class SettlementEncoder {
       throw new Error("one or more invalid order UIDs");
     }
 
-    this._encodedOrderRefunds = ethers.utils.hexConcat([
-      this._encodedOrderRefunds,
-      ...orderUids,
-    ]);
+    this._orderRefunds.push(...orderUids);
   }
 
   /**
@@ -418,8 +407,8 @@ export class SettlementEncoder {
       this.tokens,
       this.clearingPrices(prices),
       this.encodedTrades,
-      this.encodedInteractions,
-      this.encodedOrderRefunds,
+      this.interactions,
+      this.orderRefunds,
     ];
   }
 
