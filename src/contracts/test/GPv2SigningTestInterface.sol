@@ -10,27 +10,9 @@ contract GPv2SigningTestInterface is GPv2Signing {
     function recoverOrderFromTradeTest(
         IERC20[] calldata tokens,
         GPv2Trade.Data calldata trade
-    )
-        external
-        view
-        returns (RecoveredOrder memory recoveredOrder, uint256 mem)
-    {
+    ) external view returns (RecoveredOrder memory recoveredOrder) {
         recoveredOrder = allocateRecoveredOrder();
-
-        // NOTE: Solidity stores the free memory pointer at address 0x40. Read
-        // it before and after calling `processOrder` to ensure that there are
-        // no memory allocations.
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            mem := mload(0x40)
-        }
-
         recoverOrderFromTrade(recoveredOrder, tokens, trade);
-
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            mem := sub(mload(0x40), mem)
-        }
     }
 
     function recoverOrderSignerTest(
