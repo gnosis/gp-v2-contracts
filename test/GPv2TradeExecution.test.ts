@@ -6,7 +6,6 @@ import { ethers, waffle } from "hardhat";
 import { BUY_ETH_ADDRESS } from "../src/ts";
 
 import { NON_STANDARD_ERC20 } from "./ERC20";
-import { encodeExecutedTrade } from "./encoding";
 
 const RECEIVER_SAME_AS_OWNER = ethers.constants.AddressZero;
 
@@ -41,12 +40,12 @@ describe("GPv2TradeExecution", () => {
 
       await expect(
         tradeExecution.transferSellAmountToRecipientTest(
-          encodeExecutedTrade({
+          {
             owner: traders[0].address,
             sellToken: sellToken.address,
             sellAmount: amount,
             ...withoutBuy,
-          }),
+          },
           recipient.address,
         ),
       ).to.not.be.reverted;
@@ -62,12 +61,12 @@ describe("GPv2TradeExecution", () => {
 
       await expect(
         tradeExecution.transferSellAmountToRecipientTest(
-          encodeExecutedTrade({
+          {
             owner: traders[0].address,
             sellToken: sellToken.address,
             sellAmount: amount,
             ...withoutBuy,
-          }),
+          },
           recipient.address,
         ),
       ).to.be.revertedWith("test error");
@@ -76,12 +75,12 @@ describe("GPv2TradeExecution", () => {
     it("does not revert when transfering a token with no contract at its address", async () => {
       await expect(
         tradeExecution.transferSellAmountToRecipientTest(
-          encodeExecutedTrade({
+          {
             owner: traders[0].address,
             sellToken: traders[1].address,
             sellAmount: ethers.utils.parseEther("1.0"),
             ...withoutBuy,
-          }),
+          },
           recipient.address,
         ),
       ).not.to.be.reverted;
@@ -90,12 +89,12 @@ describe("GPv2TradeExecution", () => {
     it("reverts when mistakenly trying to sell ETH using the marker buy Ether address", async () => {
       await expect(
         tradeExecution.transferSellAmountToRecipientTest(
-          encodeExecutedTrade({
+          {
             owner: traders[0].address,
             sellToken: BUY_ETH_ADDRESS,
             sellAmount: ethers.utils.parseEther("1.0"),
             ...withoutBuy,
-          }),
+          },
           recipient.address,
         ),
       ).to.be.revertedWith("GPv2: cannot transfer native ETH");
@@ -115,12 +114,12 @@ describe("GPv2TradeExecution", () => {
 
         await expect(
           tradeExecution.transferSellAmountToRecipientTest(
-            encodeExecutedTrade({
+            {
               owner: traders[0].address,
               sellToken: sellToken.address,
               sellAmount: amount,
               ...withoutBuy,
-            }),
+            },
             recipient.address,
           ),
         ).to.not.be.reverted;
@@ -136,12 +135,12 @@ describe("GPv2TradeExecution", () => {
 
         await expect(
           tradeExecution.transferSellAmountToRecipientTest(
-            encodeExecutedTrade({
+            {
               owner: traders[0].address,
               sellToken: sellToken.address,
               sellAmount: amount,
               ...withoutBuy,
-            }),
+            },
             recipient.address,
           ),
         ).to.be.revertedWith("GPv2SafeERC20: failed transfer");
@@ -166,15 +165,13 @@ describe("GPv2TradeExecution", () => {
         .returns(true);
 
       await expect(
-        tradeExecution.transferBuyAmountToOwnerTest(
-          encodeExecutedTrade({
-            owner: owner.address,
-            receiver: receiver.address,
-            buyToken: buyToken.address,
-            buyAmount: amount,
-            ...withoutSell,
-          }),
-        ),
+        tradeExecution.transferBuyAmountToOwnerTest({
+          owner: owner.address,
+          receiver: receiver.address,
+          buyToken: buyToken.address,
+          buyAmount: amount,
+          ...withoutSell,
+        }),
       ).to.not.be.reverted;
     });
 
@@ -187,15 +184,13 @@ describe("GPv2TradeExecution", () => {
         .returns(true);
 
       await expect(
-        tradeExecution.transferBuyAmountToOwnerTest(
-          encodeExecutedTrade({
-            owner: traders[0].address,
-            receiver: RECEIVER_SAME_AS_OWNER,
-            buyToken: buyToken.address,
-            buyAmount: amount,
-            ...withoutSell,
-          }),
-        ),
+        tradeExecution.transferBuyAmountToOwnerTest({
+          owner: traders[0].address,
+          receiver: RECEIVER_SAME_AS_OWNER,
+          buyToken: buyToken.address,
+          buyAmount: amount,
+          ...withoutSell,
+        }),
       ).to.not.be.reverted;
     });
 
@@ -208,29 +203,25 @@ describe("GPv2TradeExecution", () => {
         .revertsWithReason("test error");
 
       await expect(
-        tradeExecution.transferBuyAmountToOwnerTest(
-          encodeExecutedTrade({
-            owner: traders[0].address,
-            receiver: RECEIVER_SAME_AS_OWNER,
-            buyToken: buyToken.address,
-            buyAmount: amount,
-            ...withoutSell,
-          }),
-        ),
+        tradeExecution.transferBuyAmountToOwnerTest({
+          owner: traders[0].address,
+          receiver: RECEIVER_SAME_AS_OWNER,
+          buyToken: buyToken.address,
+          buyAmount: amount,
+          ...withoutSell,
+        }),
       ).to.be.revertedWith("test error");
     });
 
     it("should not revert when transfering from a token with no contract at its address", async () => {
       await expect(
-        tradeExecution.transferBuyAmountToOwnerTest(
-          encodeExecutedTrade({
-            owner: traders[0].address,
-            receiver: RECEIVER_SAME_AS_OWNER,
-            buyToken: traders[1].address,
-            buyAmount: ethers.utils.parseEther("1.0"),
-            ...withoutSell,
-          }),
-        ),
+        tradeExecution.transferBuyAmountToOwnerTest({
+          owner: traders[0].address,
+          receiver: RECEIVER_SAME_AS_OWNER,
+          buyToken: traders[1].address,
+          buyAmount: ethers.utils.parseEther("1.0"),
+          ...withoutSell,
+        }),
       ).not.to.be.reverted;
     });
 
@@ -245,15 +236,13 @@ describe("GPv2TradeExecution", () => {
         value: amount,
       });
 
-      await tradeExecution.transferBuyAmountToOwnerTest(
-        encodeExecutedTrade({
-          owner: owner.address,
-          receiver: receiver.address,
-          buyToken: BUY_ETH_ADDRESS,
-          buyAmount: amount,
-          ...withoutSell,
-        }),
-      );
+      await tradeExecution.transferBuyAmountToOwnerTest({
+        owner: owner.address,
+        receiver: receiver.address,
+        buyToken: BUY_ETH_ADDRESS,
+        buyAmount: amount,
+        ...withoutSell,
+      });
 
       expect(await receiver.getBalance()).to.deep.equal(
         initialBalance.add(amount),
@@ -269,15 +258,13 @@ describe("GPv2TradeExecution", () => {
         value: amount,
       });
 
-      await tradeExecution.transferBuyAmountToOwnerTest(
-        encodeExecutedTrade({
-          owner: traders[0].address,
-          receiver: RECEIVER_SAME_AS_OWNER,
-          buyToken: BUY_ETH_ADDRESS,
-          buyAmount: amount,
-          ...withoutSell,
-        }),
-      );
+      await tradeExecution.transferBuyAmountToOwnerTest({
+        owner: traders[0].address,
+        receiver: RECEIVER_SAME_AS_OWNER,
+        buyToken: BUY_ETH_ADDRESS,
+        buyAmount: amount,
+        ...withoutSell,
+      });
 
       expect(await traders[0].getBalance()).to.deep.equal(
         initialBalance.add(amount),
@@ -297,15 +284,13 @@ describe("GPv2TradeExecution", () => {
           .returns();
 
         await expect(
-          tradeExecution.transferBuyAmountToOwnerTest(
-            encodeExecutedTrade({
-              owner: traders[0].address,
-              receiver: RECEIVER_SAME_AS_OWNER,
-              buyToken: buyToken.address,
-              buyAmount: amount,
-              ...withoutSell,
-            }),
-          ),
+          tradeExecution.transferBuyAmountToOwnerTest({
+            owner: traders[0].address,
+            receiver: RECEIVER_SAME_AS_OWNER,
+            buyToken: buyToken.address,
+            buyAmount: amount,
+            ...withoutSell,
+          }),
         ).to.not.be.reverted;
       });
 
@@ -318,15 +303,13 @@ describe("GPv2TradeExecution", () => {
           .returns(false);
 
         await expect(
-          tradeExecution.transferBuyAmountToOwnerTest(
-            encodeExecutedTrade({
-              owner: traders[0].address,
-              receiver: RECEIVER_SAME_AS_OWNER,
-              buyToken: buyToken.address,
-              buyAmount: amount,
-              ...withoutSell,
-            }),
-          ),
+          tradeExecution.transferBuyAmountToOwnerTest({
+            owner: traders[0].address,
+            receiver: RECEIVER_SAME_AS_OWNER,
+            buyToken: buyToken.address,
+            buyAmount: amount,
+            ...withoutSell,
+          }),
         ).to.be.revertedWith("GPv2SafeERC20: failed transfer");
       });
     });

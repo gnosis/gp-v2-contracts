@@ -13,34 +13,14 @@ import "./libraries/GPv2Interaction.sol";
 import "./libraries/GPv2Order.sol";
 import "./libraries/GPv2Trade.sol";
 import "./libraries/GPv2TradeExecution.sol";
+import "./mixins/GPv2Signing.sol";
 
 /// @title Gnosis Protocol v2 Settlement Contract
 /// @author Gnosis Developers
-contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
+contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     using GPv2Order for bytes;
-    using GPv2Signing for GPv2Signing.RecoveredOrder;
     using GPv2TradeExecution for GPv2TradeExecution.Data;
     using SafeMath for uint256;
-
-    /// @dev The EIP-712 domain type hash used for computing the domain
-    /// separator.
-    bytes32 private constant DOMAIN_TYPE_HASH =
-        keccak256(
-            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-        );
-
-    /// @dev The EIP-712 domain name used for computing the domain separator.
-    bytes32 private constant DOMAIN_NAME = keccak256("Gnosis Protocol");
-
-    /// @dev The EIP-712 domain version used for computing the domain separator.
-    bytes32 private constant DOMAIN_VERSION = keccak256("v2");
-
-    /// @dev The domain separator used for signing orders that gets mixed in
-    /// making signatures for different domains incompatible. This domain
-    /// separator is computed following the EIP-712 standard and has replay
-    /// protection mixed in so that signed orders are only valid for specific
-    /// GPv2 contracts.
-    bytes32 public immutable domainSeparator;
 
     /// @dev The authenticator is used to determine who can call the settle function.
     /// That is, only authorised solvers have the ability to invoke settlements.
@@ -86,24 +66,6 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
 
     constructor(GPv2Authentication authenticator_) {
         authenticator = authenticator_;
-
-        // NOTE: Currently, the only way to get the chain ID in solidity is
-        // using assembly.
-        uint256 chainId;
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            chainId := chainid()
-        }
-
-        domainSeparator = keccak256(
-            abi.encode(
-                DOMAIN_TYPE_HASH,
-                DOMAIN_NAME,
-                DOMAIN_VERSION,
-                chainId,
-                address(this)
-            )
-        );
         allowanceManager = new GPv2AllowanceManager();
     }
 
@@ -198,18 +160,13 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
         uint256[] calldata clearingPrices,
         GPv2Trade.Data[] calldata trades
     ) internal returns (GPv2TradeExecution.Data[] memory executedTrades) {
-        GPv2Signing.RecoveredOrder memory recoveredOrder =
-            GPv2Signing.allocateRecoveredOrder();
+        RecoveredOrder memory recoveredOrder = allocateRecoveredOrder();
 
         executedTrades = new GPv2TradeExecution.Data[](trades.length);
         for (uint256 i = 0; i < trades.length; i++) {
             GPv2Trade.Data calldata trade = trades[i];
 
-            recoveredOrder.recoverOrderFromTrade(
-                domainSeparator,
-                tokens,
-                trade
-            );
+            recoverOrderFromTrade(recoveredOrder, tokens, trade);
             computeTradeExecution(
                 recoveredOrder,
                 clearingPrices[trade.sellTokenIndex],
@@ -234,7 +191,7 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
     /// @param feeDiscount The discount to apply to the final executed fees.
     /// @param executedTrade Memory location for computed executed trade data.
     function computeTradeExecution(
-        GPv2Signing.RecoveredOrder memory recoveredOrder,
+        RecoveredOrder memory recoveredOrder,
         uint256 sellPrice,
         uint256 buyPrice,
         uint256 executedAmount,

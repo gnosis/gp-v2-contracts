@@ -3,63 +3,41 @@ pragma solidity ^0.7.6;
 pragma abicoder v2;
 
 import "../libraries/GPv2Order.sol";
-import "../libraries/GPv2Signing.sol";
 import "../libraries/GPv2Trade.sol";
+import "../mixins/GPv2Signing.sol";
 
-contract GPv2SigningTestInterface {
-    using GPv2Signing for GPv2Signing.RecoveredOrder;
-
-    bytes32 public constant DOMAIN_SEPARATOR =
-        keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(string name)"),
-                keccak256("test")
-            )
-        );
-
-    function recoverOrdersFromTradesTest(
+contract GPv2SigningTestInterface is GPv2Signing {
+    function recoverOrderFromTradeTest(
         IERC20[] calldata tokens,
-        GPv2Trade.Data[] calldata trades
+        GPv2Trade.Data calldata trade
     )
         external
         view
-        returns (
-            GPv2Signing.RecoveredOrder[] memory recoveredOrders,
-            uint256 mem,
-            uint256 gas_
-        )
+        returns (RecoveredOrder memory recoveredOrder, uint256 mem)
     {
-        bytes32 domainSeparator = DOMAIN_SEPARATOR;
+        recoveredOrder = allocateRecoveredOrder();
 
-        recoveredOrders = new GPv2Signing.RecoveredOrder[](trades.length);
-        for (uint256 i = 0; i < recoveredOrders.length; i++) {
-            recoveredOrders[i].uid = new bytes(GPv2Order.UID_LENGTH);
-        }
-
-        // NOTE: Solidity keeps a total memory count at address 0x40. Check
-        // before and after decoding a trade to compute memory usage growth per
-        // call to `decodeTrade`. Additionally, write 0 past the free memory
-        // pointer so the size of `recoveredOrders` does not affect the gas
-        // measurement.
+        // NOTE: Solidity stores the free memory pointer at address 0x40. Read
+        // it before and after calling `processOrder` to ensure that there are
+        // no memory allocations.
         // solhint-disable-next-line no-inline-assembly
         assembly {
             mem := mload(0x40)
-            mstore(mem, 0)
         }
-        gas_ = gasleft();
 
-        for (uint256 i = 0; i < recoveredOrders.length; i++) {
-            recoveredOrders[i].recoverOrderFromTrade(
-                domainSeparator,
-                tokens,
-                trades[i]
-            );
-        }
+        recoverOrderFromTrade(recoveredOrder, tokens, trade);
 
         // solhint-disable-next-line no-inline-assembly
         assembly {
             mem := sub(mload(0x40), mem)
         }
-        gas_ = gas_ - gasleft();
+    }
+
+    function recoverOrderSignerTest(
+        GPv2Order.Data memory order,
+        GPv2Signing.Scheme signingScheme,
+        bytes calldata signature
+    ) external view returns (address owner) {
+        (, owner) = recoverOrderSigner(order, signingScheme, signature);
     }
 }
