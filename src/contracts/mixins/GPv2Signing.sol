@@ -42,8 +42,8 @@ abstract contract GPv2Signing {
     /// GPv2 contracts.
     bytes32 public immutable domainSeparator;
 
-    /// @dev Storage indicating whether or not an order has been signed for by
-    /// a particular address.
+    /// @dev Storage indicating whether or not an order has been signed by a
+    /// particular address.
     mapping(bytes => bool) public preSignature;
 
     constructor() {
