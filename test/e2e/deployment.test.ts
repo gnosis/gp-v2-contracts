@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import { Contract, Wallet } from "ethers";
 import { artifacts } from "hardhat";
+import Proxy from "hardhat-deploy/extendedArtifacts/EIP173Proxy.json";
 
 import {
   ContractName,
@@ -72,10 +73,24 @@ describe("E2E: Deployment", () => {
   });
 
   describe("deterministic addresses", () => {
-    it("authenticator", async () => {
-      expect(await contractAddress("GPv2AllowListAuthentication")).to.equal(
-        await implementationAddress(authenticator.address),
-      );
+    describe("authenticator", () => {
+      it("proxy", async () => {
+        expect(
+          deterministicDeploymentAddress(Proxy, [
+            await implementationAddress(authenticator.address),
+            authenticator.interface.encodeFunctionData("initializeManager", [
+              owner.address,
+            ]),
+            owner.address,
+          ]),
+        ).to.equal(authenticator.address);
+      });
+
+      it("implementation", async () => {
+        expect(await contractAddress("GPv2AllowListAuthentication")).to.equal(
+          await implementationAddress(authenticator.address),
+        );
+      });
     });
 
     it("settlement", async () => {

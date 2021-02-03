@@ -32,7 +32,7 @@ export type ContractName = typeof CONTRACT_NAMES[keyof typeof CONTRACT_NAMES];
  * The deployment args for a contract.
  */
 export type DeploymentArguments<
-  T extends ContractName
+  T
 > = T extends typeof CONTRACT_NAMES.authenticator
   ? never
   : T extends typeof CONTRACT_NAMES.settlement
@@ -40,13 +40,22 @@ export type DeploymentArguments<
   : unknown[];
 
 /**
+ * Artifact information important for computing deterministic deployments.
+ */
+export type ArtifactDeployment = Pick<Artifact, "abi" | "bytecode">;
+
+/**
  * An artifact with a contract name matching one of the deterministically
  * deployed contracts.
  */
-export interface NamedArtifact<C extends ContractName>
-  extends Pick<Artifact, "abi" | "bytecode"> {
+export interface NamedArtifactDeployment<C extends ContractName>
+  extends ArtifactDeployment {
   contractName: C;
 }
+
+type MaybeNamedArtifactArtifactDeployment<C> = C extends ContractName
+  ? NamedArtifactDeployment<C>
+  : ArtifactDeployment;
 
 /**
  * Computes the deterministic address at which the contract will be deployed.
@@ -56,8 +65,8 @@ export interface NamedArtifact<C extends ContractName>
  * @param deploymentArguments Extra arguments that are necessary to deploy.
  * @returns The address that is expected to store the deployed code.
  */
-export function deterministicDeploymentAddress<C extends ContractName>(
-  { abi, bytecode }: NamedArtifact<C> | Artifact,
+export function deterministicDeploymentAddress<C>(
+  { abi, bytecode }: MaybeNamedArtifactArtifactDeployment<C>,
   deploymentArguments: DeploymentArguments<C>,
 ): string {
   const contractInterface = new utils.Interface(abi);
