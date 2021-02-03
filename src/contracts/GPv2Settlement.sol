@@ -16,7 +16,7 @@ import "./libraries/GPv2TradeExecution.sol";
 
 /// @title Gnosis Protocol v2 Settlement Contract
 /// @author Gnosis Developers
-contract GPv2Settlement is ReentrancyGuard {
+contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
     using GPv2Order for bytes;
     using GPv2Signing for GPv2Signing.RecoveredOrder;
     using GPv2TradeExecution for GPv2TradeExecution.Data;

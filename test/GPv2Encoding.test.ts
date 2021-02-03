@@ -423,14 +423,14 @@ describe("GPv2Trade+GPv2Signing", () => {
           SigningScheme.EIP712,
         );
 
-        const { trades } = await tradeLibrary.recoverTradesTest(
+        const { recoveredOrders } = await signing.recoverOrdersFromTradesTest(
           encoder.tokens,
           encoder.trades,
         );
 
-        const { orderUid } = trades[0];
+        const { uid: orderUid } = recoveredOrders[0];
         const encodedTransactionData = ethers.utils.arrayify(
-          tradeLibrary.interface.encodeFunctionData("recoverTradesTest", [
+          signing.interface.encodeFunctionData("recoverOrdersFromTradesTest", [
             encoder.tokens,
             encoder.trades,
           ]),
@@ -462,7 +462,7 @@ describe("GPv2Trade+GPv2Signing", () => {
         }
         const encodedOutput = await ethers.provider.call({
           data: ethers.utils.hexlify(encodedTransactionData),
-          to: tradeLibrary.address,
+          to: signing.address,
         });
         expect(encodedOutput).to.contain(orderUid.slice(2));
       });

@@ -1,10 +1,10 @@
 import { expect } from "chai";
-import { BigNumber, Contract } from "ethers";
+import { Contract } from "ethers";
 import { ethers, waffle } from "hardhat";
 
 import { computeOrderUid, SettlementReader } from "../src/ts";
 
-describe("GPv2AllowListAuthentication", () => {
+describe("SettlementStorageReader", () => {
   const [deployer, owner, ...traders] = waffle.provider.getWallets();
   let settlement: Contract;
   let reader: Contract;
@@ -44,7 +44,7 @@ describe("GPv2AllowListAuthentication", () => {
       ).to.deep.equal([
         ethers.constants.MaxUint256,
         ethers.constants.MaxUint256,
-        BigNumber.from(0),
+        ethers.constants.Zero,
       ]);
     });
   });
