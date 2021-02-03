@@ -46,7 +46,7 @@ describe("GPv2AllowListAuthentication", () => {
     it("should not allow non-owner to add solver", async () => {
       await expect(
         authenticator.connect(nonOwner).addSolver(solver.address),
-      ).to.be.revertedWith("caller is not the manager");
+      ).to.be.revertedWith("GPv2: caller not manager");
     });
   });
 
@@ -59,7 +59,7 @@ describe("GPv2AllowListAuthentication", () => {
     it("should not allow non-owner to remove solver", async () => {
       await expect(
         authenticator.connect(nonOwner).removeSolver(solver.address),
-      ).to.be.revertedWith("caller is not the manager");
+      ).to.be.revertedWith("GPv2: caller not manager");
     });
   });
 
