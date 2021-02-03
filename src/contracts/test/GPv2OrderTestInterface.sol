@@ -5,7 +5,8 @@ pragma abicoder v2;
 import "../libraries/GPv2Order.sol";
 
 contract GPv2OrderTestInterface {
-    using GPv2Order for *;
+    using GPv2Order for GPv2Order.Data;
+    using GPv2Order for bytes;
 
     function typeHashTest() external pure returns (bytes32) {
         return GPv2Order.TYPE_HASH;

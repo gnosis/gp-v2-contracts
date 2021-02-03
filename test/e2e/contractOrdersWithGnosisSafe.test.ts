@@ -247,17 +247,23 @@ describe("E2E: Order From A Gnosis Safe", () => {
     };
     const gpv2Message = eip1271Message(domainSeparator, order);
     // Note: threshold is 2, any two owners should suffice.
-    const sig = await fallbackSign(safe, gpv2Message, [
+    const signature = await fallbackSign(safe, gpv2Message, [
       safeOwners[4],
       safeOwners[2],
     ]);
 
     const safeAsVerifier = GnosisSafeEIP1271Fallback.attach(safe.address);
     expect(
-      await safeAsVerifier.callStatic.isValidSignature(gpv2Message, sig),
+      await safeAsVerifier.callStatic.isValidSignature(gpv2Message, signature),
     ).to.equal(EIP1271_MAGICVALUE);
 
-    encoder.encodeContractTrade(order, safe.address, sig);
+    encoder.encodeTrade(order, {
+      scheme: SigningScheme.EIP1271,
+      data: {
+        verifier: safe.address,
+        signature,
+      },
+    });
 
     await settlement.connect(solver).settle(
       ...encoder.encodedSettlement({

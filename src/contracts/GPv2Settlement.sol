@@ -9,38 +9,18 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import "./GPv2AllowanceManager.sol";
 import "./interfaces/GPv2Authentication.sol";
-import "./libraries/GPv2Encoding.sol";
 import "./libraries/GPv2Interaction.sol";
 import "./libraries/GPv2Order.sol";
+import "./libraries/GPv2Trade.sol";
 import "./libraries/GPv2TradeExecution.sol";
+import "./mixins/GPv2Signing.sol";
 
 /// @title Gnosis Protocol v2 Settlement Contract
 /// @author Gnosis Developers
-contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
-    using GPv2Encoding for bytes;
+contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     using GPv2Order for bytes;
     using GPv2TradeExecution for GPv2TradeExecution.Data;
     using SafeMath for uint256;
-
-    /// @dev The EIP-712 domain type hash used for computing the domain
-    /// separator.
-    bytes32 private constant DOMAIN_TYPE_HASH =
-        keccak256(
-            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-        );
-
-    /// @dev The EIP-712 domain name used for computing the domain separator.
-    bytes32 private constant DOMAIN_NAME = keccak256("Gnosis Protocol");
-
-    /// @dev The EIP-712 domain version used for computing the domain separator.
-    bytes32 private constant DOMAIN_VERSION = keccak256("v2");
-
-    /// @dev The domain separator used for signing orders that gets mixed in
-    /// making signatures for different domains incompatible. This domain
-    /// separator is computed following the EIP-712 standard and has replay
-    /// protection mixed in so that signed orders are only valid for specific
-    /// GPv2 contracts.
-    bytes32 public immutable domainSeparator;
 
     /// @dev The authenticator is used to determine who can call the settle function.
     /// That is, only authorised solvers have the ability to invoke settlements.
@@ -86,24 +66,6 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
 
     constructor(GPv2Authentication authenticator_) {
         authenticator = authenticator_;
-
-        // NOTE: Currently, the only way to get the chain ID in solidity is
-        // using assembly.
-        uint256 chainId;
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            chainId := chainid()
-        }
-
-        domainSeparator = keccak256(
-            abi.encode(
-                DOMAIN_TYPE_HASH,
-                DOMAIN_NAME,
-                DOMAIN_VERSION,
-                chainId,
-                address(this)
-            )
-        );
         allowanceManager = new GPv2AllowanceManager();
     }
 
@@ -142,7 +104,7 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
     /// Orders and interactions encode tokens as indices into this array.
     /// @param clearingPrices An array of clearing prices where the `i`-th price
     /// is for the `i`-th token in the [`tokens`] array.
-    /// @param encodedTrades Encoded trades for signed orders.
+    /// @param trades Trades for signed orders.
     /// @param interactions Smart contract interactions split into three
     /// separate lists to be run before the settlement, during the settlement
     /// and after the settlement respectively.
@@ -151,14 +113,14 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
     function settle(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
-        bytes calldata encodedTrades,
+        GPv2Trade.Data[] calldata trades,
         GPv2Interaction.Data[][3] calldata interactions,
         bytes[] calldata orderRefunds
     ) external nonReentrant onlySolver {
         executeInteractions(interactions[0]);
 
         GPv2TradeExecution.Data[] memory executedTrades =
-            computeTradeExecutions(tokens, clearingPrices, encodedTrades);
+            computeTradeExecutions(tokens, clearingPrices, trades);
         allowanceManager.transferIn(executedTrades);
 
         executeInteractions(interactions[1]);
@@ -191,35 +153,29 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
     /// [`computeTradeExecution`] for more details.
     /// @param tokens An array of ERC20 tokens to be traded in the settlement.
     /// @param clearingPrices An array of token clearing prices.
-    /// @param encodedTrades Encoded trades for signed orders.
+    /// @param trades Trades for signed orders.
     /// @return executedTrades Array of executed trades.
     function computeTradeExecutions(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
-        bytes calldata encodedTrades
+        GPv2Trade.Data[] calldata trades
     ) internal returns (GPv2TradeExecution.Data[] memory executedTrades) {
-        (uint256 tradeCount, bytes calldata remainingEncodedTrades) =
-            encodedTrades.decodeTradeCount();
-        executedTrades = new GPv2TradeExecution.Data[](tradeCount);
+        RecoveredOrder memory recoveredOrder = allocateRecoveredOrder();
 
-        GPv2Encoding.Trade memory trade;
-        uint256 i = 0;
-        while (remainingEncodedTrades.length != 0) {
-            remainingEncodedTrades = remainingEncodedTrades.decodeTrade(
-                domainSeparator,
-                tokens,
-                trade
-            );
+        executedTrades = new GPv2TradeExecution.Data[](trades.length);
+        for (uint256 i = 0; i < trades.length; i++) {
+            GPv2Trade.Data calldata trade = trades[i];
+
+            recoverOrderFromTrade(recoveredOrder, tokens, trade);
             computeTradeExecution(
-                trade,
+                recoveredOrder,
                 clearingPrices[trade.sellTokenIndex],
                 clearingPrices[trade.buyTokenIndex],
+                trade.executedAmount,
+                trade.feeDiscount,
                 executedTrades[i]
             );
-            i++;
         }
-
-        require(i == tradeCount, "GPv2: invalid trade encoding");
     }
 
     /// @dev Compute the in and out transfer amounts for a single trade.
@@ -227,22 +183,28 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
     /// - The order has expired
     /// - The order's limit price is not respected.
     ///
-    /// @param trade The trade to process.
+    /// @param recoveredOrder The recovered order to process.
     /// @param sellPrice The price of the order's sell token.
     /// @param buyPrice The price of the order's buy token.
+    /// @param executedAmount The portion of the order to execute. This will be
+    /// ignored for fill-or-kill orders.
+    /// @param feeDiscount The discount to apply to the final executed fees.
     /// @param executedTrade Memory location for computed executed trade data.
     function computeTradeExecution(
-        GPv2Encoding.Trade memory trade,
+        RecoveredOrder memory recoveredOrder,
         uint256 sellPrice,
         uint256 buyPrice,
+        uint256 executedAmount,
+        uint256 feeDiscount,
         GPv2TradeExecution.Data memory executedTrade
     ) internal {
-        GPv2Order.Data memory order = trade.order;
+        GPv2Order.Data memory order = recoveredOrder.data;
+        bytes memory orderUid = recoveredOrder.uid;
 
         // solhint-disable-next-line not-rely-on-time
         require(order.validTo >= block.timestamp, "GPv2: order expired");
 
-        executedTrade.owner = trade.owner;
+        executedTrade.owner = recoveredOrder.owner;
         executedTrade.receiver = order.receiver;
         executedTrade.sellToken = order.sellToken;
         executedTrade.buyToken = order.buyToken;
@@ -282,7 +244,7 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
 
         if (order.kind == GPv2Order.SELL) {
             if (order.partiallyFillable) {
-                executedSellAmount = trade.executedAmount;
+                executedSellAmount = executedAmount;
                 executedFeeAmount =
                     order.feeAmount.mul(executedSellAmount) /
                     order.sellAmount;
@@ -293,7 +255,7 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
 
             executedBuyAmount = executedSellAmount.mul(sellPrice) / buyPrice;
 
-            currentFilledAmount = filledAmount[trade.orderUid].add(
+            currentFilledAmount = filledAmount[orderUid].add(
                 executedSellAmount
             );
             require(
@@ -302,7 +264,7 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
             );
         } else {
             if (order.partiallyFillable) {
-                executedBuyAmount = trade.executedAmount;
+                executedBuyAmount = executedAmount;
                 executedFeeAmount =
                     order.feeAmount.mul(executedBuyAmount) /
                     order.buyAmount;
@@ -313,9 +275,7 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
 
             executedSellAmount = executedBuyAmount.mul(buyPrice) / sellPrice;
 
-            currentFilledAmount = filledAmount[trade.orderUid].add(
-                executedBuyAmount
-            );
+            currentFilledAmount = filledAmount[orderUid].add(executedBuyAmount);
             require(
                 currentFilledAmount <= order.buyAmount,
                 "GPv2: order filled"
@@ -323,15 +283,15 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
         }
 
         require(
-            trade.feeDiscount <= executedFeeAmount,
+            feeDiscount <= executedFeeAmount,
             "GPv2: fee discount too large"
         );
-        executedFeeAmount = executedFeeAmount - trade.feeDiscount;
+        executedFeeAmount = executedFeeAmount - feeDiscount;
 
         executedTrade.sellAmount = executedSellAmount.add(executedFeeAmount);
         executedTrade.buyAmount = executedBuyAmount;
 
-        filledAmount[trade.orderUid] = currentFilledAmount;
+        filledAmount[orderUid] = currentFilledAmount;
         emit Trade(
             executedTrade.owner,
             executedTrade.sellToken,
@@ -339,7 +299,7 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
             executedTrade.sellAmount,
             executedTrade.buyAmount,
             executedFeeAmount,
-            trade.orderUid
+            orderUid
         );
     }
 

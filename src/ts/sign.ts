@@ -1,7 +1,11 @@
 import { BytesLike, ethers, Signer } from "ethers";
 
 import { ORDER_TYPE_FIELDS, Order, hashOrder, normalizeOrder } from "./order";
-import { isTypedDataSigner, TypedDataDomain } from "./types/ethers";
+import {
+  SignatureLike,
+  isTypedDataSigner,
+  TypedDataDomain,
+} from "./types/ethers";
 
 /**
  * Value returned by a call to `isValidSignature` if the signature was verified
@@ -38,26 +42,60 @@ export const enum SigningScheme {
   EIP1271,
 }
 
+export type EcdsaSigningScheme = SigningScheme.EIP712 | SigningScheme.ETHSIGN;
+
 /**
  * The signature of an order.
- * It includes the information needed to determine which signing scheme is used.
  */
-export interface Signature {
+export type Signature = EcdsaSignature | Eip1271Signature;
+
+/**
+ * ECDSA signature of an order.
+ */
+export interface EcdsaSignature {
   /**
    * The signing scheme used in the signature.
    */
-  scheme: SigningScheme;
+  scheme: EcdsaSigningScheme;
   /**
-   * The signature bytes as prescribed by the selected signing scheme.
+   * The ECDSA signature.
    */
-  data: BytesLike;
+  data: SignatureLike;
+}
+
+/**
+ * EIP-1271 signature data.
+ */
+export interface Eip1271SignatureData {
+  /**
+   * The verifying contract address.
+   */
+  verifier: string;
+  /**
+   * The arbitrary signature data used for verification.
+   */
+  signature: BytesLike;
+}
+
+/**
+ * EIP-1271 signature of an order.
+ */
+export interface Eip1271Signature {
+  /**
+   * The signing scheme used in the signature.
+   */
+  scheme: SigningScheme.EIP1271;
+  /**
+   * The signature data.
+   */
+  data: Eip1271SignatureData;
 }
 
 function ecdsaSignOrder(
   domain: TypedDataDomain,
   order: Order,
   owner: Signer,
-  scheme: SigningScheme,
+  scheme: EcdsaSigningScheme,
 ): Promise<string> {
   switch (scheme) {
     case SigningScheme.EIP712:
@@ -80,8 +118,8 @@ function ecdsaSignOrder(
         ),
       );
 
-    case SigningScheme.EIP1271:
-      throw new Error("EIP-1271 signatures are not supported by signer");
+    default:
+      throw new Error("invalid signing scheme");
   }
 }
 
@@ -102,24 +140,11 @@ export async function signOrder(
   domain: TypedDataDomain,
   order: Order,
   owner: Signer,
-  scheme: SigningScheme,
-): Promise<Signature> {
-  if (![SigningScheme.EIP712, SigningScheme.ETHSIGN].includes(scheme)) {
-    throw new Error(
-      "Cannot create a signature with the specified signing scheme",
-    );
-  }
-  const rawEcdsaSignature = await ecdsaSignOrder(domain, order, owner, scheme);
-  const ecdsaSignature = ethers.utils.splitSignature(rawEcdsaSignature);
-
-  const data = ethers.utils.solidityPack(
-    ["bytes32", "bytes32", "uint8"],
-    [ecdsaSignature.r, ecdsaSignature.s, ecdsaSignature.v],
-  );
-
+  scheme: EcdsaSigningScheme,
+): Promise<EcdsaSignature> {
   return {
-    data,
     scheme,
+    data: await ecdsaSignOrder(domain, order, owner, scheme),
   };
 }
 
@@ -135,10 +160,7 @@ export async function signOrder(
  * @returns The message that needs to be EIP-1271 signed to authorize the input
  * order.
  */
-export function eip1271Message(
-  domain: TypedDataDomain,
-  order: Order,
-): BytesLike {
+export function eip1271Message(domain: TypedDataDomain, order: Order): string {
   return ethers.utils.keccak256(
     ethers.utils.hexConcat([
       "0x192a",
@@ -148,18 +170,9 @@ export function eip1271Message(
   );
 }
 
-/**
- * Throws an error if the signature length is incompatible with the signing
- * scheme. It does not otherwise check the signature for validity.
- *
- * @param sig The signature to check.
- */
-export function assertValidSignatureLength(sig: Signature): void {
-  const ECDSA_SIGNATURE_LENGTH = 65;
-  if (
-    [SigningScheme.EIP712, SigningScheme.ETHSIGN].includes(sig.scheme) &&
-    ethers.utils.hexDataLength(sig.data) !== ECDSA_SIGNATURE_LENGTH
-  ) {
-    throw new Error("invalid signature bytes");
-  }
+export function encodeEip1271SignatureData({
+  verifier,
+  signature,
+}: Eip1271SignatureData): string {
+  return ethers.utils.solidityPack(["address", "bytes"], [verifier, signature]);
 }
