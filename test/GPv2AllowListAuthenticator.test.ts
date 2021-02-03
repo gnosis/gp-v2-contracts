@@ -16,24 +16,37 @@ describe("GPv2AllowListAuthentication", () => {
     await authenticator.initializeManager(owner.address);
   });
 
-  describe("constructor", () => {
+  describe("initializeManager", () => {
     it("should initialize the manager", async () => {
       expect(await authenticator.manager()).to.equal(owner.address);
     });
 
-    it("ensures initializeManager is idempotent", async () => {
+    it("should be idempotent", async () => {
       await expect(
         authenticator.initializeManager(nonOwner.address),
-      ).to.revertedWith("GPv2: already initialized");
+      ).to.revertedWith("contract is already initialized");
 
       // Also reverts when called by owner.
       await expect(
         authenticator.connect(owner).initializeManager(nonOwner.address),
-      ).to.revertedWith("GPv2: already initialized");
+      ).to.revertedWith("contract is already initialized");
     });
 
     it("deployer is not the manager", async () => {
       expect(await authenticator.manager()).not.to.be.equal(deployer.address);
+    });
+  });
+
+  describe("setManager", () => {
+    it("should be able to change manager", async () => {
+      await authenticator.connect(owner).setManager(nonOwner.address);
+      expect(await authenticator.manager()).to.equal(nonOwner.address);
+    });
+
+    it("should revert when non-manager attempts to set a new manager", async () => {
+      await expect(
+        authenticator.connect(nonOwner).setManager(nonOwner.address),
+      ).to.be.revertedWith("GPv2: caller not manager");
     });
   });
 
