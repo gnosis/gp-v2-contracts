@@ -4,12 +4,10 @@ import { artifacts, ethers, waffle } from "hardhat";
 
 import {
   EIP1271_MAGICVALUE,
-  ORDER_TYPE_HASH,
   OrderKind,
   SettlementEncoder,
   SigningScheme,
   computeOrderUid,
-  extractOrderUidParams,
   hashOrder,
   eip1271Message,
 } from "../src/ts";
@@ -56,12 +54,6 @@ describe("GPv2Encoding", () => {
       expect(await encoding.DOMAIN_SEPARATOR()).to.equal(
         ethers.utils._TypedDataEncoder.hashDomain(testDomain),
       );
-    });
-  });
-
-  describe("ORDER_TYPE_HASH", () => {
-    it("should be match the EIP-712 order type hash", async () => {
-      expect(await encoding.orderTypeHashTest()).to.equal(ORDER_TYPE_HASH);
     });
   });
 
@@ -176,25 +168,6 @@ describe("GPv2Encoding", () => {
       expect(buyTokenIndex).to.equal(
         encoder.tokens.indexOf(sampleOrder.buyToken),
       );
-    });
-
-    it("should compute EIP-712 order struct hash", async () => {
-      const encoder = new SettlementEncoder(testDomain);
-      await encoder.signEncodeTrade(
-        sampleOrder,
-        traders[0],
-        SigningScheme.EIP712,
-      );
-
-      const { trades } = await encoding.decodeTradesTest(
-        encoder.tokens,
-        encoder.encodedTrades,
-      );
-
-      const { orderDigest } = extractOrderUidParams(
-        decodeTrade(trades[0]).orderUid,
-      );
-      expect(orderDigest).to.equal(hashOrder(sampleOrder));
     });
 
     it("should compute order unique identifier", async () => {

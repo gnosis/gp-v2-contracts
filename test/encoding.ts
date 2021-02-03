@@ -1,7 +1,7 @@
-import type { BigNumber } from "ethers";
+import { BigNumber } from "ethers";
 import { ethers } from "hardhat";
 
-import { Order, OrderKind } from "../src/ts";
+import { Order, OrderKind, normalizeOrder } from "../src/ts";
 
 export type AbiOrder = [
   string,
@@ -10,11 +10,27 @@ export type AbiOrder = [
   BigNumber,
   BigNumber,
   number,
-  number,
+  string,
   BigNumber,
   string,
   boolean,
 ];
+
+export function encodeOrder(order: Order): AbiOrder {
+  const o = normalizeOrder(order);
+  return [
+    o.sellToken,
+    o.buyToken,
+    o.receiver,
+    BigNumber.from(o.sellAmount),
+    BigNumber.from(o.buyAmount),
+    o.validTo,
+    o.appData,
+    BigNumber.from(o.feeAmount),
+    ethers.utils.id(o.kind),
+    o.partiallyFillable,
+  ];
+}
 
 export type AbiTrade = [
   AbiOrder,
@@ -38,7 +54,7 @@ export interface Trade {
 
 export function decodeOrderKind(kindHash: string): OrderKind {
   for (const kind of [OrderKind.SELL, OrderKind.BUY]) {
-    if (kindHash == ethers.utils.keccak256(ethers.utils.toUtf8Bytes(kind))) {
+    if (kindHash == ethers.utils.id(kind)) {
       return kind;
     }
   }

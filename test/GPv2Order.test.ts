@@ -2,7 +2,19 @@ import { expect } from "chai";
 import { Contract, BigNumber } from "ethers";
 import { ethers } from "hardhat";
 
-import { ORDER_UID_LENGTH, computeOrderUid } from "../src/ts";
+import {
+  ORDER_TYPE_HASH,
+  ORDER_UID_LENGTH,
+  OrderKind,
+  computeOrderUid,
+  hashOrder,
+} from "../src/ts";
+
+import { encodeOrder } from "./encoding";
+
+function fillBytes(count: number, byte: number): string {
+  return ethers.utils.hexlify([...Array(count)].map(() => byte));
+}
 
 function fillDistinctBytes(count: number, start: number): string {
   return ethers.utils.hexlify(
@@ -16,6 +28,65 @@ describe("GPv2Order", () => {
   beforeEach(async () => {
     const GPv2Order = await ethers.getContractFactory("GPv2OrderTestInterface");
     orders = await GPv2Order.deploy();
+  });
+
+  describe("TYPE_HASH", () => {
+    it("matches the EIP-712 order type hash", async () => {
+      expect(await orders.typeHashTest()).to.equal(ORDER_TYPE_HASH);
+    });
+  });
+
+  describe("hash", () => {
+    it("computes EIP-712 order struct hash", async () => {
+      const order = {
+        sellToken: fillBytes(20, 0x01),
+        buyToken: fillBytes(20, 0x02),
+        receiver: fillBytes(20, 0x03),
+        sellAmount: ethers.utils.parseEther("42"),
+        buyAmount: ethers.utils.parseEther("13.37"),
+        validTo: 0xffffffff,
+        appData: ethers.constants.HashZero,
+        feeAmount: ethers.utils.parseEther("1.0"),
+        kind: OrderKind.SELL,
+        partiallyFillable: false,
+      };
+      expect(await orders.hashTest(encodeOrder(order))).to.equal(
+        hashOrder(order),
+      );
+    });
+  });
+
+  describe("packOrderUidParams", () => {
+    it("packs the order UID", async () => {
+      const orderDigest = fillDistinctBytes(32, 1);
+      const owner = ethers.utils.getAddress(fillDistinctBytes(20, 1 + 32));
+      const validTo = BigNumber.from(fillDistinctBytes(4, 1 + 32 + 20));
+      expect(
+        await orders.packOrderUidParamsTest(
+          ORDER_UID_LENGTH,
+          orderDigest,
+          owner,
+          validTo,
+        ),
+      ).to.equal(
+        computeOrderUid({
+          orderDigest,
+          owner,
+          validTo: validTo.toNumber(),
+        }),
+      );
+    });
+
+    it("reverts if the buffer length is wrong", async () => {
+      await expect(
+        orders.packOrderUidParamsTest(
+          ORDER_UID_LENGTH + 1,
+          ethers.constants.HashZero,
+          ethers.constants.AddressZero,
+          0,
+        ),
+      ).to.be.revertedWith("uid buffer overflow");
+    });
   });
 
   describe("extractOrderUidParams", () => {

@@ -15,10 +15,6 @@ contract GPv2EncodingTestInterface {
             )
         );
 
-    function orderTypeHashTest() external pure returns (bytes32) {
-        return (GPv2Encoding.ORDER_TYPE_HASH);
-    }
-
     function tradeCountTest(bytes calldata encodedTrades)
         external
         pure
