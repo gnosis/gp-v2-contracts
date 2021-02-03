@@ -30,7 +30,7 @@ export async function implementationAddress(proxy: string): Promise<string> {
 }
 
 /**
- * Returns the address of the imple mentation of an EIP-1967-compatible proxy
+ * Returns the address of the implementation of an EIP-1967-compatible proxy
  * from its address.
  *
  * @param proxy Address of the proxy contract.
