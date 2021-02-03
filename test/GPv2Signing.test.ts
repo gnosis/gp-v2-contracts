@@ -202,10 +202,9 @@ describe("GPv2Signing", () => {
       ];
 
       for (const [i, trade] of encoder.trades.entries()) {
-        const { owner } = await signing.recoverOrderFromTradeTest(
-          encoder.tokens,
-          trade,
-        );
+        const {
+          recoveredOrder: { owner },
+        } = await signing.recoverOrderFromTradeTest(encoder.tokens, trade);
         expect(owner).to.equal(owners[i]);
       }
     });
