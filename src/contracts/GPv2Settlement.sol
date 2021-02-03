@@ -10,6 +10,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./GPv2AllowanceManager.sol";
 import "./interfaces/GPv2Authentication.sol";
 import "./libraries/GPv2Encoding.sol";
+import "./libraries/GPv2Interaction.sol";
 import "./libraries/GPv2TradeExecution.sol";
 
 /// @title Gnosis Protocol v2 Settlement Contract
@@ -140,29 +141,29 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
     /// @param clearingPrices An array of clearing prices where the `i`-th price
     /// is for the `i`-th token in the [`tokens`] array.
     /// @param encodedTrades Encoded trades for signed orders.
-    /// @param encodedInteractions Encoded smart contract interactions split
-    /// into three separate chunks to be run before the settlement, during the
-    /// settlement and after the settlement respectively.
+    /// @param interactions Smart contract interactions split into three
+    /// separate lists to be run before the settlement, during the settlement
+    /// and after the settlement respectively.
     /// @param encodedOrderRefunds Encoded order refunds for clearing storage
     /// related to invalid orders.
     function settle(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
         bytes calldata encodedTrades,
-        bytes[3] calldata encodedInteractions,
+        GPv2Interaction.Data[][3] calldata interactions,
         bytes calldata encodedOrderRefunds
     ) external nonReentrant onlySolver {
-        executeInteractions(encodedInteractions[0]);
+        executeInteractions(interactions[0]);
 
         GPv2TradeExecution.Data[] memory executedTrades =
             computeTradeExecutions(tokens, clearingPrices, encodedTrades);
         allowanceManager.transferIn(executedTrades);
 
-        executeInteractions(encodedInteractions[1]);
+        executeInteractions(interactions[1]);
 
         transferOut(executedTrades);
 
-        executeInteractions(encodedInteractions[2]);
+        executeInteractions(interactions[2]);
 
         claimOrderRefunds(encodedOrderRefunds);
 
@@ -341,62 +342,28 @@ contract GPv2Settlement is ReentrancyGuard, StorageAccessible {
     }
 
     /// @dev Execute a list of arbitrary contract calls from this contract.
-    /// @param encodedInteractions The encoded list of interactions that will be
-    /// executed.
-    function executeInteractions(bytes calldata encodedInteractions) internal {
-        // Note: at every decoding step, the content of this variable is
-        // replaced with the latest decoded interaction.
-        GPv2Encoding.Interaction memory interaction;
-
-        bytes calldata remainingEncodedInteractions = encodedInteractions;
-        while (remainingEncodedInteractions.length != 0) {
-            remainingEncodedInteractions = remainingEncodedInteractions
-                .decodeInteraction(interaction);
-            executeInteraction(interaction);
-        }
-    }
-
-    /// @dev Allows settlement function to make arbitrary contract executions.
-    /// @param interaction contains address and calldata of the contract interaction.
-    function executeInteraction(GPv2Encoding.Interaction memory interaction)
+    /// @param interactions The list of interactions to execute.
+    function executeInteractions(GPv2Interaction.Data[] calldata interactions)
         internal
     {
-        // To prevent possible attack on user funds, we explicitly disable
-        // interactions with AllowanceManager contract.
-        require(
-            interaction.target != address(allowanceManager),
-            "GPv2: forbidden interaction"
-        );
+        GPv2Interaction.Data calldata interaction;
+        for (uint256 i; i < interactions.length; i++) {
+            interaction = interactions[i];
 
-        // solhint-disable avoid-low-level-calls
-        (bool success, bytes memory response) =
-            (interaction.target).call{value: interaction.value}(
-                interaction.callData
+            // To prevent possible attack on user funds, we explicitly disable
+            // any interactions with AllowanceManager contract.
+            require(
+                interaction.target != address(allowanceManager),
+                "GPv2: forbidden interaction"
             );
-        // solhint-enable avoid-low-level-calls
+            GPv2Interaction.execute(interaction);
 
-        // TODO - concatenate the following reponse "GPv2: Failed Interaction"
-        // This is the topic of https://github.com/gnosis/gp-v2-contracts/issues/240
-        if (!success) {
-            // Assembly used to revert with correctly encoded error message.
-            // solhint-disable-next-line no-inline-assembly
-            assembly {
-                revert(add(response, 0x20), mload(response))
-            }
+            emit Interaction(
+                interaction.target,
+                interaction.value,
+                GPv2Interaction.selector(interaction)
+            );
         }
-
-        bytes4 selector;
-        if (interaction.callData.length >= 4) {
-            bytes memory callData = interaction.callData;
-            // Assembly used to read selector with a single `mload`. Note that
-            // we read offset by 32 bytes, as the first word in a `bytes memory`
-            // is the length.
-            // solhint-disable-next-line no-inline-assembly
-            assembly {
-                selector := mload(add(callData, 32))
-            }
-        }
-        emit Interaction(interaction.target, interaction.value, selector);
     }
 
     /// @dev Transfers all buy amounts for the executed trades from the

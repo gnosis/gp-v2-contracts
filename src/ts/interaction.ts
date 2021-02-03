@@ -1,4 +1,4 @@
-import { BigNumber, BigNumberish, BytesLike, ethers } from "ethers";
+import type { BigNumberish, BytesLike } from "ethers";
 
 /**
  * Gnosis Protocol v2 interaction data.
@@ -11,30 +11,41 @@ export interface Interaction {
   /**
    * Call value in wei for the interaction, allowing Ether to be sent.
    */
-  value?: BigNumberish;
+  value: BigNumberish;
   /**
    * Call data used in the interaction with a smart contract.
    */
-  callData?: BytesLike;
+  callData: BytesLike;
 }
 
-export function encodeInteraction(interaction: Interaction): string {
-  const value = BigNumber.from(interaction.value || 0);
-  const callData = interaction.callData || "0x";
-  const callDataLength = ethers.utils.hexDataLength(callData);
+export type InteractionLike = Pick<Interaction, "target"> &
+  Partial<Interaction>;
 
-  const encodedInteraction = value.isZero()
-    ? ethers.utils.solidityPack(
-        ["address", "bool", "uint24", "bytes"],
-        [interaction.target, false, callDataLength, callData],
-      )
-    : ethers.utils.solidityPack(
-        ["address", "bool", "uint24", "uint256", "bytes"],
-        [interaction.target, true, callDataLength, value, callData],
-      );
-  return encodedInteraction;
+/**
+ * Normalizes interaction data so that it is ready to be be ABI encoded.
+ *
+ * @param interaction The interaction to normalize.
+ * @return The normalized interaction.
+ */
+export function normalizeInteraction(
+  interaction: InteractionLike,
+): Interaction {
+  return {
+    value: 0,
+    callData: "0x",
+    ...interaction,
+  };
 }
 
-export function packInteractions(interactions: Interaction[]): string {
-  return ethers.utils.hexConcat(interactions.map(encodeInteraction));
+/**
+ * Normalizes data for many interactions so that they can be ABI encoded. This
+ * calls [`normalizeInteraction`] for each interaction.
+ *
+ * @param interactions The interactions to normalize.
+ * @return The normalized interactions.
+ */
+export function normalizeInteractions(
+  interactions: InteractionLike[],
+): Interaction[] {
+  return interactions.map(normalizeInteraction);
 }
