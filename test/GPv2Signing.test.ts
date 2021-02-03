@@ -10,9 +10,8 @@ import {
   TypedDataDomain,
   computeOrderUid,
   domain,
-  eip1271Message,
   encodeEip1271SignatureData,
-  hashOrder,
+  orderSigningHash,
   signOrder,
 } from "../src/ts";
 
@@ -130,7 +129,7 @@ describe("GPv2Signing", () => {
       );
       expect(orderUid).to.equal(
         computeOrderUid({
-          orderDigest: hashOrder(sampleOrder),
+          orderDigest: orderSigningHash(testDomain, sampleOrder),
           owner: traders[0].address,
           validTo: sampleOrder.validTo,
         }),
@@ -317,7 +316,7 @@ describe("GPv2Signing", () => {
           SigningScheme.EIP712,
           invalidSignature,
         ),
-      ).to.be.revertedWith("invalid eip712 signature");
+      ).to.be.revertedWith("invalid ecdsa signature");
     });
 
     it("should revert for invalid ethsign order signatures", async () => {
@@ -341,14 +340,14 @@ describe("GPv2Signing", () => {
           SigningScheme.ETHSIGN,
           invalidSignature,
         ),
-      ).to.be.revertedWith("invalid ethsign signature");
+      ).to.be.revertedWith("invalid ecdsa signature");
     });
 
     it("should verify EIP-1271 contract signatures by returning owner", async () => {
       const artifact = await artifacts.readArtifact("EIP1271Verifier");
       const verifier = await waffle.deployMockContract(deployer, artifact.abi);
 
-      const message = eip1271Message(testDomain, sampleOrder);
+      const message = orderSigningHash(testDomain, sampleOrder);
       const eip1271Signature = "0x031337";
       await verifier.mock.isValidSignature
         .withArgs(message, eip1271Signature)
@@ -367,7 +366,7 @@ describe("GPv2Signing", () => {
     });
 
     it("should revert on an invalid EIP-1271 signature", async () => {
-      const message = eip1271Message(testDomain, sampleOrder);
+      const message = orderSigningHash(testDomain, sampleOrder);
       const eip1271Signature = "0x031337";
 
       const artifact = await artifacts.readArtifact("EIP1271Verifier");
@@ -389,7 +388,7 @@ describe("GPv2Signing", () => {
     });
 
     it("should revert with non-standard EIP-1271 verifiers", async () => {
-      const message = eip1271Message(testDomain, sampleOrder);
+      const message = orderSigningHash(testDomain, sampleOrder);
       const eip1271Signature = "0x031337";
 
       const NON_STANDARD_EIP1271_VERIFIER = [
@@ -435,7 +434,7 @@ describe("GPv2Signing", () => {
       );
 
       const evilVerifier = await StateChangingEIP1271.deploy();
-      const message = eip1271Message(testDomain, sampleOrder);
+      const message = orderSigningHash(testDomain, sampleOrder);
       const eip1271Signature = "0x";
 
       expect(await evilVerifier.state()).to.equal(ethers.constants.Zero);
@@ -460,6 +459,14 @@ describe("GPv2Signing", () => {
         ),
       ).to.be.reverted;
       expect(await evilVerifier.state()).to.equal(ethers.constants.One);
+    });
+  });
+
+  describe("orderSigningHash", () => {
+    it("computes EIP-712 order signing hash", async () => {
+      expect(
+        await signing.orderSigningHashTest(encodeOrder(sampleOrder)),
+      ).to.equal(orderSigningHash(testDomain, sampleOrder));
     });
   });
 });

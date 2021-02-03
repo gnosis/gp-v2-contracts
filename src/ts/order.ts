@@ -1,5 +1,7 @@
 import { BigNumberish, BytesLike, ethers } from "ethers";
 
+import { TypedDataDomain } from "./types/ethers";
+
 /**
  * Gnosis Protocol v2 order data.
  */
@@ -168,13 +170,18 @@ export function normalizeOrder(order: Order): NormalizedOrder {
 }
 
 /**
- * Compute the 32-byte digest for the specified order.
+ * Compute the 32-byte signing hash for the specified order.
+ *
+ * @param domain The EIP-712 domain separator to compute the hash for.
  * @param order The order to compute the digest for.
  * @return Hex-encoded 32-byte order digest.
  */
-export function hashOrder(order: Order): string {
-  return ethers.utils._TypedDataEncoder.hashStruct(
-    "Order",
+export function orderSigningHash(
+  domain: TypedDataDomain,
+  order: Order,
+): string {
+  return ethers.utils._TypedDataEncoder.hash(
+    domain,
     { Order: ORDER_TYPE_FIELDS },
     normalizeOrder(order),
   );

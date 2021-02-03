@@ -115,21 +115,57 @@ abstract contract GPv2Signing {
         Scheme signingScheme,
         bytes calldata signature
     ) internal view returns (bytes32 orderDigest, address owner) {
-        orderDigest = order.hash();
+        // Read the free memory pointer so that we can de-allocate after
+        // recovering the order signer. See below for more details.
+        uint256 freeMemoryPointer;
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            freeMemoryPointer := mload(0x40)
+        }
+
+        orderDigest = orderSigningHash(order);
         if (signingScheme == Scheme.Eip712) {
-            owner = recoverEip712Signer(signature, orderDigest);
+            owner = recoverEip712Signer(orderDigest, signature);
         } else if (signingScheme == Scheme.EthSign) {
-            owner = recoverEthsignSigner(signature, orderDigest);
+            owner = recoverEthsignSigner(orderDigest, signature);
         } else if (signingScheme == Scheme.Eip1271) {
-            owner = recoverEip1271Signer(signature, orderDigest);
+            owner = recoverEip1271Signer(orderDigest, signature);
+        }
+
+        // Manually set the free memory pointer back to what it was at the start
+        // of the function, effectively freeing allocated memory. This is done
+        // because Solidity allocates temporary memory for certain operations
+        // that can safely be discarded after use. Examples are:
+        // - calling the ABI encoding methods
+        // - calling the `ecrecover` precompile.
+        //
+        // Note that memory pointed to by the free memory pointer **does not
+        // have to point to zero-ed out**.
+        // <https://docs.soliditylang.org/en/v0.7.6/internals/layout_in_memory.html>
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            mstore(0x40, freeMemoryPointer)
         }
     }
 
-    /// @dev Decodes ECDSA signatures from calldata.
+    /// @dev Returns the EIP-712 signing hash for the specified order.
     ///
-    /// The first bytes of the input tightly pack the signature parameters
-    /// specified in the following struct:
+    /// @param order The order to hash.
+    /// @return orderDigest The EIP-712 signing hash for the order.
+    function orderSigningHash(GPv2Order.Data memory order)
+        internal
+        view
+        returns (bytes32 orderDigest)
+    {
+        orderDigest = keccak256(
+            abi.encodePacked("\x19\x01", domainSeparator, order.hash())
+        );
+    }
+
+    /// @dev Perform an ECDSA recover for the specified message and calldata
+    /// signature.
     ///
+    /// The signature is encoded by tighyly packing the following struct:
     /// ```
     /// struct EncodedSignature {
     ///     bytes32 r;
@@ -138,28 +174,21 @@ abstract contract GPv2Signing {
     /// }
     /// ```
     ///
-    /// Unused signature data is returned along with the address of the signer.
-    /// If the encoding is not valid, for example because the calldata does not
-    /// suffice, the function reverts.
-    ///
-    /// @param encodedSignature Calldata pointing to tightly packed signature
-    /// bytes.
-    /// @return r r parameter of the ECDSA signature.
-    /// @return s s parameter of the ECDSA signature.
-    /// @return v v parameter of the ECDSA signature.
-    function decodeEcdsaSignature(bytes calldata encodedSignature)
+    /// @param message The signed message.
+    /// @param encodedSignature The encoded signature.
+    function ecdsaRecover(bytes32 message, bytes calldata encodedSignature)
         internal
         pure
-        returns (
-            bytes32 r,
-            bytes32 s,
-            uint8 v
-        )
+        returns (address signer)
     {
         require(
             encodedSignature.length == ECDSA_SIGNATURE_LENGTH,
             "GPv2: malformed ecdsa signature"
         );
+
+        bytes32 r;
+        bytes32 s;
+        uint8 v;
 
         // NOTE: Use assembly to efficiently decode signature data.
         // solhint-disable-next-line no-inline-assembly
@@ -171,6 +200,9 @@ abstract contract GPv2Signing {
             // v = uint8(encodedSignature[64])
             v := shr(248, calldataload(add(encodedSignature.offset, 64)))
         }
+
+        signer = ecrecover(message, v, r, s);
+        require(signer != address(0), "GPv2: invalid ecdsa signature");
     }
 
     /// @dev Decodes signature bytes originating from an EIP-712-encoded
@@ -180,34 +212,18 @@ abstract contract GPv2Signing {
     /// related EIP (<https://eips.ethereum.org/EIPS/eip-712>).
     ///
     /// EIP-712 signatures are encoded as standard ECDSA signatures as described
-    /// in the corresponding decoding function [`decodeEcdsaSignature`].
+    /// in the corresponding decoding function [`ecdsaRecover`].
     ///
-    /// Unused signature data is returned along with the address of the signer.
-    /// If the signature is not valid, the function reverts.
-    ///
-    /// @param encodedSignature Calldata pointing to tightly packed signature
-    /// bytes.
     /// @param orderDigest The EIP-712 signing digest derived from the order
     /// parameters.
+    /// @param encodedSignature Calldata pointing to tightly packed signature
+    /// bytes.
     /// @return owner The address of the signer.
     function recoverEip712Signer(
-        bytes calldata encodedSignature,
-        bytes32 orderDigest
-    ) internal view returns (address owner) {
-        (bytes32 r, bytes32 s, uint8 v) =
-            decodeEcdsaSignature(encodedSignature);
-
-        uint256 freeMemoryPointer = getFreeMemoryPointer();
-
-        bytes32 signingDigest =
-            keccak256(
-                abi.encodePacked("\x19\x01", domainSeparator, orderDigest)
-            );
-
-        owner = ecrecover(signingDigest, v, r, s);
-        require(owner != address(0), "GPv2: invalid eip712 signature");
-
-        setFreeMemoryPointer(freeMemoryPointer);
+        bytes32 orderDigest,
+        bytes calldata encodedSignature
+    ) internal pure returns (address owner) {
+        owner = ecdsaRecover(orderDigest, encodedSignature);
     }
 
     /// @dev Decodes signature bytes originating from the output of the eth_sign
@@ -218,42 +234,30 @@ abstract contract GPv2Signing {
     ///
     /// eth_sign signatures are encoded as standard ECDSA signatures as
     /// described in the corresponding decoding function
-    /// [`decodeEcdsaSignature`].
+    /// [`ecdsaRecover`].
     ///
-    /// Unused signature data is returned along with the address of the signer.
-    /// If the signature is not valid, the function reverts.
-    ///
-    /// @param encodedSignature Calldata pointing to tightly packed signature
-    /// bytes.
     /// @param orderDigest The EIP-712 signing digest derived from the order
     /// parameters.
+    /// @param encodedSignature Calldata pointing to tightly packed signature
+    /// bytes.
     /// @return owner The address of the signer.
     function recoverEthsignSigner(
-        bytes calldata encodedSignature,
-        bytes32 orderDigest
-    ) internal view returns (address owner) {
-        (bytes32 r, bytes32 s, uint8 v) =
-            decodeEcdsaSignature(encodedSignature);
-
-        uint256 freeMemoryPointer = getFreeMemoryPointer();
-
+        bytes32 orderDigest,
+        bytes calldata encodedSignature
+    ) internal pure returns (address owner) {
         // The signed message is encoded as:
         // `"\x19Ethereum Signed Message:\n" || length || data`, where
-        // the length is a constant (64 bytes) and the data is defined as:
-        // `domainSeparator || orderDigest`.
-        bytes32 signingDigest =
+        // the length is a constant (32 bytes) and the data is defined as:
+        // `orderDigest`.
+        bytes32 ethsignDigest =
             keccak256(
                 abi.encodePacked(
-                    "\x19Ethereum Signed Message:\n64",
-                    domainSeparator,
+                    "\x19Ethereum Signed Message:\n32",
                     orderDigest
                 )
             );
 
-        owner = ecrecover(signingDigest, v, r, s);
-        require(owner != address(0), "GPv2: invalid ethsign signature");
-
-        setFreeMemoryPointer(freeMemoryPointer);
+        owner = ecdsaRecover(ethsignDigest, encodedSignature);
     }
 
     /// @dev Verifies the input calldata as an EIP-1271 contract signature and
@@ -271,8 +275,8 @@ abstract contract GPv2Signing {
     /// This function enforces that the encoded data stores enough bytes to
     /// cover the full length of the decoded signature.
     function recoverEip1271Signer(
-        bytes calldata encodedSignature,
-        bytes32 orderDigest
+        bytes32 orderDigest,
+        bytes calldata encodedSignature
     ) internal view returns (address owner) {
         // NOTE: Use assembly to read the verifier address from the encoded
         // signature bytes.
@@ -287,59 +291,10 @@ abstract contract GPv2Signing {
         // prettier-ignore
         bytes calldata signature = encodedSignature[20:];
 
-        uint256 freeMemoryPointer = getFreeMemoryPointer();
-
-        // The digest is chosen to be consistent with EIP-191. Its format is:
-        // 0x19 <1 byte version> <version specific data> <data to sign>.
-        // Version number 0x2a is chosen arbitrarily so that it does not
-        // overlaps already assigned version numbers.
-        bytes32 signingDigest =
-            keccak256(
-                abi.encodePacked("\x19\x2a", domainSeparator, orderDigest)
-            );
-
-        setFreeMemoryPointer(freeMemoryPointer);
-
         require(
-            EIP1271Verifier(owner).isValidSignature(signingDigest, signature) ==
+            EIP1271Verifier(owner).isValidSignature(orderDigest, signature) ==
                 GPv2EIP1271.MAGICVALUE,
             "GPv2: invalid eip1271 signature"
         );
-    }
-
-    /// @dev Returns a pointer to the first location in memory that has not
-    /// been allocated by the code at this point in the code.
-    ///
-    /// @return pointer A pointer to the first unallocated location in memory.
-    function getFreeMemoryPointer() private pure returns (uint256 pointer) {
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            pointer := mload(0x40)
-        }
-    }
-
-    /// @dev Manually sets the pointer that specifies the first location in
-    /// memory that is available to be allocated. It allows to free unused
-    /// allocated memory, but if used incorrectly it could lead to the same
-    /// address in memory being used twice.
-    ///
-    /// This function exists to deallocate memory for operations that allocate
-    /// memory during their execution but do not free it after use.
-    /// Examples are:
-    /// - calling the ABI encoding methods
-    /// - calling the `ecrecover` precompile.
-    /// If we reset the free memory pointer to what it was before the execution
-    /// of these operations, we effectively deallocated the memory used by them.
-    /// This is safe as the memory used can be discarded, and the memory pointed
-    /// to by the free memory pointer **does not have to point to zero-ed out
-    /// memory**.
-    /// <https://docs.soliditylang.org/en/v0.7.6/internals/layout_in_memory.html>
-    ///
-    /// @param pointer A pointer to a location in memory.
-    function setFreeMemoryPointer(uint256 pointer) private pure {
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            mstore(0x40, pointer)
-        }
     }
 }

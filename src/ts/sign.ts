@@ -1,6 +1,11 @@
 import { BytesLike, ethers, Signer } from "ethers";
 
-import { ORDER_TYPE_FIELDS, Order, hashOrder, normalizeOrder } from "./order";
+import {
+  ORDER_TYPE_FIELDS,
+  Order,
+  normalizeOrder,
+  orderSigningHash,
+} from "./order";
 import {
   SignatureLike,
   isTypedDataSigner,
@@ -110,12 +115,7 @@ function ecdsaSignOrder(
 
     case SigningScheme.ETHSIGN:
       return owner.signMessage(
-        ethers.utils.arrayify(
-          ethers.utils.hexConcat([
-            ethers.utils._TypedDataEncoder.hashDomain(domain),
-            hashOrder(order),
-          ]),
-        ),
+        ethers.utils.arrayify(orderSigningHash(domain, order)),
       );
 
     default:
@@ -126,6 +126,7 @@ function ecdsaSignOrder(
 /**
  * Returns the signature for the specified order with the signing scheme encoded
  * into the signature bytes.
+ *
  * @param domain The domain to sign the order for. This is used by the smart
  * contract to ensure orders can't be replayed across different applications,
  * but also different deployments (as the contract chain ID and address are
@@ -149,27 +150,11 @@ export async function signOrder(
 }
 
 /**
- * Returns the message that a contract should sign to authorize the input order
- * in GPv2.
+ * Encodes the necessary data required for the Gnosis Protocol contracts to
+ * verify an EIP-1271 signature.
  *
- * @param domain The domain to sign the order for. This is used by the smart
- * contract to ensure orders can't be replayed across different applications,
- * but also different deployments (as the contract chain ID and address are
- * mixed into to the domain value).
- * @param order The order to sign.
- * @returns The message that needs to be EIP-1271 signed to authorize the input
- * order.
+ * @param signature The EIP-1271 signature data to encode.
  */
-export function eip1271Message(domain: TypedDataDomain, order: Order): string {
-  return ethers.utils.keccak256(
-    ethers.utils.hexConcat([
-      "0x192a",
-      ethers.utils._TypedDataEncoder.hashDomain(domain),
-      hashOrder(order),
-    ]),
-  );
-}
-
 export function encodeEip1271SignatureData({
   verifier,
   signature,

@@ -6,13 +6,13 @@ import { BytesLike, ContractFactory, Signer, Contract, Wallet } from "ethers";
 import { ethers, waffle } from "hardhat";
 
 import {
+  EIP1271_MAGICVALUE,
   OrderKind,
   SettlementEncoder,
   SigningScheme,
   TypedDataDomain,
   domain,
-  eip1271Message,
-  EIP1271_MAGICVALUE,
+  orderSigningHash,
 } from "../../src/ts";
 
 import { deployTestContracts } from "./fixture";
@@ -245,7 +245,7 @@ describe("E2E: Order From A Gnosis Safe", () => {
       validTo: UNLIMITED_VALID_TO,
       feeAmount: SAFE_FEE,
     };
-    const gpv2Message = eip1271Message(domainSeparator, order);
+    const gpv2Message = orderSigningHash(domainSeparator, order);
     // Note: threshold is 2, any two owners should suffice.
     const signature = await fallbackSign(safe, gpv2Message, [
       safeOwners[4],

@@ -40,4 +40,12 @@ contract GPv2SigningTestInterface is GPv2Signing {
     ) external view returns (address owner) {
         (, owner) = recoverOrderSigner(order, signingScheme, signature);
     }
+
+    function orderSigningHashTest(GPv2Order.Data memory order)
+        external
+        view
+        returns (bytes32 orderDigest)
+    {
+        orderDigest = orderSigningHash(order);
+    }
 }
