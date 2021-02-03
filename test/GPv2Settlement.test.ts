@@ -52,26 +52,6 @@ describe("GPv2Settlement", () => {
     testDomain = domain(chainId, settlement.address);
   });
 
-  describe("domainSeparator", () => {
-    it("should have an EIP-712 domain separator", async () => {
-      expect(await settlement.domainSeparator()).to.equal(
-        ethers.utils._TypedDataEncoder.hashDomain(testDomain),
-      );
-    });
-
-    it("should have a different replay protection for each deployment", async () => {
-      const GPv2Settlement = await ethers.getContractFactory(
-        "GPv2SettlementTestInterface",
-        deployer,
-      );
-      const settlement2 = await GPv2Settlement.deploy(authenticator.address);
-
-      expect(await settlement.domainSeparator()).to.not.equal(
-        await settlement2.domainSeparator(),
-      );
-    });
-  });
-
   describe("authenticator", () => {
     it("should be set to the authenticator the contract was initialized with", async () => {
       expect(await settlement.authenticator()).to.equal(authenticator.address);

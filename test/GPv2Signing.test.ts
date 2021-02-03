@@ -7,7 +7,9 @@ import {
   OrderKind,
   SettlementEncoder,
   SigningScheme,
+  TypedDataDomain,
   computeOrderUid,
+  domain,
   eip1271Message,
   encodeEip1271SignatureData,
   hashOrder,
@@ -27,7 +29,6 @@ function fillUint(bits: number, byte: number): BigNumber {
 describe("GPv2Signing", () => {
   const [deployer, ...traders] = waffle.provider.getWallets();
 
-  const testDomain = { name: "test" };
   const sampleOrder = {
     sellToken: fillBytes(20, 0x01),
     buyToken: fillBytes(20, 0x02),
@@ -42,6 +43,7 @@ describe("GPv2Signing", () => {
   };
 
   let signing: Contract;
+  let testDomain: TypedDataDomain;
 
   beforeEach(async () => {
     const GPv2Signing = await ethers.getContractFactory(
@@ -49,12 +51,26 @@ describe("GPv2Signing", () => {
     );
 
     signing = await GPv2Signing.deploy();
+
+    const { chainId } = await ethers.provider.getNetwork();
+    testDomain = domain(chainId, signing.address);
   });
 
-  describe("DOMAIN_SEPARATOR", () => {
-    it("should match the test domain hash", async () => {
-      expect(await signing.DOMAIN_SEPARATOR()).to.equal(
+  describe("domainSeparator", () => {
+    it("should have an EIP-712 domain separator", async () => {
+      expect(await signing.domainSeparator()).to.equal(
         ethers.utils._TypedDataEncoder.hashDomain(testDomain),
+      );
+    });
+
+    it("should have a different replay protection for each deployment", async () => {
+      const GPv2Signing = await ethers.getContractFactory(
+        "GPv2SigningTestInterface",
+      );
+      const signing2 = await GPv2Signing.deploy();
+
+      expect(await signing.domainSeparator()).to.not.equal(
+        await signing2.domainSeparator(),
       );
     });
   });

@@ -2,12 +2,12 @@
 pragma solidity ^0.7.6;
 
 import "../interfaces/GPv2EIP1271.sol";
-import "./GPv2Order.sol";
-import "./GPv2Trade.sol";
+import "../libraries/GPv2Order.sol";
+import "../libraries/GPv2Trade.sol";
 
 /// @title Gnosis Protocol v2 Signing Library.
 /// @author Gnosis Developers
-library GPv2Signing {
+abstract contract GPv2Signing {
     using GPv2Order for GPv2Order.Data;
     using GPv2Order for bytes;
 
@@ -21,6 +21,46 @@ library GPv2Signing {
 
     /// @dev Signing scheme used for recovery.
     enum Scheme {Eip712, EthSign, Eip1271}
+
+    /// @dev The EIP-712 domain type hash used for computing the domain
+    /// separator.
+    bytes32 private constant DOMAIN_TYPE_HASH =
+        keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+        );
+
+    /// @dev The EIP-712 domain name used for computing the domain separator.
+    bytes32 private constant DOMAIN_NAME = keccak256("Gnosis Protocol");
+
+    /// @dev The EIP-712 domain version used for computing the domain separator.
+    bytes32 private constant DOMAIN_VERSION = keccak256("v2");
+
+    /// @dev The domain separator used for signing orders that gets mixed in
+    /// making signatures for different domains incompatible. This domain
+    /// separator is computed following the EIP-712 standard and has replay
+    /// protection mixed in so that signed orders are only valid for specific
+    /// GPv2 contracts.
+    bytes32 public immutable domainSeparator;
+
+    constructor() {
+        // NOTE: Currently, the only way to get the chain ID in solidity is
+        // using assembly.
+        uint256 chainId;
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            chainId := chainid()
+        }
+
+        domainSeparator = keccak256(
+            abi.encode(
+                DOMAIN_TYPE_HASH,
+                DOMAIN_NAME,
+                DOMAIN_VERSION,
+                chainId,
+                address(this)
+            )
+        );
+    }
 
     /// @dev Returns an empty recovered order with a pre-allocated buffer for
     /// packing the unique identifier.
@@ -38,27 +78,19 @@ library GPv2Signing {
     /// trade.
     ///
     /// @param recoveredOrder Memory location used for writing the recovered order data.
-    /// @param domainSeparator The domain separator used for signing the order.
     /// @param tokens The list of tokens included in the settlement. The token
     /// indices in the trade parameters map to tokens in this array.
     /// @param trade The trade data to recover the order data from.
     function recoverOrderFromTrade(
         RecoveredOrder memory recoveredOrder,
-        bytes32 domainSeparator,
         IERC20[] calldata tokens,
         GPv2Trade.Data calldata trade
     ) internal view {
         GPv2Order.Data memory order = recoveredOrder.data;
 
-        GPv2Signing.Scheme signingScheme =
-            GPv2Trade.extractOrder(trade, tokens, order);
+        Scheme signingScheme = GPv2Trade.extractOrder(trade, tokens, order);
         (bytes32 orderDigest, address owner) =
-            recoverOrderSigner(
-                order,
-                domainSeparator,
-                signingScheme,
-                trade.signature
-            );
+            recoverOrderSigner(order, signingScheme, trade.signature);
 
         recoveredOrder.uid.packOrderUidParams(
             orderDigest,
@@ -74,36 +106,22 @@ library GPv2Signing {
     /// @dev Recovers an order's signer from the specified order and signature.
     ///
     /// @param order The order to recover a signature for.
-    /// @param domainSeparator The domain separator used for signing the order.
     /// @param signingScheme The signing scheme.
     /// @param signature The signature bytes.
     /// @return orderDigest The computed order hash.
     /// @return owner The recovered address from the specified signature.
     function recoverOrderSigner(
         GPv2Order.Data memory order,
-        bytes32 domainSeparator,
         Scheme signingScheme,
         bytes calldata signature
     ) internal view returns (bytes32 orderDigest, address owner) {
         orderDigest = order.hash();
         if (signingScheme == Scheme.Eip712) {
-            owner = recoverEip712Signer(
-                signature,
-                domainSeparator,
-                orderDigest
-            );
+            owner = recoverEip712Signer(signature, orderDigest);
         } else if (signingScheme == Scheme.EthSign) {
-            owner = recoverEthsignSigner(
-                signature,
-                domainSeparator,
-                orderDigest
-            );
+            owner = recoverEthsignSigner(signature, orderDigest);
         } else if (signingScheme == Scheme.Eip1271) {
-            owner = recoverEip1271Signer(
-                signature,
-                domainSeparator,
-                orderDigest
-            );
+            owner = recoverEip1271Signer(signature, orderDigest);
         }
     }
 
@@ -169,15 +187,13 @@ library GPv2Signing {
     ///
     /// @param encodedSignature Calldata pointing to tightly packed signature
     /// bytes.
-    /// @param domainSeparator The domain separator used for signing the order.
     /// @param orderDigest The EIP-712 signing digest derived from the order
     /// parameters.
     /// @return owner The address of the signer.
     function recoverEip712Signer(
         bytes calldata encodedSignature,
-        bytes32 domainSeparator,
         bytes32 orderDigest
-    ) internal pure returns (address owner) {
+    ) internal view returns (address owner) {
         (bytes32 r, bytes32 s, uint8 v) =
             decodeEcdsaSignature(encodedSignature);
 
@@ -209,15 +225,13 @@ library GPv2Signing {
     ///
     /// @param encodedSignature Calldata pointing to tightly packed signature
     /// bytes.
-    /// @param domainSeparator The domain separator used for signing the order.
     /// @param orderDigest The EIP-712 signing digest derived from the order
     /// parameters.
     /// @return owner The address of the signer.
     function recoverEthsignSigner(
         bytes calldata encodedSignature,
-        bytes32 domainSeparator,
         bytes32 orderDigest
-    ) internal pure returns (address owner) {
+    ) internal view returns (address owner) {
         (bytes32 r, bytes32 s, uint8 v) =
             decodeEcdsaSignature(encodedSignature);
 
@@ -258,7 +272,6 @@ library GPv2Signing {
     /// cover the full length of the decoded signature.
     function recoverEip1271Signer(
         bytes calldata encodedSignature,
-        bytes32 domainSeparator,
         bytes32 orderDigest
     ) internal view returns (address owner) {
         // NOTE: Use assembly to read the verifier address from the encoded
