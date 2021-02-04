@@ -6,6 +6,7 @@ import { ethers, waffle } from "hardhat";
 
 import {
   OrderKind,
+  OrderRefunds,
   SettlementEncoder,
   SigningScheme,
   TypedDataDomain,
@@ -72,7 +73,9 @@ describe("E2E: Expired Order Gas Refunds", () => {
     }
 
     const ORDER_VALIDITY = 60; // seconds
-    const prepareBatch = async () => {
+    const prepareBatch = async (): Promise<
+      [SettlementEncoder, OrderRefunds]
+    > => {
       const { timestamp } = await ethers.provider.getBlock("latest");
       const validTo = timestamp + ORDER_VALIDITY;
 
@@ -124,10 +127,16 @@ describe("E2E: Expired Order Gas Refunds", () => {
         data: traders[1].address,
       });
 
-      return [encoder, [sellOrderUid, buyOrderUid]] as const;
+      return [
+        encoder,
+        {
+          filledAmounts: [sellOrderUid, buyOrderUid],
+          preSignatures: [buyOrderUid],
+        },
+      ];
     };
 
-    const [encoder1, orderUids] = await prepareBatch();
+    const [encoder1, orderRefunds] = await prepareBatch();
 
     const txWithoutRefunds = await settlement.connect(solver).settle(
       ...encoder1.encodedSettlement({
@@ -141,7 +150,7 @@ describe("E2E: Expired Order Gas Refunds", () => {
     await ethers.provider.send("evm_mine", []);
 
     const [encoder2] = await prepareBatch();
-    encoder2.encodeOrderRefunds(...orderUids);
+    encoder2.encodeOrderRefunds(orderRefunds);
 
     const txWithRefunds = await settlement.connect(solver).settle(
       ...encoder2.encodedSettlement({
@@ -151,11 +160,13 @@ describe("E2E: Expired Order Gas Refunds", () => {
     );
     const { gasUsed: gasUsedWithRefunds } = await txWithRefunds.wait();
 
-    const gasSavingsPerOrderRefund = gasUsedWithoutRefunds
+    const gasSavingsPerRefund = gasUsedWithoutRefunds
       .sub(gasUsedWithRefunds)
-      .div(orderUids.length);
-    debug(`Gas savings per order: ${gasSavingsPerOrderRefund}`);
+      .div(
+        orderRefunds.filledAmounts.length + orderRefunds.preSignatures.length,
+      );
+    debug(`Gas savings per refund: ${gasSavingsPerRefund}`);
 
-    expect(gasSavingsPerOrderRefund.gt(8000)).to.be.true;
+    expect(gasSavingsPerRefund.gt(8000)).to.be.true;
   });
 });

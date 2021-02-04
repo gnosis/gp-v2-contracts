@@ -22,6 +22,12 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     using GPv2TradeExecution for GPv2TradeExecution.Data;
     using SafeMath for uint256;
 
+    /// @dev Data used for freeing storage and claiming a gas refund.
+    struct OrderRefunds {
+        bytes[] filledAmounts;
+        bytes[] preSignatures;
+    }
+
     /// @dev The authenticator is used to determine who can call the settle function.
     /// That is, only authorised solvers have the ability to invoke settlements.
     /// Any valid authenticator implements an isSolver method called by the onlySolver
@@ -108,14 +114,14 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     /// @param interactions Smart contract interactions split into three
     /// separate lists to be run before the settlement, during the settlement
     /// and after the settlement respectively.
-    /// @param orderRefunds Encoded order refunds for clearing storage
-    /// related to invalid orders.
+    /// @param orderRefunds Order refunds for clearing storage related to
+    /// expired orders.
     function settle(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
         GPv2Trade.Data[] calldata trades,
         GPv2Interaction.Data[][3] calldata interactions,
-        bytes[] calldata orderRefunds
+        OrderRefunds calldata orderRefunds
     ) external nonReentrant onlySolver {
         executeInteractions(interactions[0]);
 
@@ -342,21 +348,32 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         }
     }
 
-    /// @dev Claims order gas refunds by freeing storage for all encoded order
-    /// gas refunds.
+    /// @dev Claims order gas refunds.
+    ///
+    /// @param orderRefunds Order refund data for freeing storage.
+    function claimOrderRefunds(OrderRefunds calldata orderRefunds) internal {
+        freeOrderStorage(orderRefunds.filledAmounts, filledAmount);
+        freeOrderStorage(orderRefunds.preSignatures, preSignature);
+    }
+
+    /// @dev Claims refund for the specified storage and order UIDs.
     ///
     /// This method reverts if any of the orders are still valid.
     ///
-    /// @param orderRefunds Unique identifiers of orders to get a gas refund for
-    /// by freeing storage.
-    function claimOrderRefunds(bytes[] calldata orderRefunds) internal {
-        for (uint256 i = 0; i < orderRefunds.length; i++) {
-            bytes calldata orderUid = orderRefunds[i];
+    /// @param orderUids Order refund data for freeing storage.
+    /// @param orderStorage Order storage mapped on a UID.
+    function freeOrderStorage(
+        bytes[] calldata orderUids,
+        mapping(bytes => uint256) storage orderStorage
+    ) internal {
+        for (uint256 i = 0; i < orderUids.length; i++) {
+            bytes calldata orderUid = orderUids[i];
+
             (, , uint32 validTo) = orderUid.extractOrderUidParams();
             // solhint-disable-next-line not-rely-on-time
             require(validTo < block.timestamp, "GPv2: order still valid");
-            filledAmount[orderUid] = 0;
-            preSignature[orderUid] = false;
+
+            orderStorage[orderUid] = 0;
         }
     }
 }

@@ -1,7 +1,7 @@
-import { BigNumber } from "ethers";
+import { BigNumber, BytesLike } from "ethers";
 import { ethers } from "hardhat";
 
-import { Order, OrderKind, normalizeOrder } from "../src/ts";
+import { Order, OrderKind, OrderRefunds, normalizeOrder } from "../src/ts";
 
 export type AbiOrder = [
   string,
@@ -90,4 +90,16 @@ export function encodeOutTransfers(transfers: OutTransfer[]): ExecutedTrade[] {
     sellToken: ethers.constants.AddressZero,
     sellAmount: ethers.constants.Zero,
   }));
+}
+
+export function encodeFilledAmountRefunds(
+  ...filledAmounts: BytesLike[]
+): OrderRefunds {
+  return { filledAmounts, preSignatures: [] };
+}
+
+export function encodePreSignatureRefunds(
+  ...preSignatures: BytesLike[]
+): OrderRefunds {
+  return { filledAmounts: [], preSignatures };
 }

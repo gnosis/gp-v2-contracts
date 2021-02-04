@@ -298,8 +298,14 @@ export class BenchFixture {
         owner: trader.address,
         validTo: 0,
       });
-      await settlement.connect(trader).invalidateOrder(orderUid);
-      encoder.encodeOrderRefunds(orderUid);
+
+      if (i % 5 !== 0) {
+        await settlement.connect(trader).invalidateOrder(orderUid);
+        encoder.encodeOrderRefunds({ filledAmounts: [orderUid] });
+      } else {
+        await settlement.connect(trader).setPreSignature(orderUid, true);
+        encoder.encodeOrderRefunds({ preSignatures: [orderUid] });
+      }
     }
 
     const prices = tokens.instances.slice(0, options.tokens).reduce(

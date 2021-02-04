@@ -35,6 +35,10 @@ abstract contract GPv2Signing {
     /// @dev The EIP-712 domain version used for computing the domain separator.
     bytes32 private constant DOMAIN_VERSION = keccak256("v2");
 
+    /// @dev Marker value indicating an order is pre-signed.
+    uint256 private constant PRE_SIGNED =
+        uint256(keccak256("GPv2Signing.Scheme.PreSign"));
+
     /// @dev The domain separator used for signing orders that gets mixed in
     /// making signatures for different domains incompatible. This domain
     /// separator is computed following the EIP-712 standard and has replay
@@ -44,7 +48,7 @@ abstract contract GPv2Signing {
 
     /// @dev Storage indicating whether or not an order has been signed by a
     /// particular address.
-    mapping(bytes => bool) public preSignature;
+    mapping(bytes => uint256) public preSignature;
 
     constructor() {
         // NOTE: Currently, the only way to get the chain ID in solidity is
@@ -72,7 +76,11 @@ abstract contract GPv2Signing {
     function setPreSignature(bytes calldata orderUid, bool signed) external {
         (, address owner, ) = orderUid.extractOrderUidParams();
         require(owner == msg.sender, "GPv2: cannot presign order");
-        preSignature[orderUid] = signed;
+        if (signed) {
+            preSignature[orderUid] = PRE_SIGNED;
+        } else {
+            preSignature[orderUid] = 0;
+        }
     }
 
     /// @dev Returns an empty recovered order with a pre-allocated buffer for
@@ -320,6 +328,9 @@ abstract contract GPv2Signing {
         bytes memory orderUid = new bytes(GPv2Order.UID_LENGTH);
         orderUid.packOrderUidParams(orderDigest, owner, validTo);
 
-        require(preSignature[orderUid], "GPv2: order not presigned");
+        require(
+            preSignature[orderUid] == PRE_SIGNED,
+            "GPv2: order not presigned"
+        );
     }
 }

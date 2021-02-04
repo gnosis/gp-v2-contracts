@@ -116,6 +116,16 @@ export interface TradeExecution {
 export type Prices = Record<string, BigNumberish | undefined>;
 
 /**
+ * Order refund data.
+ */
+export interface OrderRefunds {
+  /** Refund storage used for order filled amount */
+  filledAmounts: BytesLike[];
+  /** Refund storage used for order pre-signature */
+  preSignatures: BytesLike[];
+}
+
+/**
  * Encoded settlement parameters.
  */
 export type EncodedSettlement = [
@@ -128,7 +138,7 @@ export type EncodedSettlement = [
   /** Encoded interactions. */
   [Interaction[], Interaction[], Interaction[]],
   /** Encoded order refunds. */
-  BytesLike[],
+  OrderRefunds,
 ];
 
 /**
@@ -221,7 +231,10 @@ export class SettlementEncoder {
     [InteractionStage.INTRA]: [],
     [InteractionStage.POST]: [],
   };
-  private _orderRefunds: string[] = [];
+  private _orderRefunds: OrderRefunds = {
+    filledAmounts: [],
+    preSignatures: [],
+  };
 
   /**
    * Creates a new settlement encoder instance.
@@ -267,8 +280,11 @@ export class SettlementEncoder {
   /**
    * Gets the currently encoded order UIDs for gas refunds.
    */
-  public get orderRefunds(): string[] {
-    return this._orderRefunds.slice();
+  public get orderRefunds(): OrderRefunds {
+    return {
+      filledAmounts: this._orderRefunds.filledAmounts.slice(),
+      preSignatures: this._orderRefunds.preSignatures.slice(),
+    };
   }
 
   /**
@@ -371,18 +387,22 @@ export class SettlementEncoder {
   /**
    * Encodes order UIDs for gas refunds.
    *
-   * @param orderUids The order UIDs for which to claim gas refunds.
+   * @param orderRefunds The order refunds to encode.
    */
-  public encodeOrderRefunds(...orderUids: string[]): void {
+  public encodeOrderRefunds(orderRefunds: Partial<OrderRefunds>): void {
+    const filledAmounts = orderRefunds.filledAmounts ?? [];
+    const preSignatures = orderRefunds.preSignatures ?? [];
+
     if (
-      !orderUids.every((orderUid) =>
+      ![...filledAmounts, ...preSignatures].every((orderUid) =>
         ethers.utils.isHexString(orderUid, ORDER_UID_LENGTH),
       )
     ) {
       throw new Error("one or more invalid order UIDs");
     }
 
-    this._orderRefunds.push(...orderUids);
+    this._orderRefunds.filledAmounts.push(...filledAmounts);
+    this._orderRefunds.preSignatures.push(...preSignatures);
   }
 
   /**

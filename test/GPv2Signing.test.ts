@@ -4,6 +4,7 @@ import { artifacts, ethers, waffle } from "hardhat";
 
 import {
   EIP1271_MAGICVALUE,
+  PRE_SIGNED,
   OrderKind,
   SettlementEncoder,
   SigningScheme,
@@ -85,13 +86,15 @@ describe("GPv2Signing", () => {
 
     it("should set the pre-signature", async () => {
       await signing.connect(owner).setPreSignature(orderUid, true);
-      expect(await signing.preSignature(orderUid)).to.be.true;
+      expect(await signing.preSignature(orderUid)).to.equal(PRE_SIGNED);
     });
 
     it("should unset the pre-signature", async () => {
       await signing.connect(owner).setPreSignature(orderUid, true);
       await signing.connect(owner).setPreSignature(orderUid, false);
-      expect(await signing.preSignature(orderUid)).to.be.false;
+      expect(await signing.preSignature(orderUid)).to.equal(
+        ethers.constants.Zero,
+      );
     });
 
     it("should revert if the order owner is not the transaction sender", async () => {
