@@ -9,6 +9,7 @@ contract SettlementStorageReader {
     // This sneaky storage member is inherited through ReentrancyGuard
     uint256 private _status;
 
+    mapping(bytes => uint256) public preSignature;
     mapping(bytes => uint256) public filledAmount;
 
     function filledAmountsForOrders(bytes[] calldata orderUids)

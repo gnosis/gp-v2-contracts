@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { Contract } from "ethers";
 import { ethers, waffle } from "hardhat";
 
-import { computeOrderUid, SettlementReader } from "../src/ts";
+import { SettlementReader, packOrderUidParams } from "../src/ts";
 
 describe("SettlementStorageReader", () => {
   const [deployer, owner, ...traders] = waffle.provider.getWallets();
@@ -29,7 +29,7 @@ describe("SettlementStorageReader", () => {
     it("returns expected filledAmounts", async () => {
       // construct 3 unique order Ids and invalidate the first two.
       const orderUids = [0, 1, 2].map((i) =>
-        computeOrderUid({
+        packOrderUidParams({
           orderDigest: "0x" + "11".repeat(32),
           owner: traders[i].address,
           validTo: 2 ** 32 - 1,

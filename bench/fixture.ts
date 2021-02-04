@@ -11,8 +11,8 @@ import {
   SettlementEncoder,
   SigningScheme,
   TypedDataDomain,
-  computeOrderUid,
   domain,
+  packOrderUidParams,
 } from "../src/ts";
 import { deployTestContracts, TestDeployment } from "../test/e2e/fixture";
 
@@ -293,7 +293,7 @@ export class BenchFixture {
     for (let i = 0; i < options.refunds; i++) {
       const trader = traders[i % traders.length];
       const key = (i + 1).toString(16).padStart(2, "0");
-      const orderUid = computeOrderUid({
+      const orderUid = packOrderUidParams({
         orderDigest: `0x${key}${"42".repeat(31)}`,
         owner: trader.address,
         validTo: 0,

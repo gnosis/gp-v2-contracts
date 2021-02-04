@@ -20,7 +20,7 @@ abstract contract GPv2Signing {
     }
 
     /// @dev Signing scheme used for recovery.
-    enum Scheme {Eip712, EthSign, Eip1271}
+    enum Scheme {Eip712, EthSign, Eip1271, PreSign}
 
     /// @dev The EIP-712 domain type hash used for computing the domain
     /// separator.
@@ -42,6 +42,10 @@ abstract contract GPv2Signing {
     /// GPv2 contracts.
     bytes32 public immutable domainSeparator;
 
+    /// @dev Storage indicating whether or not an order has been signed by a
+    /// particular address.
+    mapping(bytes => bool) public preSignature;
+
     constructor() {
         // NOTE: Currently, the only way to get the chain ID in solidity is
         // using assembly.
@@ -60,6 +64,15 @@ abstract contract GPv2Signing {
                 address(this)
             )
         );
+    }
+
+    /// @dev Sets a presignature for the specified order UID.
+    ///
+    /// @param orderUid The unique identifier of the order to pre-sign.
+    function setPreSignature(bytes calldata orderUid, bool signed) external {
+        (, address owner, ) = orderUid.extractOrderUidParams();
+        require(owner == msg.sender, "GPv2: cannot presign order");
+        preSignature[orderUid] = signed;
     }
 
     /// @dev Returns an empty recovered order with a pre-allocated buffer for
@@ -122,6 +135,8 @@ abstract contract GPv2Signing {
             owner = recoverEthsignSigner(orderDigest, signature);
         } else if (signingScheme == Scheme.Eip1271) {
             owner = recoverEip1271Signer(orderDigest, signature);
+        } else if (signingScheme == Scheme.PreSign) {
+            owner = recoverPreSigner(orderDigest, signature, order.validTo);
         }
     }
 
@@ -251,6 +266,11 @@ abstract contract GPv2Signing {
     ///
     /// This function enforces that the encoded data stores enough bytes to
     /// cover the full length of the decoded signature.
+    ///
+    /// @param encodedSignature The encoded EIP-1271 signature.
+    /// @param orderDigest The EIP-712 signing digest derived from the order
+    /// parameters.
+    /// @return owner The address of the signer.
     function recoverEip1271Signer(
         bytes32 orderDigest,
         bytes calldata encodedSignature
@@ -273,5 +293,33 @@ abstract contract GPv2Signing {
                 GPv2EIP1271.MAGICVALUE,
             "GPv2: invalid eip1271 signature"
         );
+    }
+
+    /// @dev Verifies the order has been pre-signed. The signature is the
+    /// address of the signer of the order.
+    ///
+    /// @param orderDigest The EIP-712 signing digest derived from the order
+    /// parameters.
+    /// @param encodedSignature The pre-sign signature reprenting the order UID.
+    /// @param validTo The order expiry timestamp.
+    /// @return owner The address of the signer.
+    function recoverPreSigner(
+        bytes32 orderDigest,
+        bytes calldata encodedSignature,
+        uint32 validTo
+    ) internal view returns (address owner) {
+        require(encodedSignature.length == 20, "GPv2: malformed presignature");
+        // NOTE: Use assembly to read the owner address from the encoded
+        // signature bytes.
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            // owner = address(encodedSignature[0:20])
+            owner := shr(96, calldataload(encodedSignature.offset))
+        }
+
+        bytes memory orderUid = new bytes(GPv2Order.UID_LENGTH);
+        orderUid.packOrderUidParams(orderDigest, owner, validTo);
+
+        require(preSignature[orderUid], "GPv2: order not presigned");
     }
 }

@@ -135,6 +135,7 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     }
 
     /// @dev Invalidate onchain an order that has been signed offline.
+    ///
     /// @param orderUid The unique identifier of the order that is to be made
     /// invalid after calling this function. The user that created the order
     /// must be the the sender of this message. See [`extractOrderUidParams`]
@@ -151,6 +152,7 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     ///
     /// This method reverts if processing of any single trade fails. See
     /// [`computeTradeExecution`] for more details.
+    ///
     /// @param tokens An array of ERC20 tokens to be traded in the settlement.
     /// @param clearingPrices An array of token clearing prices.
     /// @param trades Trades for signed orders.
@@ -354,6 +356,7 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
             // solhint-disable-next-line not-rely-on-time
             require(validTo < block.timestamp, "GPv2: order still valid");
             filledAmount[orderUid] = 0;
+            preSignature[orderUid] = false;
         }
     }
 }
