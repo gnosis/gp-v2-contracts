@@ -19,6 +19,8 @@ describe("GPv2AllowListAuthentication", () => {
       deployer,
     );
 
+    // NOTE: This deploys the test interface contract which emulates being
+    // proxied by an EIP-1967 compatible proxy for unit testing purposes.
     authenticator = await GPv2AllowListAuthentication.deploy(owner.address);
     await authenticator.initializeManager(manager.address);
   });

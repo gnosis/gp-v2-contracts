@@ -96,6 +96,11 @@ describe("Upgrade Authenticator", () => {
     expect(await authenticatorV2.manager()).to.equal(newManager.address);
   });
 
+  it("should allow the proxy owner to change the manager", async () => {
+    await authenticator.connect(owner).setManager(newManager.address);
+    expect(await authenticator.manager()).to.equal(newManager.address);
+  });
+
   it("should be able to transfer proxy ownership", async () => {
     const proxy = proxyInterface(authenticator);
     await proxy.connect(owner).transferOwnership(newOwner.address);
