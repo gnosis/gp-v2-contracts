@@ -4,10 +4,10 @@ import { ethers } from "hardhat";
 
 import {
   ORDER_TYPE_HASH,
+  ORDER_TYPE_FIELDS,
   ORDER_UID_LENGTH,
   OrderKind,
   computeOrderUid,
-  hashOrder,
 } from "../src/ts";
 
 import { encodeOrder } from "./encoding";
@@ -51,7 +51,11 @@ describe("GPv2Order", () => {
         partiallyFillable: false,
       };
       expect(await orders.hashTest(encodeOrder(order))).to.equal(
-        hashOrder(order),
+        ethers.utils._TypedDataEncoder.hashStruct(
+          "Order",
+          { Order: ORDER_TYPE_FIELDS },
+          order,
+        ),
       );
     });
   });

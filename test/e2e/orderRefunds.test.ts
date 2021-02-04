@@ -11,7 +11,7 @@ import {
   TypedDataDomain,
   computeOrderUid,
   domain,
-  hashOrder,
+  orderSigningHash,
 } from "../../src/ts";
 
 import { deployTestContracts } from "./fixture";
@@ -111,12 +111,12 @@ describe("E2E: Expired Order Gas Refunds", () => {
 
       const orderUids = [
         computeOrderUid({
-          orderDigest: hashOrder(sellOrder),
+          orderDigest: orderSigningHash(domainSeparator, sellOrder),
           owner: traders[0].address,
           validTo,
         }),
         computeOrderUid({
-          orderDigest: hashOrder(buyOrder),
+          orderDigest: orderSigningHash(domainSeparator, buyOrder),
           owner: traders[1].address,
           validTo,
         }),
