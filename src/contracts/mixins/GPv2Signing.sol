@@ -115,14 +115,6 @@ abstract contract GPv2Signing {
         Scheme signingScheme,
         bytes calldata signature
     ) internal view returns (bytes32 orderDigest, address owner) {
-        // Read the free memory pointer so that we can de-allocate after
-        // recovering the order signer. See below for more details.
-        uint256 freeMemoryPointer;
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            freeMemoryPointer := mload(0x40)
-        }
-
         orderDigest = orderSigningHash(order);
         if (signingScheme == Scheme.Eip712) {
             owner = recoverEip712Signer(orderDigest, signature);
@@ -130,21 +122,6 @@ abstract contract GPv2Signing {
             owner = recoverEthsignSigner(orderDigest, signature);
         } else if (signingScheme == Scheme.Eip1271) {
             owner = recoverEip1271Signer(orderDigest, signature);
-        }
-
-        // Manually set the free memory pointer back to what it was at the start
-        // of the function, effectively freeing allocated memory. This is done
-        // because Solidity allocates temporary memory for certain operations
-        // that can safely be discarded after use. Examples are:
-        // - calling the ABI encoding methods
-        // - calling the `ecrecover` precompile.
-        //
-        // Note that memory pointed to by the free memory pointer **does not
-        // have to point to zero-ed out**.
-        // <https://docs.soliditylang.org/en/v0.7.6/internals/layout_in_memory.html>
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            mstore(0x40, freeMemoryPointer)
         }
     }
 
