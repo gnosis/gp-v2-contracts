@@ -1,7 +1,8 @@
 // defined in https://eips.ethereum.org/EIPS/eip-1967
 
-import { BigNumber } from "ethers";
+import { BigNumber, Contract } from "ethers";
 import { ethers } from "hardhat";
+import Proxy from "hardhat-deploy/extendedArtifacts/EIP173Proxy.json";
 
 // The proxy contract used by hardhat-deploy implements EIP-1967 (Standard Proxy
 // Storage Slot). See <https://eips.ethereum.org/EIPS/eip-1967>.
@@ -22,7 +23,7 @@ const OWNER_STORAGE_SLOT = slot("eip1967.proxy.admin");
  * @returns The address of the contract storing the proxy implementation.
  */
 export async function implementationAddress(proxy: string): Promise<string> {
-  const [implementation] = await ethers.utils.defaultAbiCoder.decode(
+  const [implementation] = ethers.utils.defaultAbiCoder.decode(
     ["address"],
     await ethers.provider.getStorageAt(proxy, IMPLEMENTATION_STORAGE_SLOT),
   );
@@ -37,9 +38,24 @@ export async function implementationAddress(proxy: string): Promise<string> {
  * @returns The address of the administrator of the proxy.
  */
 export async function ownerAddress(proxy: string): Promise<string> {
-  const [owner] = await ethers.utils.defaultAbiCoder.decode(
+  const [owner] = ethers.utils.defaultAbiCoder.decode(
     ["address"],
     await ethers.provider.getStorageAt(proxy, OWNER_STORAGE_SLOT),
   );
   return owner;
+}
+
+/**
+ * Returns the proxy interface for the specified address.
+ *
+ * @param contract The proxy contract to return a proxy interface for.
+ * @returns A Ethers.js contract instance for interacting with the proxy.
+ */
+export function proxyInterface(contract: Contract): Contract {
+  const { abi } = Proxy;
+  return new Contract(
+    contract.address,
+    abi,
+    contract.signer ?? contract.provider,
+  );
 }

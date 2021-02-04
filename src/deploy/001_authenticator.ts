@@ -7,7 +7,7 @@ const deployAuthenticator: DeployFunction = async function ({
   deployments,
   getNamedAccounts,
 }: HardhatRuntimeEnvironment) {
-  const { deployer, owner } = await getNamedAccounts();
+  const { deployer, owner, manager } = await getNamedAccounts();
   const { deploy } = deployments;
 
   const { authenticator } = CONTRACT_NAMES;
@@ -20,7 +20,7 @@ const deployAuthenticator: DeployFunction = async function ({
       owner,
       methodName: "initializeManager",
     },
-    args: [owner],
+    args: [manager],
   });
 };
 

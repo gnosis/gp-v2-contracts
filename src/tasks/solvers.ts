@@ -12,9 +12,9 @@ async function getOwnerSigner({
   ethers,
   getNamedAccounts,
 }: HardhatRuntimeEnvironment): Promise<Signer> {
-  const { owner } = await getNamedAccounts();
+  const { manager } = await getNamedAccounts();
   const signer = (await ethers.getSigners()).find(
-    (signer) => signer.address == owner,
+    (signer) => signer.address == manager,
   );
   if (signer == undefined) {
     throw new Error(

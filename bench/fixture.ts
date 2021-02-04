@@ -90,14 +90,14 @@ export class BenchFixture {
       authenticator,
       settlement,
       deployer,
-      owner,
-      wallets: [solver, ...traders],
+      manager,
+      wallets: [solver, pooler, ...traders],
     } = deployment;
 
     const { chainId } = await ethers.provider.getNetwork();
     const domainSeparator = domain(chainId, settlement.address);
 
-    await authenticator.connect(owner).addSolver(solver.address);
+    await authenticator.connect(manager).addSolver(solver.address);
 
     const tokens = new TokenManager(deployment, traders);
 
@@ -122,7 +122,7 @@ export class BenchFixture {
     ].map((tokenAddress) => new Contract(tokenAddress, ERC20.abi, deployer));
     await uniswapTokens[0].mint(uniswapPair.address, LOTS);
     await uniswapTokens[1].mint(uniswapPair.address, LOTS);
-    await uniswapPair.mint(owner.address);
+    await uniswapPair.mint(pooler.address);
 
     debug("performing Uniswap initial swap to write initial storage values");
     await uniswapTokens[1].mint(
@@ -132,7 +132,7 @@ export class BenchFixture {
     await uniswapPair.swap(
       ethers.utils.parseEther("0.99"),
       ethers.constants.Zero,
-      owner.address,
+      pooler.address,
       "0x",
     );
 
