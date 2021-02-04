@@ -45,6 +45,10 @@ export const enum SigningScheme {
    * <https://eips.ethereum.org/EIPS/eip-1271>
    */
   EIP1271,
+  /**
+   * Pre-signed order.
+   */
+  PRESIGN,
 }
 
 export type EcdsaSigningScheme = SigningScheme.EIP712 | SigningScheme.ETHSIGN;
@@ -52,7 +56,7 @@ export type EcdsaSigningScheme = SigningScheme.EIP712 | SigningScheme.ETHSIGN;
 /**
  * The signature of an order.
  */
-export type Signature = EcdsaSignature | Eip1271Signature;
+export type Signature = EcdsaSignature | Eip1271Signature | PreSignSignature;
 
 /**
  * ECDSA signature of an order.
@@ -94,6 +98,20 @@ export interface Eip1271Signature {
    * The signature data.
    */
   data: Eip1271SignatureData;
+}
+
+/**
+ * Signature data for a pre-signed order.
+ */
+export interface PreSignSignature {
+  /**
+   * The signing scheme used in the signature.
+   */
+  scheme: SigningScheme.PRESIGN;
+  /**
+   * The address of the signer.
+   */
+  data: string;
 }
 
 function ecdsaSignOrder(

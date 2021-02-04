@@ -11,7 +11,6 @@ import {
   TypedDataDomain,
   computeOrderUid,
   domain,
-  orderSigningHash,
 } from "../../src/ts";
 
 import { deployTestContracts } from "./fixture";
@@ -102,27 +101,30 @@ describe("E2E: Expired Order Gas Refunds", () => {
       };
 
       const encoder = new SettlementEncoder(domainSeparator);
+
+      const sellOrderUid = computeOrderUid(
+        domainSeparator,
+        sellOrder,
+        traders[0].address,
+      );
       await encoder.signEncodeTrade(
         sellOrder,
         traders[0],
         SigningScheme.EIP712,
       );
-      await encoder.signEncodeTrade(buyOrder, traders[1], SigningScheme.EIP712);
 
-      const orderUids = [
-        computeOrderUid({
-          orderDigest: orderSigningHash(domainSeparator, sellOrder),
-          owner: traders[0].address,
-          validTo,
-        }),
-        computeOrderUid({
-          orderDigest: orderSigningHash(domainSeparator, buyOrder),
-          owner: traders[1].address,
-          validTo,
-        }),
-      ];
+      const buyOrderUid = computeOrderUid(
+        domainSeparator,
+        buyOrder,
+        traders[1].address,
+      );
+      await settlement.connect(traders[1]).setPreSignature(buyOrderUid, true);
+      encoder.encodeTrade(buyOrder, {
+        scheme: SigningScheme.PRESIGN,
+        data: traders[1].address,
+      });
 
-      return [encoder, orderUids] as const;
+      return [encoder, [sellOrderUid, buyOrderUid]] as const;
     };
 
     const [encoder1, orderUids] = await prepareBatch();

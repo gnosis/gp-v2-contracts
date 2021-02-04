@@ -7,7 +7,7 @@ import {
   ORDER_TYPE_FIELDS,
   ORDER_UID_LENGTH,
   OrderKind,
-  computeOrderUid,
+  packOrderUidParams,
 } from "../src/ts";
 
 import { encodeOrder } from "./encoding";
@@ -73,7 +73,7 @@ describe("GPv2Order", () => {
           validTo,
         ),
       ).to.equal(
-        computeOrderUid({
+        packOrderUidParams({
           orderDigest,
           owner,
           validTo: validTo.toNumber(),
@@ -100,7 +100,7 @@ describe("GPv2Order", () => {
       const address = ethers.utils.getAddress(fillDistinctBytes(20, 1 + 32));
       const validTo = BigNumber.from(fillDistinctBytes(4, 1 + 32 + 20));
 
-      const orderUid = computeOrderUid({
+      const orderUid = packOrderUidParams({
         orderDigest,
         owner: address,
         validTo: validTo.toNumber(),

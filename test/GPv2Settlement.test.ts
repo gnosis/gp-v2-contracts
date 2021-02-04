@@ -15,7 +15,7 @@ import {
   computeOrderUid,
   domain,
   normalizeInteractions,
-  orderSigningHash,
+  packOrderUidParams,
 } from "../src/ts";
 
 import { builtAndDeployedMetadataCoincide } from "./bytecode";
@@ -114,7 +114,7 @@ describe("GPv2Settlement", () => {
 
       expect(
         await settlement.filledAmount(
-          computeOrderUid({ orderDigest, owner, validTo }),
+          packOrderUidParams({ orderDigest, owner, validTo }),
         ),
       ).to.equal(ethers.constants.Zero);
     });
@@ -258,7 +258,7 @@ describe("GPv2Settlement", () => {
     it("sets filled amount of the caller's order to max uint256", async () => {
       const orderDigest = "0x" + "11".repeat(32);
       const validTo = 2 ** 32 - 1;
-      const orderUid = computeOrderUid({
+      const orderUid = packOrderUidParams({
         orderDigest,
         owner: traders[0].address,
         validTo,
@@ -271,7 +271,7 @@ describe("GPv2Settlement", () => {
     });
 
     it("emits an OrderInvalidated event log", async () => {
-      const orderUid = computeOrderUid({
+      const orderUid = packOrderUidParams({
         orderDigest: ethers.constants.HashZero,
         owner: traders[0].address,
         validTo: 0,
@@ -292,7 +292,7 @@ describe("GPv2Settlement", () => {
     it("fails to invalidate order that is not owned by the caller", async () => {
       const orderDigest = "0x".padEnd(66, "1");
       const validTo = 2 ** 32 - 1;
-      const orderUid = computeOrderUid({
+      const orderUid = packOrderUidParams({
         orderDigest,
         owner: traders[0].address,
         validTo,
@@ -706,11 +706,7 @@ describe("GPv2Settlement", () => {
           encoder.trades,
         );
 
-        const orderUid = computeOrderUid({
-          orderDigest: orderSigningHash(testDomain, order),
-          owner: traders[0].address,
-          validTo: order.validTo,
-        });
+        const orderUid = computeOrderUid(testDomain, order, traders[0].address);
         const filledAmount = await settlement.filledAmount(orderUid);
 
         return filledAmount;
@@ -838,11 +834,7 @@ describe("GPv2Settlement", () => {
           executedSellAmount,
           executedBuyAmount,
           order.feeAmount,
-          computeOrderUid({
-            orderDigest: orderSigningHash(testDomain, order),
-            owner: traders[0].address,
-            validTo: order.validTo,
-          }),
+          computeOrderUid(testDomain, order, traders[0].address),
         );
 
       const { events } = await (await tx).wait();
@@ -1059,17 +1051,17 @@ describe("GPv2Settlement", () => {
   describe("claimOrderRefunds", () => {
     it("should set filled amount to 0 for all orders", async () => {
       const orderUids = [
-        computeOrderUid({
+        packOrderUidParams({
           orderDigest: `0x${"11".repeat(32)}`,
           owner: traders[0].address,
           validTo: 0,
         }),
-        computeOrderUid({
+        packOrderUidParams({
           orderDigest: `0x${"22".repeat(32)}`,
           owner: traders[0].address,
           validTo: 0,
         }),
-        computeOrderUid({
+        packOrderUidParams({
           orderDigest: `0x${"33".repeat(32)}`,
           owner: traders[0].address,
           validTo: 0,
@@ -1091,8 +1083,21 @@ describe("GPv2Settlement", () => {
       }
     });
 
+    it("should clear pre-signatures", async () => {
+      const orderUid = packOrderUidParams({
+        orderDigest: `0x${"11".repeat(32)}`,
+        owner: traders[0].address,
+        validTo: 0,
+      });
+
+      await settlement.connect(traders[0]).setPreSignature(orderUid, true);
+      await settlement.claimOrderRefundsTest([orderUid]);
+
+      expect(await settlement.preSignature(orderUid)).to.be.false;
+    });
+
     it("should revert if the encoded order UIDs are malformed", async () => {
-      const orderUid = computeOrderUid({
+      const orderUid = packOrderUidParams({
         orderDigest: ethers.constants.HashZero,
         owner: ethers.constants.AddressZero,
         validTo: 0,
@@ -1109,7 +1114,7 @@ describe("GPv2Settlement", () => {
 
     it("should revert if the order is still valid", async () => {
       const orderDigest = "0x" + "11".repeat(32);
-      const orderUid = computeOrderUid({
+      const orderUid = packOrderUidParams({
         orderDigest,
         owner: traders[0].address,
         validTo: 0xffffffff,
