@@ -14,8 +14,8 @@ library GPv2EIP1967 {
 
     /// @dev Returns the address stored in the EIP-1967 implementation storage
     /// slot for the current contract. If this method is not called from an
-    /// EIP-1967 contract, then it will likely return `address(0)`.
-    /// as `keccak256('eip1967.proxy.implementation') - 1`.
+    /// EIP-1967 contract, then it will likely return `address(0)`, as the
+    /// implementation slot is likely to be unset.
     ///
     /// @return implementation The implementation address.
     function getImplementation()
