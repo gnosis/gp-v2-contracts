@@ -1,7 +1,8 @@
 import { expect } from "chai";
 import { Contract, Wallet } from "ethers";
 import { deployments, ethers } from "hardhat";
-import Proxy from "hardhat-deploy/extendedArtifacts/EIP173Proxy.json";
+
+import { proxyInterface } from "../../src/ts";
 
 import { deployTestContracts } from "./fixture";
 
@@ -96,7 +97,7 @@ describe("Upgrade Authenticator", () => {
   });
 
   it("should be able to transfer proxy ownership", async () => {
-    const proxy = new Contract(authenticator.address, Proxy.abi, deployer);
+    const proxy = proxyInterface(authenticator);
     await proxy.connect(owner).transferOwnership(newOwner.address);
     expect(await proxy.owner()).to.equal(newOwner.address);
 

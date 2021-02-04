@@ -8,6 +8,7 @@ import {
   DeploymentArguments,
   deterministicDeploymentAddress,
   implementationAddress,
+  proxyInterface,
 } from "../../src/ts";
 import { builtAndDeployedMetadataCoincide } from "../bytecode";
 
@@ -104,7 +105,8 @@ describe("E2E: Deployment", () => {
 
   describe("authorization", () => {
     it("authenticator has dedicated owner", async () => {
-      expect(await authenticator.owner()).to.equal(owner.address);
+      const proxy = proxyInterface(authenticator);
+      expect(await proxy.owner()).to.equal(owner.address);
     });
 
     it("authenticator has dedicated manager", async () => {
