@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import { Contract, Wallet } from "ethers";
 import { deployments, ethers } from "hardhat";
+import Proxy from "hardhat-deploy/extendedArtifacts/EIP173Proxy.json";
 
 import { deployTestContracts } from "./fixture";
 
@@ -33,7 +34,9 @@ describe("Upgrade Authenticator", () => {
   let authenticator: Contract;
   let deployer: Wallet;
   let owner: Wallet;
-  let nonOwner: Wallet;
+  let manager: Wallet;
+  let nobody: Wallet;
+  let newOwner: Wallet;
   let newManager: Wallet;
   let solver: Wallet;
 
@@ -42,7 +45,8 @@ describe("Upgrade Authenticator", () => {
       authenticator,
       deployer,
       owner,
-      wallets: [nonOwner, newManager, solver],
+      manager,
+      wallets: [nobody, newOwner, newManager, solver],
     } = await deployTestContracts());
   });
 
@@ -68,8 +72,8 @@ describe("Upgrade Authenticator", () => {
   });
 
   it("should preserve storage", async () => {
-    await authenticator.connect(owner).setManager(newManager.address);
-    await authenticator.connect(newManager).addSolver(solver.address);
+    await authenticator.connect(manager).addSolver(solver.address);
+    await authenticator.connect(manager).setManager(newManager.address);
 
     // Upgrade after storage is set with **proxy owner**;
     await upgrade(
@@ -91,6 +95,18 @@ describe("Upgrade Authenticator", () => {
     expect(await authenticatorV2.manager()).to.equal(newManager.address);
   });
 
+  it("should be able to transfer proxy ownership", async () => {
+    const proxy = new Contract(authenticator.address, Proxy.abi, deployer);
+    await proxy.connect(owner).transferOwnership(newOwner.address);
+    expect(await proxy.owner()).to.equal(newOwner.address);
+
+    await upgrade(
+      newOwner,
+      "GPv2AllowListAuthentication",
+      "GPv2AllowListAuthenticationV2",
+    );
+  });
+
   it("should revert when not upgrading with the authentication manager", async () => {
     await authenticator.connect(owner).setManager(newManager.address);
     expect(
@@ -108,7 +124,7 @@ describe("Upgrade Authenticator", () => {
     expect(
       await rejectError(
         upgrade(
-          nonOwner,
+          nobody,
           "GPv2AllowListAuthentication",
           "GPv2AllowListAuthenticationV2",
         ),

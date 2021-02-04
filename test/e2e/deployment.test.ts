@@ -23,6 +23,7 @@ async function contractAddress<C extends ContractName>(
 
 describe("E2E: Deployment", () => {
   let owner: Wallet;
+  let manager: Wallet;
   let user: Wallet;
 
   let authenticator: Contract;
@@ -32,6 +33,7 @@ describe("E2E: Deployment", () => {
   beforeEach(async () => {
     ({
       owner,
+      manager,
       wallets: [user],
       authenticator,
       settlement,
@@ -79,7 +81,7 @@ describe("E2E: Deployment", () => {
           deterministicDeploymentAddress(Proxy, [
             await implementationAddress(authenticator.address),
             authenticator.interface.encodeFunctionData("initializeManager", [
-              owner.address,
+              manager.address,
             ]),
             owner.address,
           ]),
@@ -100,9 +102,13 @@ describe("E2E: Deployment", () => {
     });
   });
 
-  describe("ownership", () => {
+  describe("authorization", () => {
     it("authenticator has dedicated owner", async () => {
-      expect(await authenticator.manager()).to.equal(owner.address);
+      expect(await authenticator.owner()).to.equal(owner.address);
+    });
+
+    it("authenticator has dedicated manager", async () => {
+      expect(await authenticator.manager()).to.equal(manager.address);
     });
   });
 });

@@ -91,6 +91,10 @@ export default {
       default: "0x6Fb5916c0f57f88004d5b5EB25f6f4D77353a1eD",
       hardhat: 1,
     },
+    manager: {
+      default: "0x6Fb5916c0f57f88004d5b5EB25f6f4D77353a1eD",
+      hardhat: 2,
+    },
   },
   gasReporter: {
     enabled: REPORT_GAS ? true : false,

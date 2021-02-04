@@ -32,8 +32,8 @@ describe("E2E: EIP-2612 Permit", () => {
       wallets: [solver, ...traders],
     } = deployment);
 
-    const { authenticator, owner } = deployment;
-    await authenticator.connect(owner).addSolver(solver.address);
+    const { authenticator, manager } = deployment;
+    await authenticator.connect(manager).addSolver(solver.address);
 
     const { chainId } = await ethers.provider.getNetwork();
     domainSeparator = domain(chainId, settlement.address);

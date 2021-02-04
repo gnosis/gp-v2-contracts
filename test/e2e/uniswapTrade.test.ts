@@ -40,8 +40,8 @@ describe("E2E: Should Trade Surplus With Uniswap", () => {
       wallets: [solver, pooler, ...traders],
     } = deployment);
 
-    const { authenticator, owner } = deployment;
-    await authenticator.connect(owner).addSolver(solver.address);
+    const { authenticator, manager } = deployment;
+    await authenticator.connect(manager).addSolver(solver.address);
 
     const { chainId } = await ethers.provider.getNetwork();
     domainSeparator = domain(chainId, settlement.address);

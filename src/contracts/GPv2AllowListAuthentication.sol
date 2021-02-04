@@ -5,6 +5,7 @@ import "@gnosis.pm/util-contracts/contracts/StorageAccessible.sol";
 import "@openzeppelin/contracts/proxy/Initializable.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "./interfaces/GPv2Authentication.sol";
+import "./libraries/GPv2EIP1967.sol";
 
 /// @title Gnosis Protocol v2 Access Control Contract
 /// @author Gnosis Developers
@@ -28,7 +29,15 @@ contract GPv2AllowListAuthentication is
         _;
     }
 
-    function setManager(address manager_) external onlyManager {
+    modifier onlyManagerOrOwner() {
+        require(
+            manager == msg.sender || GPv2EIP1967.getAdmin() == msg.sender,
+            "GPv2: not authorized"
+        );
+        _;
+    }
+
+    function setManager(address manager_) external onlyManagerOrOwner {
         manager = manager_;
     }
 

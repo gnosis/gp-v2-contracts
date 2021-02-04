@@ -4,6 +4,7 @@ import { deployments } from "hardhat";
 export interface TestDeployment {
   deployer: Wallet;
   owner: Wallet;
+  manager: Wallet;
   wallets: Wallet[];
   authenticator: Contract;
   settlement: Contract;
@@ -24,7 +25,7 @@ export const deployTestContracts: () => Promise<TestDeployment> = deployments.cr
     } = await deployments.fixture();
 
     const allWallets = waffle.provider.getWallets();
-    const { deployer, owner } = await getNamedAccounts();
+    const { deployer, owner, manager } = await getNamedAccounts();
     const unnamedAccounts = await getUnnamedAccounts();
 
     const authenticator = await ethers.getContractAt(
@@ -43,6 +44,7 @@ export const deployTestContracts: () => Promise<TestDeployment> = deployments.cr
     return {
       deployer: findAccountWallet(allWallets, deployer),
       owner: findAccountWallet(allWallets, owner),
+      manager: findAccountWallet(allWallets, manager),
       wallets: unnamedAccounts.map((account) =>
         findAccountWallet(allWallets, account),
       ),
