@@ -109,9 +109,9 @@ export interface PreSignSignature {
    */
   scheme: SigningScheme.PRESIGN;
   /**
-   * The order UID.
+   * The address of the signer.
    */
-  data: BytesLike;
+  data: string;
 }
 
 function ecdsaSignOrder(

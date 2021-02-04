@@ -191,7 +191,7 @@ describe("GPv2Signing", () => {
       });
       encoder.encodeTrade(sampleOrder, {
         scheme: SigningScheme.PRESIGN,
-        data: sampleOrderUid,
+        data: traders[2].address,
       });
 
       const owners = [
@@ -512,33 +512,9 @@ describe("GPv2Signing", () => {
         await signing.recoverOrderSignerTest(
           encodeOrder(sampleOrder),
           SigningScheme.PRESIGN,
-          orderUid,
+          traders[0].address,
         ),
       ).to.equal(traders[0].address);
-    });
-
-    it("should revert if order parameters don't match", async () => {
-      for (const uidParams of [
-        {
-          orderDigest: orderSigningHash(testDomain, sampleOrder),
-          validTo: 0xbaadc0de,
-        },
-        {
-          orderDigest: ethers.constants.HashZero,
-          validTo: sampleOrder.validTo,
-        },
-      ]) {
-        await expect(
-          signing.recoverOrderSignerTest(
-            encodeOrder(sampleOrder),
-            SigningScheme.PRESIGN,
-            packOrderUidParams({
-              ...uidParams,
-              owner: ethers.constants.AddressZero,
-            }),
-          ),
-        ).to.be.revertedWith("invalid presign signature");
-      }
     });
 
     it("should revert if order doesn't have pre-signature set", async () => {
@@ -546,7 +522,27 @@ describe("GPv2Signing", () => {
         signing.recoverOrderSignerTest(
           encodeOrder(sampleOrder),
           SigningScheme.PRESIGN,
+          traders[0].address,
+        ),
+      ).to.be.revertedWith("order not presigned");
+    });
+
+    it("should revert if pre-signed order is modified", async () => {
+      await signing
+        .connect(traders[0])
+        .setPreSignature(
           computeOrderUid(testDomain, sampleOrder, traders[0].address),
+          true,
+        );
+
+      await expect(
+        signing.recoverOrderSignerTest(
+          encodeOrder({
+            ...sampleOrder,
+            buyAmount: ethers.constants.Zero,
+          }),
+          SigningScheme.PRESIGN,
+          traders[0].address,
         ),
       ).to.be.revertedWith("order not presigned");
     });
@@ -558,7 +554,7 @@ describe("GPv2Signing", () => {
           SigningScheme.PRESIGN,
           "0x",
         ),
-      ).to.be.revertedWith("invalid uid");
+      ).to.be.revertedWith("malformed presignature");
     });
   });
 

@@ -11,9 +11,7 @@ import {
   Order,
   OrderFlags,
   OrderKind,
-  extractOrderUidParams,
   normalizeOrder,
-  packOrderUidParams,
 } from "./order";
 import {
   EcdsaSigningScheme,
@@ -201,9 +199,7 @@ function encodeSignatureData(sig: Signature): string {
     case SigningScheme.EIP1271:
       return encodeEip1271SignatureData(sig.data);
     case SigningScheme.PRESIGN:
-      return packOrderUidParams(
-        extractOrderUidParams(ethers.utils.hexlify(sig.data)),
-      );
+      return ethers.utils.getAddress(sig.data);
     default:
       throw new Error("unsupported signing scheme");
   }

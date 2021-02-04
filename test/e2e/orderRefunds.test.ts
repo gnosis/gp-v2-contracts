@@ -121,7 +121,7 @@ describe("E2E: Expired Order Gas Refunds", () => {
       await settlement.connect(traders[1]).setPreSignature(buyOrderUid, true);
       encoder.encodeTrade(buyOrder, {
         scheme: SigningScheme.PRESIGN,
-        data: buyOrderUid,
+        data: traders[1].address,
       });
 
       return [encoder, [sellOrderUid, buyOrderUid]] as const;

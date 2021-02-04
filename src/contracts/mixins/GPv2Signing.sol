@@ -331,7 +331,7 @@ abstract contract GPv2Signing {
         bytes calldata encodedSignature,
         uint32 validTo
     ) internal view returns (address owner) {
-        require(encodedSignature.length == 20, "GPv2: malformed presign sig");
+        require(encodedSignature.length == 20, "GPv2: malformed presignature");
         // NOTE: Use assembly to read the owner address from the encoded
         // signature bytes.
         // solhint-disable-next-line no-inline-assembly
@@ -343,6 +343,6 @@ abstract contract GPv2Signing {
         bytes memory orderUid = new bytes(GPv2Order.UID_LENGTH);
         orderUid.packOrderUidParams(orderDigest, owner, validTo);
 
-        require(preSignature[orderUid], "GPv2: invalid presign signature");
+        require(preSignature[orderUid], "GPv2: order not presigned");
     }
 }
