@@ -24,6 +24,11 @@ export const EIP1271_MAGICVALUE = ethers.utils.hexDataSlice(
 );
 
 /**
+ * Marker value indicating a presignature is set.
+ */
+export const PRE_SIGNED = ethers.utils.id("GPv2Signing.Scheme.PreSign");
+
+/**
  * The signing scheme used to sign the order.
  */
 export const enum SigningScheme {

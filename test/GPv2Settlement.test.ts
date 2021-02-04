@@ -19,7 +19,11 @@ import {
 } from "../src/ts";
 
 import { builtAndDeployedMetadataCoincide } from "./bytecode";
-import { encodeOutTransfers } from "./encoding";
+import {
+  encodeOutTransfers,
+  encodeFilledAmountRefunds,
+  encodePreSignatureRefunds,
+} from "./encoding";
 
 function toNumberLossy(value: BigNumber): number {
   // NOTE: BigNumber throws an exception when if is outside the range of
@@ -1075,7 +1079,9 @@ describe("GPv2Settlement", () => {
         );
       }
 
-      await settlement.claimOrderRefundsTest(orderUids);
+      await settlement.claimOrderRefundsTest(
+        encodeFilledAmountRefunds(...orderUids),
+      );
       for (const orderUid of orderUids) {
         expect(await settlement.filledAmount(orderUid)).to.deep.equal(
           ethers.constants.Zero,
@@ -1091,9 +1097,13 @@ describe("GPv2Settlement", () => {
       });
 
       await settlement.connect(traders[0]).setPreSignature(orderUid, true);
-      await settlement.claimOrderRefundsTest([orderUid]);
+      await settlement.claimOrderRefundsTest(
+        encodePreSignatureRefunds(orderUid),
+      );
 
-      expect(await settlement.preSignature(orderUid)).to.be.false;
+      expect(await settlement.preSignature(orderUid)).to.equal(
+        ethers.constants.Zero,
+      );
     });
 
     it("should revert if the encoded order UIDs are malformed", async () => {
@@ -1107,8 +1117,16 @@ describe("GPv2Settlement", () => {
         ethers.utils.hexDataSlice(orderUid, 0, 55),
         ethers.utils.hexZeroPad(orderUid, 57),
       ]) {
-        await expect(settlement.claimOrderRefundsTest([malformedOrderUid])).to
-          .be.reverted;
+        await expect(
+          settlement.claimOrderRefundsTest(
+            encodeFilledAmountRefunds(malformedOrderUid),
+          ),
+        ).to.be.reverted;
+        await expect(
+          settlement.claimOrderRefundsTest(
+            encodePreSignatureRefunds(malformedOrderUid),
+          ),
+        ).to.be.reverted;
       }
     });
 
@@ -1119,8 +1137,12 @@ describe("GPv2Settlement", () => {
         owner: traders[0].address,
         validTo: 0xffffffff,
       });
+
       await expect(
-        settlement.claimOrderRefundsTest([orderUid]),
+        settlement.claimOrderRefundsTest(encodeFilledAmountRefunds(orderUid)),
+      ).to.be.revertedWith("order still valid");
+      await expect(
+        settlement.claimOrderRefundsTest(encodePreSignatureRefunds(orderUid)),
       ).to.be.revertedWith("order still valid");
     });
   });
