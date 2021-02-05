@@ -72,7 +72,7 @@ describe("GPv2SafeERC20.sol", () => {
 
         await expect(
           executor.transfer(sellToken.address, recipient.address, amount),
-        ).to.be.revertedWith("GPv2SafeERC20: failed transfer");
+        ).to.be.revertedWith("failed transfer");
       });
 
       it("reverts when invalid ABI encoded bool is returned", async () => {
@@ -175,7 +175,7 @@ describe("GPv2SafeERC20.sol", () => {
             recipient.address,
             amount,
           ),
-        ).to.be.revertedWith("GPv2SafeERC20: failed transfer");
+        ).to.be.revertedWith("failed transferFrom");
       });
 
       it("reverts when invalid ABI encoded bool is returned", async () => {

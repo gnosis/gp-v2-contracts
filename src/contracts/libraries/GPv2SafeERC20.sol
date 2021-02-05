@@ -28,7 +28,7 @@ library GPv2SafeERC20 {
             }
         }
 
-        require(getLastTansferResult(), "GPv2SafeERC20: failed transferFrom");
+        require(getLastTansferResult(), "GPv2: failed transfer");
     }
 
     /// @dev Wrapper around a call to the ERC20 function `transferFrom` that
@@ -55,7 +55,7 @@ library GPv2SafeERC20 {
             }
         }
 
-        require(getLastTansferResult(), "GPv2SafeERC20: failed transferFrom");
+        require(getLastTansferResult(), "GPv2: failed transferFrom");
     }
 
     /// @dev Verifies that the last return was a successful `transfer*` call.
