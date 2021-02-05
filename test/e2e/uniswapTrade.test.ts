@@ -167,8 +167,8 @@ describe("E2E: Should Trade Surplus With Uniswap", () => {
       ]),
     });
 
-    await settlement.connect(solver).settle(
-      ...encoder.encodedSettlement({
+    await settlement.connect(solver).settleLite(
+      ...encoder.encodedSettlementLite({
         [weth.address]: uniswapUsdtOutAmount,
         [usdt.address]: uniswapWethInAmount,
       }),
