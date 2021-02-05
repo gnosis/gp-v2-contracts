@@ -72,6 +72,7 @@ export class UniswapFixture {
     );
     const totalBuyAmount = swapAmounts[hops];
     const buyAmount = totalBuyAmount.div(batchSize);
+    const feeAmount = sellAmount.div(1000);
     debug(`swap amounts ${swapAmounts.join("->")}`);
 
     const encoder = new SettlementEncoder(domainSeparator);
@@ -84,12 +85,15 @@ export class UniswapFixture {
           buyAmount,
           validTo: 0xffffffff,
           appData: nonce,
-          feeAmount: 0,
+          feeAmount,
           kind: OrderKind.SELL,
           partiallyFillable: false,
         },
         trader,
         SigningScheme.EIP712,
+        {
+          feeDiscount: feeAmount,
+        },
       );
     }
 
