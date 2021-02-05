@@ -283,7 +283,9 @@ describe("GPv2Settlement", () => {
       });
 
       await expect(
-        settlement.connect(solver).settleLite(...encoder.encodedSettlement({})),
+        settlement
+          .connect(solver)
+          .settleLite(...encoder.encodedSettlementLite({})),
       ).to.be.revertedWith("reentrant call");
     });
 
@@ -296,7 +298,9 @@ describe("GPv2Settlement", () => {
       });
 
       await expect(
-        settlement.connect(solver).settleLite(...encoder.encodedSettlement({})),
+        settlement
+          .connect(solver)
+          .settleLite(...encoder.encodedSettlementLite({})),
       ).to.be.revertedWith("reentrant call");
     });
 
