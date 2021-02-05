@@ -1,11 +1,6 @@
 import { BytesLike, ethers, Signer } from "ethers";
 
-import {
-  ORDER_TYPE_FIELDS,
-  Order,
-  normalizeOrder,
-  orderSigningHash,
-} from "./order";
+import { ORDER_TYPE_FIELDS, Order, normalizeOrder, hashOrder } from "./order";
 import {
   SignatureLike,
   isTypedDataSigner,
@@ -137,9 +132,7 @@ function ecdsaSignOrder(
       );
 
     case SigningScheme.ETHSIGN:
-      return owner.signMessage(
-        ethers.utils.arrayify(orderSigningHash(domain, order)),
-      );
+      return owner.signMessage(ethers.utils.arrayify(hashOrder(domain, order)));
 
     default:
       throw new Error("invalid signing scheme");

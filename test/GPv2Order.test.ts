@@ -4,9 +4,9 @@ import { ethers } from "hardhat";
 
 import {
   ORDER_TYPE_HASH,
-  ORDER_TYPE_FIELDS,
   ORDER_UID_LENGTH,
   OrderKind,
+  hashOrder,
   packOrderUidParams,
 } from "../src/ts";
 
@@ -37,7 +37,10 @@ describe("GPv2Order", () => {
   });
 
   describe("hash", () => {
-    it("computes EIP-712 order struct hash", async () => {
+    it("computes EIP-712 order signing hash", async () => {
+      const domain = { name: "test" };
+      const domainSeparator = ethers.utils._TypedDataEncoder.hashDomain(domain);
+
       const order = {
         sellToken: fillBytes(20, 0x01),
         buyToken: fillBytes(20, 0x02),
@@ -50,13 +53,10 @@ describe("GPv2Order", () => {
         kind: OrderKind.SELL,
         partiallyFillable: false,
       };
-      expect(await orders.hashTest(encodeOrder(order))).to.equal(
-        ethers.utils._TypedDataEncoder.hashStruct(
-          "Order",
-          { Order: ORDER_TYPE_FIELDS },
-          order,
-        ),
-      );
+
+      expect(
+        await orders.hashTest(encodeOrder(order), domainSeparator),
+      ).to.equal(hashOrder(domain, order));
     });
   });
 

@@ -136,7 +136,7 @@ abstract contract GPv2Signing {
         Scheme signingScheme,
         bytes calldata signature
     ) internal view returns (bytes32 orderDigest, address owner) {
-        orderDigest = orderSigningHash(order);
+        orderDigest = order.hash(domainSeparator);
         if (signingScheme == Scheme.Eip712) {
             owner = recoverEip712Signer(orderDigest, signature);
         } else if (signingScheme == Scheme.EthSign) {
@@ -146,20 +146,6 @@ abstract contract GPv2Signing {
         } else if (signingScheme == Scheme.PreSign) {
             owner = recoverPreSigner(orderDigest, signature, order.validTo);
         }
-    }
-
-    /// @dev Returns the EIP-712 signing hash for the specified order.
-    ///
-    /// @param order The order to hash.
-    /// @return orderDigest The EIP-712 signing hash for the order.
-    function orderSigningHash(GPv2Order.Data memory order)
-        internal
-        view
-        returns (bytes32 orderDigest)
-    {
-        orderDigest = keccak256(
-            abi.encodePacked("\x19\x01", domainSeparator, order.hash())
-        );
     }
 
     /// @dev Perform an ECDSA recover for the specified message and calldata
