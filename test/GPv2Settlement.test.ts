@@ -937,8 +937,6 @@ describe("GPv2Settlement", () => {
       ]);
       await mockRevert.mock.alwaysReverts.revertsWithReason("test error");
 
-      // TODO - update this error with concatenated version "GPv2 Interaction:
-      // test error"
       await expect(
         settlement.executeInteractionsTest(
           normalizeInteractions([

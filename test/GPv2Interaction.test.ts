@@ -30,7 +30,6 @@ describe("GPv2Interaction", () => {
       ]);
       await reverter.mock.alwaysReverts.revertsWithReason("test error");
 
-      // TODO - update this error with concatenated version "GPv2 Interaction: test error"
       await expect(
         interactions.executeTest({
           target: reverter.address,
