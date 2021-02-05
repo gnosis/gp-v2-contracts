@@ -15,10 +15,38 @@ library GPv2SafeERC20 {
         address to,
         uint256 value
     ) internal {
-        _callOptionalReturn(
-            token,
-            abi.encodeWithSelector(token.transfer.selector, to, value)
-        );
+        bytes4 selector_ = token.transfer.selector;
+
+        // solhint-disable-next-line no-inline-assembly
+        bool success;
+        assembly {
+            let freeMemoryPointer := mload(0x40)
+            mstore(freeMemoryPointer, selector_)
+            mstore(add(freeMemoryPointer, 4), to)
+            mstore(add(freeMemoryPointer, 36), value)
+
+            if iszero(call(gas(), token, 0, freeMemoryPointer, 68, 0, 0)) {
+                returndatacopy(0, 0, returndatasize())
+                revert(0, returndatasize())
+            }
+
+            switch returndatasize()
+                case 0 {
+                    success := 1
+                }
+                case 32 {
+                    returndatacopy(0, 0, returndatasize())
+                    success := mload(0)
+                    if gt(success, 1) {
+                        revert(0, 0)
+                    }
+                }
+                default {
+                    revert(0, 0)
+                }
+        }
+
+        require(success, "GPv2SafeERC20: failed transfer");
     }
 
     /// @dev Wrapper around a call to the ERC20 function `transferFrom` that
@@ -29,36 +57,38 @@ library GPv2SafeERC20 {
         address to,
         uint256 value
     ) internal {
-        _callOptionalReturn(
-            token,
-            abi.encodeWithSelector(token.transferFrom.selector, from, to, value)
-        );
-    }
+        bytes4 selector_ = token.transferFrom.selector;
 
-    /// @dev A reimplementation of the function with the same name in
-    /// Openzeppelin's SafeERC20. Unlike Openzeppelin's implementation, this
-    /// function does not revert if an address without code is called.
-    ///
-    /// @param token The token targeted by the call.
-    /// @param data The call data (encoded using abi.encode or one of its
-    /// variants).
-    function _callOptionalReturn(IERC20 token, bytes memory data) private {
-        // solhint-disable-next-line avoid-low-level-calls
-        (bool success, bytes memory returndata) = address(token).call(data);
+        // solhint-disable-next-line no-inline-assembly
+        bool success;
+        assembly {
+            let freeMemoryPointer := mload(0x40)
+            mstore(freeMemoryPointer, selector_)
+            mstore(add(freeMemoryPointer, 4), from)
+            mstore(add(freeMemoryPointer, 36), to)
+            mstore(add(freeMemoryPointer, 68), value)
 
-        if (!success) {
-            // Assembly used to revert with correctly encoded error message.
-            // solhint-disable-next-line no-inline-assembly
-            assembly {
-                revert(add(returndata, 0x20), mload(returndata))
+            if iszero(call(gas(), token, 0, freeMemoryPointer, 100, 0, 0)) {
+                returndatacopy(0, 0, returndatasize())
+                revert(0, returndatasize())
             }
+
+            switch returndatasize()
+                case 0 {
+                    success := 1
+                }
+                case 32 {
+                    returndatacopy(0, 0, returndatasize())
+                    success := mload(0)
+                    if gt(success, 1) {
+                        revert(0, 0)
+                    }
+                }
+                default {
+                    revert(0, 0)
+                }
         }
-        if (returndata.length > 0) {
-            // Return data is optional
-            require(
-                abi.decode(returndata, (bool)),
-                "GPv2SafeERC20: failed transfer"
-            );
-        }
+
+        require(success, "GPv2SafeERC20: failed transfer");
     }
 }
