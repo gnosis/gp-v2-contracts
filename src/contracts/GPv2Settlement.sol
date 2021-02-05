@@ -137,6 +137,20 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         emit Settlement(msg.sender);
     }
 
+    function settleLite(
+        IERC20[] calldata tokens,
+        uint256[] calldata clearingPrices,
+        GPv2Trade.Data[] calldata trades,
+        GPv2Interaction.Data[] calldata intraInteractions
+    ) external nonReentrant onlySolver {
+        GPv2TradeExecution.Data[] memory executedTrades =
+            computeTradeExecutions(tokens, clearingPrices, trades);
+        allowanceManager.transferIn(executedTrades);
+        executeInteractions(intraInteractions);
+        transferOut(executedTrades);
+        emit Settlement(msg.sender);
+    }
+
     /// @dev Invalidate onchain an order that has been signed offline.
     ///
     /// @param orderUid The unique identifier of the order that is to be made
