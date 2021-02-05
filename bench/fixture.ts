@@ -13,8 +13,10 @@ import {
   TypedDataDomain,
   domain,
   packOrderUidParams,
+  signOrder,
 } from "../src/ts";
 import { deployTestContracts, TestDeployment } from "../test/e2e/fixture";
+import { encodeOrder } from "../test/encoding";
 
 const debug = Debug("bench:fixture");
 const LOTS = ethers.utils.parseEther("1000000000.0");
@@ -332,6 +334,62 @@ export class BenchFixture {
       .connect(solver)
       .settle(...encoder.encodedSettlement(prices));
 
+    return await transaction.wait();
+  }
+
+  public async settleOne(): Promise<ContractReceipt> {
+    const {
+      deployment: { settlement },
+      domainSeparator,
+      solver,
+      traders: [trader],
+      uniswapPair,
+      uniswapTokens: [sellToken, buyToken],
+    } = this;
+
+    const sellAmount = ethers.utils.parseEther("1.0");
+    const buyAmount = ethers.utils.parseEther("0.9");
+    const feeAmount = sellAmount.div(1000);
+
+    const order = {
+      sellToken: sellToken.address,
+      buyToken: buyToken.address,
+      sellAmount,
+      buyAmount,
+      validTo: 0xffffffff,
+      appData: this.nonce++,
+      feeAmount,
+      kind: OrderKind.SELL,
+      partiallyFillable: false,
+    };
+    const signature = await signOrder(
+      domainSeparator,
+      order,
+      trader,
+      SigningScheme.EIP712,
+    );
+    const interaction = {
+      target: uniswapPair.address,
+      value: 0,
+      callData: uniswapPair.interface.encodeFunctionData("swap", [
+        0,
+        buyAmount,
+        settlement.address,
+        "0x",
+      ]),
+    };
+
+    const transaction = await settlement
+      .connect(solver)
+      .settleOne(
+        encodeOrder(order),
+        signature.scheme,
+        signature.data,
+        buyAmount,
+        sellAmount,
+        uniswapPair.address,
+        interaction,
+      );
     return await transaction.wait();
   }
 }

@@ -137,6 +137,47 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         emit Settlement(msg.sender);
     }
 
+    function settleOne(
+        GPv2Order.Data memory order,
+        Scheme signingScheme,
+        bytes calldata signature,
+        uint256 sellPrice,
+        uint256 buyPrice,
+        address target,
+        GPv2Interaction.Data calldata interaction
+    ) external nonReentrant onlySolver {
+        RecoveredOrder memory recoveredOrder;
+        {
+            (bytes32 orderDigest, address owner) =
+                recoverOrderSigner(order, signingScheme, signature);
+
+            recoveredOrder.data = order;
+            recoveredOrder.uid = abi.encodePacked(
+                orderDigest,
+                owner,
+                order.validTo
+            );
+            recoveredOrder.owner = owner;
+        }
+
+        GPv2TradeExecution.Data memory executedTrade;
+        computeTradeExecution(
+            recoveredOrder,
+            sellPrice,
+            buyPrice,
+            0,
+            order.feeAmount,
+            executedTrade
+        );
+
+        allowanceManager.transferToTarget(executedTrade, target);
+        executeInteraction(interaction);
+
+        executedTrade.transferBuyAmountToOwner();
+
+        emit Settlement(msg.sender);
+    }
+
     /// @dev Invalidate onchain an order that has been signed offline.
     ///
     /// @param orderUid The unique identifier of the order that is to be made
@@ -315,24 +356,27 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     function executeInteractions(GPv2Interaction.Data[] calldata interactions)
         internal
     {
-        GPv2Interaction.Data calldata interaction;
         for (uint256 i; i < interactions.length; i++) {
-            interaction = interactions[i];
-
-            // To prevent possible attack on user funds, we explicitly disable
-            // any interactions with AllowanceManager contract.
-            require(
-                interaction.target != address(allowanceManager),
-                "GPv2: forbidden interaction"
-            );
-            GPv2Interaction.execute(interaction);
-
-            emit Interaction(
-                interaction.target,
-                interaction.value,
-                GPv2Interaction.selector(interaction)
-            );
+            executeInteraction(interactions[i]);
         }
+    }
+
+    function executeInteraction(GPv2Interaction.Data calldata interaction)
+        internal
+    {
+        // To prevent possible attack on user funds, we explicitly disable
+        // any interactions with AllowanceManager contract.
+        require(
+            interaction.target != address(allowanceManager),
+            "GPv2: forbidden interaction"
+        );
+        GPv2Interaction.execute(interaction);
+
+        emit Interaction(
+            interaction.target,
+            interaction.value,
+            GPv2Interaction.selector(interaction)
+        );
     }
 
     /// @dev Transfers all buy amounts for the executed trades from the

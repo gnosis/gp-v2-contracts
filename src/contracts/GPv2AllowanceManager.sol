@@ -44,4 +44,11 @@ contract GPv2AllowanceManager {
             );
         }
     }
+
+    function transferToTarget(
+        GPv2TradeExecution.Data calldata trade,
+        address target
+    ) external onlyRecipient {
+        GPv2TradeExecution.transferSellAmountToRecipient(trade, target);
+    }
 }
