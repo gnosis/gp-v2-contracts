@@ -67,30 +67,42 @@ library GPv2Order {
     /// @dev The byte length of an order unique identifier.
     uint256 internal constant UID_LENGTH = 56;
 
-    /// @dev Return the EIP-712 struct hash for the specified order.
+    /// @dev Return the EIP-712 signing hash for the specified order.
     ///
-    /// @param order The order to compute the EIP-712 struct hash for.
+    /// @param order The order to compute the EIP-712 signing hash for.
+    /// @param domainSeparator The EIP-712 domain separator to use.
     /// @return orderDigest The 32 byte EIP-712 struct hash.
-    function hash(Data memory order)
+    function hash(Data memory order, bytes32 domainSeparator)
         internal
         pure
         returns (bytes32 orderDigest)
     {
-        // NOTE: Compute the EIP-712 order struct hash in place. The hash is
-        // computed from the order type hash concatenated with the ABI
-        // encoded order fields for a total of `11 * sizeof(uint) = 352`
-        // bytes. Fortunately, since Solidity memory structs **are not**
-        // packed, they are already laid out in memory exactly as is needed
-        // to compute the struct hash, just requiring the order type hash to
-        // be temporarily written to the memory slot coming right before the
-        // order data.
+        // NOTE: Compute the EIP-712 order struct hash in place. As suggested
+        // in the EIP proposal, noting that the order struct has 10 field, and
+        // including the type hash `11 * 32 = 352` bytes to hash.
+        // <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-712.md#rationale-for-encodedata>
+        bytes32 structHash;
         // solhint-disable-next-line no-inline-assembly
         assembly {
             let dataStart := sub(order, 32)
             let temp := mload(dataStart)
             mstore(dataStart, TYPE_HASH)
-            orderDigest := keccak256(dataStart, 352)
+            structHash := keccak256(dataStart, 352)
             mstore(dataStart, temp)
+        }
+
+        // NOTE: Now that we have the struct hash, compute the EIP-712 signing
+        // hash using scratch memory past the free memory pointer. The signing
+        // hash is computed from `"\x19\x01" || domainSeparator || structHash`.
+        // <https://docs.soliditylang.org/en/v0.7.6/internals/layout_in_memory.html#layout-in-memory>
+        // <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-712.md#specification>
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            let freeMemoryPointer := mload(0x40)
+            mstore(freeMemoryPointer, "\x19\x01")
+            mstore(add(freeMemoryPointer, 2), domainSeparator)
+            mstore(add(freeMemoryPointer, 34), structHash)
+            orderDigest := keccak256(freeMemoryPointer, 66)
         }
     }
 

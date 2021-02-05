@@ -176,10 +176,7 @@ export function normalizeOrder(order: Order): NormalizedOrder {
  * @param order The order to compute the digest for.
  * @return Hex-encoded 32-byte order digest.
  */
-export function orderSigningHash(
-  domain: TypedDataDomain,
-  order: Order,
-): string {
+export function hashOrder(domain: TypedDataDomain, order: Order): string {
   return ethers.utils._TypedDataEncoder.hash(
     domain,
     { Order: ORDER_TYPE_FIELDS },
@@ -219,7 +216,7 @@ export function computeOrderUid(
   owner: string,
 ): string {
   return packOrderUidParams({
-    orderDigest: orderSigningHash(domain, order),
+    orderDigest: hashOrder(domain, order),
     owner,
     validTo: order.validTo,
   });

@@ -12,7 +12,7 @@ import {
   SigningScheme,
   TypedDataDomain,
   domain,
-  orderSigningHash,
+  hashOrder,
 } from "../../src/ts";
 
 import { deployTestContracts } from "./fixture";
@@ -245,7 +245,7 @@ describe("E2E: Order From A Gnosis Safe", () => {
       validTo: UNLIMITED_VALID_TO,
       feeAmount: SAFE_FEE,
     };
-    const gpv2Message = orderSigningHash(domainSeparator, order);
+    const gpv2Message = hashOrder(domainSeparator, order);
     // Note: threshold is 2, any two owners should suffice.
     const signature = await fallbackSign(safe, gpv2Message, [
       safeOwners[4],
