@@ -94,13 +94,7 @@ export class UniswapFixture {
     }
 
     if (useRouter) {
-      encoder.encodeInteraction({
-        target: sellToken.address,
-        callData: sellToken.interface.encodeFunctionData("approve", [
-          uniswapRouter.address,
-          totalSellAmount,
-        ]),
-      });
+      await this.sendSettlementPreApproval(sellToken, uniswapRouter.address);
       encoder.encodeInteraction({
         target: uniswapRouter.address,
         callData: uniswapRouter.interface.encodeFunctionData(
@@ -267,5 +261,23 @@ export class UniswapFixture {
       });
       await token.connect(pooler).transfer(target, value);
     }
+  }
+
+  private async sendSettlementPreApproval(
+    token: Contract,
+    target: string,
+  ): Promise<void> {
+    const { domainSeparator, settlement, solver } = this.base;
+
+    const encoder = new SettlementEncoder(domainSeparator);
+    encoder.encodeInteraction({
+      target: token.address,
+      callData: token.interface.encodeFunctionData("approve", [
+        target,
+        ethers.constants.MaxUint256,
+      ]),
+    });
+
+    await settlement.connect(solver).settle(...encoder.encodedSettlement({}));
   }
 }
