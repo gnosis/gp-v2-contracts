@@ -147,6 +147,7 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         GPv2Interaction.Data calldata interaction
     ) external nonReentrant onlySolver {
         RecoveredOrder memory recoveredOrder;
+        uint256 startingBalance;
         {
             (bytes32 orderDigest, address owner) =
                 recoverOrderSigner(order, signingScheme, signature);
@@ -158,6 +159,11 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
                 order.validTo
             );
             recoveredOrder.owner = owner;
+
+            if (order.receiver == address(0)) {
+                order.receiver = owner;
+            }
+            startingBalance = order.buyToken.balanceOf(order.receiver);
         }
 
         GPv2TradeExecution.Data memory executedTrade;
@@ -173,7 +179,11 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         allowanceManager.transferToTarget(executedTrade, target);
         executeInteraction(interaction);
 
-        executedTrade.transferBuyAmountToOwner();
+        require(
+            startingBalance.add(executedTrade.buyAmount) <=
+                order.buyToken.balanceOf(order.receiver),
+            "bad order"
+        );
 
         emit Settlement(msg.sender);
     }

@@ -374,7 +374,7 @@ export class BenchFixture {
       callData: uniswapPair.interface.encodeFunctionData("swap", [
         0,
         buyAmount,
-        settlement.address,
+        trader.address,
         "0x",
       ]),
     };
