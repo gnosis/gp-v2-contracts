@@ -169,14 +169,17 @@ export class UniswapFixture {
     await path[0]
       .connect(trader)
       .approve(uniswapRouter.address, ethers.constants.MaxUint256);
-    const tx = await uniswapRouter.connect(trader).swapExactTokensForTokens(
-      ethers.utils.parseEther("1.0"),
-      ethers.utils.parseEther("0.1"),
-      path.map(({ address }) => address),
-      trader.address,
-      0xffffffff,
-    );
-    return await tx.wait();
+
+    const transaction = await uniswapRouter
+      .connect(trader)
+      .swapExactTokensForTokens(
+        ethers.utils.parseEther("1.0"),
+        ethers.utils.parseEther("0.1"),
+        path.map(({ address }) => address),
+        trader.address,
+        0xffffffff,
+      );
+    return await transaction.wait();
   }
 
   private async makeUniswapPath(hops: number): Promise<Contract[]> {
@@ -184,13 +187,14 @@ export class UniswapFixture {
       base: { tokens },
       weth,
     } = this;
-    // NOTE: To simulate more "real-world" swaps, make the path chain trades
-    // throw WETH.
-    await tokens.ensureTokenCount(1 + Math.ceil((hops * 2) / 3));
+
+    // NOTE: To simulate more "real-world" swaps, make the path chain one trade
+    // through WETH if it is long enough.
+    await tokens.ensureTokenCount(Math.max(2, hops));
     const path = [];
     let tokenId = 0;
     for (let hop = 0; hop < hops; hop++) {
-      if (hop % 3 === 1) {
+      if (hop === 1) {
         path.push(weth);
       } else {
         path.push(tokens.id(tokenId));
@@ -218,10 +222,14 @@ export class UniswapFixture {
     tokenB: Contract,
   ): Promise<Contract> {
     const {
-      deployment: { deployer },
-      pooler,
-      uniswapFactory,
-    } = this.base;
+      base: {
+        deployment: { deployer },
+        pooler,
+        traders: [, primer],
+        uniswapFactory,
+      },
+      uniswapRouter,
+    } = this;
 
     let pairAddress = await uniswapFactory.getPair(
       tokenA.address,
@@ -244,6 +252,22 @@ export class UniswapFixture {
       await this.mintToken(tokenA, uniswapPair.address);
       await this.mintToken(tokenB, uniswapPair.address);
       await uniswapPair.mint(pooler.address);
+
+      // NOTE: In order to "prime" the storage used for swapping a pair
+      // get a more accurate gas estimate, swap a small amount first;
+      await this.mintToken(tokenA, primer.address);
+      await tokenA
+        .connect(primer)
+        .approve(uniswapRouter.address, ethers.constants.MaxUint256);
+      await uniswapRouter
+        .connect(primer)
+        .swapExactTokensForTokens(
+          ethers.utils.parseEther("0.01"),
+          0,
+          [tokenA.address, tokenB.address],
+          primer.address,
+          0xffffffff,
+        );
     }
 
     return uniswapPair;
