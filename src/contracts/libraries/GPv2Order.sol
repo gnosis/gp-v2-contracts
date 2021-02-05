@@ -77,11 +77,12 @@ library GPv2Order {
         pure
         returns (bytes32 orderDigest)
     {
-        // NOTE: Compute the EIP-712 order struct hash in place. As suggested
-        // in the EIP proposal, noting that the order struct has 10 field, and
-        // including the type hash `11 * 32 = 352` bytes to hash.
-        // <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-712.md#rationale-for-encodedata>
         bytes32 structHash;
+
+        // NOTE: Compute the EIP-712 order struct hash in place. As suggested
+        // in the EIP proposal, noting that the order struct has 10 fields, and
+        // including the type hash `(10 + 1) * 32 = 352` bytes to hash.
+        // <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-712.md#rationale-for-encodedata>
         // solhint-disable-next-line no-inline-assembly
         assembly {
             let dataStart := sub(order, 32)

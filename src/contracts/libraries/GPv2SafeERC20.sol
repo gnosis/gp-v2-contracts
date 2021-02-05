@@ -1,20 +1,15 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
-
-pragma solidity >=0.6.0 <0.8.0;
+pragma solidity ^0.7.6;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-/**
- * @title GPv2SafeERC20
- * @author Gnosis Developers
- * @dev Gas-efficient version of Openzeppelin's SafeERC20 contract that does not
- * revert when calling a non-contract.
- */
+/// @title GPv2SafeERC20
+/// @author Gnosis Developers
+/// @dev Gas-efficient version of Openzeppelin's SafeERC20 contract that does
+/// not revert when calling a non-contract.
 library GPv2SafeERC20 {
-    /**
-     * @dev Wrapper around a call to the ERC20 function `transfer` that reverts
-     * also when the token returns `false`.
-     */
+    /// @dev Wrapper around a call to the ERC20 function `transfer` that reverts
+    /// also when the token returns `false`.
     function safeTransfer(
         IERC20 token,
         address to,
@@ -26,10 +21,8 @@ library GPv2SafeERC20 {
         );
     }
 
-    /**
-     * @dev Wrapper around a call to the ERC20 function `transferFrom` that
-     * reverts also when the token returns `false`.
-     */
+    /// @dev Wrapper around a call to the ERC20 function `transferFrom` that
+    /// reverts also when the token returns `false`.
     function safeTransferFrom(
         IERC20 token,
         address from,
@@ -42,14 +35,13 @@ library GPv2SafeERC20 {
         );
     }
 
-    /**
-     * @dev A reimplementation of the function with the same name in
-     * Openzeppelin's SafeERC20. Unlike Openzeppelin's implementation, this
-     * function does not revert if an address without code is called.
-     *
-     * @param token The token targeted by the call.
-     * @param data The call data (encoded using abi.encode or one of its variants).
-     */
+    /// @dev A reimplementation of the function with the same name in
+    /// Openzeppelin's SafeERC20. Unlike Openzeppelin's implementation, this
+    /// function does not revert if an address without code is called.
+    ///
+    /// @param token The token targeted by the call.
+    /// @param data The call data (encoded using abi.encode or one of its
+    /// variants).
     function _callOptionalReturn(IERC20 token, bytes memory data) private {
         // solhint-disable-next-line avoid-low-level-calls
         (bool success, bytes memory returndata) = address(token).call(data);

@@ -102,12 +102,8 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     ///     settlement
     ///   - Critically, user orders are entirely protected
     ///
-    /// Note that some parameters are encoded as packed bytes in order to save
-    /// calldata gas. For more information on encoding format consult the
-    /// [`GPv2Encoding`] library.
-    ///
     /// @param tokens An array of ERC20 tokens to be traded in the settlement.
-    /// Orders and interactions encode tokens as indices into this array.
+    /// Trades encode tokens as indices into this array.
     /// @param clearingPrices An array of clearing prices where the `i`-th price
     /// is for the `i`-th token in the [`tokens`] array.
     /// @param trades Trades for signed orders.
@@ -127,6 +123,7 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
 
         GPv2TradeExecution.Data[] memory executedTrades =
             computeTradeExecutions(tokens, clearingPrices, trades);
+
         allowanceManager.transferIn(executedTrades);
 
         executeInteractions(interactions[1]);
@@ -189,7 +186,9 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     /// @dev Compute the in and out transfer amounts for a single trade.
     /// This function reverts if:
     /// - The order has expired
-    /// - The order's limit price is not respected.
+    /// - The order's limit price is not respected
+    /// - The order gets over-filled
+    /// - The fee discount is larger than the executed fee
     ///
     /// @param recoveredOrder The recovered order to process.
     /// @param sellPrice The price of the order's sell token.
