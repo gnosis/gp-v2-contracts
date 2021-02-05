@@ -258,6 +258,62 @@ describe("GPv2Settlement", () => {
     });
   });
 
+  describe("settleLite", () => {
+    const emptySettlement = new SettlementEncoder(testDomain);
+    const [emptyLite, empty] = [
+      emptySettlement.encodedSettlementLite({}),
+      emptySettlement.encodedSettlement({}),
+    ];
+
+    it("rejects transactions from non-solvers", async () => {
+      await expect(settlement.settleLite(...emptyLite)).to.be.revertedWith(
+        "GPv2: not a solver",
+      );
+    });
+
+    it("rejects reentrancy attempts via interactions", async () => {
+      await authenticator.connect(owner).addSolver(solver.address);
+      const encoder = new SettlementEncoder(testDomain);
+      encoder.encodeInteraction({
+        target: settlement.address,
+        callData: settlement.interface.encodeFunctionData(
+          "settleLite",
+          emptyLite,
+        ),
+      });
+
+      await expect(
+        settlement.connect(solver).settleLite(...encoder.encodedSettlement({})),
+      ).to.be.revertedWith("reentrant call");
+    });
+
+    it("rejects reentrancy attempts to full settlement function via interactions", async () => {
+      await authenticator.connect(owner).addSolver(solver.address);
+      const encoder = new SettlementEncoder(testDomain);
+      encoder.encodeInteraction({
+        target: settlement.address,
+        callData: settlement.interface.encodeFunctionData("settle", empty),
+      });
+
+      await expect(
+        settlement.connect(solver).settleLite(...encoder.encodedSettlement({})),
+      ).to.be.revertedWith("reentrant call");
+    });
+
+    it("accepts transactions from solvers", async () => {
+      await authenticator.connect(owner).addSolver(solver.address);
+      await expect(settlement.connect(solver).settleLite(...emptyLite)).to.not
+        .be.reverted;
+    });
+
+    it("emits a Settlement event", async () => {
+      await authenticator.connect(owner).addSolver(solver.address);
+      await expect(settlement.connect(solver).settleLite(...emptyLite))
+        .to.emit(settlement, "Settlement")
+        .withArgs(solver.address);
+    });
+  });
+
   describe("invalidateOrder", () => {
     it("sets filled amount of the caller's order to max uint256", async () => {
       const orderDigest = "0x" + "11".repeat(32);

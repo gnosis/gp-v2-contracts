@@ -327,20 +327,18 @@ export class BenchFixture {
       {},
     );
 
-    debug(`executing settlement`);
-    const transaction =
-      options.refunds > 0
-        ? await settlement
-            .connect(solver)
-            .settle(...encoder.encodedSettlement(prices))
-        : await settlement
-            .connect(solver)
-            .settleLite(
-              encoder.tokens,
-              encoder.clearingPrices(prices),
-              encoder.trades,
-              encoder.interactions[1],
-            );
+    let transaction;
+    if (encoder.isLite) {
+      debug(`executing lite settlement`);
+      transaction = await settlement
+        .connect(solver)
+        .settleLite(...encoder.encodedSettlementLite(prices));
+    } else {
+      debug(`executing full settlement`);
+      transaction = await settlement
+        .connect(solver)
+        .settle(...encoder.encodedSettlement(prices));
+    }
 
     return await transaction.wait();
   }

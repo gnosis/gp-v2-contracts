@@ -146,8 +146,8 @@ export class UniswapFixture {
       }
     }
 
-    const transaction = await settlement.connect(solver).settle(
-      ...encoder.encodedSettlement({
+    const transaction = await settlement.connect(solver).settleLite(
+      ...encoder.encodedSettlementLite({
         [buyToken.address]: totalSellAmount,
         [sellToken.address]: totalBuyAmount,
       }),
@@ -306,6 +306,8 @@ export class UniswapFixture {
       ]),
     });
 
-    await settlement.connect(solver).settle(...encoder.encodedSettlement({}));
+    await settlement
+      .connect(solver)
+      .settleLite(...encoder.encodedSettlementLite({}));
   }
 }

@@ -142,10 +142,18 @@ export type EncodedSettlement = [
 ];
 
 /**
- * Maximum number of trades that can be included in a single call to the settle
- * function.
+ * Encoded "lite" settlement parameters.
  */
-export const MAX_TRADES_IN_SETTLEMENT = 2 ** 16 - 1;
+export type EncodedSettlementLite = [
+  /** Tokens. */
+  string[],
+  /** Clearing prices. */
+  BigNumberish[],
+  /** Encoded trades. */
+  Trade[],
+  /** Encoded intra-settlement interactions. */
+  Interaction[],
+];
 
 /**
  * Encodes signing scheme as a bitfield.
@@ -288,6 +296,21 @@ export class SettlementEncoder {
   }
 
   /**
+   * Returns true if this settlement can be executed as a "lite" settlement in
+   * order to save gas.
+   */
+  public get isLite(): boolean {
+    const [preInteractions, , postInteractions] = this.interactions;
+    const { filledAmounts, preSignatures } = this.orderRefunds;
+    return [
+      preInteractions,
+      postInteractions,
+      filledAmounts,
+      preSignatures,
+    ].every(({ length }) => length === 0);
+  }
+
+  /**
    * Returns a clearing price vector for the current settlement tokens from the
    * provided price map.
    *
@@ -415,6 +438,22 @@ export class SettlementEncoder {
       this.trades,
       this.interactions,
       this.orderRefunds,
+    ];
+  }
+
+  /**
+   * Returns the encoded "lite" settlement paramters.
+   */
+  public encodedSettlementLite(prices: Prices): EncodedSettlementLite {
+    if (!this.isLite) {
+      throw new Error("not a lite settlement");
+    }
+
+    return [
+      this.tokens,
+      this.clearingPrices(prices),
+      this.trades,
+      this.interactions[InteractionStage.INTRA],
     ];
   }
 
