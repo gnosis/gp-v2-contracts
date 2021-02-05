@@ -89,12 +89,12 @@ library GPv2Trade {
             GPv2Signing.Scheme signingScheme
         )
     {
-        if (flags & 0b01 == 0) {
+        if (flags & 0x01 == 0) {
             kind = GPv2Order.SELL;
         } else {
             kind = GPv2Order.BUY;
         }
-        partiallyFillable = flags & 0b10 != 0;
+        partiallyFillable = flags & 0x02 != 0;
 
         // NOTE: Take advantage of the fact that Solidity will revert if the
         // following expression does not produce a valid enum value. This means
