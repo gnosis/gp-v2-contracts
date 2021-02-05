@@ -23,8 +23,6 @@ library GPv2Interaction {
             );
         // solhint-enable avoid-low-level-calls
 
-        // TODO - concatenate the following reponse "GPv2: Failed Interaction"
-        // This is the topic of https://github.com/gnosis/gp-v2-contracts/issues/240
         if (!success) {
             // Assembly used to revert with correctly encoded error message.
             // solhint-disable-next-line no-inline-assembly
