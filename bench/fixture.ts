@@ -19,7 +19,7 @@ import { deployTestContracts, TestDeployment } from "../test/e2e/fixture";
 const debug = Debug("bench:fixture");
 const LOTS = ethers.utils.parseEther("1000000000.0");
 
-class TokenManager {
+export class TokenManager {
   public readonly instances: Contract[] = [];
 
   public constructor(
@@ -47,7 +47,10 @@ class TokenManager {
     const symbol = `T${this.instances.length.toString().padStart(3, "0")}`;
     debug(`creating token ${symbol} and funding traders`);
 
-    const token = await waffle.deployContract(deployer, ERC20, [symbol, 18]);
+    const token = await waffle.deployContract(deployer, ERC20, [
+      symbol,
+      symbol,
+    ]);
 
     // NOTE: Fund the settlement contract is funded with a lot of extra tokens,
     // so the settlements don't have to balance out.
@@ -71,16 +74,18 @@ export interface SettlementOptions {
 }
 
 export class BenchFixture {
-  private nonce = 0;
+  private _nonce = 0;
 
   private constructor(
-    private readonly deployment: TestDeployment,
-    private readonly domainSeparator: TypedDataDomain,
-    private readonly solver: Wallet,
-    private readonly traders: Wallet[],
-    private readonly tokens: TokenManager,
-    private readonly uniswapTokens: Contract[],
-    private readonly uniswapPair: Contract,
+    public readonly deployment: TestDeployment,
+    public readonly domainSeparator: TypedDataDomain,
+    public readonly solver: Wallet,
+    public readonly pooler: Wallet,
+    public readonly traders: Wallet[],
+    public readonly tokens: TokenManager,
+    public readonly uniswapFactory: Contract,
+    public readonly uniswapTokens: Contract[],
+    public readonly uniswapPair: Contract,
   ) {}
 
   public static async create(): Promise<BenchFixture> {
@@ -141,11 +146,17 @@ export class BenchFixture {
       deployment,
       domainSeparator,
       solver,
+      pooler,
       traders,
       tokens,
+      uniswapFactory,
       uniswapTokens,
       uniswapPair,
     );
+  }
+
+  public get nonce(): number {
+    return this._nonce++;
   }
 
   public get settlement(): Contract {
@@ -239,7 +250,7 @@ export class BenchFixture {
           buyToken: tokens.id((i + 1) % options.tokens).address,
           feeAmount,
           validTo: 0xffffffff,
-          appData: this.nonce++,
+          appData: this.nonce,
           ...orderSpice,
         },
         traders[i % traders.length],
