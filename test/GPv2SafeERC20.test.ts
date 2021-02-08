@@ -95,7 +95,7 @@ describe("GPv2SafeERC20.sol", () => {
         ).to.be.revertedWith("malformed transfer result");
       });
 
-      it("reverts when invalid ABI encoded bool is returned", async () => {
+      it("coerces invalid ABI encoded bool", async () => {
         const amount = ethers.utils.parseEther("1.0");
 
         const sellToken = await waffle.deployMockContract(
@@ -108,7 +108,7 @@ describe("GPv2SafeERC20.sol", () => {
 
         await expect(
           executor.transfer(sellToken.address, recipient.address, amount),
-        ).to.be.revertedWith("invalid transfer result");
+        ).to.not.be.reverted;
       });
     });
 
@@ -219,7 +219,7 @@ describe("GPv2SafeERC20.sol", () => {
         ).to.be.revertedWith("malformed transfer result");
       });
 
-      it("reverts when invalid ABI encoded bool is returned", async () => {
+      it("coerces invalid ABI encoded bool", async () => {
         const amount = ethers.utils.parseEther("1.0");
 
         const sellToken = await waffle.deployMockContract(
@@ -237,7 +237,7 @@ describe("GPv2SafeERC20.sol", () => {
             recipient.address,
             amount,
           ),
-        ).to.be.revertedWith("invalid transfer result");
+        ).to.not.be.reverted;
       });
     });
 

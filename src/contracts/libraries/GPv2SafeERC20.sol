@@ -63,8 +63,7 @@ library GPv2SafeERC20 {
     /// @dev Verifies that the last return was a successful `transfer*` call.
     /// This is done by checking that the return data is either empty, or
     /// is a valid ABI encoded boolean.
-    function getLastTansferResult() private pure returns (bool) {
-        uint256 success;
+    function getLastTansferResult() private pure returns (bool success) {
         bool badReturnSize;
 
         // NOTE: Inspecting previous return data requires assembly. Note that
@@ -83,7 +82,14 @@ library GPv2SafeERC20 {
                 // Standard ERC20 transfer returning boolean success value.
                 case 32 {
                     returndatacopy(0, 0, returndatasize())
-                    success := mload(0)
+
+                    // NOTE: For ABI encoding v1, any non-zero value is accepted
+                    // as `true` for a boolean. In order to stay compatible with
+                    // OpenZeppelin's `SafeERC20` library which is known to work
+                    // with the existing ERC20 implementation we care about,
+                    // make sure we return success for any non-zero return value
+                    // from the `transfer*` call.
+                    success := iszero(iszero(mload(0)))
                 }
                 default {
                     badReturnSize := 1
@@ -91,8 +97,5 @@ library GPv2SafeERC20 {
         }
 
         require(!badReturnSize, "GPv2: malformed transfer result");
-        require(success <= 1, "GPv2: invalid transfer result");
-
-        return success != 0;
     }
 }
