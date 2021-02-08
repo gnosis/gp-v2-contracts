@@ -4,8 +4,8 @@
       "address": "0x60027a9c1EF06EE9890f086B05A4ACc6cd041D62"
     },
     "4": {
-      "address": "0x091c1CDe12584225dce0fc2a5b3F50bC04D470CC",
-      "transactionHash": "0xfe87edfa6a56ec2493ad875bd1f9d32f55b6b80b26ea5dfec282fdce9970f31d"
+      "address": "0xD368E836f0548678Bd46D8Bb3183f25ef476D75d",
+      "transactionHash": "0x8f5db76d9b9b3e6b7d535465c12a610930e7b4ad32b3cc39ce7d3b5ef5e2569b"
     },
     "100": {
       "address": "0x60027a9c1EF06EE9890f086B05A4ACc6cd041D62",
@@ -18,8 +18,8 @@
       "transactionHash": "0x4e20d94594f7ae340dadb18a9b7fa10e80f0a8dae2c72c27442cb015b9b205cf"
     },
     "4": {
-      "address": "0x471B773019E5023DB37f33A774e5f4CC9C50CaBC",
-      "transactionHash": "0xfc3066fa7632f9ce8a0f258ce3d5886d9f2083c47ca27c17a5a0db466f419a53"
+      "address": "0x8B63DeF1214563DBed4576B569F7d5e9f7aaa677",
+      "transactionHash": "0x9414074a00d8e1ea5df73235e190b361a0ac05a372117983d9a02f4a1ff967c1"
     },
     "100": {
       "address": "0x4E608b7Da83f8E9213F554BDAA77C72e125529d0",
@@ -32,12 +32,24 @@
       "transactionHash": "0x4e20d94594f7ae340dadb18a9b7fa10e80f0a8dae2c72c27442cb015b9b205cf"
     },
     "4": {
-      "address": "0x0AD02243a47eB21Bb0EBd9986d99c0605039100e",
-      "transactionHash": "0xfc3066fa7632f9ce8a0f258ce3d5886d9f2083c47ca27c17a5a0db466f419a53"
+      "address": "0x8c71bc489dD8E894dF630C5a250ACfcA38d2E47f",
+      "transactionHash": "0x9414074a00d8e1ea5df73235e190b361a0ac05a372117983d9a02f4a1ff967c1"
     },
     "100": {
       "address": "0x7B0F8dEE044af57eb9D57Fb16A8738cd84aB1f9E",
       "transactionHash": "0xa1f149073825dc0ea99ce00656a54b038b739a70309193e43c2e64935828fdaa"
+    }
+  },
+  "GPv2AllowListAuthentication_Implementation": {
+    "4": {
+      "address": "0x2DEafCb9E66c408255cc5fAa5714Eb7C0E1C7F08",
+      "transactionHash": "0x883700e6e4e810cafb82ed841d586ab43b861ca7d602516db086cfa1c7fec2a8"
+    }
+  },
+  "GPv2AllowListAuthentication_Proxy": {
+    "4": {
+      "address": "0xD368E836f0548678Bd46D8Bb3183f25ef476D75d",
+      "transactionHash": "0x8f5db76d9b9b3e6b7d535465c12a610930e7b4ad32b3cc39ce7d3b5ef5e2569b"
     }
   }
 }
