@@ -37,16 +37,20 @@ REPORT_GAS=1 yarn test
 This repository additionally includes tools for gas benchmarking and tracing.
 
 In order to run a gas benchmark on a whole bunch of settlement scenarios:
-```
+
+```sh
+yarn bench
 ```
 
-These gas benchmarks can be compared against any other git reference:
-```
+These gas benchmarks can be compared against any other git reference and will default to the merge-base if omitted:
+
+```sh
 yarn bench:compare [<ref>]
 ```
 
 In order to get a detailed trace of a settlement to identify how much gas is being spent where:
-```
+
+```sh
 yarn bench:trace
 ```
 
@@ -68,7 +72,7 @@ These files should be committed to this repository.
 
 ### Verify Contracts on Etherscan
 
-```
+```sh
 ETHERSCAN_API_KEY=<Your Key>
 yarn verify --network $NETWORK
 ```
@@ -83,7 +87,7 @@ This repo contains scripts to manage the list of authenticated solvers in all ne
 
 The scripts are called with:
 
-```
+```sh
 yarn solvers command [arg ...]
 ```
 
@@ -98,7 +102,7 @@ The commands flagged with [*] require the private key of the authentication cont
 
 For example, adding the address `0x0000000000000000000000000000000000000042` to the solver list:
 
-```
+```sh
 export PK=<private key>
 yarn solvers add 0x0000000000000000000000000000000000000042
 ```
