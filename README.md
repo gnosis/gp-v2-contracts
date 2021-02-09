@@ -42,7 +42,7 @@ In order to run a gas benchmark on a whole bunch of settlement scenarios:
 
 These gas benchmarks can be compared against any other git reference:
 ```
-yarn bench:compare <ref>
+yarn bench:compare [<ref>]
 ```
 
 In order to get a detailed trace of a settlement to identify how much gas is being spent where:
