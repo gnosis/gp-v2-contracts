@@ -26,7 +26,7 @@ DEBUG=* yarn test
 
 ### Gas Reporter
 
-Gas consumption can be reported using by setting the `REPORT_GAS` flag when running tests as
+Gas consumption can be reported by setting the `REPORT_GAS` flag when running tests as
 
 ```sh
 REPORT_GAS=1 yarn test
