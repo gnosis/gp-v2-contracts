@@ -1,6 +1,6 @@
 # Gnosis Protocol V2
 
-This repository contains the Solidy smart contract code for the Gnosis Protocol version 2.
+This repository contains the Solidity smart contract code for the Gnosis Protocol version 2.
 For more documentation on how the protocol works on a smart contract level, see the [documentation pages](docs/index.md).
 
 ## Getting Started
