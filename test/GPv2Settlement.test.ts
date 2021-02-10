@@ -1,11 +1,14 @@
 import IERC20 from "@openzeppelin/contracts/build/contracts/IERC20.json";
 import { expect } from "chai";
+import { MockContract } from "ethereum-waffle";
 import { BigNumber, Contract, ContractReceipt, Event } from "ethers";
 import { artifacts, ethers, waffle } from "hardhat";
 
 import {
   Interaction,
+  InteractionLike,
   InteractionStage,
+  Order,
   OrderFlags,
   OrderKind,
   SettlementEncoder,
@@ -16,12 +19,16 @@ import {
   domain,
   normalizeInteractions,
   packOrderUidParams,
+  signOrder,
+  ORDER_TYPE_FIELDS,
+  normalizeOrder,
 } from "../src/ts";
 
 import { builtAndDeployedMetadataCoincide } from "./bytecode";
 import {
-  encodeOutTransfers,
   encodeFilledAmountRefunds,
+  encodeOrder,
+  encodeOutTransfers,
   encodePreSignatureRefunds,
 } from "./encoding";
 
@@ -255,6 +262,394 @@ describe("GPv2Settlement", () => {
             encodedOrderRefunds,
           ]),
       ).to.be.reverted;
+    });
+  });
+
+  describe("settleOrder", () => {
+    const AMOUNT = ethers.utils.parseEther("1.0");
+    const [trader, transferTarget, receiver] = traders;
+
+    let sellToken: MockContract;
+    let buyToken: Contract;
+
+    beforeEach(async () => {
+      sellToken = await waffle.deployMockContract(deployer, IERC20.abi);
+
+      const BalanceOf = await ethers.getContractFactory("BalanceOf");
+      buyToken = await BalanceOf.deploy();
+    });
+
+    const orderWithOverrides = (
+      orderOverrides: OrderFlags & Partial<Order>,
+    ): Order => {
+      return {
+        sellToken: sellToken.address,
+        buyToken: buyToken.address,
+        sellAmount: AMOUNT,
+        buyAmount: AMOUNT,
+        validTo: 0xffffffff,
+        appData: 0,
+        feeAmount: ethers.constants.Zero,
+        ...orderOverrides,
+      };
+    };
+
+    const prepareSingleOrderSettlement = async (
+      orderOverrides: OrderFlags & Partial<Order>,
+      executedAmounts: { sell: BigNumber; buy: BigNumber },
+      extraInteraction?: InteractionLike,
+    ): Promise<unknown[]> => {
+      const order = orderWithOverrides(orderOverrides);
+      const receiver = order.receiver ?? trader.address;
+      const signature = await signOrder(
+        testDomain,
+        order,
+        trader,
+        SigningScheme.EIP712,
+      );
+      const transfer = {
+        target: transferTarget.address,
+        amount: executedAmounts.sell,
+      };
+
+      await sellToken.mock.transferFrom
+        .withArgs(trader.address, transferTarget.address, executedAmounts.sell)
+        .returns(true);
+
+      const initialBalance = ethers.utils.parseEther("42.0");
+      await buyToken.setBalanceOf(receiver, initialBalance);
+
+      // NOTE: Use an interaction to update the mock balance contract.
+      const interaction = {
+        target: buyToken.address,
+        value: 0,
+        callData: buyToken.interface.encodeFunctionData("setBalanceOf", [
+          receiver,
+          initialBalance.add(executedAmounts.buy),
+        ]),
+      };
+
+      return [
+        encodeOrder(order),
+        signature.scheme,
+        signature.data,
+        [transfer],
+        normalizeInteractions(
+          extraInteraction !== undefined
+            ? [interaction, extraInteraction]
+            : [interaction],
+        ),
+      ];
+    };
+
+    it("emits Interaction events", async () => {
+      const interaction = {
+        target: `0x${"42".repeat(20)}`,
+        value: 0,
+        callData: "0x01020304",
+      };
+
+      await authenticator.connect(owner).addSolver(solver.address);
+      await expect(
+        settlement
+          .connect(solver)
+          .settleOrder(
+            ...(await prepareSingleOrderSettlement(
+              { kind: OrderKind.SELL, partiallyFillable: false },
+              { sell: AMOUNT, buy: AMOUNT },
+              interaction,
+            )),
+          ),
+      )
+        .to.emit(settlement, "Interaction")
+        .withArgs(interaction.target, interaction.value, interaction.callData);
+    });
+
+    it("emits a Trade event", async () => {
+      await authenticator.connect(owner).addSolver(solver.address);
+
+      const order = orderWithOverrides({
+        kind: OrderKind.SELL,
+        partiallyFillable: true,
+      });
+      await expect(
+        settlement.connect(solver).settleOrder(
+          ...(await prepareSingleOrderSettlement(order, {
+            sell: AMOUNT,
+            buy: AMOUNT.add(1),
+          })),
+        ),
+      )
+        .to.emit(settlement, "Trade")
+        .withArgs(
+          trader.address,
+          sellToken.address,
+          buyToken.address,
+          AMOUNT,
+          AMOUNT.add(1),
+          0,
+          computeOrderUid(testDomain, order, trader.address),
+        );
+    });
+
+    it("emits a Settlement event", async () => {
+      await authenticator.connect(owner).addSolver(solver.address);
+      await expect(
+        settlement
+          .connect(solver)
+          .settleOrder(
+            ...(await prepareSingleOrderSettlement(
+              { kind: OrderKind.BUY, partiallyFillable: false },
+              { sell: AMOUNT, buy: AMOUNT },
+            )),
+          ),
+      )
+        .to.emit(settlement, "Settlement")
+        .withArgs(solver.address);
+    });
+
+    it("checks receiver balance if set", async () => {
+      await authenticator.connect(owner).addSolver(solver.address);
+      await expect(
+        settlement.connect(solver).settleOrder(
+          ...(await prepareSingleOrderSettlement(
+            {
+              kind: OrderKind.BUY,
+              partiallyFillable: true,
+              receiver: receiver.address,
+            },
+            { sell: AMOUNT, buy: AMOUNT },
+          )),
+        ),
+      ).to.not.be.reverted;
+    });
+
+    it("reverts for expired order", async () => {
+      await authenticator.connect(owner).addSolver(solver.address);
+      await expect(
+        settlement
+          .connect(solver)
+          .settleOrder(
+            ...(await prepareSingleOrderSettlement(
+              { kind: OrderKind.SELL, partiallyFillable: false, validTo: 0 },
+              { sell: AMOUNT, buy: AMOUNT },
+            )),
+          ),
+      ).to.be.revertedWith("order expired");
+    });
+
+    it("reverts for filled order", async () => {
+      const order = orderWithOverrides({
+        kind: OrderKind.SELL,
+        partiallyFillable: false,
+      });
+      await settlement
+        .connect(trader)
+        .invalidateOrder(computeOrderUid(testDomain, order, trader.address));
+
+      await authenticator.connect(owner).addSolver(solver.address);
+      await expect(
+        settlement.connect(solver).settleOrder(
+          ...(await prepareSingleOrderSettlement(order, {
+            sell: AMOUNT,
+            buy: AMOUNT,
+          })),
+        ),
+      ).to.be.revertedWith("order filled");
+    });
+
+    describe("Order Variants", () => {
+      it("sets filled amount for sell orders", async () => {
+        const sellAmount = ethers.utils.parseEther("4.2");
+        const order = orderWithOverrides({
+          sellAmount,
+          kind: OrderKind.SELL,
+          partiallyFillable: false,
+        });
+
+        await authenticator.connect(owner).addSolver(solver.address);
+        await settlement.connect(solver).settleOrder(
+          ...(await prepareSingleOrderSettlement(order, {
+            sell: sellAmount,
+            buy: AMOUNT.mul(2),
+          })),
+        );
+
+        expect(
+          await settlement.filledAmount(
+            computeOrderUid(testDomain, order, trader.address),
+          ),
+        ).to.equal(sellAmount);
+      });
+
+      it("sets filled amount for buy orders", async () => {
+        const buyAmount = ethers.utils.parseEther("4.2");
+        const order = orderWithOverrides({
+          buyAmount,
+          kind: OrderKind.BUY,
+          partiallyFillable: false,
+        });
+
+        await authenticator.connect(owner).addSolver(solver.address);
+        await settlement.connect(solver).settleOrder(
+          ...(await prepareSingleOrderSettlement(order, {
+            sell: AMOUNT.div(2),
+            buy: buyAmount,
+          })),
+        );
+
+        expect(
+          await settlement.filledAmount(
+            computeOrderUid(testDomain, order, trader.address),
+          ),
+        ).to.equal(buyAmount);
+      });
+
+      it("reverts on invalid executed sell amount for sell orders", async () => {
+        await authenticator.connect(owner).addSolver(solver.address);
+        await expect(
+          settlement.connect(solver).settleOrder(
+            ...(await prepareSingleOrderSettlement(
+              { kind: OrderKind.SELL, partiallyFillable: true },
+              // NOTE: Order is treated as fill or kill, and even if the
+              // executed amount is favourable for the user, the settlement
+              // reverts.
+              { sell: AMOUNT.sub(1), buy: AMOUNT },
+            )),
+          ),
+        ).to.be.revertedWith("invalid sell amount");
+      });
+
+      it("reverts on invalid executed buy amount for buy orders", async () => {
+        await authenticator.connect(owner).addSolver(solver.address);
+        await expect(
+          settlement
+            .connect(solver)
+            .settleOrder(
+              ...(await prepareSingleOrderSettlement(
+                { kind: OrderKind.BUY, partiallyFillable: true },
+                { sell: AMOUNT, buy: AMOUNT.add(1) },
+              )),
+            ),
+        ).to.be.revertedWith("invalid buy amount");
+      });
+
+      it("reverts when executed buy amount is too low for sell orders", async () => {
+        await authenticator.connect(owner).addSolver(solver.address);
+        await expect(
+          settlement
+            .connect(solver)
+            .settleOrder(
+              ...(await prepareSingleOrderSettlement(
+                { kind: OrderKind.SELL, partiallyFillable: false },
+                { sell: AMOUNT, buy: AMOUNT.sub(1) },
+              )),
+            ),
+        ).to.be.revertedWith("buy amount too low");
+      });
+
+      it("reverts when executed sell amount is too high for buy orders", async () => {
+        await authenticator.connect(owner).addSolver(solver.address);
+        await expect(
+          settlement
+            .connect(solver)
+            .settleOrder(
+              ...(await prepareSingleOrderSettlement(
+                { kind: OrderKind.BUY, partiallyFillable: false },
+                { sell: AMOUNT.add(1), buy: AMOUNT },
+              )),
+            ),
+        ).to.be.revertedWith("sell amount too high");
+      });
+
+      it("reverts for invalid order kinds", async () => {
+        const normalizedOrder = normalizeOrder(
+          orderWithOverrides({
+            kind: OrderKind.SELL,
+            partiallyFillable: false,
+          }),
+        );
+        normalizedOrder.kind = "invalid";
+
+        const signature = await trader._signTypedData(
+          testDomain,
+          { Order: ORDER_TYPE_FIELDS },
+          normalizedOrder,
+        );
+
+        await authenticator.connect(owner).addSolver(solver.address);
+        await expect(
+          settlement.connect(solver).settleOrder(
+            {
+              ...normalizedOrder,
+              kind: ethers.utils.id(normalizedOrder.kind),
+            },
+            SigningScheme.EIP712,
+            signature,
+            [],
+            [],
+          ),
+        ).to.be.revertedWith("invalid order kind");
+      });
+    });
+
+    it("rejects transactions from non-solvers", async () => {
+      await expect(
+        settlement.settleOrder(
+          ...(await prepareSingleOrderSettlement(
+            { kind: OrderKind.SELL, partiallyFillable: false },
+            { sell: AMOUNT, buy: AMOUNT },
+          )),
+        ),
+      ).to.be.revertedWith("not a solver");
+    });
+
+    it("rejects reentrancy attempts via interactions", async () => {
+      await authenticator.connect(owner).addSolver(solver.address);
+
+      const rentrantSettlement = await prepareSingleOrderSettlement(
+        { kind: OrderKind.SELL, partiallyFillable: false },
+        { sell: AMOUNT, buy: AMOUNT },
+      );
+
+      await expect(
+        settlement.connect(solver).settleOrder(
+          ...(await prepareSingleOrderSettlement(
+            { kind: OrderKind.SELL, partiallyFillable: false },
+            { sell: AMOUNT, buy: AMOUNT },
+            {
+              target: settlement.address,
+              callData: settlement.interface.encodeFunctionData(
+                "settleOrder",
+                rentrantSettlement,
+              ),
+            },
+          )),
+        ),
+      ).to.be.revertedWith("reentrant call");
+    });
+
+    it("rejects reentrancy attempts to full settlment function", async () => {
+      await authenticator.connect(owner).addSolver(solver.address);
+
+      const emptySettlement = new SettlementEncoder(
+        testDomain,
+      ).encodedSettlement({});
+      await expect(
+        settlement.connect(solver).settleOrder(
+          ...(await prepareSingleOrderSettlement(
+            { kind: OrderKind.SELL, partiallyFillable: false },
+            { sell: AMOUNT, buy: AMOUNT },
+            {
+              target: settlement.address,
+              callData: settlement.interface.encodeFunctionData(
+                "settle",
+                emptySettlement,
+              ),
+            },
+          )),
+        ),
+      ).to.be.revertedWith("reentrant call");
     });
   });
 

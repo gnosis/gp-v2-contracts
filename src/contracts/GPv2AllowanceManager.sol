@@ -2,6 +2,7 @@
 pragma solidity ^0.7.6;
 pragma abicoder v2;
 
+import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./libraries/GPv2SafeERC20.sol";
 import "./libraries/GPv2TradeExecution.sol";
@@ -11,6 +12,7 @@ import "./libraries/GPv2TradeExecution.sol";
 contract GPv2AllowanceManager {
     using GPv2SafeERC20 for IERC20;
     using GPv2TradeExecution for GPv2TradeExecution.Data;
+    using SafeMath for uint256;
 
     /// @dev A struct for direct transfers when settling a single order.
     struct DirectTransfer {
@@ -72,7 +74,7 @@ contract GPv2AllowanceManager {
         for (uint256 i = 0; i < transfers.length; i++) {
             DirectTransfer calldata transfer = transfers[i];
             sellToken.safeTransferFrom(owner, transfer.target, transfer.amount);
-            totalTransfer += transfer.amount;
+            totalTransfer = totalTransfer.add(transfer.amount);
         }
     }
 }

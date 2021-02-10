@@ -168,6 +168,9 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
             (bytes32 orderDigest, address owner) =
                 recoverOrderSigner(order, signingScheme, signature);
 
+            // solhint-disable-next-line not-rely-on-time
+            require(order.validTo >= block.timestamp, "GPv2: order expired");
+
             executedTrade.owner = owner;
             if (order.receiver == GPv2TradeExecution.RECEIVER_SAME_AS_OWNER) {
                 executedTrade.receiver = owner;
@@ -360,7 +363,7 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
                 currentFilledAmount <= order.sellAmount,
                 "GPv2: order filled"
             );
-        } else if (order.kind == GPv2Order.BUY) {
+        } else {
             if (order.partiallyFillable) {
                 executedBuyAmount = executedAmount;
                 executedFeeAmount =
@@ -378,8 +381,6 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
                 currentFilledAmount <= order.buyAmount,
                 "GPv2: order filled"
             );
-        } else {
-            revert("GPv2: invalid order kind");
         }
 
         require(
