@@ -79,7 +79,7 @@ yarn verify --network $NETWORK
 
 ### Deployed Contract Addresses
 
-This package additonally contains a `networks.json` file at the root with the address of each deployed contract as well the hash of the Ethereum transaction used to create the contract.
+This package additionally contains a `networks.json` file at the root with the address of each deployed contract as well the hash of the Ethereum transaction used to create the contract.
 
 ### Solver Authentication
 
