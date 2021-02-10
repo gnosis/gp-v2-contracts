@@ -37,6 +37,7 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
 
         // solhint-disable-next-line not-rely-on-time
         recoveredOrder.data.validTo = uint32(block.timestamp);
+        recoveredOrder.data.kind = GPv2Order.SELL;
         computeTradeExecution(recoveredOrder, 1, 1, 0, 0, executedTrade);
 
         // solhint-disable-next-line no-inline-assembly
