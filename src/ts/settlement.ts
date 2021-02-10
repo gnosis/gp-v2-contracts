@@ -153,6 +153,8 @@ export type EncodedSettlementLite = [
   Trade[],
   /** Encoded intra-settlement interactions. */
   Interaction[],
+  /** Order UIDs for `filledAmount` storage refunds. */
+  BytesLike[],
 ];
 
 /**
@@ -301,13 +303,10 @@ export class SettlementEncoder {
    */
   public get isLite(): boolean {
     const [preInteractions, , postInteractions] = this.interactions;
-    const { filledAmounts, preSignatures } = this.orderRefunds;
-    return [
-      preInteractions,
-      postInteractions,
-      filledAmounts,
-      preSignatures,
-    ].every(({ length }) => length === 0);
+    const { preSignatures } = this.orderRefunds;
+    return [preInteractions, postInteractions, preSignatures].every(
+      ({ length }) => length === 0,
+    );
   }
 
   /**
@@ -454,6 +453,7 @@ export class SettlementEncoder {
       this.clearingPrices(prices),
       this.trades,
       this.interactions[InteractionStage.INTRA],
+      this.orderRefunds.filledAmounts,
     ];
   }
 
