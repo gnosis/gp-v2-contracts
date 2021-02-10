@@ -97,6 +97,23 @@ describe("GPv2Signing", () => {
       );
     });
 
+    it("should emit a PreSignature event", async () => {
+      await expect(signing.connect(owner).setPreSignature(orderUid, true))
+        .to.emit(signing, "PreSignature")
+        .withArgs(owner.address, orderUid, true);
+
+      await expect(signing.connect(owner).setPreSignature(orderUid, false))
+        .to.emit(signing, "PreSignature")
+        .withArgs(owner.address, orderUid, false);
+    });
+
+    it("should emit a PreSignature event even if storage doesn't change", async () => {
+      await signing.connect(owner).setPreSignature(orderUid, true);
+      await expect(signing.connect(owner).setPreSignature(orderUid, true))
+        .to.emit(signing, "PreSignature")
+        .withArgs(owner.address, orderUid, true);
+    });
+
     it("should revert if the order owner is not the transaction sender", async () => {
       await expect(
         signing.connect(nonOwner).setPreSignature(orderUid, true),
