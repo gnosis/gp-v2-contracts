@@ -337,7 +337,7 @@ export class BenchFixture {
     return await transaction.wait();
   }
 
-  public async settleOne(): Promise<ContractReceipt> {
+  public async settleOrder(): Promise<ContractReceipt> {
     const {
       deployment: { settlement },
       domainSeparator,
@@ -357,7 +357,7 @@ export class BenchFixture {
       sellAmount,
       buyAmount,
       validTo: 0xffffffff,
-      appData: this.nonce++,
+      appData: this.nonce,
       feeAmount,
       kind: OrderKind.SELL,
       partiallyFillable: false,
@@ -368,6 +368,10 @@ export class BenchFixture {
       trader,
       SigningScheme.EIP712,
     );
+    const transfer = {
+      target: uniswapPair.address,
+      amount: order.sellAmount,
+    };
     const interaction = {
       target: uniswapPair.address,
       value: 0,
@@ -381,14 +385,12 @@ export class BenchFixture {
 
     const transaction = await settlement
       .connect(solver)
-      .settleOne(
+      .settleOrder(
         encodeOrder(order),
         signature.scheme,
         signature.data,
-        buyAmount,
-        sellAmount,
-        uniswapPair.address,
-        interaction,
+        [transfer],
+        [interaction],
       );
     return await transaction.wait();
   }

@@ -137,54 +137,94 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         emit Settlement(msg.sender);
     }
 
-    function settleOne(
+    /// @dev Settle a single order directly with on-chain liquidity. This
+    /// function is provided as a "fast-path" for settlements without any
+    /// coincidence of wants.
+    ///
+    /// This type of settlement always assumes the order will be filled in full,
+    /// and while it does accept partially fillable orders, they must have no
+    /// prior filled amount, and will be executed in full.
+    ///
+    /// @param order The single order to settle.
+    /// @param signingScheme The signing scheme used for the order.
+    /// @param signature The signature of the order used to recover the owner
+    /// address.
+    /// @param transfers Direct transfers of user funds to execute to interact
+    /// with on-chain liquidity.
+    /// @param interactions Smart contract interaction to perform with executed
+    /// sell amount of the order.
+    function settleOrder(
         GPv2Order.Data memory order,
         Scheme signingScheme,
         bytes calldata signature,
-        uint256 sellPrice,
-        uint256 buyPrice,
-        address target,
-        GPv2Interaction.Data calldata interaction
+        GPv2AllowanceManager.DirectTransfer[] calldata transfers,
+        GPv2Interaction.Data[] calldata interactions
     ) external nonReentrant onlySolver {
-        RecoveredOrder memory recoveredOrder;
+        GPv2TradeExecution.Data memory executedTrade;
+        bytes memory orderUid;
         uint256 startingBalance;
+
         {
             (bytes32 orderDigest, address owner) =
                 recoverOrderSigner(order, signingScheme, signature);
 
-            recoveredOrder.data = order;
-            recoveredOrder.uid = abi.encodePacked(
-                orderDigest,
-                owner,
-                order.validTo
-            );
-            recoveredOrder.owner = owner;
-
-            if (order.receiver == address(0)) {
-                order.receiver = owner;
+            executedTrade.owner = owner;
+            if (order.receiver == GPv2TradeExecution.RECEIVER_SAME_AS_OWNER) {
+                executedTrade.receiver = owner;
+            } else {
+                executedTrade.receiver = order.receiver;
             }
-            startingBalance = order.buyToken.balanceOf(order.receiver);
+            orderUid = abi.encodePacked(orderDigest, owner, order.validTo);
+            startingBalance = order.buyToken.balanceOf(executedTrade.receiver);
         }
 
-        GPv2TradeExecution.Data memory executedTrade;
-        computeTradeExecution(
-            recoveredOrder,
-            sellPrice,
-            buyPrice,
+        executedTrade.sellAmount = allowanceManager.transferDirect(
+            order.sellToken,
+            executedTrade.owner,
+            transfers
+        );
+
+        executeInteractions(interactions);
+
+        executedTrade.buyAmount = order
+            .buyToken
+            .balanceOf(executedTrade.receiver)
+            .sub(startingBalance);
+
+        require(filledAmount[orderUid] == 0, "GPv2: order filled");
+        if (order.kind == GPv2Order.SELL) {
+            filledAmount[orderUid] = order.sellAmount;
+            require(
+                executedTrade.sellAmount == order.sellAmount,
+                "GPv2: invalid sell amount"
+            );
+            require(
+                executedTrade.buyAmount >= order.buyAmount,
+                "GPv2: buy amount too low"
+            );
+        } else if (order.kind == GPv2Order.BUY) {
+            filledAmount[orderUid] = order.buyAmount;
+            require(
+                executedTrade.sellAmount <= order.sellAmount,
+                "GPv2: sell amount too high"
+            );
+            require(
+                executedTrade.buyAmount == order.buyAmount,
+                "GPv2: invalid buy amount"
+            );
+        } else {
+            revert("GPv2: invalid order kind");
+        }
+
+        emit Trade(
+            executedTrade.owner,
+            order.sellToken,
+            order.buyToken,
+            executedTrade.sellAmount,
+            executedTrade.buyAmount,
             0,
-            order.feeAmount,
-            executedTrade
+            orderUid
         );
-
-        allowanceManager.transferToTarget(executedTrade, target);
-        executeInteraction(interaction);
-
-        require(
-            startingBalance.add(executedTrade.buyAmount) <=
-                order.buyToken.balanceOf(order.receiver),
-            "bad order"
-        );
-
         emit Settlement(msg.sender);
     }
 
@@ -320,7 +360,7 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
                 currentFilledAmount <= order.sellAmount,
                 "GPv2: order filled"
             );
-        } else {
+        } else if (order.kind == GPv2Order.BUY) {
             if (order.partiallyFillable) {
                 executedBuyAmount = executedAmount;
                 executedFeeAmount =
@@ -338,6 +378,8 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
                 currentFilledAmount <= order.buyAmount,
                 "GPv2: order filled"
             );
+        } else {
+            revert("GPv2: invalid order kind");
         }
 
         require(
@@ -367,26 +409,22 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         internal
     {
         for (uint256 i; i < interactions.length; i++) {
-            executeInteraction(interactions[i]);
+            GPv2Interaction.Data calldata interaction = interactions[i];
+
+            // To prevent possible attack on user funds, we explicitly disable
+            // any interactions with AllowanceManager contract.
+            require(
+                interaction.target != address(allowanceManager),
+                "GPv2: forbidden interaction"
+            );
+            GPv2Interaction.execute(interaction);
+
+            emit Interaction(
+                interaction.target,
+                interaction.value,
+                GPv2Interaction.selector(interaction)
+            );
         }
-    }
-
-    function executeInteraction(GPv2Interaction.Data calldata interaction)
-        internal
-    {
-        // To prevent possible attack on user funds, we explicitly disable
-        // any interactions with AllowanceManager contract.
-        require(
-            interaction.target != address(allowanceManager),
-            "GPv2: forbidden interaction"
-        );
-        GPv2Interaction.execute(interaction);
-
-        emit Interaction(
-            interaction.target,
-            interaction.value,
-            GPv2Interaction.selector(interaction)
-        );
     }
 
     /// @dev Transfers all buy amounts for the executed trades from the

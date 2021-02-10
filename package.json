@@ -10,6 +10,7 @@
     "test": "hardhat test",
     "bench": "hardhat run bench/index.ts",
     "bench:compare": "bash bench/compare.sh",
+    "bench:single": "hardhat run bench/single.ts",
     "bench:trace": "hardhat run bench/trace/index.ts",
     "bench:uniswap": "hardhat run bench/uniswap/index.ts",
     "lint": "yarn lint:sol && yarn lint:ts",
