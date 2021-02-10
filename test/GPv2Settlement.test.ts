@@ -585,6 +585,54 @@ describe("GPv2Settlement", () => {
             .gt(executedSellAmount.mul(buyAmount)),
         ).to.be.true;
       });
+
+      describe("should revert if order is executed for a too large amount", () => {
+        it("sell order", async () => {
+          const encoder = new SettlementEncoder(testDomain);
+          const executedAmount = partialOrder.sellAmount.add(1);
+          await encoder.signEncodeTrade(
+            {
+              ...partialOrder,
+              kind: OrderKind.SELL,
+              partiallyFillable: true,
+            },
+            traders[0],
+            SigningScheme.EIP712,
+            { executedAmount },
+          );
+
+          await expect(
+            settlement.computeTradeExecutionsTest(
+              encoder.tokens,
+              encoder.clearingPrices(prices),
+              encoder.trades,
+            ),
+          ).to.be.revertedWith("GPv2: order filled");
+        });
+
+        it("buy order", async () => {
+          const encoder = new SettlementEncoder(testDomain);
+          const executedAmount = partialOrder.buyAmount.add(1);
+          await encoder.signEncodeTrade(
+            {
+              ...partialOrder,
+              kind: OrderKind.BUY,
+              partiallyFillable: true,
+            },
+            traders[0],
+            SigningScheme.EIP712,
+            { executedAmount },
+          );
+
+          await expect(
+            settlement.computeTradeExecutionsTest(
+              encoder.tokens,
+              encoder.clearingPrices(prices),
+              encoder.trades,
+            ),
+          ).to.be.revertedWith("GPv2: order filled");
+        });
+      });
     });
 
     describe("Order Executed Fees", () => {
