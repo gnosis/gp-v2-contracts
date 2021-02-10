@@ -610,6 +610,54 @@ describe("GPv2Settlement", () => {
           ).to.be.revertedWith("GPv2: order filled");
         });
 
+        it("already partially filled sell order", async () => {
+          let encoder = new SettlementEncoder(testDomain);
+          const initialExecutedAmount = partialOrder.sellAmount.div(2);
+          expect(initialExecutedAmount).not.to.deep.equal(
+            ethers.constants.Zero,
+          );
+          await encoder.signEncodeTrade(
+            {
+              ...partialOrder,
+              kind: OrderKind.SELL,
+              partiallyFillable: true,
+            },
+            traders[0],
+            SigningScheme.EIP712,
+            { executedAmount: initialExecutedAmount },
+          );
+          await settlement.computeTradeExecutionsTest(
+            encoder.tokens,
+            encoder.clearingPrices(prices),
+            encoder.trades,
+          );
+
+          encoder = new SettlementEncoder(testDomain);
+          const unfilledAmount = partialOrder.sellAmount.sub(
+            initialExecutedAmount,
+          );
+          expect(initialExecutedAmount).not.to.deep.equal(
+            ethers.constants.Zero,
+          );
+          await encoder.signEncodeTrade(
+            {
+              ...partialOrder,
+              kind: OrderKind.SELL,
+              partiallyFillable: true,
+            },
+            traders[0],
+            SigningScheme.EIP712,
+            { executedAmount: unfilledAmount.add(1) },
+          );
+          await expect(
+            settlement.computeTradeExecutionsTest(
+              encoder.tokens,
+              encoder.clearingPrices(prices),
+              encoder.trades,
+            ),
+          ).to.be.revertedWith("GPv2: order filled");
+        });
+
         it("buy order", async () => {
           const encoder = new SettlementEncoder(testDomain);
           const executedAmount = partialOrder.buyAmount.add(1);
