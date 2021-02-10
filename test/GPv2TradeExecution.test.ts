@@ -143,7 +143,7 @@ describe("GPv2TradeExecution", () => {
             },
             recipient.address,
           ),
-        ).to.be.revertedWith("GPv2SafeERC20: failed transfer");
+        ).to.be.revertedWith("failed transferFrom");
       });
     });
   });
@@ -310,7 +310,7 @@ describe("GPv2TradeExecution", () => {
             buyAmount: amount,
             ...withoutSell,
           }),
-        ).to.be.revertedWith("GPv2SafeERC20: failed transfer");
+        ).to.be.revertedWith("failed transfer");
       });
     });
   });

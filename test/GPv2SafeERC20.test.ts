@@ -3,7 +3,11 @@ import { expect } from "chai";
 import { Contract } from "ethers";
 import { ethers, waffle } from "hardhat";
 
-import { NON_STANDARD_ERC20 } from "./ERC20";
+import {
+  NON_STANDARD_ERC20,
+  ERC20_RETURNING_BYTES,
+  ERC20_RETURNING_UINT,
+} from "./ERC20";
 
 describe("GPv2SafeERC20.sol", () => {
   const [deployer, recipient, ...traders] = waffle.provider.getWallets();
@@ -72,7 +76,39 @@ describe("GPv2SafeERC20.sol", () => {
 
         await expect(
           executor.transfer(sellToken.address, recipient.address, amount),
-        ).to.be.revertedWith("GPv2SafeERC20: failed transfer");
+        ).to.be.revertedWith("failed transfer");
+      });
+
+      it("reverts when too much data is returned", async () => {
+        const amount = ethers.utils.parseEther("1.0");
+
+        const sellToken = await waffle.deployMockContract(
+          deployer,
+          ERC20_RETURNING_BYTES,
+        );
+        await sellToken.mock.transfer
+          .withArgs(recipient.address, amount)
+          .returns(ethers.utils.hexlify([...Array(256)].map((_, i) => i)));
+
+        await expect(
+          executor.transfer(sellToken.address, recipient.address, amount),
+        ).to.be.revertedWith("malformed transfer result");
+      });
+
+      it("coerces invalid ABI encoded bool", async () => {
+        const amount = ethers.utils.parseEther("1.0");
+
+        const sellToken = await waffle.deployMockContract(
+          deployer,
+          ERC20_RETURNING_UINT,
+        );
+        await sellToken.mock.transfer
+          .withArgs(recipient.address, amount)
+          .returns(42);
+
+        await expect(
+          executor.transfer(sellToken.address, recipient.address, amount),
+        ).to.not.be.reverted;
       });
     });
 
@@ -159,7 +195,49 @@ describe("GPv2SafeERC20.sol", () => {
             recipient.address,
             amount,
           ),
-        ).to.be.revertedWith("GPv2SafeERC20: failed transfer");
+        ).to.be.revertedWith("failed transferFrom");
+      });
+
+      it("reverts when too much data is returned", async () => {
+        const amount = ethers.utils.parseEther("1.0");
+
+        const sellToken = await waffle.deployMockContract(
+          deployer,
+          ERC20_RETURNING_BYTES,
+        );
+        await sellToken.mock.transferFrom
+          .withArgs(traders[0].address, recipient.address, amount)
+          .returns(ethers.utils.hexlify([...Array(256)].map((_, i) => i)));
+
+        await expect(
+          executor.transferFrom(
+            sellToken.address,
+            traders[0].address,
+            recipient.address,
+            amount,
+          ),
+        ).to.be.revertedWith("malformed transfer result");
+      });
+
+      it("coerces invalid ABI encoded bool", async () => {
+        const amount = ethers.utils.parseEther("1.0");
+
+        const sellToken = await waffle.deployMockContract(
+          deployer,
+          ERC20_RETURNING_UINT,
+        );
+        await sellToken.mock.transferFrom
+          .withArgs(traders[0].address, recipient.address, amount)
+          .returns(42);
+
+        await expect(
+          executor.transferFrom(
+            sellToken.address,
+            traders[0].address,
+            recipient.address,
+            amount,
+          ),
+        ).to.not.be.reverted;
       });
     });
 
