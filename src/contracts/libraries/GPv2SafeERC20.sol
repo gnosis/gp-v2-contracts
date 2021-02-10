@@ -21,7 +21,10 @@ library GPv2SafeERC20 {
         assembly {
             let freeMemoryPointer := mload(0x40)
             mstore(freeMemoryPointer, selector_)
-            mstore(add(freeMemoryPointer, 4), to)
+            mstore(
+                add(freeMemoryPointer, 4),
+                and(to, 0xffffffffffffffffffffffffffffffffffffffff)
+            )
             mstore(add(freeMemoryPointer, 36), value)
 
             if iszero(call(gas(), token, 0, freeMemoryPointer, 68, 0, 0)) {
@@ -47,8 +50,14 @@ library GPv2SafeERC20 {
         assembly {
             let freeMemoryPointer := mload(0x40)
             mstore(freeMemoryPointer, selector_)
-            mstore(add(freeMemoryPointer, 4), from)
-            mstore(add(freeMemoryPointer, 36), to)
+            mstore(
+                add(freeMemoryPointer, 4),
+                and(from, 0xffffffffffffffffffffffffffffffffffffffff)
+            )
+            mstore(
+                add(freeMemoryPointer, 36),
+                and(to, 0xffffffffffffffffffffffffffffffffffffffff)
+            )
             mstore(add(freeMemoryPointer, 68), value)
 
             if iszero(call(gas(), token, 0, freeMemoryPointer, 100, 0, 0)) {
