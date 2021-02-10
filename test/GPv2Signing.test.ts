@@ -12,12 +12,13 @@ import {
   computeOrderUid,
   domain,
   encodeEip1271SignatureData,
+  encodeOrder,
   hashOrder,
   packOrderUidParams,
   signOrder,
 } from "../src/ts";
 
-import { decodeOrder, encodeOrder } from "./encoding";
+import { decodeOrder } from "./encoding";
 
 function fillBytes(count: number, byte: number): string {
   return ethers.utils.hexlify([...Array(count)].map(() => byte));

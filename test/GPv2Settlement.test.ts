@@ -17,6 +17,7 @@ import {
   TypedDataDomain,
   computeOrderUid,
   domain,
+  encodeOrder,
   normalizeInteractions,
   packOrderUidParams,
   signOrder,
@@ -27,7 +28,6 @@ import {
 import { builtAndDeployedMetadataCoincide } from "./bytecode";
 import {
   encodeFilledAmountRefunds,
-  encodeOrder,
   encodeOutTransfers,
   encodePreSignatureRefunds,
 } from "./encoding";

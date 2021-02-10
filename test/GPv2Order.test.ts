@@ -6,11 +6,10 @@ import {
   ORDER_TYPE_HASH,
   ORDER_UID_LENGTH,
   OrderKind,
+  encodeOrder,
   hashOrder,
   packOrderUidParams,
 } from "../src/ts";
-
-import { encodeOrder } from "./encoding";
 
 function fillBytes(count: number, byte: number): string {
   return ethers.utils.hexlify([...Array(count)].map(() => byte));

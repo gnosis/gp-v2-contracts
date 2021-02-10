@@ -158,7 +158,7 @@ export type NormalizedOrder = Omit<Order, "validTo" | "appData" | "kind"> & {
  * Normalizes an order for hashing and signing, so that it can be used with
  * Ethers.js for EIP-712 operations.
  * @param hashLike A hash-like value to normalize.
- * @returns A 32-byte hash encoded as a hex-string.
+ * @returns The normalized order.
  */
 export function normalizeOrder(order: Order): NormalizedOrder {
   return {
@@ -166,6 +166,29 @@ export function normalizeOrder(order: Order): NormalizedOrder {
     ...order,
     validTo: timestamp(order.validTo),
     appData: hashify(order.appData),
+  };
+}
+
+/**
+ * Encoded representation of an [`Order`] for interaction with the settlement
+ * contract `settleOrder` function. Specifically, it expects the order [`kind`]
+ * to be the Keccak256 hash of its string representation, since that is what
+ * is used to compute the order signing hash.
+ */
+export type EncodedOrder = Omit<NormalizedOrder, "kind"> & {
+  kind: BytesLike;
+};
+
+/**
+ * Encode an order for use with the settlement contract `settleOrder` function.
+ * @param order The order to normalize and encode.
+ * @returns The encoded order..
+ */
+export function encodeOrder(order: Order): EncodedOrder {
+  const normalizedOrder = normalizeOrder(order);
+  return {
+    ...normalizedOrder,
+    kind: ethers.utils.id(normalizedOrder.kind),
   };
 }
 

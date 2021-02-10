@@ -1,9 +1,9 @@
 import { BigNumber, BytesLike } from "ethers";
 import { ethers } from "hardhat";
 
-import { Order, OrderKind, OrderRefunds, normalizeOrder } from "../src/ts";
+import { Order, OrderKind, OrderRefunds } from "../src/ts";
 
-export type AbiOrder = [
+export type AbiTupleOrder = [
   string,
   string,
   string,
@@ -16,22 +16,6 @@ export type AbiOrder = [
   boolean,
 ];
 
-export function encodeOrder(order: Order): AbiOrder {
-  const o = normalizeOrder(order);
-  return [
-    o.sellToken,
-    o.buyToken,
-    o.receiver,
-    BigNumber.from(o.sellAmount),
-    BigNumber.from(o.buyAmount),
-    o.validTo,
-    o.appData,
-    BigNumber.from(o.feeAmount),
-    ethers.utils.id(o.kind),
-    o.partiallyFillable,
-  ];
-}
-
 export function decodeOrderKind(kindHash: string): OrderKind {
   for (const kind of [OrderKind.SELL, OrderKind.BUY]) {
     if (kindHash == ethers.utils.id(kind)) {
@@ -41,7 +25,7 @@ export function decodeOrderKind(kindHash: string): OrderKind {
   throw new Error(`invalid order kind hash '${kindHash}'`);
 }
 
-export function decodeOrder(order: AbiOrder): Order {
+export function decodeOrder(order: AbiTupleOrder): Order {
   return {
     sellToken: order[0],
     buyToken: order[1],

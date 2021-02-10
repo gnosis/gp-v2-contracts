@@ -12,11 +12,11 @@ import {
   SigningScheme,
   TypedDataDomain,
   domain,
+  encodeOrder,
   packOrderUidParams,
   signOrder,
 } from "../src/ts";
 import { deployTestContracts, TestDeployment } from "../test/e2e/fixture";
-import { encodeOrder } from "../test/encoding";
 
 const debug = Debug("bench:fixture");
 const LOTS = ethers.utils.parseEther("1000000000.0");
