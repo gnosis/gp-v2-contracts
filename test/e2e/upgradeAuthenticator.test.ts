@@ -31,7 +31,7 @@ async function upgrade(
   });
 }
 
-describe("Upgrade Authenticator", () => {
+describe("E2E: Upgrade Authenticator", () => {
   let authenticator: Contract;
   let deployer: Wallet;
   let owner: Wallet;

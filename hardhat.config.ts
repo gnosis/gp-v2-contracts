@@ -1,6 +1,7 @@
 import "@nomiclabs/hardhat-waffle";
 import "hardhat-deploy";
 import "hardhat-gas-reporter";
+import "solidity-coverage";
 
 import dotenv from "dotenv";
 import type { HttpNetworkUserConfig } from "hardhat/types";
