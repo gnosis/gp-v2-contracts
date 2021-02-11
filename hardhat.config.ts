@@ -5,6 +5,7 @@ import "solidity-coverage";
 
 import dotenv from "dotenv";
 import type { HttpNetworkUserConfig } from "hardhat/types";
+import { MochaOptions } from "mocha";
 import yargs from "yargs";
 
 import { setupSolversTask } from "./src/tasks/solvers";
@@ -19,7 +20,7 @@ const argv = yargs
 
 // Load environment variables.
 dotenv.config();
-const { INFURA_KEY, MNEMONIC, PK, REPORT_GAS } = process.env;
+const { INFURA_KEY, MNEMONIC, PK, REPORT_GAS, MOCHA_CONF } = process.env;
 
 const DEFAULT_MNEMONIC =
   "candy maple cake sugar pudding cream honey rich smooth crumble sweet treat";
@@ -39,9 +40,24 @@ if (["rinkeby", "mainnet"].includes(argv.network) && INFURA_KEY === undefined) {
   );
 }
 
+const mocha: MochaOptions = {};
+switch (MOCHA_CONF) {
+  case undefined:
+    break;
+  case "coverage":
+    mocha.grep = /^(?!E2E)/;
+    break;
+  case "ignored in coverage":
+    mocha.grep = /^E2E/;
+    break;
+  default:
+    throw new Error("Invalid MOCHA_CONF");
+}
+
 setupSolversTask();
 
 export default {
+  mocha,
   paths: {
     artifacts: "build/artifacts",
     cache: "build/cache",
