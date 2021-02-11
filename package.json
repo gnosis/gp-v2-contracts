@@ -28,7 +28,7 @@
     "@nomiclabs/hardhat-ethers": "^2.0.1",
     "@nomiclabs/hardhat-waffle": "^2.0.1",
     "@openzeppelin/contracts": "^3.4.0",
-    "@types/chai": "^4.2.14",
+    "@types/chai": "^4.2.15",
     "@types/debug": "^4.1.5",
     "@types/mocha": "^8.2.0",
     "@types/yargs": "^16.0.0",
