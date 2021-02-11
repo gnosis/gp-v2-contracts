@@ -365,31 +365,69 @@ describe("GPv2Settlement", () => {
         .withArgs(interaction.target, interaction.value, interaction.callData);
     });
 
-    it("emits a Trade event", async () => {
-      await authenticator.connect(owner).addSolver(solver.address);
+    describe("Trade event", () => {
+      it("emits a Trade event with computed executed fee for sell orders", async () => {
+        await authenticator.connect(owner).addSolver(solver.address);
 
-      const order = orderWithOverrides({
-        kind: OrderKind.SELL,
-        partiallyFillable: true,
+        const order = orderWithOverrides({
+          kind: OrderKind.SELL,
+          partiallyFillable: true,
+          feeAmount: ethers.utils.parseEther("0.01"),
+        });
+        const executedFeeAmount = BigNumber.from(order.feeAmount).div(2);
+
+        await expect(
+          settlement.connect(solver).settleOrder(
+            ...(await prepareSingleOrderSettlement(order, {
+              sell: AMOUNT.add(executedFeeAmount),
+              buy: AMOUNT.add(1),
+            })),
+          ),
+        )
+          .to.emit(settlement, "Trade")
+          .withArgs(
+            trader.address,
+            sellToken.address,
+            buyToken.address,
+            AMOUNT.add(executedFeeAmount),
+            AMOUNT.add(1),
+            executedFeeAmount,
+            computeOrderUid(testDomain, order, trader.address),
+          );
       });
-      await expect(
-        settlement.connect(solver).settleOrder(
-          ...(await prepareSingleOrderSettlement(order, {
-            sell: AMOUNT,
-            buy: AMOUNT.add(1),
-          })),
-        ),
-      )
-        .to.emit(settlement, "Trade")
-        .withArgs(
-          trader.address,
-          sellToken.address,
-          buyToken.address,
-          AMOUNT,
-          AMOUNT.add(1),
-          0,
-          computeOrderUid(testDomain, order, trader.address),
-        );
+
+      it("emits a Trade event with interpolated executed fee for buy orders", async () => {
+        await authenticator.connect(owner).addSolver(solver.address);
+
+        const order = orderWithOverrides({
+          kind: OrderKind.BUY,
+          partiallyFillable: true,
+          feeAmount: ethers.utils.parseEther("0.01"),
+        });
+
+        await expect(
+          settlement.connect(solver).settleOrder(
+            ...(await prepareSingleOrderSettlement(order, {
+              // NOTE: Charge only **half** of what the user was willing to pay,
+              // what a steal!
+              sell: AMOUNT.add(order.feeAmount).div(2),
+              buy: AMOUNT,
+            })),
+          ),
+        )
+          .to.emit(settlement, "Trade")
+          .withArgs(
+            trader.address,
+            sellToken.address,
+            buyToken.address,
+            AMOUNT.add(order.feeAmount).div(2),
+            AMOUNT,
+            // NOTE: Fee is interpolated to be **half** of the order maximum fee
+            // amount.
+            BigNumber.from(order.feeAmount).div(2),
+            computeOrderUid(testDomain, order, trader.address),
+          );
+      });
     });
 
     it("emits a Settlement event", async () => {
@@ -505,7 +543,7 @@ describe("GPv2Settlement", () => {
         ).to.equal(buyAmount);
       });
 
-      it("reverts on invalid executed sell amount for sell orders", async () => {
+      it("reverts on insufficient executed sell amount for sell orders", async () => {
         await authenticator.connect(owner).addSolver(solver.address);
         await expect(
           settlement.connect(solver).settleOrder(
@@ -517,7 +555,23 @@ describe("GPv2Settlement", () => {
               { sell: AMOUNT.sub(1), buy: AMOUNT },
             )),
           ),
-        ).to.be.revertedWith("invalid sell amount");
+        ).to.be.revertedWith("insufficient sell amount");
+      });
+
+      it("reverts on fee too high for sell orders", async () => {
+        const feeAmount = ethers.utils.parseEther("0.1");
+
+        await authenticator.connect(owner).addSolver(solver.address);
+        await expect(
+          settlement
+            .connect(solver)
+            .settleOrder(
+              ...(await prepareSingleOrderSettlement(
+                { kind: OrderKind.SELL, partiallyFillable: true, feeAmount },
+                { sell: AMOUNT.add(feeAmount).add(1), buy: AMOUNT },
+              )),
+            ),
+        ).to.be.revertedWith("fee too high");
       });
 
       it("reverts on invalid executed buy amount for buy orders", async () => {

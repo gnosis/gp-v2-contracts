@@ -85,10 +85,16 @@ describe("GPv2AllowanceManager", () => {
     });
   });
 
-  describe("transferDirect", () => {
+  describe("transferToTargets", () => {
     it("should revert if not called by the recipient", async () => {
       await expect(
-        allowanceManager.connect(nonRecipient).transferIn([]),
+        allowanceManager
+          .connect(nonRecipient)
+          .transferToTargets(
+            ethers.constants.AddressZero,
+            ethers.constants.AddressZero,
+            [],
+          ),
       ).to.be.revertedWith("not allowance recipient");
     });
 
@@ -108,7 +114,7 @@ describe("GPv2AllowanceManager", () => {
         .returns(true);
 
       await expect(
-        allowanceManager.transferDirect(token.address, trader.address, [
+        allowanceManager.transferToTargets(token.address, trader.address, [
           {
             target: targets[0].address,
             amount: amounts[0],
@@ -137,7 +143,7 @@ describe("GPv2AllowanceManager", () => {
         .returns(true);
 
       expect(
-        await allowanceManager.callStatic.transferDirect(
+        await allowanceManager.callStatic.transferToTargets(
           token.address,
           trader.address,
           [
@@ -163,7 +169,7 @@ describe("GPv2AllowanceManager", () => {
         .revertsWithReason("test error");
 
       await expect(
-        allowanceManager.transferDirect(token.address, traders[0].address, [
+        allowanceManager.transferToTargets(token.address, traders[0].address, [
           {
             target: recipient.address,
             amount,

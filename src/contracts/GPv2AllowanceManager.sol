@@ -15,7 +15,7 @@ contract GPv2AllowanceManager {
     using SafeMath for uint256;
 
     /// @dev A struct for direct transfers when settling a single order.
-    struct DirectTransfer {
+    struct Transfer {
         address target;
         uint256 amount;
     }
@@ -66,13 +66,13 @@ contract GPv2AllowanceManager {
     /// @param sellToken The sell token for the order.
     /// @param owner The owner of the order.
     /// @param transfers The direct transfers to perform.
-    function transferDirect(
+    function transferToTargets(
         IERC20 sellToken,
         address owner,
-        DirectTransfer[] calldata transfers
+        Transfer[] calldata transfers
     ) external onlyRecipient returns (uint256 totalTransfer) {
         for (uint256 i = 0; i < transfers.length; i++) {
-            DirectTransfer calldata transfer = transfers[i];
+            Transfer calldata transfer = transfers[i];
             sellToken.safeTransferFrom(owner, transfer.target, transfer.amount);
             totalTransfer = totalTransfer.add(transfer.amount);
         }
