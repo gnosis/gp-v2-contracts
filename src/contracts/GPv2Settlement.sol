@@ -138,7 +138,8 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     }
 
     /// @dev Execute a "lite" settlement. Calling this method is identical to
-    /// [`settle`] without refunds and with only intra-settlement interations.
+    /// [`settle`] without pre-sign refunds and with only intra-settlement
+    /// interations.
     ///
     /// @param tokens An array of ERC20 tokens to be traded in the settlement.
     /// @param clearingPrices The settlement clearing prices.
@@ -146,11 +147,14 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     /// @param interactions Smart contract intra-settlement interactions to be
     /// executed in between withdrawing user sell amounts and paying out buy
     /// amounts.
+    /// @param filledAmountRefunds Order refunds for clearing filled amount
+    /// storage of expired orders.
     function settleLite(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
         GPv2Trade.Data[] calldata trades,
-        GPv2Interaction.Data[] calldata interactions
+        GPv2Interaction.Data[] calldata interactions,
+        bytes[] calldata filledAmountRefunds
     ) external nonReentrant onlySolver {
         GPv2TradeExecution.Data[] memory executedTrades =
             computeTradeExecutions(tokens, clearingPrices, trades);
@@ -160,6 +164,8 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         executeInteractions(interactions);
 
         transferOut(executedTrades);
+
+        freeOrderStorage(filledAmountRefunds, filledAmount);
 
         emit Settlement(msg.sender);
     }

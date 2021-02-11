@@ -316,6 +316,40 @@ describe("GPv2Settlement", () => {
         .to.emit(settlement, "Settlement")
         .withArgs(solver.address);
     });
+
+    it("refunds filled amount storage", async () => {
+      await authenticator.connect(owner).addSolver(solver.address);
+
+      const encoder = new SettlementEncoder(testDomain);
+      for (const trader of traders.slice(0, 3)) {
+        const orderUid = packOrderUidParams({
+          orderDigest: ethers.constants.HashZero,
+          owner: trader.address,
+          validTo: 0,
+        });
+        await settlement.connect(trader).invalidateOrder(orderUid);
+
+        encoder.encodeOrderRefunds({
+          filledAmounts: [orderUid],
+        });
+      }
+
+      for (const orderUid of encoder.orderRefunds.filledAmounts) {
+        expect(await settlement.filledAmount(orderUid)).to.equal(
+          ethers.constants.MaxUint256,
+        );
+      }
+
+      await settlement
+        .connect(solver)
+        .settleLite(...encoder.encodedSettlementLite({}));
+
+      for (const orderUid of encoder.orderRefunds.filledAmounts) {
+        expect(await settlement.filledAmount(orderUid)).to.equal(
+          ethers.constants.Zero,
+        );
+      }
+    });
   });
 
   describe("invalidateOrder", () => {
