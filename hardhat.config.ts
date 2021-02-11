@@ -5,7 +5,7 @@ import "solidity-coverage";
 
 import dotenv from "dotenv";
 import type { HttpNetworkUserConfig } from "hardhat/types";
-import { MochaOptions } from "mocha";
+import type { MochaOptions } from "mocha";
 import yargs from "yargs";
 
 import { setupSolversTask } from "./src/tasks/solvers";
