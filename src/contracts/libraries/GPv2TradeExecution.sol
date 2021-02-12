@@ -23,10 +23,6 @@ library GPv2TradeExecution {
     address internal constant BUY_ETH_ADDRESS =
         0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
-    /// @dev Marker address used to indicate that the receiver of the trade
-    /// proceeds should the owner of the order.
-    address internal constant RECEIVER_SAME_AS_OWNER = address(0);
-
     /// @dev Executes the trade's sell amount, transferring it from the trade's
     /// owner to the specified recipient.
     function transferSellAmountToRecipient(
@@ -47,15 +43,10 @@ library GPv2TradeExecution {
     /// @dev Executes the trade's buy amount, transferring it to the trade's
     /// receiver from the caller's address.
     function transferBuyAmountToOwner(Data memory trade) internal {
-        address receiver = trade.receiver;
-        if (receiver == RECEIVER_SAME_AS_OWNER) {
-            receiver = trade.owner;
-        }
-
         if (address(trade.buyToken) == BUY_ETH_ADDRESS) {
-            payable(receiver).transfer(trade.buyAmount);
+            payable(trade.receiver).transfer(trade.buyAmount);
         } else {
-            trade.buyToken.safeTransfer(receiver, trade.buyAmount);
+            trade.buyToken.safeTransfer(trade.receiver, trade.buyAmount);
         }
     }
 }

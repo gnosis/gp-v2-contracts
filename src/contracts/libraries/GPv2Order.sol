@@ -64,8 +64,32 @@ library GPv2Order {
     bytes32 internal constant BUY =
         hex"6ed88e868af0a1983e3886d5f3e95a2fafbd6c3450bc229e27342283dc429ccc";
 
+    /// @dev Marker address used to indicate that the receiver of the trade
+    /// proceeds should the owner of the order.
+    ///
+    /// This is chosen to be `address(0)` for gas efficiency as it is expected
+    /// to be the most common case.
+    address internal constant RECEIVER_SAME_AS_OWNER = address(0);
+
     /// @dev The byte length of an order unique identifier.
     uint256 internal constant UID_LENGTH = 56;
+
+    /// @dev Returns the actual receiver for an order. This function checks
+    /// whether or not the [`receiver`] field uses the marker value to indicate
+    /// it is the same as the order owner.
+    ///
+    /// @return receiver The actual receiver of trade proceeds.
+    function actualReceiver(Data memory order, address owner)
+        internal
+        pure
+        returns (address receiver)
+    {
+        if (order.receiver == RECEIVER_SAME_AS_OWNER) {
+            receiver = owner;
+        } else {
+            receiver = order.receiver;
+        }
+    }
 
     /// @dev Return the EIP-712 signing hash for the specified order.
     ///

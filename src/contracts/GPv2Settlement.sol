@@ -212,7 +212,7 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         require(order.validTo >= block.timestamp, "GPv2: order expired");
 
         executedTrade.owner = recoveredOrder.owner;
-        executedTrade.receiver = order.receiver;
+        executedTrade.receiver = recoveredOrder.receiver;
         executedTrade.sellToken = order.sellToken;
         executedTrade.buyToken = order.buyToken;
 
