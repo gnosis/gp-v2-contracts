@@ -158,8 +158,8 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         IERC20[] calldata tokens,
         GPv2Trade.Data calldata trade,
         GPv2AllowanceManager.Transfer[] calldata transfers,
-        GPv2Interaction.Data[] calldata interactions,
-        bytes[] calldata filledAmountRefunds
+        GPv2Interaction.Data[] calldata interactions
+        //bytes[] calldata filledAmountRefunds
     ) external nonReentrant onlySolver {
         RecoveredOrder memory recoveredOrder = allocateRecoveredOrder();
         recoverOrderFromTrade(recoveredOrder, tokens, trade);
@@ -171,7 +171,7 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
             trade.feeDiscount
         );
 
-        freeOrderStorage(filledAmountRefunds, filledAmount);
+        //freeOrderStorage(filledAmountRefunds, filledAmount);
 
         emit Settlement(msg.sender);
     }
