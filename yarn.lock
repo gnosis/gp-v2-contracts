@@ -525,10 +525,10 @@
     solc "0.5.17"
     truffle "^5.1.21"
 
-"@gnosis.pm/util-contracts@=3.0.1-solc-7":
-  version "3.0.1-solc-7"
-  resolved "https://registry.yarnpkg.com/@gnosis.pm/util-contracts/-/util-contracts-3.0.1-solc-7.tgz#453dd78e038bbb4b2db43672a8f1283969ac2ee2"
-  integrity sha512-8/dlsGoxxaq9dn+7uBJupZECQJKVuW3H/eGumWuq31FOhWh3J0nTMQjFKxbpkM6CakOZd7VlQKfO4hHhWmtPxQ==
+"@gnosis.pm/util-contracts@=3.1.0-solc-7":
+  version "3.1.0-solc-7"
+  resolved "https://registry.yarnpkg.com/@gnosis.pm/util-contracts/-/util-contracts-3.1.0-solc-7.tgz#3c5e116052ea0b24fde2abd05676d3c6276173fe"
+  integrity sha512-I8mQuCoh8B92tKMdaUvXtiZRoK1kClG1vYMl5/a0kat+8an/ch2olxbVB4jeDwwmkRCHIHI/WiSqNQbPHn9ihQ==
   dependencies:
     "@truffle/hdwallet-provider" "^1.0.42"
 
