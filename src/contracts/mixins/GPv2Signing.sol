@@ -143,7 +143,8 @@ abstract contract GPv2Signing {
             owner = recoverEthsignSigner(orderDigest, signature);
         } else if (signingScheme == Scheme.Eip1271) {
             owner = recoverEip1271Signer(orderDigest, signature);
-        } else if (signingScheme == Scheme.PreSign) {
+        } else {
+            // signingScheme == Scheme.PreSign
             owner = recoverPreSigner(orderDigest, signature, order.validTo);
         }
     }
