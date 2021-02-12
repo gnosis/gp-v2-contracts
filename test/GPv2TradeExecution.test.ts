@@ -148,7 +148,7 @@ describe("GPv2TradeExecution", () => {
     });
   });
 
-  describe("transferBuyAmountToOwner", () => {
+  describe.skip("transferBuyAmountToOwner", () => {
     const withoutSell = {
       sellToken: ethers.constants.AddressZero,
       sellAmount: ethers.constants.Zero,

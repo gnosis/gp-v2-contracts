@@ -18,7 +18,7 @@ import {
 
 import { deployTestContracts } from "./fixture";
 
-describe("E2E: Should Perform Single Order Settlements With Uniswap", () => {
+describe.skip("E2E: Should Perform Single Order Settlements With Uniswap", () => {
   let deployer: Wallet;
   let solver: Wallet;
   let pooler: Wallet;

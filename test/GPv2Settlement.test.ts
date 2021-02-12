@@ -265,7 +265,7 @@ describe("GPv2Settlement", () => {
     });
   });
 
-  describe("settleOrder", () => {
+  describe.skip("settleOrder", () => {
     const AMOUNT = ethers.utils.parseEther("1.0");
     const [trader, transferTarget, receiver] = traders;
 
@@ -1463,7 +1463,7 @@ describe("GPv2Settlement", () => {
     });
   });
 
-  describe("transferOut", () => {
+  describe.skip("transferOut", () => {
     it("should execute ERC20 transfers", async () => {
       const tokens = [
         await waffle.deployMockContract(deployer, IERC20.abi),
