@@ -353,6 +353,8 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
             );
         }
 
+        // solhint-disable-next-line not-rely-on-time
+        require(order.validTo >= block.timestamp, "GPv2: order expired");
         require(filledAmount[orderUid] == 0, "GPv2: order filled");
         if (order.kind == GPv2Order.SELL) {
             filledAmount[orderUid] = order.sellAmount;

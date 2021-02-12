@@ -12,7 +12,6 @@ import { artifacts, ethers, waffle } from "hardhat";
 
 import {
   Interaction,
-  InteractionLike,
   InteractionStage,
   Order,
   OrderFlags,
@@ -905,7 +904,6 @@ describe("GPv2Settlement", () => {
     const prepareTrade = async (
       order: Order,
       execution?: Partial<SingleTradeExecution>,
-      extraInteraction?: InteractionLike,
     ): Promise<[string[], Trade, Transfer[], Interaction[]]> => {
       const receiver = order.receiver ?? trader.address;
 
@@ -953,11 +951,7 @@ describe("GPv2Settlement", () => {
         encoder.tokens,
         trade,
         [transfer],
-        normalizeInteractions(
-          extraInteraction !== undefined
-            ? [interaction, extraInteraction]
-            : [interaction],
-        ),
+        normalizeInteractions([interaction]),
       ];
     };
 
@@ -1114,6 +1108,45 @@ describe("GPv2Settlement", () => {
           ),
         ).to.be.revertedWith("sell amount too high");
       });
+    });
+
+    it("rejects expired order", async () => {
+      const order = prepareOrder({
+        kind: OrderKind.SELL,
+        partiallyFillable: false,
+        validTo: 0,
+      });
+
+      await authenticator.connect(owner).addSolver(solver.address);
+      await expect(
+        settlement
+          .connect(solver)
+          .executeSingleTradeTest(...(await prepareTrade(order))),
+      ).to.be.revertedWith("order expired");
+    });
+
+    it("ignores trade executed amount field", async () => {
+      const order = prepareOrder({
+        kind: OrderKind.SELL,
+        partiallyFillable: true,
+      });
+
+      const [tokens, trade, transfers, interactions] = await prepareTrade(
+        order,
+      );
+      trade.executedAmount = ethers.utils.parseEther("1447.42");
+      expect(trade.executedAmount).not.to.equal(order.sellAmount);
+
+      await authenticator.connect(owner).addSolver(solver.address);
+      await settlement
+        .connect(solver)
+        .executeSingleTradeTest(tokens, trade, transfers, interactions);
+
+      expect(
+        await settlement.filledAmount(
+          computeOrderUid(testDomain, order, trader.address),
+        ),
+      ).to.equal(order.sellAmount);
     });
   });
 
