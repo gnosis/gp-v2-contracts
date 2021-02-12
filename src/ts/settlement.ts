@@ -142,6 +142,16 @@ export type EncodedSettlement = [
 ];
 
 /**
+ * Direct transfers used in "fast-path" for settling single trades.
+ */
+export interface Transfer {
+  /** Receiver of the user funds. */
+  target: string;
+  /** Amount to transfer. */
+  amount: BigNumberish;
+}
+
+/**
  * Maximum number of trades that can be included in a single call to the settle
  * function.
  */
