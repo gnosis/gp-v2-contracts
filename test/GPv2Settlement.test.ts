@@ -897,8 +897,8 @@ describe("GPv2Settlement", () => {
     };
 
     interface SingleTradeExecution {
-      executedSellAmount: BigNumberish;
-      executedBuyAmount: BigNumberish;
+      transferOutAmount: BigNumberish;
+      receiverBalanceIncreaseAmount: BigNumberish;
       feeDiscount: BigNumberish;
     }
 
@@ -909,9 +909,13 @@ describe("GPv2Settlement", () => {
     ): Promise<[string[], Trade, Transfer[], Interaction[]]> => {
       const receiver = order.receiver ?? trader.address;
 
-      const { executedSellAmount, executedBuyAmount, feeDiscount } = {
-        executedSellAmount: order.sellAmount,
-        executedBuyAmount: order.buyAmount,
+      const {
+        transferOutAmount,
+        receiverBalanceIncreaseAmount,
+        feeDiscount,
+      } = {
+        transferOutAmount: order.sellAmount,
+        receiverBalanceIncreaseAmount: order.buyAmount,
         feeDiscount: 0,
         ...(execution || {}),
       };
@@ -924,7 +928,7 @@ describe("GPv2Settlement", () => {
       const [trade] = encoder.trades;
 
       await sellToken.mock.transferFrom
-        .withArgs(trader.address, transferTarget.address, executedSellAmount)
+        .withArgs(trader.address, transferTarget.address, transferOutAmount)
         .returns(true);
 
       const initialBalance = ethers.utils.parseEther("42.0");
@@ -932,7 +936,7 @@ describe("GPv2Settlement", () => {
 
       const transfer = {
         target: transferTarget.address,
-        amount: executedSellAmount,
+        amount: transferOutAmount,
       };
 
       // NOTE: Use an interaction to update the mock balance contract.
@@ -941,7 +945,7 @@ describe("GPv2Settlement", () => {
         value: 0,
         callData: buyToken.interface.encodeFunctionData("setBalanceOf", [
           receiver,
-          initialBalance.add(executedBuyAmount),
+          initialBalance.add(receiverBalanceIncreaseAmount),
         ]),
       };
 
@@ -976,8 +980,8 @@ describe("GPv2Settlement", () => {
       await expect(
         settlement.connect(solver).executeSingleTradeTest(
           ...(await prepareTrade(order, {
-            executedSellAmount,
-            executedBuyAmount,
+            transferOutAmount: executedSellAmount,
+            receiverBalanceIncreaseAmount: executedBuyAmount,
             feeDiscount: feeAmount.sub(executedFeeAmount),
           })),
         ),
@@ -1002,11 +1006,9 @@ describe("GPv2Settlement", () => {
         });
 
         await authenticator.connect(owner).addSolver(solver.address);
-        await settlement.connect(solver).executeSingleTradeTest(
-          ...(await prepareTrade(order, {
-            executedSellAmount: order.sellAmount,
-          })),
-        );
+        await settlement
+          .connect(solver)
+          .executeSingleTradeTest(...(await prepareTrade(order)));
 
         expect(
           await settlement.filledAmount(
@@ -1022,11 +1024,9 @@ describe("GPv2Settlement", () => {
         });
 
         await authenticator.connect(owner).addSolver(solver.address);
-        await settlement.connect(solver).executeSingleTradeTest(
-          ...(await prepareTrade(order, {
-            executedBuyAmount: order.buyAmount,
-          })),
-        );
+        await settlement
+          .connect(solver)
+          .executeSingleTradeTest(...(await prepareTrade(order)));
 
         expect(
           await settlement.filledAmount(
@@ -1049,7 +1049,7 @@ describe("GPv2Settlement", () => {
               // NOTE: Order is treated as fill or kill, and even if the
               // executed amount is favourable for the user, the settlement
               // reverts.
-              { executedSellAmount: BigNumber.from(order.sellAmount).sub(1) },
+              { transferOutAmount: BigNumber.from(order.sellAmount).sub(1) },
             )),
           ),
         ).to.be.revertedWith("invalid sell amount");
@@ -1069,7 +1069,11 @@ describe("GPv2Settlement", () => {
               // NOTE: Order is treated as fill or kill, and even if the
               // executed amount is favourable for the user, the settlement
               // reverts.
-              { executedBuyAmount: BigNumber.from(order.buyAmount).add(1) },
+              {
+                receiverBalanceIncreaseAmount: BigNumber.from(
+                  order.buyAmount,
+                ).add(1),
+              },
             )),
           ),
         ).to.be.revertedWith("invalid buy amount");
@@ -1086,7 +1090,9 @@ describe("GPv2Settlement", () => {
         await expect(
           settlement.connect(solver).executeSingleTradeTest(
             ...(await prepareTrade(order, {
-              executedBuyAmount: BigNumber.from(order.buyAmount).sub(1),
+              receiverBalanceIncreaseAmount: BigNumber.from(
+                order.buyAmount,
+              ).sub(1),
             })),
           ),
         ).to.be.revertedWith("buy amount too low");
@@ -1103,7 +1109,7 @@ describe("GPv2Settlement", () => {
         await expect(
           settlement.connect(solver).executeSingleTradeTest(
             ...(await prepareTrade(order, {
-              executedSellAmount: BigNumber.from(order.sellAmount).add(1),
+              transferOutAmount: BigNumber.from(order.sellAmount).add(1),
             })),
           ),
         ).to.be.revertedWith("sell amount too high");
