@@ -18,6 +18,7 @@ import "./mixins/GPv2Signing.sol";
 /// @title Gnosis Protocol v2 Settlement Contract
 /// @author Gnosis Developers
 contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
+    using GPv2Order for GPv2Order.Data;
     using GPv2Order for bytes;
     using GPv2TradeExecution for GPv2TradeExecution.Data;
     using SafeMath for uint256;
@@ -137,116 +138,41 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         emit Settlement(msg.sender);
     }
 
-    /// @dev Settle a single order directly with on-chain liquidity. This
+    /// @dev Settle a single trade directly with on-chain liquidity. This
     /// function is provided as a "fast-path" for settlements without any
     /// coincidence of wants.
     ///
     /// This type of settlement always assumes the order will be filled in full,
     /// and while it does accept partially fillable orders, they must have no
-    /// prior filled amount, and will be executed in full.
+    /// prior filled amount, and will be executed in full. As such, the trade's
+    /// `executedAmount` is ignored.
     ///
-    /// @param order The single order to settle.
-    /// @param signingScheme The signing scheme used for the order.
-    /// @param signature The signature of the order used to recover the owner
-    /// address.
-    /// @param transfers Direct transfers of user funds to execute to interact
-    /// with on-chain liquidity.
+    /// @param tokens An array of ERC20 tokens to be traded in the settlement.
+    /// Trades encode tokens as indices into this array.
+    /// @param trade The trade for the single signed order to settle.
+    /// @param transfers Direct transfers of user funds to execute in order to
+    /// interact with on-chain liquidity.
     /// @param interactions Smart contract interaction to perform with executed
     /// sell amount of the order.
-    function settleOrder(
-        GPv2Order.Data memory order,
-        Scheme signingScheme,
-        bytes calldata signature,
+    function settleSingleTrade(
+        IERC20[] calldata tokens,
+        GPv2Trade.Data calldata trade,
         GPv2AllowanceManager.Transfer[] calldata transfers,
-        GPv2Interaction.Data[] calldata interactions
+        GPv2Interaction.Data[] calldata interactions,
+        bytes[] calldata filledAmountRefunds
     ) external nonReentrant onlySolver {
-        GPv2TradeExecution.Data memory executedTrade;
-        bytes memory orderUid;
-        {
-            (bytes32 orderDigest, address owner) =
-                recoverOrderSigner(order, signingScheme, signature);
+        RecoveredOrder memory recoveredOrder = allocateRecoveredOrder();
+        recoverOrderFromTrade(recoveredOrder, tokens, trade);
 
-            // solhint-disable-next-line not-rely-on-time
-            require(order.validTo >= block.timestamp, "GPv2: order expired");
-
-            executedTrade.owner = owner;
-            if (order.receiver == GPv2TradeExecution.RECEIVER_SAME_AS_OWNER) {
-                executedTrade.receiver = owner;
-            } else {
-                executedTrade.receiver = order.receiver;
-            }
-            orderUid = abi.encodePacked(orderDigest, owner, order.validTo);
-        }
-
-        {
-            uint256 startingBalance =
-                order.buyToken.balanceOf(executedTrade.receiver);
-
-            executedTrade.sellAmount = allowanceManager.transferToTargets(
-                order.sellToken,
-                executedTrade.owner,
-                transfers
-            );
-
-            executeInteractions(interactions);
-
-            executedTrade.buyAmount = order
-                .buyToken
-                .balanceOf(executedTrade.receiver)
-                .sub(startingBalance);
-        }
-
-        uint256 executedFeeAmount;
-        require(filledAmount[orderUid] == 0, "GPv2: order filled");
-        if (order.kind == GPv2Order.SELL) {
-            filledAmount[orderUid] = order.sellAmount;
-
-            executedFeeAmount = executedTrade.sellAmount.sub(
-                order.sellAmount,
-                "GPv2: insufficient sell amount"
-            );
-            require(executedFeeAmount <= order.feeAmount, "GPv2: fee too high");
-            require(
-                executedTrade.buyAmount >= order.buyAmount,
-                "GPv2: buy amount too low"
-            );
-        } else if (order.kind == GPv2Order.BUY) {
-            filledAmount[orderUid] = order.buyAmount;
-
-            // NOTE: Computing the actual executed fee amount is ambiguous for
-            // buy orders. Make a best effort guess by interpolating based on
-            // the actual and maximum executed sell amounts. This is not an
-            // issue since the executed fee amount is only used for informative
-            // purposes when emitting the `Trade` event and doesn't actually
-            // affect the settlement.
-            uint256 maximumExecutedSellAmount =
-                order.sellAmount.add(order.feeAmount);
-            executedFeeAmount = order
-                .feeAmount
-                .mul(executedTrade.sellAmount)
-                .div(maximumExecutedSellAmount);
-
-            require(
-                executedTrade.sellAmount <= maximumExecutedSellAmount,
-                "GPv2: sell amount too high"
-            );
-            require(
-                executedTrade.buyAmount == order.buyAmount,
-                "GPv2: invalid buy amount"
-            );
-        } else {
-            revert("GPv2: invalid order kind");
-        }
-
-        emit Trade(
-            executedTrade.owner,
-            order.sellToken,
-            order.buyToken,
-            executedTrade.sellAmount,
-            executedTrade.buyAmount,
-            executedFeeAmount,
-            orderUid
+        executeSingleTrade(
+            recoveredOrder,
+            transfers,
+            interactions,
+            trade.feeDiscount
         );
+
+        freeOrderStorage(filledAmountRefunds, filledAmount);
+
         emit Settlement(msg.sender);
     }
 
@@ -325,7 +251,7 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         require(order.validTo >= block.timestamp, "GPv2: order expired");
 
         executedTrade.owner = recoveredOrder.owner;
-        executedTrade.receiver = order.receiver;
+        executedTrade.receiver = order.actualReceiver(recoveredOrder.owner);
         executedTrade.sellToken = order.sellToken;
         executedTrade.buyToken = order.buyToken;
 
@@ -418,6 +344,83 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
             executedTrade.buyToken,
             executedTrade.sellAmount,
             executedTrade.buyAmount,
+            executedFeeAmount,
+            orderUid
+        );
+    }
+
+    /// @dev Executes a single trade on-chain by performing the specified
+    /// transfers and interactions. This function is used as part of the
+    /// "fast-path" for settling single trades against on-chain liquidity.
+    ///
+    /// This method computes the executed sell amount from the total transfer
+    /// amount and the executed buy amount by reading the receiver's balance
+    /// before and after the execution.
+    ///
+    /// @param recoveredOrder The recovered order to execute.
+    /// @param transfers Direct transfers of user funds to permorm for executing
+    /// this order.
+    /// @param interactions Smart contract interaction to perform with the
+    /// transferred user funds.
+    /// @param feeDiscount The discount to apply to the final executed fees.
+    function executeSingleTrade(
+        RecoveredOrder memory recoveredOrder,
+        GPv2AllowanceManager.Transfer[] calldata transfers,
+        GPv2Interaction.Data[] calldata interactions,
+        uint256 feeDiscount
+    ) internal {
+        GPv2Order.Data memory order = recoveredOrder.data;
+        bytes memory orderUid = recoveredOrder.uid;
+        uint256 executedFeeAmount = order.feeAmount.sub(feeDiscount);
+
+        uint256 executedSellAmount;
+        uint256 executedBuyAmount;
+        {
+            address receiver = order.actualReceiver(recoveredOrder.owner);
+            uint256 startingBalance = order.buyToken.balanceOf(receiver);
+
+            executedSellAmount = allowanceManager.transferToTargets(
+                order.sellToken,
+                recoveredOrder.owner,
+                transfers
+            );
+
+            executeInteractions(interactions);
+
+            executedBuyAmount = order.buyToken.balanceOf(receiver).sub(
+                startingBalance
+            );
+        }
+
+        require(filledAmount[orderUid] == 0, "GPv2: order filled");
+        if (order.kind == GPv2Order.SELL) {
+            filledAmount[orderUid] = order.sellAmount;
+            require(
+                executedSellAmount == order.sellAmount.add(executedFeeAmount),
+                "GPv2: invalid sell amount"
+            );
+            require(
+                executedBuyAmount >= order.buyAmount,
+                "GPv2: buy amount too low"
+            );
+        } else {
+            filledAmount[orderUid] = order.buyAmount;
+            require(
+                executedSellAmount <= order.sellAmount.add(executedFeeAmount),
+                "GPv2: sell amount too high"
+            );
+            require(
+                executedBuyAmount == order.buyAmount,
+                "GPv2: invalid buy amount"
+            );
+        }
+
+        emit Trade(
+            recoveredOrder.owner,
+            order.sellToken,
+            order.buyToken,
+            executedSellAmount,
+            executedBuyAmount,
             executedFeeAmount,
             orderUid
         );

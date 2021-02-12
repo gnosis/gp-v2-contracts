@@ -12,9 +12,7 @@ import {
   SigningScheme,
   TypedDataDomain,
   domain,
-  encodeOrder,
   packOrderUidParams,
-  signOrder,
 } from "../src/ts";
 import { deployTestContracts, TestDeployment } from "../test/e2e/fixture";
 
@@ -362,17 +360,12 @@ export class BenchFixture {
       kind: OrderKind.SELL,
       partiallyFillable: false,
     };
-    const signature = await signOrder(
-      domainSeparator,
-      order,
-      trader,
-      SigningScheme.EIP712,
-    );
-    const transfer = {
-      target: uniswapPair.address,
-      amount: order.sellAmount,
-    };
-    const interaction = {
+
+    const encoder = new SettlementEncoder(domainSeparator);
+    await encoder.signEncodeTrade(order, trader, SigningScheme.EIP712, {
+      feeDiscount: order.feeAmount,
+    });
+    encoder.encodeInteraction({
       target: uniswapPair.address,
       value: 0,
       callData: uniswapPair.interface.encodeFunctionData("swap", [
@@ -381,17 +374,16 @@ export class BenchFixture {
         trader.address,
         "0x",
       ]),
-    };
+    });
 
-    const transaction = await settlement
-      .connect(solver)
-      .settleOrder(
-        encodeOrder(order),
-        signature.scheme,
-        signature.data,
-        [transfer],
-        [interaction],
-      );
+    const transaction = await settlement.connect(solver).settleSingleTrade(
+      ...encoder.encodeSingleTradeSettlement([
+        {
+          target: uniswapPair.address,
+          amount: order.sellAmount,
+        },
+      ]),
+    );
     return await transaction.wait();
   }
 }

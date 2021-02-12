@@ -142,6 +142,32 @@ export type EncodedSettlement = [
 ];
 
 /**
+ * Direct transfers used in "fast-path" for settling single trades.
+ */
+export interface Transfer {
+  /** Receiver of the user funds. */
+  target: string;
+  /** Amount to transfer. */
+  amount: BigNumberish;
+}
+
+/**
+ * Encoded single trade settlement parameters.
+ */
+export type EncodedSingleTradeSettlement = [
+  /** Tokens. */
+  [string, string],
+  /** Encoded trade. */
+  Trade,
+  /** Encoded transfers. */
+  Transfer[],
+  /** Encoded interactions for executing a single trade order. */
+  Interaction[],
+  /** Encoded filled amount refunds. */
+  BytesLike[],
+];
+
+/**
  * Maximum number of trades that can be included in a single call to the settle
  * function.
  */
@@ -288,6 +314,22 @@ export class SettlementEncoder {
   }
 
   /**
+   * Returns whether the currently encoded settlement can be executed with the
+   * `settleOne` single trade settlement "fast-path".
+   */
+  public get isSingleTradeSettlement(): boolean {
+    const [preInteractions, , postInteractions] = this.interactions;
+    const { preSignatures } = this.orderRefunds;
+    return (
+      this.tokens.length === 2 &&
+      this.trades.length === 1 &&
+      [preInteractions, postInteractions, preSignatures].every(
+        ({ length }) => length === 0,
+      )
+    );
+  }
+
+  /**
    * Returns a clearing price vector for the current settlement tokens from the
    * provided price map.
    *
@@ -415,6 +457,25 @@ export class SettlementEncoder {
       this.trades,
       this.interactions,
       this.orderRefunds,
+    ];
+  }
+
+  /**
+   * Returns the encoded single trade settlement parameters.
+   */
+  public encodeSingleTradeSettlement(
+    transfers: Transfer[],
+  ): EncodedSingleTradeSettlement {
+    if (!this.isSingleTradeSettlement) {
+      throw new Error("cannot be encoded as a single trade settlement");
+    }
+    const [token0, token1] = this.tokens;
+    return [
+      [token0, token1],
+      this.trades[0],
+      transfers,
+      this.interactions[InteractionStage.INTRA],
+      this.orderRefunds.filledAmounts,
     ];
   }
 
