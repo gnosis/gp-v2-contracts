@@ -334,4 +334,56 @@ export class BenchFixture {
 
     return await transaction.wait();
   }
+
+  public async settleOrder(): Promise<ContractReceipt> {
+    const {
+      deployment: { settlement },
+      domainSeparator,
+      solver,
+      traders: [trader],
+      uniswapPair,
+      uniswapTokens: [sellToken, buyToken],
+    } = this;
+
+    const sellAmount = ethers.utils.parseEther("1.0");
+    const buyAmount = ethers.utils.parseEther("0.9");
+    const feeAmount = sellAmount.div(1000);
+
+    const order = {
+      sellToken: sellToken.address,
+      buyToken: buyToken.address,
+      sellAmount,
+      buyAmount,
+      validTo: 0xffffffff,
+      appData: this.nonce,
+      feeAmount,
+      kind: OrderKind.SELL,
+      partiallyFillable: false,
+    };
+
+    const encoder = new SettlementEncoder(domainSeparator);
+    await encoder.signEncodeTrade(order, trader, SigningScheme.EIP712, {
+      feeDiscount: order.feeAmount,
+    });
+    encoder.encodeInteraction({
+      target: uniswapPair.address,
+      value: 0,
+      callData: uniswapPair.interface.encodeFunctionData("swap", [
+        0,
+        buyAmount,
+        trader.address,
+        "0x",
+      ]),
+    });
+
+    const transaction = await settlement.connect(solver).settleSingleTrade(
+      ...encoder.encodeSingleTradeSettlement([
+        {
+          target: uniswapPair.address,
+          amount: order.sellAmount,
+        },
+      ]),
+    );
+    return await transaction.wait();
+  }
 }

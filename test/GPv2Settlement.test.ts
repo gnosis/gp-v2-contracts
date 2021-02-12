@@ -11,7 +11,9 @@ import {
 import { artifacts, ethers, waffle } from "hardhat";
 
 import {
+  EncodedSingleTradeSettlement,
   Interaction,
+  InteractionLike,
   InteractionStage,
   Order,
   OrderFlags,
@@ -265,6 +267,96 @@ describe("GPv2Settlement", () => {
             encodedOrderRefunds,
           ]),
       ).to.be.reverted;
+    });
+  });
+
+  describe("settleSingleTrade", () => {
+    let buyToken: Contract;
+
+    beforeEach(async () => {
+      const BalanceOf = await ethers.getContractFactory("BalanceOf");
+      buyToken = await BalanceOf.deploy();
+    });
+
+    const emptySingleTradeSettlement = async (
+      extraInteraction?: InteractionLike,
+    ): Promise<EncodedSingleTradeSettlement> => {
+      const uselessOrder = {
+        kind: OrderKind.SELL,
+        partiallyFillable: false,
+        sellToken: ethers.constants.AddressZero,
+        buyToken: buyToken.address,
+        sellAmount: 0,
+        buyAmount: 0,
+        feeAmount: 0,
+        validTo: 0xffffffff,
+        appData: 0,
+      };
+
+      const encoder = new SettlementEncoder(testDomain);
+      await encoder.signEncodeTrade(
+        uselessOrder,
+        traders[0],
+        SigningScheme.EIP712,
+      );
+
+      if (extraInteraction !== undefined) {
+        encoder.encodeInteraction(extraInteraction);
+      }
+
+      return encoder.encodeSingleTradeSettlement([]);
+    };
+
+    it("emits a Settlement event", async () => {
+      await authenticator.connect(owner).addSolver(solver.address);
+      await expect(
+        settlement
+          .connect(solver)
+          .settleSingleTrade(...(await emptySingleTradeSettlement())),
+      )
+        .to.emit(settlement, "Settlement")
+        .withArgs(solver.address);
+    });
+
+    it("rejects transactions from non-solvers", async () => {
+      await expect(
+        settlement.settleSingleTrade(...(await emptySingleTradeSettlement())),
+      ).to.be.revertedWith("not a solver");
+    });
+
+    it("rejects reentrancy attempts via interactions", async () => {
+      await authenticator.connect(owner).addSolver(solver.address);
+
+      await expect(
+        settlement.connect(solver).settleSingleTrade(
+          ...(await emptySingleTradeSettlement({
+            target: settlement.address,
+            callData: settlement.interface.encodeFunctionData(
+              "settleSingleTrade",
+              await emptySingleTradeSettlement(),
+            ),
+          })),
+        ),
+      ).to.be.revertedWith("reentrant call");
+    });
+
+    it("rejects reentrancy attempts to full settlement function", async () => {
+      await authenticator.connect(owner).addSolver(solver.address);
+
+      const emptySettlement = new SettlementEncoder(
+        testDomain,
+      ).encodedSettlement({});
+      await expect(
+        settlement.connect(solver).settleSingleTrade(
+          ...(await emptySingleTradeSettlement({
+            target: settlement.address,
+            callData: settlement.interface.encodeFunctionData(
+              "settle",
+              emptySettlement,
+            ),
+          })),
+        ),
+      ).to.be.revertedWith("reentrant call");
     });
   });
 
@@ -1019,7 +1111,6 @@ describe("GPv2Settlement", () => {
         feeDiscount,
         executedAmount: ethers.constants.Zero,
       });
-      const [trade] = encoder.trades;
 
       await sellToken.mock.transferFrom
         .withArgs(trader.address, transferTarget.address, transferOutAmount)
@@ -1034,21 +1125,16 @@ describe("GPv2Settlement", () => {
       };
 
       // NOTE: Use an interaction to update the mock balance contract.
-      const interaction = {
+      encoder.encodeInteraction({
         target: buyToken.address,
         value: 0,
         callData: buyToken.interface.encodeFunctionData("setBalanceOf", [
           receiver,
           initialBalance.add(receiverBalanceIncreaseAmount),
         ]),
-      };
+      });
 
-      return [
-        encoder.tokens,
-        trade,
-        [transfer],
-        normalizeInteractions([interaction]),
-      ];
+      return encoder.encodeSingleTradeSettlement([transfer]);
     };
 
     describe("Trade event", () => {
