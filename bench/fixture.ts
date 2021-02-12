@@ -75,6 +75,7 @@ export interface SettlementOptions {
 
 export interface SingleTradeSettlementOptions {
   includeFees: boolean;
+  refunds: number;
 }
 
 export class BenchFixture {
@@ -341,6 +342,7 @@ export class BenchFixture {
 
   public async settleOrder({
     includeFees,
+    refunds,
   }: SingleTradeSettlementOptions): Promise<ContractReceipt> {
     const {
       deployment: { settlement },
@@ -381,6 +383,18 @@ export class BenchFixture {
         "0x",
       ]),
     });
+
+    for (let i = 0; i < refunds; i++) {
+      const key = (i + 1).toString(16).padStart(2, "0");
+      const orderUid = packOrderUidParams({
+        orderDigest: `0x${key.repeat(32)}`,
+        owner: trader.address,
+        validTo: 0,
+      });
+
+      await settlement.connect(trader).invalidateOrder(orderUid);
+      encoder.encodeOrderRefunds({ filledAmounts: [orderUid] });
+    }
 
     const transfers = [
       {

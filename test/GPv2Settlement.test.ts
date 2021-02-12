@@ -4,6 +4,7 @@ import { MockContract } from "ethereum-waffle";
 import {
   BigNumber,
   BigNumberish,
+  BytesLike,
   Contract,
   ContractReceipt,
   Event,
@@ -280,6 +281,7 @@ describe("GPv2Settlement", () => {
 
     const emptySingleTradeSettlement = async (
       extraInteraction?: InteractionLike,
+      filledAmountRefunds?: BytesLike[],
     ): Promise<EncodedSingleTradeSettlement> => {
       const uselessOrder = {
         kind: OrderKind.SELL,
@@ -303,6 +305,7 @@ describe("GPv2Settlement", () => {
       if (extraInteraction !== undefined) {
         encoder.encodeInteraction(extraInteraction);
       }
+      encoder.encodeOrderRefunds({ filledAmounts: filledAmountRefunds });
 
       return encoder.encodeSingleTradeSettlement([]);
     };
@@ -357,6 +360,36 @@ describe("GPv2Settlement", () => {
           })),
         ),
       ).to.be.revertedWith("reentrant call");
+    });
+
+    it("frees filled amount storage for gas refunds", async () => {
+      await authenticator.connect(owner).addSolver(solver.address);
+
+      const orderUids = [...Array(3)].map((_, i) =>
+        packOrderUidParams({
+          orderDigest: `0x${i.toString(16).padStart(2, "0").repeat(32)}`,
+          owner: traders[0].address,
+          validTo: 0,
+        }),
+      );
+      for (const orderUid of orderUids) {
+        await settlement.connect(traders[0]).invalidateOrder(orderUid);
+        expect(await settlement.filledAmount(orderUid)).to.not.equal(
+          ethers.constants.Zero,
+        );
+      }
+
+      await settlement
+        .connect(solver)
+        .settleSingleTrade(
+          ...(await emptySingleTradeSettlement(undefined, orderUids)),
+        );
+
+      for (const orderUid of orderUids) {
+        expect(await settlement.filledAmount(orderUid)).to.equal(
+          ethers.constants.Zero,
+        );
+      }
     });
   });
 
@@ -1089,10 +1122,17 @@ describe("GPv2Settlement", () => {
       feeDiscount: BigNumberish;
     }
 
+    type ExecuteSingleTradeParameters = [
+      string[],
+      Trade,
+      Transfer[],
+      Interaction[],
+    ];
+
     const prepareTrade = async (
       order: Order,
       execution?: Partial<SingleTradeExecution>,
-    ): Promise<[string[], Trade, Transfer[], Interaction[]]> => {
+    ): Promise<ExecuteSingleTradeParameters> => {
       const receiver = order.receiver ?? trader.address;
 
       const {
@@ -1134,7 +1174,9 @@ describe("GPv2Settlement", () => {
         ]),
       });
 
-      return encoder.encodeSingleTradeSettlement([transfer]);
+      return encoder
+        .encodeSingleTradeSettlement([transfer])
+        .slice(0, 4) as ExecuteSingleTradeParameters;
     };
 
     describe("Trade event", () => {

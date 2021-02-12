@@ -163,6 +163,8 @@ export type EncodedSingleTradeSettlement = [
   Transfer[],
   /** Encoded interactions for executing a single trade order. */
   Interaction[],
+  /** Encoded filled amount refunds. */
+  BytesLike[],
 ];
 
 /**
@@ -317,11 +319,11 @@ export class SettlementEncoder {
    */
   public get isSingleTradeSettlement(): boolean {
     const [preInteractions, , postInteractions] = this.interactions;
-    const { filledAmounts, preSignatures } = this.orderRefunds;
+    const { preSignatures } = this.orderRefunds;
     return (
       this.tokens.length === 2 &&
       this.trades.length === 1 &&
-      [preInteractions, postInteractions, filledAmounts, preSignatures].every(
+      [preInteractions, postInteractions, preSignatures].every(
         ({ length }) => length === 0,
       )
     );
@@ -479,6 +481,7 @@ export class SettlementEncoder {
       trade,
       transfers,
       this.interactions[InteractionStage.INTRA],
+      this.orderRefunds.filledAmounts,
     ];
   }
 
