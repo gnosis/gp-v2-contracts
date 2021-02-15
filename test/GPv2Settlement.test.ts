@@ -232,28 +232,16 @@ describe("GPv2Settlement", () => {
     it("reverts if encoded interactions has incorrect number of stages", async () => {
       await authenticator.connect(owner).addSolver(solver.address);
 
-      const [tokens, clearingPrices, trades, , encodedOrderRefunds] = empty;
+      const [tokens, clearingPrices, trades] = empty;
       await expect(
         settlement
           .connect(solver)
-          .settle([
-            tokens,
-            clearingPrices,
-            trades,
-            ["0x", "0x"],
-            encodedOrderRefunds,
-          ]),
+          .settle([tokens, clearingPrices, trades, ["0x", "0x"]]),
       ).to.be.reverted;
       await expect(
         settlement
           .connect(solver)
-          .settle([
-            tokens,
-            clearingPrices,
-            trades,
-            ["0x", "0x", "0x", "0x"],
-            encodedOrderRefunds,
-          ]),
+          .settle([tokens, clearingPrices, trades, ["0x", "0x", "0x", "0x"]]),
       ).to.be.reverted;
     });
   });
