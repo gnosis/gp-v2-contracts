@@ -332,7 +332,11 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     ) internal {
         GPv2Order.Data memory order = recoveredOrder.data;
         bytes memory orderUid = recoveredOrder.uid;
-        uint256 executedFeeAmount = order.feeAmount.sub(feeDiscount);
+        uint256 executedFeeAmount =
+            order.feeAmount.sub(feeDiscount, "GPv2: fee discount too high");
+
+        // solhint-disable-next-line not-rely-on-time
+        require(order.validTo >= block.timestamp, "GPv2: order expired");
 
         uint256 executedSellAmount;
         uint256 executedBuyAmount;
@@ -353,8 +357,6 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
             );
         }
 
-        // solhint-disable-next-line not-rely-on-time
-        require(order.validTo >= block.timestamp, "GPv2: order expired");
         require(filledAmount[orderUid] == 0, "GPv2: order filled");
         if (order.kind == GPv2Order.SELL) {
             filledAmount[orderUid] = order.sellAmount;

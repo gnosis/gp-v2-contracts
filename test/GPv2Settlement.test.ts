@@ -955,41 +955,80 @@ describe("GPv2Settlement", () => {
       ];
     };
 
-    it("emits a Trade event", async () => {
-      await authenticator.connect(owner).addSolver(solver.address);
+    describe("Trade event", () => {
+      it("has correct executed amounts for a sell order", async () => {
+        await authenticator.connect(owner).addSolver(solver.address);
 
-      const feeAmount = ethers.utils.parseEther("0.01");
-      const executedFeeAmount = ethers.utils.parseEther("0.0042");
+        const feeAmount = ethers.utils.parseEther("0.01");
+        const executedFeeAmount = ethers.utils.parseEther("0.0042");
 
-      const order = prepareOrder({
-        kind: OrderKind.SELL,
-        partiallyFillable: true,
-        feeAmount,
+        const order = prepareOrder({
+          kind: OrderKind.SELL,
+          partiallyFillable: true,
+          feeAmount,
+        });
+        const executedSellAmount = executedFeeAmount.add(order.sellAmount);
+        const executedBuyAmount = ethers.utils
+          .parseEther("0.1134")
+          .add(order.buyAmount);
+
+        await expect(
+          settlement.connect(solver).executeSingleTradeTest(
+            ...(await prepareTrade(order, {
+              transferOutAmount: executedSellAmount,
+              receiverBalanceIncreaseAmount: executedBuyAmount,
+              feeDiscount: feeAmount.sub(executedFeeAmount),
+            })),
+          ),
+        )
+          .to.emit(settlement, "Trade")
+          .withArgs(
+            trader.address,
+            sellToken.address,
+            buyToken.address,
+            executedSellAmount,
+            executedBuyAmount,
+            executedFeeAmount,
+            computeOrderUid(testDomain, order, trader.address),
+          );
       });
-      const executedSellAmount = executedFeeAmount.add(order.sellAmount);
-      const executedBuyAmount = ethers.utils
-        .parseEther("0.1134")
-        .add(order.buyAmount);
 
-      await expect(
-        settlement.connect(solver).executeSingleTradeTest(
-          ...(await prepareTrade(order, {
-            transferOutAmount: executedSellAmount,
-            receiverBalanceIncreaseAmount: executedBuyAmount,
-            feeDiscount: feeAmount.sub(executedFeeAmount),
-          })),
-        ),
-      )
-        .to.emit(settlement, "Trade")
-        .withArgs(
-          trader.address,
-          sellToken.address,
-          buyToken.address,
-          executedSellAmount,
-          executedBuyAmount,
-          executedFeeAmount,
-          computeOrderUid(testDomain, order, trader.address),
-        );
+      it("has correct executed amounts for a buy order", async () => {
+        await authenticator.connect(owner).addSolver(solver.address);
+
+        const feeAmount = ethers.utils.parseEther("0.01");
+        const executedFeeAmount = ethers.utils.parseEther("0.0042");
+
+        const order = prepareOrder({
+          kind: OrderKind.BUY,
+          partiallyFillable: true,
+          feeAmount,
+        });
+        const executedSellAmount = executedFeeAmount
+          .add(order.sellAmount)
+          .sub(ethers.utils.parseEther("0.1134"));
+        const executedBuyAmount = order.buyAmount;
+
+        await expect(
+          settlement.connect(solver).executeSingleTradeTest(
+            ...(await prepareTrade(order, {
+              transferOutAmount: executedSellAmount,
+              receiverBalanceIncreaseAmount: executedBuyAmount,
+              feeDiscount: feeAmount.sub(executedFeeAmount),
+            })),
+          ),
+        )
+          .to.emit(settlement, "Trade")
+          .withArgs(
+            trader.address,
+            sellToken.address,
+            buyToken.address,
+            executedSellAmount,
+            executedBuyAmount,
+            executedFeeAmount,
+            computeOrderUid(testDomain, order, trader.address),
+          );
+      });
     });
 
     describe("Order Variants", () => {
@@ -1147,6 +1186,24 @@ describe("GPv2Settlement", () => {
           computeOrderUid(testDomain, order, trader.address),
         ),
       ).to.equal(order.sellAmount);
+    });
+
+    it("reverts when fee discount is too high", async () => {
+      const feeAmount = ethers.utils.parseEther("0.01");
+      const order = prepareOrder({
+        kind: OrderKind.BUY,
+        partiallyFillable: true,
+        feeAmount,
+      });
+
+      await authenticator.connect(owner).addSolver(solver.address);
+      await expect(
+        settlement.connect(solver).executeSingleTradeTest(
+          ...(await prepareTrade(order, {
+            feeDiscount: feeAmount.add(1),
+          })),
+        ),
+      ).to.be.revertedWith("fee discount too high");
     });
   });
 
