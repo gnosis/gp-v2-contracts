@@ -17,6 +17,7 @@ abstract contract GPv2Signing {
         GPv2Order.Data data;
         bytes uid;
         address owner;
+        address receiver;
     }
 
     /// @dev Signing scheme used for recovery.
@@ -124,6 +125,7 @@ abstract contract GPv2Signing {
             order.validTo
         );
         recoveredOrder.owner = owner;
+        recoveredOrder.receiver = order.actualReceiver(owner);
     }
 
     /// @dev The length of any signature from an externally owned account.

@@ -1130,7 +1130,7 @@ describe("GPv2Settlement", () => {
           encodeOutTransfers([
             {
               owner: traders[0].address,
-              receiver: ethers.constants.AddressZero,
+              receiver: traders[0].address,
               buyToken: tokens[0].address,
               buyAmount: amount,
             },
