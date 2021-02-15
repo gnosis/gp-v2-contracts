@@ -7,27 +7,35 @@ async function main() {
 
   const pad = (x: unknown) => ` ${x} `.padStart(14);
   console.log(chalk.bold("=== Single Order Gas Benchmarks ==="));
-  console.log(chalk.gray("--------------+--------------"));
+  console.log(chalk.gray("--------------+--------------+--------------"));
   console.log(
-    ["settlement", "gas"]
+    ["settlement", "include fees", "gas"]
       .map((header) => chalk.cyan(pad(header)))
       .join(chalk.gray("|")),
   );
-  console.log(chalk.gray("--------------+--------------"));
-  for (const [kind, { gasUsed }] of [
-    [
-      "standard",
-      await fixture.settle({
-        tokens: 2,
-        trades: 1,
-        interactions: 1,
-        refunds: 0,
-      }),
-    ],
-    ["single", await fixture.settleOrder()],
+  console.log(chalk.gray("--------------+--------------+--------------"));
+  for (const [kind, includeFees] of [
+    ["standard", undefined],
+    ["single", true],
+    ["single", false],
   ] as const) {
+    const { gasUsed } =
+      kind === "standard"
+        ? await fixture.settle({
+            tokens: 2,
+            trades: 1,
+            interactions: 1,
+            refunds: 0,
+          })
+        : await fixture.settleOrder({
+            includeFees: includeFees === true,
+          });
+
     console.log(
-      [pad(kind), chalk.yellow(pad(gasUsed.toString()))].join(chalk.gray("|")),
+      [
+        ...[kind, includeFees ?? "-"].map(pad),
+        chalk.yellow(pad(gasUsed.toString())),
+      ].join(chalk.gray("|")),
     );
   }
 }

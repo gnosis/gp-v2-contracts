@@ -73,6 +73,10 @@ export interface SettlementOptions {
   refunds: number;
 }
 
+export interface SingleTradeSettlementOptions {
+  includeFees: boolean;
+}
+
 export class BenchFixture {
   private _nonce = 0;
 
@@ -335,7 +339,9 @@ export class BenchFixture {
     return await transaction.wait();
   }
 
-  public async settleOrder(): Promise<ContractReceipt> {
+  public async settleOrder({
+    includeFees,
+  }: SingleTradeSettlementOptions): Promise<ContractReceipt> {
     const {
       deployment: { settlement },
       domainSeparator,
@@ -363,7 +369,7 @@ export class BenchFixture {
 
     const encoder = new SettlementEncoder(domainSeparator);
     await encoder.signEncodeTrade(order, trader, SigningScheme.EIP712, {
-      feeDiscount: order.feeAmount,
+      feeDiscount: includeFees ? 0 : order.feeAmount,
     });
     encoder.encodeInteraction({
       target: uniswapPair.address,
@@ -376,14 +382,22 @@ export class BenchFixture {
       ]),
     });
 
-    const transaction = await settlement.connect(solver).settleSingleTrade(
-      ...encoder.encodeSingleTradeSettlement([
-        {
-          target: uniswapPair.address,
-          amount: order.sellAmount,
-        },
-      ]),
-    );
+    const transfers = [
+      {
+        target: uniswapPair.address,
+        amount: order.sellAmount,
+      },
+    ];
+    if (includeFees) {
+      transfers.push({
+        target: settlement.address,
+        amount: order.feeAmount,
+      });
+    }
+
+    const transaction = await settlement
+      .connect(solver)
+      .settleSingleTrade(...encoder.encodeSingleTradeSettlement(transfers));
     return await transaction.wait();
   }
 }
