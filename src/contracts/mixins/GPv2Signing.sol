@@ -51,6 +51,10 @@ abstract contract GPv2Signing {
     /// particular address.
     mapping(bytes => uint256) public preSignature;
 
+    /// @dev Event that is emitted when an account either pre-signs an order or
+    /// revokes an existing pre-signature.
+    event PreSignature(address indexed owner, bytes orderUid, bool signed);
+
     constructor() {
         // NOTE: Currently, the only way to get the chain ID in solidity is
         // using assembly.
@@ -82,6 +86,7 @@ abstract contract GPv2Signing {
         } else {
             preSignature[orderUid] = 0;
         }
+        emit PreSignature(owner, orderUid, signed);
     }
 
     /// @dev Returns an empty recovered order with a pre-allocated buffer for
@@ -145,7 +150,8 @@ abstract contract GPv2Signing {
             owner = recoverEthsignSigner(orderDigest, signature);
         } else if (signingScheme == Scheme.Eip1271) {
             owner = recoverEip1271Signer(orderDigest, signature);
-        } else if (signingScheme == Scheme.PreSign) {
+        } else {
+            // signingScheme == Scheme.PreSign
             owner = recoverPreSigner(orderDigest, signature, order.validTo);
         }
     }
