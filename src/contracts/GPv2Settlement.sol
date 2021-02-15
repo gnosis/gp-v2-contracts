@@ -137,6 +137,41 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         emit Settlement(msg.sender);
     }
 
+    /// @dev Settle a single trade directly with on-chain liquidity. This
+    /// function is provided as a "fast-path" for settlements without any
+    /// coincidence of wants.
+    ///
+    /// This type of settlement always assumes the order will be filled in full,
+    /// and while it does accept partially fillable orders, they must have no
+    /// prior filled amount, and will be executed in full. As such, the trade's
+    /// `executedAmount` is ignored.
+    ///
+    /// @param tokens An array of ERC20 tokens to be traded in the settlement.
+    /// Trades encode tokens as indices into this array.
+    /// @param trade The trade for the single signed order to settle.
+    /// @param transfers Direct transfers of user funds to execute in order to
+    /// interact with on-chain liquidity.
+    /// @param interactions Smart contract interactions to perform with executed
+    /// sell amount of the order.
+    function settleSingleTrade(
+        IERC20[] calldata tokens,
+        GPv2Trade.Data calldata trade,
+        GPv2AllowanceManager.Transfer[] calldata transfers,
+        GPv2Interaction.Data[] calldata interactions
+    ) external nonReentrant onlySolver {
+        RecoveredOrder memory recoveredOrder = allocateRecoveredOrder();
+        recoverOrderFromTrade(recoveredOrder, tokens, trade);
+
+        executeSingleTrade(
+            recoveredOrder,
+            transfers,
+            interactions,
+            trade.feeDiscount
+        );
+
+        emit Settlement(msg.sender);
+    }
+
     /// @dev Invalidate onchain an order that has been signed offline.
     ///
     /// @param orderUid The unique identifier of the order that is to be made
