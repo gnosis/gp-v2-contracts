@@ -310,14 +310,94 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         );
     }
 
+    /// @dev Executes a single trade on-chain by performing the specified
+    /// transfers and interactions. This function is used as part of the
+    /// "fast-path" for settling single trades against on-chain liquidity.
+    ///
+    /// This method computes the executed sell amount from the total transfer
+    /// amount and the executed buy amount by reading the receiver's balance
+    /// before and after the execution.
+    ///
+    /// @param recoveredOrder The recovered order to execute.
+    /// @param transfers Direct transfers of user funds to permorm for executing
+    /// this order.
+    /// @param interactions Smart contract interaction to perform with the
+    /// transferred user funds.
+    /// @param feeDiscount The discount applied to the final executed fees.
+    function executeSingleTrade(
+        RecoveredOrder memory recoveredOrder,
+        GPv2AllowanceManager.Transfer[] calldata transfers,
+        GPv2Interaction.Data[] calldata interactions,
+        uint256 feeDiscount
+    ) internal {
+        GPv2Order.Data memory order = recoveredOrder.data;
+        bytes memory orderUid = recoveredOrder.uid;
+        uint256 executedFeeAmount =
+            order.feeAmount.sub(feeDiscount, "GPv2: fee discount too high");
+
+        // solhint-disable-next-line not-rely-on-time
+        require(order.validTo >= block.timestamp, "GPv2: order expired");
+
+        uint256 executedSellAmount;
+        uint256 executedBuyAmount;
+        {
+            address receiver = recoveredOrder.receiver;
+            uint256 startingBalance = order.buyToken.balanceOf(receiver);
+
+            executedSellAmount = allowanceManager.transferToTargets(
+                order.sellToken,
+                recoveredOrder.owner,
+                transfers
+            );
+
+            executeInteractions(interactions);
+
+            executedBuyAmount = order.buyToken.balanceOf(receiver).sub(
+                startingBalance
+            );
+        }
+
+        require(filledAmount[orderUid] == 0, "GPv2: order filled");
+        if (order.kind == GPv2Order.SELL) {
+            filledAmount[orderUid] = order.sellAmount;
+            require(
+                executedSellAmount == order.sellAmount.add(executedFeeAmount),
+                "GPv2: invalid sell amount"
+            );
+            require(
+                executedBuyAmount >= order.buyAmount,
+                "GPv2: buy amount too low"
+            );
+        } else {
+            filledAmount[orderUid] = order.buyAmount;
+            require(
+                executedSellAmount <= order.sellAmount.add(executedFeeAmount),
+                "GPv2: sell amount too high"
+            );
+            require(
+                executedBuyAmount == order.buyAmount,
+                "GPv2: invalid buy amount"
+            );
+        }
+
+        emit Trade(
+            recoveredOrder.owner,
+            order.sellToken,
+            order.buyToken,
+            executedSellAmount,
+            executedBuyAmount,
+            executedFeeAmount,
+            orderUid
+        );
+    }
+
     /// @dev Execute a list of arbitrary contract calls from this contract.
     /// @param interactions The list of interactions to execute.
     function executeInteractions(GPv2Interaction.Data[] calldata interactions)
         internal
     {
-        GPv2Interaction.Data calldata interaction;
         for (uint256 i; i < interactions.length; i++) {
-            interaction = interactions[i];
+            GPv2Interaction.Data calldata interaction = interactions[i];
 
             // To prevent possible attack on user funds, we explicitly disable
             // any interactions with AllowanceManager contract.
