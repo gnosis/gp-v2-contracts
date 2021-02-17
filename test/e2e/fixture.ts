@@ -57,25 +57,27 @@ export const deployTestContracts: () => Promise<TestDeployment> = deployments.cr
   },
 );
 
+const CHI_TOKEN_DEPLOYER = "0x7E1E3334130355799F833ffec2D731BCa3E68aF6";
+
 async function deployGasToken(deployer: Wallet) {
   // Deploy ChiToken with original creator account so that deployed address is same as on mainnet
   // Otherwise, the selfdestruct logic will not work as it hard-codes the ChiToken address.
   await network.provider.request({
     method: "hardhat_impersonateAccount",
-    params: ["0x7E1E3334130355799F833ffec2D731BCa3E68aF6"],
+    params: [CHI_TOKEN_DEPLOYER],
   });
-  const signer = ethers.provider.getSigner(
-    "0x7E1E3334130355799F833ffec2D731BCa3E68aF6",
+  const chi_token_deployer = ethers.provider.getSigner(
+    CHI_TOKEN_DEPLOYER,
   );
   await deployer.sendTransaction({
-    to: "0x7E1E3334130355799F833ffec2D731BCa3E68aF6",
+    to: CHI_TOKEN_DEPLOYER,
     value: ethers.utils.parseEther("1.0"),
   });
-  const ChiToken = await ethers.getContractFactory("ChiToken", signer);
+  const ChiToken = await ethers.getContractFactory("ChiToken", chi_token_deployer);
   const chiToken = await ChiToken.deploy();
   await network.provider.request({
     method: "hardhat_stopImpersonatingAccount",
-    params: ["0x7E1E3334130355799F833ffec2D731BCa3E68aF6"],
+    params: [CHI_TOKEN_DEPLOYER],
   });
   return chiToken;
 }
