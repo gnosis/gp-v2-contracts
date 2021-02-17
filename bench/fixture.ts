@@ -71,10 +71,12 @@ export interface SettlementOptions {
   trades: number;
   interactions: number;
   refunds: number;
+  gasToken: number;
 }
 
 export interface SingleTradeSettlementOptions {
   includeFees: boolean;
+  gasToken: number;
 }
 
 export class BenchFixture {
@@ -171,7 +173,7 @@ export class BenchFixture {
     debug(`running fixture with ${JSON.stringify(options)}`);
 
     const {
-      deployment: { settlement },
+      deployment: { settlement, gasToken },
       domainSeparator,
       solver,
       tokens,
@@ -323,6 +325,16 @@ export class BenchFixture {
       }
     }
 
+    if (options.gasToken > 0) {
+      debug(`encoding ${options.gasToken} gasToken burns`);
+      await gasToken.connect(solver).mint(options.gasToken);
+      await gasToken.connect(solver).transfer(settlement.address, options.gasToken);
+      encoder.encodeInteraction({
+        target: gasToken.address,
+        callData: gasToken.interface.encodeFunctionData("free", [options.gasToken])
+      })
+    }
+
     const prices = tokens.instances.slice(0, options.tokens).reduce(
       (prices, token) => ({
         ...prices,
@@ -339,11 +351,9 @@ export class BenchFixture {
     return await transaction.wait();
   }
 
-  public async settleOrder({
-    includeFees,
-  }: SingleTradeSettlementOptions): Promise<ContractReceipt> {
+  public async settleOrder(options: SingleTradeSettlementOptions): Promise<ContractReceipt> {
     const {
-      deployment: { settlement },
+      deployment: { settlement, gasToken },
       domainSeparator,
       solver,
       traders: [trader],
@@ -369,7 +379,7 @@ export class BenchFixture {
 
     const encoder = new SettlementEncoder(domainSeparator);
     await encoder.signEncodeTrade(order, trader, SigningScheme.EIP712, {
-      feeDiscount: includeFees ? 0 : order.feeAmount,
+      feeDiscount: options.includeFees ? 0 : order.feeAmount,
     });
     encoder.encodeInteraction({
       target: uniswapPair.address,
@@ -388,11 +398,20 @@ export class BenchFixture {
         amount: order.sellAmount,
       },
     ];
-    if (includeFees) {
+    if (options.includeFees) {
       transfers.push({
         target: settlement.address,
         amount: order.feeAmount,
       });
+    }
+
+    if (options.gasToken > 0) {
+      await gasToken.connect(solver).mint(options.gasToken);
+      await gasToken.connect(solver).transfer(settlement.address, options.gasToken);
+      encoder.encodeInteraction({
+        target: gasToken.address,
+        callData: gasToken.interface.encodeFunctionData("free", [options.gasToken])
+      })
     }
 
     const transaction = await settlement
