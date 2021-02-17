@@ -66,14 +66,15 @@ async function deployGasToken(deployer: Wallet) {
     method: "hardhat_impersonateAccount",
     params: [CHI_TOKEN_DEPLOYER],
   });
-  const chi_token_deployer = ethers.provider.getSigner(
-    CHI_TOKEN_DEPLOYER,
-  );
+  const chi_token_deployer = ethers.provider.getSigner(CHI_TOKEN_DEPLOYER);
   await deployer.sendTransaction({
     to: CHI_TOKEN_DEPLOYER,
     value: ethers.utils.parseEther("1.0"),
   });
-  const ChiToken = await ethers.getContractFactory("ChiToken", chi_token_deployer);
+  const ChiToken = await ethers.getContractFactory(
+    "ChiToken",
+    chi_token_deployer,
+  );
   const chiToken = await ChiToken.deploy();
   await network.provider.request({
     method: "hardhat_stopImpersonatingAccount",
