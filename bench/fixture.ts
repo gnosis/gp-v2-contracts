@@ -327,10 +327,12 @@ export class BenchFixture {
 
     if (options.gasToken > 0) {
       debug(`encoding ${options.gasToken} gasToken burns`);
-      await gasToken.connect(solver).mint(options.gasToken);
+
+      // Create more gas tokens than needed as otherwise we might get extra storage refunds which may skew benchmarks
+      await gasToken.connect(solver).mint(options.gasToken + 10);
       await gasToken
         .connect(solver)
-        .transfer(settlement.address, options.gasToken);
+        .transfer(settlement.address, options.gasToken + 10);
       encoder.encodeInteraction({
         target: gasToken.address,
         callData: gasToken.interface.encodeFunctionData("free", [
@@ -412,10 +414,11 @@ export class BenchFixture {
     }
 
     if (options.gasToken > 0) {
-      await gasToken.connect(solver).mint(options.gasToken);
+      // Create more gas tokens than needed as otherwise we might get extra storage refunds which may skew benchmarks
+      await gasToken.connect(solver).mint(options.gasToken + 10);
       await gasToken
         .connect(solver)
-        .transfer(settlement.address, options.gasToken);
+        .transfer(settlement.address, options.gasToken + 10);
       encoder.encodeInteraction({
         target: gasToken.address,
         callData: gasToken.interface.encodeFunctionData("free", [
