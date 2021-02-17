@@ -18,6 +18,7 @@ async function main() {
     trades: 6,
     interactions: 2,
     refunds: 3,
+    gasToken: 0,
   });
   const trace = getLastTrace(fixture.settlement.interface.getSighash("settle"));
   if (!trace) {

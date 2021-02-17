@@ -328,11 +328,15 @@ export class BenchFixture {
     if (options.gasToken > 0) {
       debug(`encoding ${options.gasToken} gasToken burns`);
       await gasToken.connect(solver).mint(options.gasToken);
-      await gasToken.connect(solver).transfer(settlement.address, options.gasToken);
+      await gasToken
+        .connect(solver)
+        .transfer(settlement.address, options.gasToken);
       encoder.encodeInteraction({
         target: gasToken.address,
-        callData: gasToken.interface.encodeFunctionData("free", [options.gasToken])
-      })
+        callData: gasToken.interface.encodeFunctionData("free", [
+          options.gasToken,
+        ]),
+      });
     }
 
     const prices = tokens.instances.slice(0, options.tokens).reduce(
@@ -351,7 +355,9 @@ export class BenchFixture {
     return await transaction.wait();
   }
 
-  public async settleOrder(options: SingleTradeSettlementOptions): Promise<ContractReceipt> {
+  public async settleOrder(
+    options: SingleTradeSettlementOptions,
+  ): Promise<ContractReceipt> {
     const {
       deployment: { settlement, gasToken },
       domainSeparator,
@@ -407,11 +413,15 @@ export class BenchFixture {
 
     if (options.gasToken > 0) {
       await gasToken.connect(solver).mint(options.gasToken);
-      await gasToken.connect(solver).transfer(settlement.address, options.gasToken);
+      await gasToken
+        .connect(solver)
+        .transfer(settlement.address, options.gasToken);
       encoder.encodeInteraction({
         target: gasToken.address,
-        callData: gasToken.interface.encodeFunctionData("free", [options.gasToken])
-      })
+        callData: gasToken.interface.encodeFunctionData("free", [
+          options.gasToken,
+        ]),
+      });
     }
 
     const transaction = await settlement
