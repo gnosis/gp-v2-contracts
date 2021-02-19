@@ -63,6 +63,7 @@ async function main() {
       trades,
       interactions,
       refunds,
+      gasToken: 0,
     });
 
     console.log(
