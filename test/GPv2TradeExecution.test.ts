@@ -7,8 +7,6 @@ import { BUY_ETH_ADDRESS } from "../src/ts";
 
 import { NON_STANDARD_ERC20 } from "./ERC20";
 
-const RECEIVER_SAME_AS_OWNER = ethers.constants.AddressZero;
-
 describe("GPv2TradeExecution", () => {
   const [deployer, recipient, ...traders] = waffle.provider.getWallets();
 
@@ -175,7 +173,7 @@ describe("GPv2TradeExecution", () => {
       ).to.not.be.reverted;
     });
 
-    it("should transfer buy amount to owner when receiver is not set", async () => {
+    it("should allow receiver to be same as the owner", async () => {
       const amount = ethers.utils.parseEther("13.37");
 
       const buyToken = await waffle.deployMockContract(deployer, IERC20.abi);
@@ -186,7 +184,7 @@ describe("GPv2TradeExecution", () => {
       await expect(
         tradeExecution.transferBuyAmountToOwnerTest({
           owner: traders[0].address,
-          receiver: RECEIVER_SAME_AS_OWNER,
+          receiver: traders[0].address,
           buyToken: buyToken.address,
           buyAmount: amount,
           ...withoutSell,
@@ -205,7 +203,7 @@ describe("GPv2TradeExecution", () => {
       await expect(
         tradeExecution.transferBuyAmountToOwnerTest({
           owner: traders[0].address,
-          receiver: RECEIVER_SAME_AS_OWNER,
+          receiver: traders[0].address,
           buyToken: buyToken.address,
           buyAmount: amount,
           ...withoutSell,
@@ -217,7 +215,7 @@ describe("GPv2TradeExecution", () => {
       await expect(
         tradeExecution.transferBuyAmountToOwnerTest({
           owner: traders[0].address,
-          receiver: RECEIVER_SAME_AS_OWNER,
+          receiver: traders[0].address,
           buyToken: traders[1].address,
           buyAmount: ethers.utils.parseEther("1.0"),
           ...withoutSell,
@@ -260,7 +258,7 @@ describe("GPv2TradeExecution", () => {
 
       await tradeExecution.transferBuyAmountToOwnerTest({
         owner: traders[0].address,
-        receiver: RECEIVER_SAME_AS_OWNER,
+        receiver: traders[0].address,
         buyToken: BUY_ETH_ADDRESS,
         buyAmount: amount,
         ...withoutSell,
@@ -286,7 +284,7 @@ describe("GPv2TradeExecution", () => {
         await expect(
           tradeExecution.transferBuyAmountToOwnerTest({
             owner: traders[0].address,
-            receiver: RECEIVER_SAME_AS_OWNER,
+            receiver: traders[0].address,
             buyToken: buyToken.address,
             buyAmount: amount,
             ...withoutSell,
@@ -305,7 +303,7 @@ describe("GPv2TradeExecution", () => {
         await expect(
           tradeExecution.transferBuyAmountToOwnerTest({
             owner: traders[0].address,
-            receiver: RECEIVER_SAME_AS_OWNER,
+            receiver: traders[0].address,
             buyToken: buyToken.address,
             buyAmount: amount,
             ...withoutSell,
