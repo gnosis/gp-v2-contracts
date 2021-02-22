@@ -81,7 +81,7 @@ yarn verify --network $NETWORK
 
 This package additionally contains a `networks.json` file at the root with the address of each deployed contract as well the hash of the Ethereum transaction used to create the contract.
 
-## Test coverage
+## Test coverage [![Coverage Status](https://coveralls.io/repos/github/gnosis/gp-v2-contracts/badge.svg?branch=main)](https://coveralls.io/github/gnosis/gp-v2-contracts?branch=main)
 
 Test coverage can be checked with the command
 
