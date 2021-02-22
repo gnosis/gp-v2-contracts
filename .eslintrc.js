@@ -15,7 +15,6 @@ module.exports = {
     "plugin:import/typescript",
     "plugin:@typescript-eslint/recommended",
     "plugin:prettier/recommended",
-    "prettier/@typescript-eslint",
   ],
   ignorePatterns: ["build/", "node_modules/", "!.prettierrc.js", "lib/"],
   rules: {
