@@ -2,7 +2,7 @@ name: Node.js CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
 
 jobs:
@@ -28,4 +28,9 @@ jobs:
       - run: yarn --frozen-lockfile
       - run: yarn build
       - run: yarn lint
-      - run: yarn test
+      - run: yarn coverage
+      - run: yarn test:ignored-in-coverage
+      - name: Coveralls
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,6 +1,8 @@
 build/
+coverage/
 deployments/*/solcInputs
-node_modules/
 lib/
+node_modules/
+coverage.json
 yarn-error.log
 *.tgz
