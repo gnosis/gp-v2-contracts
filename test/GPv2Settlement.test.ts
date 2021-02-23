@@ -1387,6 +1387,74 @@ describe("GPv2Settlement", () => {
         ),
       ).to.be.revertedWith("fee discount too high");
     });
+
+    it("reverts if order was invalidated by the user", async () => {
+      const order = prepareOrder({
+        kind: OrderKind.SELL,
+        partiallyFillable: false,
+      });
+      const orderUid = computeOrderUid(testDomain, order, trader.address);
+
+      await settlement.connect(trader).invalidateOrder(orderUid);
+
+      await authenticator.connect(owner).addSolver(solver.address);
+      await expect(
+        settlement
+          .connect(solver)
+          .executeSingleTradeTest(...(await prepareTrade(order))),
+      ).to.be.revertedWith("order filled");
+    });
+
+    it("reverts if order was already partially filled", async () => {
+      const order = prepareOrder({
+        kind: OrderKind.SELL,
+        partiallyFillable: true,
+      });
+      const prices = {
+        [order.sellToken]: order.buyAmount,
+        [order.buyToken]: order.sellAmount,
+      };
+      const orderUid = computeOrderUid(testDomain, order, trader.address);
+
+      const encoder = new SettlementEncoder(testDomain);
+      const executedSellAmount = BigNumber.from(1);
+      await encoder.signEncodeTrade(order, traders[0], SigningScheme.EIP712, {
+        executedAmount: executedSellAmount,
+      });
+
+      await settlement.computeTradeExecutionsTest(
+        encoder.tokens,
+        encoder.clearingPrices(prices),
+        encoder.trades,
+      );
+      expect(await settlement.filledAmount(orderUid)).to.deep.equal(
+        executedSellAmount,
+      );
+
+      const [tokens, trade, transfers, interactions] = await prepareTrade(
+        order,
+      );
+      trade.executedAmount = BigNumber.from(order.sellAmount).sub(
+        executedSellAmount,
+      );
+      expect(trade.executedAmount).to.not.deep.equal(ethers.constants.Zero);
+
+      await authenticator.connect(owner).addSolver(solver.address);
+
+      await expect(
+        settlement.connect(solver).callStatic.computeTradeExecutionsTest(
+          tokens,
+          tokens.map((token) => prices[token]),
+          [trade],
+        ),
+      ).not.to.be.reverted;
+
+      await expect(
+        settlement
+          .connect(solver)
+          .executeSingleTradeTest(tokens, trade, transfers, interactions),
+      ).to.be.revertedWith("order filled");
+    });
   });
 
   describe("executeInteractions", () => {
