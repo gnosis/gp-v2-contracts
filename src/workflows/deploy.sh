@@ -22,18 +22,18 @@ fail_if_unset "ETHERSCAN_API_KEY"
 fail_if_unset "INFURA_KEY"
 fail_if_unset "PK"
 
-GAS_PRICE_GWEI_MAINNET="$( \
-  curl --silent "https://api.etherscan.io/api?module=gastracker&action=gasoracle&apikey=$ETHERSCAN_API_KEY" \
-    | jq -e --raw-output .result.FastGasPrice \
+GAS_PRICE_WEI_MAINNET="$( \
+  curl --silent "https://safe-relay.gnosis.io/api/v1/gas-station/" \
+    | jq -e --raw-output .fast \
 )"
-if ! [[ "$GAS_PRICE_GWEI_MAINNET" =~ ^[1-9][0-9]{1,2} ]]; then
-  echo "Invalid mainnet gas price $GAS_PRICE_GWEI_MAINNET" >&2
+if ! [[ "$GAS_PRICE_WEI_MAINNET" =~ ^[1-9][0-9]{9,11}$ ]]; then
+  echo "Invalid mainnet gas price $GAS_PRICE_WEI_MAINNET (wei)" >&2
   exit 1
 fi
 
 yarn deploy --network rinkeby --gasprice "$(gwei_to_wei 1)"
 yarn deploy --network xdai --gasprice "$(gwei_to_wei 1)"
-yarn deploy --network mainnet --gasprice "$(gwei_to_wei "$GAS_PRICE_GWEI_MAINNET")"
+yarn deploy --network mainnet --gasprice "$GAS_PRICE_WEI_MAINNET"
 
 # wait for Etherscan to register the new contracts on the blockchain
 sleep 60
