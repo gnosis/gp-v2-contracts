@@ -8,6 +8,8 @@
     "verify": "hardhat etherscan-verify --license LGPL-3.0 --force-license",
     "solvers": "hardhat solvers",
     "test": "hardhat test",
+    "test:ignored-in-coverage": "MOCHA_CONF='ignored in coverage' hardhat test",
+    "coverage": "MOCHA_CONF='coverage' hardhat coverage",
     "bench": "hardhat run bench/index.ts",
     "bench:compare": "bash bench/compare.sh",
     "bench:single": "hardhat run bench/single.ts",
@@ -56,6 +58,7 @@
     "prettier-plugin-solidity": "^1.0.0-beta.5",
     "solhint": "^3.3.2",
     "solhint-plugin-prettier": "^0.0.5",
+    "solidity-coverage": "^0.7.15",
     "ts-node": "^9.1.1",
     "typescript": "^4.1.5",
     "yargs": "^16.2.0"
