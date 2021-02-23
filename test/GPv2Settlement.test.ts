@@ -1388,6 +1388,23 @@ describe("GPv2Settlement", () => {
       ).to.be.revertedWith("fee discount too high");
     });
 
+    it("reverts if order was invalidated by the user", async () => {
+      const order = prepareOrder({
+        kind: OrderKind.SELL,
+        partiallyFillable: false,
+      });
+      const orderUid = computeOrderUid(testDomain, order, trader.address);
+
+      await settlement.connect(trader).invalidateOrder(orderUid);
+
+      await authenticator.connect(owner).addSolver(solver.address);
+      await expect(
+        settlement
+          .connect(solver)
+          .executeSingleTradeTest(...(await prepareTrade(order))),
+      ).to.be.revertedWith("order filled");
+    });
+
     it("reverts if order was already partially filled", async () => {
       const order = prepareOrder({
         kind: OrderKind.SELL,
