@@ -52,7 +52,7 @@
     "ethereum-waffle": "^3.2.2",
     "ethers": "^5.0.31",
     "hardhat": "^2.0.11",
-    "hardhat-deploy": "^0.7.0-beta.45",
+    "hardhat-deploy": "^0.7.0-beta.46",
     "hardhat-gas-reporter": "^1.0.4",
     "prettier": "^2.2.1",
     "prettier-plugin-solidity": "^1.0.0-beta.5",
