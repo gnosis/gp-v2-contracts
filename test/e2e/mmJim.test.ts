@@ -168,8 +168,6 @@ describe("E2E: The Ballad of Market Maker Jim", () => {
     expect(await gno.balanceOf(jim.address)).to.deep.equal(
       ethers.constants.Zero,
     );
-
-    // NOTE: The exchange keeps the surplus from the 0x order.
     expect(await gno.balanceOf(evilSolver.address)).to.deep.equal(
       jimOrder.gnoSellAmount.mul(2),
     );
