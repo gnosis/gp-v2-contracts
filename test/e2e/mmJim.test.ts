@@ -108,8 +108,8 @@ describe("E2E: The Ballad of Market Maker Jim", () => {
       .approve(zeroEx.erc20Proxy.address, ethers.constants.MaxUint256);
 
     // NOTE: Here, the evil solver is using its own OWL to trade with Jim on 0x.
-    // However, a slightly more sofisticated attack you use the GNO from Jim's
-    // GPv2 order to, say go to Uniswap to swap for owl. This way the evil
+    // However, a slightly more sophisticated attack you use the GNO from Jim's
+    // GPv2 order to, say, go to Uniswap to swap for owl. This way the evil
     // solver would only have to pay the spread + slippage in order to get one
     // free GNO from Jim.
     await owl.mint(evilSolverBalance.address, ethers.utils.parseEther("135.0"));
