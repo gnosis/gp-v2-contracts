@@ -45,22 +45,6 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
         }
     }
 
-    function executeSingleTradeTest(
-        IERC20[] calldata tokens,
-        GPv2Trade.Data calldata trade,
-        GPv2AllowanceManager.Transfer[] calldata transfers,
-        GPv2Interaction.Data[] calldata interactions
-    ) external {
-        RecoveredOrder memory recoveredOrder = allocateRecoveredOrder();
-        recoverOrderFromTrade(recoveredOrder, tokens, trade);
-        executeSingleTrade(
-            recoveredOrder,
-            transfers,
-            interactions,
-            trade.feeDiscount
-        );
-    }
-
     function transferOutTest(GPv2TradeExecution.Data[] memory trades) external {
         transferOut(trades);
     }

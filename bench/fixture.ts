@@ -74,11 +74,6 @@ export interface SettlementOptions {
   gasToken: number;
 }
 
-export interface SingleTradeSettlementOptions {
-  includeFees: boolean;
-  gasToken: number;
-}
-
 export class BenchFixture {
   private _nonce = 0;
 
@@ -356,84 +351,6 @@ export class BenchFixture {
       .connect(solver)
       .settle(...encoder.encodedSettlement(prices));
 
-    return await transaction.wait();
-  }
-
-  public async settleOrder(
-    options: SingleTradeSettlementOptions,
-  ): Promise<ContractReceipt> {
-    const {
-      deployment: { settlement, gasToken },
-      domainSeparator,
-      solver,
-      traders: [trader],
-      uniswapPair,
-      uniswapTokens: [sellToken, buyToken],
-    } = this;
-
-    const sellAmount = ethers.utils.parseEther("1.0");
-    const buyAmount = ethers.utils.parseEther("0.9");
-    const feeAmount = sellAmount.div(1000);
-
-    const order = {
-      sellToken: sellToken.address,
-      buyToken: buyToken.address,
-      sellAmount,
-      buyAmount,
-      validTo: 0xffffffff,
-      appData: this.nonce,
-      feeAmount,
-      kind: OrderKind.SELL,
-      partiallyFillable: false,
-    };
-
-    const encoder = new SettlementEncoder(domainSeparator);
-    await encoder.signEncodeTrade(order, trader, SigningScheme.EIP712, {
-      feeDiscount: options.includeFees ? 0 : order.feeAmount,
-    });
-    encoder.encodeInteraction({
-      target: uniswapPair.address,
-      value: 0,
-      callData: uniswapPair.interface.encodeFunctionData("swap", [
-        0,
-        buyAmount,
-        trader.address,
-        "0x",
-      ]),
-    });
-
-    const transfers = [
-      {
-        target: uniswapPair.address,
-        amount: order.sellAmount,
-      },
-    ];
-    if (options.includeFees) {
-      transfers.push({
-        target: settlement.address,
-        amount: order.feeAmount,
-      });
-    }
-
-    if (options.gasToken > 0) {
-      // Create more gas tokens than needed as otherwise we might get extra storage refunds which may skew benchmarks
-      // Also burn a few right away so that totalBurned is already initialized
-      await gasToken.connect(solver).mint(options.gasToken + 10);
-      await gasToken.connect(solver).free(5);
-      await gasToken
-        .connect(solver)
-        .transfer(settlement.address, options.gasToken + 5);
-      encoder.encodeInteraction({
-        target: gasToken.address,
-        callData: gasToken.interface.encodeFunctionData("free", [
-          options.gasToken,
-        ]),
-      });
-    }
-
-    const transaction = await settlement
-      .connect(solver)
-      .settleSingleTrade(...encoder.encodeSingleTradeSettlement(transfers));
     return await transaction.wait();
   }
 }
