@@ -22,12 +22,6 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     using GPv2TradeExecution for GPv2TradeExecution.Data;
     using SafeMath for uint256;
 
-    /// @dev Data used for freeing storage and claiming a gas refund.
-    struct OrderRefunds {
-        bytes[] filledAmounts;
-        bytes[] preSignatures;
-    }
-
     /// @dev The authenticator is used to determine who can call the settle function.
     /// That is, only authorised solvers have the ability to invoke settlements.
     /// Any valid authenticator implements an isSolver method called by the onlySolver
@@ -157,7 +151,10 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     ///
     /// @param orderUids The unique identifiers of the expired order to free
     /// storage for.
-    function freeFilledAmountStorage(bytes[] calldata orderUids) external onlyInteraction {
+    function freeFilledAmountStorage(bytes[] calldata orderUids)
+        external
+        onlyInteraction
+    {
         freeOrderStorage(filledAmount, orderUids);
     }
 
@@ -166,7 +163,10 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     ///
     /// @param orderUids The unique identifiers of the expired order to free
     /// storage for.
-    function freePreSignatureStorage(bytes[] calldata orderUids) external onlyInteraction {
+    function freePreSignatureStorage(bytes[] calldata orderUids)
+        external
+        onlyInteraction
+    {
         freeOrderStorage(preSignature, orderUids);
     }
 
@@ -364,14 +364,6 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         for (uint256 i = 0; i < trades.length; i++) {
             trades[i].transferBuyAmountToOwner();
         }
-    }
-
-    /// @dev Claims order gas refunds.
-    ///
-    /// @param orderRefunds Order refund data for freeing storage.
-    function claimOrderRefunds(OrderRefunds calldata orderRefunds) internal {
-        freeOrderStorage(filledAmount, orderRefunds.filledAmounts);
-        freeOrderStorage(preSignature, orderRefunds.preSignatures);
     }
 
     /// @dev Claims refund for the specified storage and order UIDs.

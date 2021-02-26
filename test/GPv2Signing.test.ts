@@ -4,8 +4,8 @@ import { artifacts, ethers, waffle } from "hardhat";
 
 import {
   EIP1271_MAGICVALUE,
-  PRE_SIGNED,
   OrderKind,
+  PRE_SIGNED,
   SettlementEncoder,
   SigningScheme,
   TypedDataDomain,
