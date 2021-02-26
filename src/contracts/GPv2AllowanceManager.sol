@@ -2,15 +2,12 @@
 pragma solidity ^0.7.6;
 pragma abicoder v2;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./libraries/GPv2SafeERC20.sol";
 import "./libraries/GPv2TradeExecution.sol";
 
 /// @title Gnosis Protocol v2 Allowance Manager Contract
 /// @author Gnosis Developers
 contract GPv2AllowanceManager {
-    using GPv2SafeERC20 for IERC20;
     using GPv2TradeExecution for GPv2TradeExecution.Data;
 
     /// @dev The recipient of all transfers made by the allowance manager. The

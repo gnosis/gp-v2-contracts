@@ -282,22 +282,6 @@ export class SettlementEncoder {
   }
 
   /**
-   * Returns whether the currently encoded settlement can be executed with the
-   * `settleOne` single trade settlement "fast-path".
-   */
-  public get isSingleTradeSettlement(): boolean {
-    const [preInteractions, , postInteractions] = this.interactions;
-    const { filledAmounts, preSignatures } = this.orderRefunds;
-    return (
-      this.tokens.length === 2 &&
-      this.trades.length === 1 &&
-      [preInteractions, postInteractions, filledAmounts, preSignatures].every(
-        ({ length }) => length === 0,
-      )
-    );
-  }
-
-  /**
    * Returns a clearing price vector for the current settlement tokens from the
    * provided price map.
    *
