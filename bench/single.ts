@@ -21,7 +21,10 @@ async function main() {
   for (const [settlements, refunds, gasToken] of [
     [1, 0, 0],
     [1, 1, 0],
+    [6, 6, 0],
+    [7, 7, 0],
     [8, 8, 0],
+    [9, 9, 0],
     [1, 4, 2],
     [1, 0, 5],
   ]) {
