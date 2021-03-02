@@ -1064,6 +1064,18 @@ describe("GPv2Settlement", () => {
       ).to.be.revertedWith("GPv2: forbidden interaction");
     });
 
+    it("should revert when target is vaultRelayer", async () => {
+      const invalidInteraction: Interaction = {
+        target: await settlement.vaultRelayer(),
+        callData: [],
+        value: 0,
+      };
+
+      await expect(
+        settlement.executeInteractionsTest([invalidInteraction]),
+      ).to.be.revertedWith("GPv2: forbidden interaction");
+    });
+
     it("reverts if the settlement contract does not have sufficient Ether balance", async () => {
       const value = ethers.utils.parseEther("1000000.0");
       expect(value.gt(await ethers.provider.getBalance(settlement.address))).to
