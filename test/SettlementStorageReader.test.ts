@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { Contract } from "ethers";
-import { ethers, waffle } from "hardhat";
+import { artifacts, ethers, waffle } from "hardhat";
 
 import { SettlementReader, packOrderUidParams } from "../src/ts";
 
@@ -11,9 +11,23 @@ describe("SettlementStorageReader", () => {
   let settlmentReader: SettlementReader;
 
   beforeEach(async () => {
+    const GPv2AllowListAuthentication = await ethers.getContractFactory(
+      "GPv2AllowListAuthentication",
+      deployer,
+    );
+    const authenticator = await GPv2AllowListAuthentication.deploy();
+    await authenticator.initializeManager(owner.address);
+
+    const IVault = await artifacts.readArtifact("IVault");
+    const vault = await waffle.deployMockContract(deployer, IVault.abi);
+
     const GPv2Settlement = await ethers.getContractFactory(
       "GPv2SettlementTestInterface",
       deployer,
+    );
+    settlement = await GPv2Settlement.deploy(
+      authenticator.address,
+      vault.address,
     );
 
     const SettlementStorageReader = await ethers.getContractFactory(
@@ -21,7 +35,7 @@ describe("SettlementStorageReader", () => {
       deployer,
     );
     reader = await SettlementStorageReader.deploy();
-    settlement = await GPv2Settlement.deploy(owner.address);
+
     settlmentReader = new SettlementReader(settlement, reader);
   });
 
