@@ -3,8 +3,10 @@ pragma solidity ^0.7.6;
 pragma abicoder v2;
 
 import "./GPv2AllowanceManager.sol";
+import "./GPv2VaultRelayer.sol";
 import "./interfaces/GPv2Authentication.sol";
 import "./interfaces/IERC20.sol";
+import "./interfaces/IVault.sol";
 import "./libraries/GPv2Interaction.sol";
 import "./libraries/GPv2Order.sol";
 import "./libraries/GPv2Trade.sol";
@@ -30,6 +32,10 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     /// @dev The allowance manager which has access to order funds. This
     /// contract is created during deployment
     GPv2AllowanceManager public immutable allowanceManager;
+
+    /// @dev The Balancer Vault relayer which can interact on behalf of users.
+    /// This contract is created during deployment
+    GPv2VaultRelayer public immutable vaultRelayer;
 
     /// @dev Map each user order by UID to the amount that has been filled so
     /// far. If this amount is larger than or equal to the amount traded in the
@@ -63,9 +69,10 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     /// @dev Event emitted when an order is invalidated.
     event OrderInvalidated(address indexed owner, bytes orderUid);
 
-    constructor(GPv2Authentication authenticator_) {
+    constructor(GPv2Authentication authenticator_, IVault vault) {
         authenticator = authenticator_;
         allowanceManager = new GPv2AllowanceManager();
+        vaultRelayer = new GPv2VaultRelayer(vault);
     }
 
     // solhint-disable-next-line no-empty-blocks
@@ -325,7 +332,8 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
             // To prevent possible attack on user funds, we explicitly disable
             // any interactions with AllowanceManager contract.
             require(
-                interaction.target != address(allowanceManager),
+                interaction.target != address(allowanceManager) &&
+                    interaction.target != address(vaultRelayer),
                 "GPv2: forbidden interaction"
             );
             GPv2Interaction.execute(interaction);
