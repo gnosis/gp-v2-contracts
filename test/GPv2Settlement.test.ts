@@ -22,8 +22,8 @@ import {
 
 import {
   builtAndDeployedMetadataCoincide,
-  immutableAsAddress,
-  readImmutables,
+  readAllowanceManagerImmutables,
+  readVaultRelayerImmutables,
 } from "./bytecode";
 import { encodeOutTransfers } from "./encoding";
 
@@ -84,42 +84,39 @@ describe("GPv2Settlement", () => {
     });
 
     it("should have the settlement contract as the creator", async () => {
-      const [creator] = await readImmutables(
-        "src/contracts/GPv2AllowanceManager.sol:GPv2AllowanceManager",
+      const { creator } = await readAllowanceManagerImmutables(
         await settlement.allowanceManager(),
       );
 
-      expect(immutableAsAddress(creator)).to.equal(settlement.address);
+      expect(creator).to.equal(settlement.address);
     });
   });
 
   describe("vaultRelayer", () => {
     it("should deploy a vault relayer", async () => {
-      const deployedAllowanceManager = await settlement.allowanceManager();
+      const deployedVaultRelayer = await settlement.vaultRelayer();
       expect(
         await builtAndDeployedMetadataCoincide(
-          deployedAllowanceManager,
-          "GPv2AllowanceManager",
+          deployedVaultRelayer,
+          "GPv2VaultRelayer",
         ),
       ).to.be.true;
     });
 
     it("should set the vault immutable", async () => {
-      const [vaultAddr] = await readImmutables(
-        "src/contracts/GPv2VaultRelayer.sol:GPv2VaultRelayer",
+      const { vault: vaultAddr } = await readVaultRelayerImmutables(
         await settlement.vaultRelayer(),
       );
 
-      expect(immutableAsAddress(vaultAddr)).to.equal(vault.address);
+      expect(vaultAddr).to.equal(vault.address);
     });
 
     it("should have the settlement contract as the creator", async () => {
-      const [, creator] = await readImmutables(
-        "src/contracts/GPv2VaultRelayer.sol:GPv2VaultRelayer",
+      const { creator } = await readVaultRelayerImmutables(
         await settlement.vaultRelayer(),
       );
 
-      expect(immutableAsAddress(creator)).to.equal(settlement.address);
+      expect(creator).to.equal(settlement.address);
     });
   });
 
