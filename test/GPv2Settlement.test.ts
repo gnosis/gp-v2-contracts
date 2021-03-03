@@ -1,5 +1,6 @@
 import IERC20 from "@openzeppelin/contracts/build/contracts/IERC20.json";
 import { expect } from "chai";
+import { MockContract } from "ethereum-waffle";
 import { BigNumber, Contract, ContractReceipt, Event } from "ethers";
 import { artifacts, ethers, waffle } from "hardhat";
 
@@ -19,7 +20,11 @@ import {
   packOrderUidParams,
 } from "../src/ts";
 
-import { builtAndDeployedMetadataCoincide } from "./bytecode";
+import {
+  builtAndDeployedMetadataCoincide,
+  readAllowanceManagerImmutables,
+  readVaultRelayerImmutables,
+} from "./bytecode";
 import { encodeOutTransfers } from "./encoding";
 
 function toNumberLossy(value: BigNumber): number {
@@ -33,6 +38,7 @@ describe("GPv2Settlement", () => {
   const [deployer, owner, solver, ...traders] = waffle.provider.getWallets();
 
   let authenticator: Contract;
+  let vault: MockContract;
   let settlement: Contract;
   let testDomain: TypedDataDomain;
 
@@ -44,11 +50,17 @@ describe("GPv2Settlement", () => {
     authenticator = await GPv2AllowListAuthentication.deploy();
     await authenticator.initializeManager(owner.address);
 
+    const IVault = await artifacts.readArtifact("IVault");
+    vault = await waffle.deployMockContract(deployer, IVault.abi);
+
     const GPv2Settlement = await ethers.getContractFactory(
       "GPv2SettlementTestInterface",
       deployer,
     );
-    settlement = await GPv2Settlement.deploy(authenticator.address);
+    settlement = await GPv2Settlement.deploy(
+      authenticator.address,
+      vault.address,
+    );
 
     const { chainId } = await ethers.provider.getNetwork();
     testDomain = domain(chainId, settlement.address);
@@ -71,39 +83,40 @@ describe("GPv2Settlement", () => {
       ).to.be.true;
     });
 
-    it("should have the settlement contract as the recipient", async () => {
-      const ADDRESS_BYTE_LENGTH = 20;
-
-      // NOTE: In order to avoid having the allowance manager add a public
-      // accessor for its recipient just for testing, which would add minor
-      // costs at both deployment time and runtime, just read the contract code
-      // to get the immutable value.
-      const buildInfo = await artifacts.getBuildInfo(
-        "src/contracts/GPv2AllowanceManager.sol:GPv2AllowanceManager",
-      );
-      if (buildInfo === undefined) {
-        throw new Error("missing GPv2AllowanceManager build info");
-      }
-
-      const [[recipientImmutableReference]] = Object.values(
-        buildInfo.output.contracts["src/contracts/GPv2AllowanceManager.sol"]
-          .GPv2AllowanceManager.evm.deployedBytecode.immutableReferences || {},
+    it("should have the settlement contract as the creator", async () => {
+      const { creator } = await readAllowanceManagerImmutables(
+        await settlement.allowanceManager(),
       );
 
-      const deployedAllowanceManager = await settlement.allowanceManager();
-      const code = await ethers.provider.send("eth_getCode", [
-        deployedAllowanceManager,
-        "latest",
-      ]);
-      const recipient = ethers.utils.hexlify(
-        ethers.utils
-          .arrayify(code)
-          .subarray(recipientImmutableReference.start)
-          .subarray(recipientImmutableReference.length - ADDRESS_BYTE_LENGTH)
-          .slice(0, ADDRESS_BYTE_LENGTH),
+      expect(creator).to.equal(settlement.address);
+    });
+  });
+
+  describe("vaultRelayer", () => {
+    it("should deploy a vault relayer", async () => {
+      const deployedVaultRelayer = await settlement.vaultRelayer();
+      expect(
+        await builtAndDeployedMetadataCoincide(
+          deployedVaultRelayer,
+          "GPv2VaultRelayer",
+        ),
+      ).to.be.true;
+    });
+
+    it("should set the vault immutable", async () => {
+      const { vault: vaultAddr } = await readVaultRelayerImmutables(
+        await settlement.vaultRelayer(),
       );
 
-      expect(ethers.utils.getAddress(recipient)).to.equal(settlement.address);
+      expect(vaultAddr).to.equal(vault.address);
+    });
+
+    it("should have the settlement contract as the creator", async () => {
+      const { creator } = await readVaultRelayerImmutables(
+        await settlement.vaultRelayer(),
+      );
+
+      expect(creator).to.equal(settlement.address);
     });
   });
 
@@ -999,6 +1012,18 @@ describe("GPv2Settlement", () => {
     it("should revert when target is allowanceManager", async () => {
       const invalidInteraction: Interaction = {
         target: await settlement.allowanceManager(),
+        callData: [],
+        value: 0,
+      };
+
+      await expect(
+        settlement.executeInteractionsTest([invalidInteraction]),
+      ).to.be.revertedWith("GPv2: forbidden interaction");
+    });
+
+    it("should revert when target is vaultRelayer", async () => {
+      const invalidInteraction: Interaction = {
+        target: await settlement.vaultRelayer(),
         callData: [],
         value: 0,
       };

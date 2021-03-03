@@ -7,7 +7,7 @@ const deploySettlement: DeployFunction = async function ({
   deployments,
   getNamedAccounts,
 }: HardhatRuntimeEnvironment) {
-  const { deployer } = await getNamedAccounts();
+  const { deployer, vault } = await getNamedAccounts();
   const { deploy, get } = deployments;
 
   const { authenticator, settlement } = CONTRACT_NAMES;
@@ -16,7 +16,7 @@ const deploySettlement: DeployFunction = async function ({
   await deploy(settlement, {
     from: deployer,
     gasLimit: 4e6,
-    args: [authenticatorAddress],
+    args: [authenticatorAddress, vault],
     deterministicDeployment: SALT,
     log: true,
   });
