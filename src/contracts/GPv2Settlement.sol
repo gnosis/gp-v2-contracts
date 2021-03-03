@@ -197,7 +197,6 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
                 clearingPrices[trade.sellTokenIndex],
                 clearingPrices[trade.buyTokenIndex],
                 trade.executedAmount,
-                trade.feeDiscount,
                 executedTrades[i]
             );
         }
@@ -215,14 +214,12 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     /// @param buyPrice The price of the order's buy token.
     /// @param executedAmount The portion of the order to execute. This will be
     /// ignored for fill-or-kill orders.
-    /// @param feeDiscount The discount to apply to the final executed fees.
     /// @param executedTrade Memory location for computed executed trade data.
     function computeTradeExecution(
         RecoveredOrder memory recoveredOrder,
         uint256 sellPrice,
         uint256 buyPrice,
         uint256 executedAmount,
-        uint256 feeDiscount,
         GPv2TradeExecution.Data memory executedTrade
     ) internal {
         GPv2Order.Data memory order = recoveredOrder.data;
@@ -308,12 +305,6 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
                 "GPv2: order filled"
             );
         }
-
-        require(
-            feeDiscount <= executedFeeAmount,
-            "GPv2: fee discount too large"
-        );
-        executedFeeAmount = executedFeeAmount - feeDiscount;
 
         executedTrade.sellAmount = executedSellAmount.add(executedFeeAmount);
         executedTrade.buyAmount = executedBuyAmount;
