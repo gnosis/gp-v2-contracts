@@ -36,7 +36,7 @@ export type DeploymentArguments<
 > = T extends typeof CONTRACT_NAMES.authenticator
   ? never
   : T extends typeof CONTRACT_NAMES.settlement
-  ? [string]
+  ? [string, string]
   : unknown[];
 
 /**

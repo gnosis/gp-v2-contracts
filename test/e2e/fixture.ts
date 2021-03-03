@@ -7,8 +7,10 @@ export interface TestDeployment {
   manager: Wallet;
   wallets: Wallet[];
   authenticator: Contract;
+  vault: Contract;
   settlement: Contract;
   allowanceManager: Contract;
+  vaultRelayer: Contract;
   gasToken: Contract;
 }
 
@@ -26,13 +28,19 @@ export const deployTestContracts: () => Promise<TestDeployment> = deployments.cr
     } = await deployments.fixture();
 
     const allWallets = waffle.provider.getWallets();
-    const { deployer, owner, manager } = await getNamedAccounts();
+    const {
+      deployer,
+      owner,
+      manager,
+      vault: vaultAddress,
+    } = await getNamedAccounts();
     const unnamedAccounts = await getUnnamedAccounts();
 
     const authenticator = await ethers.getContractAt(
       "GPv2AllowListAuthentication",
       GPv2AllowListAuthentication.address,
     );
+    const vault = await ethers.getContractAt("IVault", vaultAddress);
     const settlement = await ethers.getContractAt(
       "GPv2Settlement",
       GPv2Settlement.address,
@@ -40,6 +48,10 @@ export const deployTestContracts: () => Promise<TestDeployment> = deployments.cr
     const allowanceManager = await ethers.getContractAt(
       "GPv2AllowanceManager",
       await settlement.allowanceManager(),
+    );
+    const vaultRelayer = await ethers.getContractAt(
+      "GPv2VaultRelayer",
+      await settlement.vaultRelayer(),
     );
 
     return {
@@ -50,8 +62,10 @@ export const deployTestContracts: () => Promise<TestDeployment> = deployments.cr
         findAccountWallet(allWallets, account),
       ),
       authenticator,
+      vault,
       settlement,
       allowanceManager,
+      vaultRelayer,
       gasToken: await deployGasToken(allWallets[0]),
     };
   },
