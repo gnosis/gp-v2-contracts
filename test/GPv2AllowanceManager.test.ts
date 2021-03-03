@@ -8,8 +8,8 @@ import { encodeInTransfers } from "./encoding";
 describe("GPv2AllowanceManager", () => {
   const [
     deployer,
-    recipient,
-    nonRecipient,
+    creator,
+    nonCreator,
     ...traders
   ] = waffle.provider.getWallets();
 
@@ -18,17 +18,17 @@ describe("GPv2AllowanceManager", () => {
   beforeEach(async () => {
     const GPv2AllowanceManager = await ethers.getContractFactory(
       "GPv2AllowanceManager",
-      recipient,
+      creator,
     );
 
     allowanceManager = await GPv2AllowanceManager.deploy();
   });
 
   describe("transferIn", () => {
-    it("should revert if not called by the recipient", async () => {
+    it("should revert if not called by the creator", async () => {
       await expect(
-        allowanceManager.connect(nonRecipient).transferIn([]),
-      ).to.be.revertedWith("not allowance recipient");
+        allowanceManager.connect(nonCreator).transferIn([]),
+      ).to.be.revertedWith("not creator");
     });
 
     it("should execute ERC20 transfers", async () => {
@@ -39,10 +39,10 @@ describe("GPv2AllowanceManager", () => {
 
       const amount = ethers.utils.parseEther("13.37");
       await tokens[0].mock.transferFrom
-        .withArgs(traders[0].address, recipient.address, amount)
+        .withArgs(traders[0].address, creator.address, amount)
         .returns(true);
       await tokens[1].mock.transferFrom
-        .withArgs(traders[1].address, recipient.address, amount)
+        .withArgs(traders[1].address, creator.address, amount)
         .returns(true);
 
       await expect(
@@ -68,7 +68,7 @@ describe("GPv2AllowanceManager", () => {
 
       const amount = ethers.utils.parseEther("4.2");
       await token.mock.transferFrom
-        .withArgs(traders[0].address, recipient.address, amount)
+        .withArgs(traders[0].address, creator.address, amount)
         .revertsWithReason("test error");
 
       await expect(

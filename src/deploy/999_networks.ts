@@ -60,6 +60,10 @@ const updateNetworks: DeployFunction = async function ({
     address: await settlement.allowanceManager(),
     transactionHash: settlementRecord.transactionHash,
   });
+  updateRecord("GPv2VaultRelayer", {
+    address: await settlement.vaultRelayer(),
+    transactionHash: settlementRecord.transactionHash,
+  });
 
   await fs.writeFile(NETWORKS_PATH, JSON.stringify(networks, null, INDENT));
 };
