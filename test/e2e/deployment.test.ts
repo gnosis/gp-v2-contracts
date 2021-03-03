@@ -28,6 +28,7 @@ describe("E2E: Deployment", () => {
   let user: Wallet;
 
   let authenticator: Contract;
+  let vault: Contract;
   let settlement: Contract;
   let allowanceManager: Contract;
 
@@ -37,6 +38,7 @@ describe("E2E: Deployment", () => {
       manager,
       wallets: [user],
       authenticator,
+      vault,
       settlement,
       allowanceManager,
     } = await deployTestContracts());
@@ -98,7 +100,11 @@ describe("E2E: Deployment", () => {
 
     it("settlement", async () => {
       expect(
-        await contractAddress("GPv2Settlement", authenticator.address),
+        await contractAddress(
+          "GPv2Settlement",
+          authenticator.address,
+          vault.address,
+        ),
       ).to.equal(settlement.address);
     });
   });
