@@ -61,6 +61,8 @@ describe("GPv2Trade", () => {
         feeAmount: fillUint(256, 0x08),
         kind: OrderKind.BUY,
         partiallyFillable: true,
+        useInternalSellTokenBalance: true,
+        useInternalBuyTokenBalance: true,
       };
       const tradeExecution = {
         executedAmount: fillUint(256, 0x09),
@@ -115,18 +117,42 @@ describe("GPv2Trade", () => {
   describe("extractFlags", () => {
     it("should extract all supported order flags", async () => {
       for (const flags of [
-        { kind: OrderKind.SELL, partiallyFillable: false },
-        { kind: OrderKind.BUY, partiallyFillable: false },
-        { kind: OrderKind.SELL, partiallyFillable: true },
-        { kind: OrderKind.BUY, partiallyFillable: true },
+        {
+          kind: OrderKind.SELL,
+          partiallyFillable: false,
+          useInternalSellTokenBalance: true,
+          useInternalBuyTokenBalance: true,
+        },
+        {
+          kind: OrderKind.BUY,
+          partiallyFillable: false,
+          useInternalSellTokenBalance: false,
+          useInternalBuyTokenBalance: true,
+        },
+        {
+          kind: OrderKind.SELL,
+          partiallyFillable: true,
+          useInternalSellTokenBalance: true,
+          useInternalBuyTokenBalance: false,
+        },
+        {
+          kind: OrderKind.BUY,
+          partiallyFillable: true,
+          useInternalSellTokenBalance: false,
+          useInternalBuyTokenBalance: false,
+        },
       ]) {
         const {
           kind: encodedKind,
           partiallyFillable,
+          useInternalSellTokenBalance,
+          useInternalBuyTokenBalance,
         } = await tradeLib.extractFlagsTest(encodeOrderFlags(flags));
         expect({
           kind: decodeOrderKind(encodedKind),
           partiallyFillable,
+          useInternalSellTokenBalance,
+          useInternalBuyTokenBalance,
         }).to.deep.equal(flags);
       }
     });
@@ -146,7 +172,7 @@ describe("GPv2Trade", () => {
     });
 
     it("should revert when encoding invalid flags", async () => {
-      await expect(tradeLib.extractFlagsTest(0b10000)).to.be.reverted;
+      await expect(tradeLib.extractFlagsTest(0b1000000)).to.be.reverted;
     });
   });
 });
