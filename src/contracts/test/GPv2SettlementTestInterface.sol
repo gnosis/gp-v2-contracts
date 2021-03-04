@@ -37,28 +37,12 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
 
         // solhint-disable-next-line not-rely-on-time
         recoveredOrder.data.validTo = uint32(block.timestamp);
-        computeTradeExecution(recoveredOrder, 1, 1, 0, 0, executedTrade);
+        computeTradeExecution(recoveredOrder, 1, 1, 0, executedTrade);
 
         // solhint-disable-next-line no-inline-assembly
         assembly {
             mem := sub(mload(0x40), mem)
         }
-    }
-
-    function executeSingleTradeTest(
-        IERC20[] calldata tokens,
-        GPv2Trade.Data calldata trade,
-        GPv2AllowanceManager.Transfer[] calldata transfers,
-        GPv2Interaction.Data[] calldata interactions
-    ) external {
-        RecoveredOrder memory recoveredOrder = allocateRecoveredOrder();
-        recoverOrderFromTrade(recoveredOrder, tokens, trade);
-        executeSingleTrade(
-            recoveredOrder,
-            transfers,
-            interactions,
-            trade.feeDiscount
-        );
     }
 
     function transferOutTest(GPv2TradeExecution.Data[] memory trades) external {
@@ -71,9 +55,11 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
         executeInteractions(interactions);
     }
 
-    function claimOrderRefundsTest(OrderRefunds calldata orderRefunds)
-        external
-    {
-        claimOrderRefunds(orderRefunds);
+    function freeFilledAmountStorageTest(bytes[] calldata orderUids) external {
+        this.freeFilledAmountStorage(orderUids);
+    }
+
+    function freePreSignatureStorageTest(bytes[] calldata orderUids) external {
+        this.freePreSignatureStorage(orderUids);
     }
 }

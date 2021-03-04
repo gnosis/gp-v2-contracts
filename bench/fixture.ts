@@ -74,11 +74,6 @@ export interface SettlementOptions {
   gasToken: number;
 }
 
-export interface SingleTradeSettlementOptions {
-  includeFees: boolean;
-  gasToken: number;
-}
-
 export class BenchFixture {
   private _nonce = 0;
 
@@ -188,7 +183,7 @@ export class BenchFixture {
     for (let i = 0; i < options.trades; i++) {
       // NOTE: Alternate the order flags, signing scheme and fee discount in
       // such a way that the benchmark includes all possible combination of
-      // `(orderKind, partiallyFillable, signingScheme, feeDiscount)`.
+      // `(orderKind, partiallyFillable, signingScheme)`.
 
       let orderSpice: Pick<
         Order,
@@ -235,42 +230,33 @@ export class BenchFixture {
           ? SigningScheme.EIP712
           : SigningScheme.ETHSIGN;
 
-      const feeAmount = ethers.utils.parseEther("1.0");
-      const feeDiscount = feeAmount.mul(i % 3).div(2); // 0% | 50% | 100%
-
       const dbg = {
         fill: orderSpice.partiallyFillable
           ? "partially fillable"
           : "fill-or-kill",
         kind: orderSpice.kind == OrderKind.SELL ? "sell" : "buy",
         sign: signingScheme == SigningScheme.EIP712 ? "eip-712" : "eth_sign",
-        fee: feeAmount.sub(feeDiscount).mul(100).div(feeAmount).toNumber(),
       };
       debug(
-        `encoding ${dbg.fill} ${dbg.kind} order with ${dbg.sign} signature and ${dbg.fee}% fees`,
+        `encoding ${dbg.fill} ${dbg.kind} order with ${dbg.sign} signature`,
       );
 
       await encoder.signEncodeTrade(
         {
           sellToken: tokens.id(i % options.tokens).address,
           buyToken: tokens.id((i + 1) % options.tokens).address,
-          feeAmount,
+          feeAmount: ethers.utils.parseEther("1.0"),
           validTo: 0xffffffff,
           appData: this.nonce,
           ...orderSpice,
         },
         traders[i % traders.length],
         signingScheme,
-        orderSpice.partiallyFillable
-          ? {
-              executedAmount: ethers.utils.parseEther("100.0"),
-              // NOTE: Order is exactly half executed, so adjust fee discount as
-              // well so that it doesn't execeed the executed fee amount.
-              feeDiscount: feeDiscount.div(2),
-            }
-          : {
-              feeDiscount,
-            },
+        {
+          executedAmount: orderSpice.partiallyFillable
+            ? ethers.utils.parseEther("100.0")
+            : undefined,
+        },
       );
     }
 
@@ -356,84 +342,6 @@ export class BenchFixture {
       .connect(solver)
       .settle(...encoder.encodedSettlement(prices));
 
-    return await transaction.wait();
-  }
-
-  public async settleOrder(
-    options: SingleTradeSettlementOptions,
-  ): Promise<ContractReceipt> {
-    const {
-      deployment: { settlement, gasToken },
-      domainSeparator,
-      solver,
-      traders: [trader],
-      uniswapPair,
-      uniswapTokens: [sellToken, buyToken],
-    } = this;
-
-    const sellAmount = ethers.utils.parseEther("1.0");
-    const buyAmount = ethers.utils.parseEther("0.9");
-    const feeAmount = sellAmount.div(1000);
-
-    const order = {
-      sellToken: sellToken.address,
-      buyToken: buyToken.address,
-      sellAmount,
-      buyAmount,
-      validTo: 0xffffffff,
-      appData: this.nonce,
-      feeAmount,
-      kind: OrderKind.SELL,
-      partiallyFillable: false,
-    };
-
-    const encoder = new SettlementEncoder(domainSeparator);
-    await encoder.signEncodeTrade(order, trader, SigningScheme.EIP712, {
-      feeDiscount: options.includeFees ? 0 : order.feeAmount,
-    });
-    encoder.encodeInteraction({
-      target: uniswapPair.address,
-      value: 0,
-      callData: uniswapPair.interface.encodeFunctionData("swap", [
-        0,
-        buyAmount,
-        trader.address,
-        "0x",
-      ]),
-    });
-
-    const transfers = [
-      {
-        target: uniswapPair.address,
-        amount: order.sellAmount,
-      },
-    ];
-    if (options.includeFees) {
-      transfers.push({
-        target: settlement.address,
-        amount: order.feeAmount,
-      });
-    }
-
-    if (options.gasToken > 0) {
-      // Create more gas tokens than needed as otherwise we might get extra storage refunds which may skew benchmarks
-      // Also burn a few right away so that totalBurned is already initialized
-      await gasToken.connect(solver).mint(options.gasToken + 10);
-      await gasToken.connect(solver).free(5);
-      await gasToken
-        .connect(solver)
-        .transfer(settlement.address, options.gasToken + 5);
-      encoder.encodeInteraction({
-        target: gasToken.address,
-        callData: gasToken.interface.encodeFunctionData("free", [
-          options.gasToken,
-        ]),
-      });
-    }
-
-    const transaction = await settlement
-      .connect(solver)
-      .settleSingleTrade(...encoder.encodeSingleTradeSettlement(transfers));
     return await transaction.wait();
   }
 }

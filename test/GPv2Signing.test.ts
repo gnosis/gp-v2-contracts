@@ -4,8 +4,8 @@ import { artifacts, ethers, waffle } from "hardhat";
 
 import {
   EIP1271_MAGICVALUE,
-  PRE_SIGNED,
   OrderKind,
+  PRE_SIGNED,
   SettlementEncoder,
   SigningScheme,
   TypedDataDomain,
@@ -140,7 +140,6 @@ describe("GPv2Signing", () => {
       };
       const tradeExecution = {
         executedAmount: fillUint(256, 0x09),
-        feeDiscount: fillUint(256, 0x0a),
       };
 
       const encoder = new SettlementEncoder(testDomain);
