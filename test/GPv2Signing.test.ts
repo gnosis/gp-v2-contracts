@@ -140,7 +140,6 @@ describe("GPv2Signing", () => {
       };
       const tradeExecution = {
         executedAmount: fillUint(256, 0x09),
-        feeDiscount: fillUint(256, 0x0a),
       };
 
       const encoder = new SettlementEncoder(testDomain);

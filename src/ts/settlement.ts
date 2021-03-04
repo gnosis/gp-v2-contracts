@@ -101,13 +101,6 @@ export interface TradeExecution {
    * - Fill-or-kill orders: this value is ignored.
    */
   executedAmount: BigNumberish;
-  /**
-   * Optional fee discount to use.
-   *
-   * If this value is `0`, then there is no discount and the full fee will be
-   * taken for the order.
-   */
-  feeDiscount: BigNumberish;
 }
 
 /**
@@ -344,7 +337,7 @@ export class SettlementEncoder {
     signature: Signature,
     tradeExecution?: Partial<TradeExecution>,
   ): void {
-    const { executedAmount, feeDiscount } = tradeExecution || {};
+    const { executedAmount } = tradeExecution || {};
     if (order.partiallyFillable && executedAmount === undefined) {
       throw new Error("missing executed amount for partially fillable trade");
     }
@@ -370,7 +363,6 @@ export class SettlementEncoder {
       feeAmount: o.feeAmount,
       flags: encodeTradeFlags(tradeFlags),
       executedAmount: executedAmount || 0,
-      feeDiscount: feeDiscount || 0,
       signature: encodeSignatureData(signature),
     });
   }
