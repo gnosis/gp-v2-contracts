@@ -117,6 +117,8 @@ describe("GPv2Signing", () => {
         feeAmount: fillUint(256, 0x08),
         kind: OrderKind.BUY,
         partiallyFillable: true,
+        useInternalSellTokenBalance: true,
+        useInternalBuyTokenBalance: true,
       };
       const tradeExecution = {
         executedAmount: fillUint(256, 0x09),

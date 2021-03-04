@@ -103,6 +103,8 @@ describe("E2E: Dumb Smart Order", () => {
       feeAmount: ethers.utils.parseEther("0.05"),
       validTo: 0xffffffff,
       appData: await smartOrder.APPDATA(),
+      useInternalSellTokenBalance: false,
+      useInternalBuyTokenBalance: false,
     });
 
     await encoder.encodeTrade(smartOrderTrade, {
