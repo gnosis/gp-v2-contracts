@@ -19,6 +19,8 @@ library GPv2Order {
         uint256 feeAmount;
         bytes32 kind;
         bool partiallyFillable;
+        bool useInternalSellTokenBalance;
+        bool useInternalBuyTokenBalance;
     }
 
     /// @dev The order EIP-712 type hash for the [`GPv2Order.Data`] struct.
@@ -37,11 +39,13 @@ library GPv2Order {
     ///         "uint256 feeAmount," +
     ///         "string kind," +
     ///         "bool partiallyFillable" +
+    ///         "bool useInternalSellTokenBalance" +
+    ///         "bool useInternalBuyTokenBalance" +
     ///     ")"
     /// )
     /// ```
     bytes32 internal constant TYPE_HASH =
-        hex"d604be04a8c6d2df582ec82eba9b65ce714008acbf9122dd95e499569c8f1a80";
+        hex"e2dc073fc74b3a79b74490a80ce2541fc2191b237c79ab2b8a60f3be54432ce9";
 
     /// @dev The marker value for a sell order for computing the order struct
     /// hash. This allows the EIP-712 compatible wallets to display a
@@ -105,14 +109,14 @@ library GPv2Order {
 
         // NOTE: Compute the EIP-712 order struct hash in place. As suggested
         // in the EIP proposal, noting that the order struct has 10 fields, and
-        // including the type hash `(10 + 1) * 32 = 352` bytes to hash.
+        // including the type hash `(12 + 1) * 32 = 416` bytes to hash.
         // <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-712.md#rationale-for-encodedata>
         // solhint-disable-next-line no-inline-assembly
         assembly {
             let dataStart := sub(order, 32)
             let temp := mload(dataStart)
             mstore(dataStart, TYPE_HASH)
-            structHash := keccak256(dataStart, 352)
+            structHash := keccak256(dataStart, 416)
             mstore(dataStart, temp)
         }
 
