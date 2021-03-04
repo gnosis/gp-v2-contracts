@@ -98,6 +98,8 @@ contract SmartSellOrder is EIP1271Verifier {
         // This is done since, once a settlement commits to a specific sell
         // amount, then it is expected to use it completely and not partially.
         order.partiallyFillable = false;
+        order.useInternalSellTokenBalance = false;
+        order.useInternalBuyTokenBalance = false;
     }
 
     function buyAmountForSellAmount(uint256 sellAmount)

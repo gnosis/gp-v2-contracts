@@ -70,7 +70,12 @@ export interface TradeFlags extends OrderFlags {
 export type Trade = TradeExecution &
   Omit<
     NormalizedOrder,
-    "sellToken" | "buyToken" | "kind" | "partiallyFillable"
+    | "sellToken"
+    | "buyToken"
+    | "kind"
+    | "partiallyFillable"
+    | "useInternalSellTokenBalance"
+    | "useInternalBuyTokenBalance"
   > & {
     /**
      * The index of the sell token in the settlement.
@@ -147,8 +152,16 @@ export const FLAG_MASKS = {
     offset: 1,
     options: [false, true],
   },
-  signingScheme: {
+  useInternalSellTokenBalance: {
     offset: 2,
+    options: [false, true],
+  },
+  useInternalBuyTokenBalance: {
+    offset: 3,
+    options: [false, true],
+  },
+  signingScheme: {
+    offset: 4,
     options: [
       SigningScheme.EIP712,
       SigningScheme.ETHSIGN,
@@ -220,7 +233,12 @@ export function decodeSigningScheme(flags: number): SigningScheme {
 export function encodeOrderFlags(flags: OrderFlags): number {
   return (
     encodeFlag("kind", flags.kind) |
-    encodeFlag("partiallyFillable", flags.partiallyFillable)
+    encodeFlag("partiallyFillable", flags.partiallyFillable) |
+    encodeFlag(
+      "useInternalSellTokenBalance",
+      !!flags.useInternalSellTokenBalance,
+    ) |
+    encodeFlag("useInternalBuyTokenBalance", !!flags.useInternalBuyTokenBalance)
   );
 }
 
@@ -234,6 +252,11 @@ export function decodeOrderFlags(flags: number): OrderFlags {
   return {
     kind: decodeFlag("kind", flags),
     partiallyFillable: decodeFlag("partiallyFillable", flags),
+    useInternalSellTokenBalance: decodeFlag(
+      "useInternalSellTokenBalance",
+      flags,
+    ),
+    useInternalBuyTokenBalance: decodeFlag("useInternalBuyTokenBalance", flags),
   };
 }
 

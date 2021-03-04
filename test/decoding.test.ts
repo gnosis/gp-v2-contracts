@@ -182,6 +182,8 @@ describe("Trade", async () => {
       ...SAMPLE_ORDER,
       partiallyFillable: true,
       kind: OrderKind.BUY,
+      useInternalSellTokenBalance: true,
+      useInternalBuyTokenBalance: false,
     };
     encoder.encodeTrade(
       order,
