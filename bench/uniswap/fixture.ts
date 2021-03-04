@@ -91,9 +91,6 @@ export class UniswapFixture {
         },
         trader,
         SigningScheme.EIP712,
-        {
-          feeDiscount: feeAmount,
-        },
       );
     }
 

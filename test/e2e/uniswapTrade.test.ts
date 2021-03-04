@@ -121,9 +121,6 @@ describe("E2E: Should Trade Surplus With Uniswap", () => {
       },
       traders[0],
       SigningScheme.EIP712,
-      // NOTE: Only take 50% of fees as the user traded half of their order
-      // against Uniswap.
-      { feeDiscount: ethers.utils.parseEther("0.0005") },
     );
 
     await usdt.mint(traders[1].address, ethers.utils.parseUnits("300.3", 6));
@@ -174,18 +171,15 @@ describe("E2E: Should Trade Surplus With Uniswap", () => {
       }),
     );
 
-    // NOTE: Half of the trader 0's fees were discounted. This is reflected in
-    // the final WETH balances of the trade and the settlement contract.
-
     expect(await weth.balanceOf(settlement.address)).to.deep.equal(
-      ethers.utils.parseEther("0.001").div(2),
+      ethers.utils.parseEther("0.001"),
     );
     expect(await usdt.balanceOf(settlement.address)).to.deep.equal(
       ethers.utils.parseUnits("0.3", 6),
     );
 
     expect(await weth.balanceOf(traders[0].address)).to.deep.equal(
-      ethers.utils.parseEther("0.001").div(2),
+      ethers.constants.Zero,
     );
     expect(await usdt.balanceOf(traders[0].address)).to.deep.equal(
       uniswapUsdtOutAmount.mul(2),

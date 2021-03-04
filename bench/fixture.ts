@@ -183,7 +183,7 @@ export class BenchFixture {
     for (let i = 0; i < options.trades; i++) {
       // NOTE: Alternate the order flags, signing scheme and fee discount in
       // such a way that the benchmark includes all possible combination of
-      // `(orderKind, partiallyFillable, signingScheme, feeDiscount)`.
+      // `(orderKind, partiallyFillable, signingScheme)`.
 
       let orderSpice: Pick<
         Order,
@@ -230,42 +230,33 @@ export class BenchFixture {
           ? SigningScheme.EIP712
           : SigningScheme.ETHSIGN;
 
-      const feeAmount = ethers.utils.parseEther("1.0");
-      const feeDiscount = feeAmount.mul(i % 3).div(2); // 0% | 50% | 100%
-
       const dbg = {
         fill: orderSpice.partiallyFillable
           ? "partially fillable"
           : "fill-or-kill",
         kind: orderSpice.kind == OrderKind.SELL ? "sell" : "buy",
         sign: signingScheme == SigningScheme.EIP712 ? "eip-712" : "eth_sign",
-        fee: feeAmount.sub(feeDiscount).mul(100).div(feeAmount).toNumber(),
       };
       debug(
-        `encoding ${dbg.fill} ${dbg.kind} order with ${dbg.sign} signature and ${dbg.fee}% fees`,
+        `encoding ${dbg.fill} ${dbg.kind} order with ${dbg.sign} signature`,
       );
 
       await encoder.signEncodeTrade(
         {
           sellToken: tokens.id(i % options.tokens).address,
           buyToken: tokens.id((i + 1) % options.tokens).address,
-          feeAmount,
+          feeAmount: ethers.utils.parseEther("1.0"),
           validTo: 0xffffffff,
           appData: this.nonce,
           ...orderSpice,
         },
         traders[i % traders.length],
         signingScheme,
-        orderSpice.partiallyFillable
-          ? {
-              executedAmount: ethers.utils.parseEther("100.0"),
-              // NOTE: Order is exactly half executed, so adjust fee discount as
-              // well so that it doesn't execeed the executed fee amount.
-              feeDiscount: feeDiscount.div(2),
-            }
-          : {
-              feeDiscount,
-            },
+        {
+          executedAmount: orderSpice.partiallyFillable
+            ? ethers.utils.parseEther("100.0")
+            : undefined,
+        },
       );
     }
 

@@ -749,21 +749,6 @@ describe("GPv2Settlement", () => {
           executedSellAmount.add(executedFee),
         );
       });
-
-      it("should apply the fee discount to the executed fees", async () => {
-        const feeDiscount = feeAmount.div(100); // 1% discount.
-        const trade = await computeExecutedTradeForOrderVariant(
-          {
-            kind: OrderKind.SELL,
-            partiallyFillable: false,
-          },
-          { feeDiscount },
-        );
-
-        expect(trade.sellAmount).to.deep.equal(
-          sellAmount.add(feeAmount.sub(feeDiscount)),
-        );
-      });
     });
 
     describe("Order Filled Amounts", () => {
@@ -863,31 +848,6 @@ describe("GPv2Settlement", () => {
       );
 
       expect(trades[0]).to.deep.equal(trades[1]);
-    });
-
-    it("should revert on invalid fee discount values", async () => {
-      const feeAmount = ethers.utils.parseEther("1.0");
-
-      const encoder = new SettlementEncoder(testDomain);
-      await encoder.signEncodeTrade(
-        {
-          ...partialOrder,
-          kind: OrderKind.BUY,
-          partiallyFillable: false,
-          feeAmount,
-        },
-        traders[0],
-        SigningScheme.EIP712,
-        { feeDiscount: feeAmount.add(1) },
-      );
-
-      await expect(
-        settlement.computeTradeExecutionsTest(
-          encoder.tokens,
-          encoder.clearingPrices(prices),
-          encoder.trades,
-        ),
-      ).to.be.revertedWith("fee discount too large");
     });
 
     it("should emit a trade event", async () => {
