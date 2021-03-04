@@ -4,7 +4,7 @@ import { Artifact } from "hardhat/types";
 /**
  * The salt used when deterministically deploying smart contracts.
  */
-export const SALT = utils.formatBytes32String("mattresses in Berlin");
+export const SALT = utils.formatBytes32String("mattresses in Berlin!");
 
 /**
  * The contract used to deploy contracts deterministically with CREATE2.
