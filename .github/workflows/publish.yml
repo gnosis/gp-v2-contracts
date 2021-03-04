@@ -1,4 +1,4 @@
-ame: Publish package to NPM
+name: Publish package to NPM
 
 on:
   workflow_dispatch:
@@ -7,4 +7,4 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - run: true
+      - run: 'true'
