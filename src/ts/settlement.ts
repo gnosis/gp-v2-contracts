@@ -67,7 +67,12 @@ export interface TradeFlags extends OrderFlags {
 export type Trade = TradeExecution &
   Omit<
     NormalizedOrder,
-    "sellToken" | "buyToken" | "kind" | "partiallyFillable"
+    | "sellToken"
+    | "buyToken"
+    | "kind"
+    | "partiallyFillable"
+    | "useInternalSellTokenBalance"
+    | "useInternalBuyTokenBalance"
   > & {
     /**
      * The index of the sell token in the settlement.
@@ -139,15 +144,13 @@ export type EncodedSettlement = [
  * @return The bitfield result.
  */
 export function encodeSigningScheme(scheme: SigningScheme): number {
+  const SIGNING_SCHEME_BIT_OFFSET = 4;
   switch (scheme) {
     case SigningScheme.EIP712:
-      return 0b0000;
     case SigningScheme.ETHSIGN:
-      return 0b0100;
     case SigningScheme.EIP1271:
-      return 0b1000;
     case SigningScheme.PRESIGN:
-      return 0b1100;
+      return scheme << SIGNING_SCHEME_BIT_OFFSET;
     default:
       throw new Error("Unsupported signing scheme");
   }
@@ -163,17 +166,20 @@ export function encodeOrderFlags(flags: OrderFlags): number {
   let kind;
   switch (flags.kind) {
     case OrderKind.SELL:
-      kind = 0;
+      kind = 0b0000;
       break;
     case OrderKind.BUY:
-      kind = 1;
+      kind = 0b0001;
       break;
     default:
       throw new Error(`invalid error kind '${kind}'`);
   }
-  const partiallyFillable = flags.partiallyFillable ? 0x02 : 0x00;
+  const partiallyFillable = flags.partiallyFillable ? 0b0010 : 0b0000;
+  const internalBalances =
+    (flags.useInternalSellTokenBalance ? 0b0100 : 0b0000) |
+    (flags.useInternalBuyTokenBalance ? 0b1000 : 0b0000);
 
-  return kind | partiallyFillable;
+  return kind | partiallyFillable | internalBalances;
 }
 
 /**
