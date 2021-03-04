@@ -14,6 +14,8 @@ export type AbiOrder = [
   BigNumber,
   string,
   boolean,
+  boolean,
+  boolean,
 ];
 
 export function encodeOrder(order: Order): AbiOrder {
@@ -29,6 +31,8 @@ export function encodeOrder(order: Order): AbiOrder {
     BigNumber.from(o.feeAmount),
     ethers.utils.id(o.kind),
     o.partiallyFillable,
+    o.useInternalSellTokenBalance,
+    o.useInternalBuyTokenBalance,
   ];
 }
 
@@ -53,6 +57,8 @@ export function decodeOrder(order: AbiOrder): Order {
     feeAmount: order[7],
     kind: decodeOrderKind(order[8]),
     partiallyFillable: order[9],
+    useInternalSellTokenBalance: order[10],
+    useInternalBuyTokenBalance: order[11],
   };
 }
 

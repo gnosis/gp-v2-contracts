@@ -59,6 +59,16 @@ export interface Order {
    * Specifies whether or not the order is partially fillable.
    */
   partiallyFillable: boolean;
+  /**
+   * Specifies whether or not internal balances should be used for transferring
+   * sell tokens when settling directly with Balancer.
+   */
+  useInternalSellTokenBalance?: boolean;
+  /**
+   * Specifies whether or not trade proceeds in the buy token should be payed in
+   * internal balances when settling directly with Balancer.
+   */
+  useInternalBuyTokenBalance?: boolean;
 }
 
 /**
@@ -83,7 +93,13 @@ export const BUY_ETH_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 /**
  * Gnosis Protocol v2 order flags.
  */
-export type OrderFlags = Pick<Order, "kind" | "partiallyFillable">;
+export type OrderFlags = Pick<
+  Order,
+  | "kind"
+  | "partiallyFillable"
+  | "useInternalSellTokenBalance"
+  | "useInternalBuyTokenBalance"
+>;
 
 /**
  * A timestamp value.
@@ -123,6 +139,8 @@ export const ORDER_TYPE_FIELDS = [
   { name: "feeAmount", type: "uint256" },
   { name: "kind", type: "string" },
   { name: "partiallyFillable", type: "bool" },
+  { name: "useInternalSellTokenBalance", type: "bool" },
+  { name: "useInternalBuyTokenBalance", type: "bool" },
 ];
 
 /**
@@ -167,6 +185,8 @@ export type NormalizedOrder = Omit<Order, "validTo" | "appData" | "kind"> & {
   validTo: number;
   appData: string;
   kind: string;
+  useInternalSellTokenBalance: boolean;
+  useInternalBuyTokenBalance: boolean;
 };
 
 /**
@@ -178,6 +198,8 @@ export type NormalizedOrder = Omit<Order, "validTo" | "appData" | "kind"> & {
 export function normalizeOrder(order: Order): NormalizedOrder {
   return {
     receiver: ethers.constants.AddressZero,
+    useInternalSellTokenBalance: false,
+    useInternalBuyTokenBalance: false,
     ...order,
     validTo: timestamp(order.validTo),
     appData: hashify(order.appData),
