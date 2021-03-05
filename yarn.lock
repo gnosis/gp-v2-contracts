@@ -5497,10 +5497,10 @@ hardhat-gas-reporter@^1.0.4:
     eth-gas-reporter "^0.2.20"
     sha1 "^1.1.1"
 
-hardhat@^2.1.0:
-  version "2.1.0"
-  resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.1.0.tgz#4d400f1c209ea43c01316ca1864777d97de8d51b"
-  integrity sha512-S3/1hM0L6DF8TjfzYlXnJ6egnWyUbB3YsuhtPBk1i4PQcgnZC9od/2uLA3Vsc6o8Fs6ZbZaAA+Ubze5uGjvmbg==
+hardhat@^2.1.1:
+  version "2.1.1"
+  resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.1.1.tgz#bcfed980019672b57011845a1678f714728d6ee7"
+  integrity sha512-55XMqB5QoeRg3m56rBg0NQgU//GPqOC9t4RbRSU3pdBJGHGXFTUh8fjTPxnWJNu9r72Zju++syGcCkPGwftyvw==
   dependencies:
     "@nomiclabs/ethereumjs-vm" "4.2.2"
     "@sentry/node" "^5.18.1"
