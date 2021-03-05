@@ -1,4 +1,4 @@
-import { ERC20Proxy, Exchange, ZRXToken } from "@0x/contract-artifacts";
+import { ERC20Proxy, Exchange, ZRXToken } from "@0x/contract-artifacts-v2";
 import { BigNumberish, BytesLike, Contract, Wallet } from "ethers";
 import { ethers, waffle } from "hardhat";
 
