@@ -28,7 +28,7 @@
     "@0x/contract-artifacts-v2": "npm:@0x/contract-artifacts@^2.2.2",
     "@gnosis.pm/safe-contracts": "^1.2.0",
     "@gnosis.pm/util-contracts": "=3.1.0-solc-7",
-    "@nomiclabs/hardhat-ethers": "^2.0.1",
+    "@nomiclabs/hardhat-ethers": "^2.0.2",
     "@nomiclabs/hardhat-waffle": "^2.0.1",
     "@openzeppelin/contracts": "=3.4.0-solc-0.7",
     "@types/chai": "^4.2.15",
