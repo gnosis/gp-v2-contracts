@@ -67,7 +67,7 @@ describe("E2E: Deployment", () => {
       ).to.be.true;
     });
 
-    it("allowance manager", async () => {
+    it("vaultRelayer", async () => {
       expect(
         await builtAndDeployedMetadataCoincide(
           vaultRelayer.address,
