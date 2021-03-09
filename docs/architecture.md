@@ -4,7 +4,7 @@ Below is a brief description of the smart contracts located in the `src/contract
 
 - `GPv2Settlement.sol`: The entrypoint for Gnosis Protocol V2; authenticated solvers call the `settle` function on this contract to perform batched settlements.
 - `GPv2AllowListAuthentication.sol`: The allow list authentication contract is a simple `GPv2Authentication` implementation that manages a list of solvers that are authorized to perform settlements.
-- `GPv2AllowanceManager.sol`: The allowance manager is the contract users approve an ERC20 allowance for interacting with the protocol; it is intentionally kept as a separate contracts so that SC interactions do not have access to user allowances.
+- `GPv2VaultRelayer.sol`: The vault relayer is the contract users authorize on the Balancer v2 `Vault` enabling control of user balances; it is intentionally kept as a separate contracts so that SC interactions do not have access to this authorization.
 - `interfaces/`
   - `GPv2Authentication.sol`: Authentication interface.
   - `GPv2EIP1271.sol`: EIP-1271 related interfaces used for smart contract signed orders.

@@ -24,7 +24,7 @@ describe("E2E: Expired Order Gas Refunds", () => {
   let traders: Wallet[];
 
   let settlement: Contract;
-  let allowanceManager: Contract;
+  let vaultRelayer: Contract;
   let domainSeparator: TypedDataDomain;
 
   let owl: Contract;
@@ -36,7 +36,7 @@ describe("E2E: Expired Order Gas Refunds", () => {
     ({
       deployer,
       settlement,
-      allowanceManager,
+      vaultRelayer,
       wallets: [solver, ...traders],
     } = deployment);
 
@@ -68,7 +68,7 @@ describe("E2E: Expired Order Gas Refunds", () => {
         await token.mint(trader.address, ethers.utils.parseEther("1000000.0"));
         await token
           .connect(trader)
-          .approve(allowanceManager.address, ethers.constants.MaxUint256);
+          .approve(vaultRelayer.address, ethers.constants.MaxUint256);
       }
     }
 

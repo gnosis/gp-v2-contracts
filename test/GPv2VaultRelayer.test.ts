@@ -1,11 +1,12 @@
 import IERC20 from "@openzeppelin/contracts/build/contracts/IERC20.json";
 import { expect } from "chai";
+import { MockContract } from "ethereum-waffle";
 import { Contract } from "ethers";
-import { ethers, waffle } from "hardhat";
+import { artifacts, ethers, waffle } from "hardhat";
 
 import { encodeInTransfers } from "./encoding";
 
-describe("GPv2AllowanceManager", () => {
+describe("GPv2VaultRelayer", () => {
   const [
     deployer,
     creator,
@@ -13,21 +14,24 @@ describe("GPv2AllowanceManager", () => {
     ...traders
   ] = waffle.provider.getWallets();
 
-  let allowanceManager: Contract;
+  let vault: MockContract;
+  let vaultRelayer: Contract;
 
   beforeEach(async () => {
-    const GPv2AllowanceManager = await ethers.getContractFactory(
-      "GPv2AllowanceManager",
+    const IVault = await artifacts.readArtifact("IVault");
+    vault = await waffle.deployMockContract(deployer, IVault.abi);
+
+    const GPv2VaultRelayer = await ethers.getContractFactory(
+      "GPv2VaultRelayer",
       creator,
     );
-
-    allowanceManager = await GPv2AllowanceManager.deploy();
+    vaultRelayer = await GPv2VaultRelayer.deploy(vault.address);
   });
 
   describe("transferIn", () => {
     it("should revert if not called by the creator", async () => {
       await expect(
-        allowanceManager.connect(nonCreator).transferIn([]),
+        vaultRelayer.connect(nonCreator).transferIn([]),
       ).to.be.revertedWith("not creator");
     });
 
@@ -46,7 +50,7 @@ describe("GPv2AllowanceManager", () => {
         .returns(true);
 
       await expect(
-        allowanceManager.transferIn(
+        vaultRelayer.transferIn(
           encodeInTransfers([
             {
               owner: traders[0].address,
@@ -72,7 +76,7 @@ describe("GPv2AllowanceManager", () => {
         .revertsWithReason("test error");
 
       await expect(
-        allowanceManager.transferIn(
+        vaultRelayer.transferIn(
           encodeInTransfers([
             {
               owner: traders[0].address,

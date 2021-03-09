@@ -43,8 +43,8 @@ contract SmartSellOrder is EIP1271Verifier {
         totalFeeAmount = totalFeeAmount_;
 
         sellToken_.approve(
-            address(settlement.allowanceManager()),
-            totalSellAmount_.add(totalFeeAmount_)
+            address(settlement.vaultRelayer()),
+            type(uint256).max
         );
     }
 
