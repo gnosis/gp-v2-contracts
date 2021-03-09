@@ -22,7 +22,7 @@ describe("E2E: Should Trade Surplus With Uniswap", () => {
   let traders: Wallet[];
 
   let settlement: Contract;
-  let allowanceManager: Contract;
+  let vaultRelayer: Contract;
   let domainSeparator: TypedDataDomain;
 
   let weth: Contract;
@@ -36,7 +36,7 @@ describe("E2E: Should Trade Surplus With Uniswap", () => {
     ({
       deployer,
       settlement,
-      allowanceManager,
+      vaultRelayer,
       wallets: [solver, pooler, ...traders],
     } = deployment);
 
@@ -106,7 +106,7 @@ describe("E2E: Should Trade Surplus With Uniswap", () => {
     await weth.mint(traders[0].address, ethers.utils.parseEther("1.001"));
     await weth
       .connect(traders[0])
-      .approve(allowanceManager.address, ethers.constants.MaxUint256);
+      .approve(vaultRelayer.address, ethers.constants.MaxUint256);
     await encoder.signEncodeTrade(
       {
         kind: OrderKind.SELL,
@@ -126,7 +126,7 @@ describe("E2E: Should Trade Surplus With Uniswap", () => {
     await usdt.mint(traders[1].address, ethers.utils.parseUnits("300.3", 6));
     await usdt
       .connect(traders[1])
-      .approve(allowanceManager.address, ethers.constants.MaxUint256);
+      .approve(vaultRelayer.address, ethers.constants.MaxUint256);
     await encoder.signEncodeTrade(
       {
         kind: OrderKind.BUY,
