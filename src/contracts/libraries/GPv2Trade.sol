@@ -24,7 +24,6 @@ library GPv2Trade {
         uint256 feeAmount;
         uint256 flags;
         uint256 executedAmount;
-        uint256 feeDiscount;
         bytes signature;
     }
 

@@ -101,19 +101,7 @@ export interface TradeExecution {
    * - Fill-or-kill orders: this value is ignored.
    */
   executedAmount: BigNumberish;
-  /**
-   * Optional fee discount to use.
-   *
-   * If this value is `0`, then there is no discount and the full fee will be
-   * taken for the order.
-   */
-  feeDiscount: BigNumberish;
 }
-
-/**
- * Table mapping token addresses to their respective clearing prices.
- */
-export type Prices = Record<string, BigNumberish | undefined>;
 
 /**
  * Order refund data.
@@ -124,6 +112,11 @@ export interface OrderRefunds {
   /** Refund storage used for order pre-signature */
   preSignatures: BytesLike[];
 }
+
+/**
+ * Table mapping token addresses to their respective clearing prices.
+ */
+export type Prices = Record<string, BigNumberish | undefined>;
 
 /**
  * Encoded settlement parameters.
@@ -137,8 +130,6 @@ export type EncodedSettlement = [
   Trade[],
   /** Encoded interactions. */
   [Interaction[], Interaction[], Interaction[]],
-  /** Encoded order refunds. */
-  OrderRefunds,
 ];
 
 /**
@@ -260,25 +251,57 @@ export class SettlementEncoder {
   }
 
   /**
-   * Gets the encoded interactions for the specified stage as a hex-encoded
-   * string.
+   * Gets all encoded interactions for all stages.
+   *
+   * Note that order refund interactions are included as post-interactions.
    */
   public get interactions(): [Interaction[], Interaction[], Interaction[]] {
     return [
       this._interactions[InteractionStage.PRE].slice(),
       this._interactions[InteractionStage.INTRA].slice(),
-      this._interactions[InteractionStage.POST].slice(),
+      [
+        ...this._interactions[InteractionStage.POST],
+        ...this.encodedOrderRefunds,
+      ],
     ];
   }
 
   /**
-   * Gets the currently encoded order UIDs for gas refunds.
+   * Gets the order refunds encoded as interactions.
    */
-  public get orderRefunds(): OrderRefunds {
-    return {
-      filledAmounts: this._orderRefunds.filledAmounts.slice(),
-      preSignatures: this._orderRefunds.preSignatures.slice(),
-    };
+  public get encodedOrderRefunds(): Interaction[] {
+    const { filledAmounts, preSignatures } = this._orderRefunds;
+    if (filledAmounts.length + preSignatures.length === 0) {
+      return [];
+    }
+
+    const settlement = this.domain.verifyingContract;
+    if (settlement === undefined) {
+      throw new Error("domain missing settlement contract address");
+    }
+
+    // NOTE: Avoid importing the full GPv2Settlement contract artifact just for
+    // a tiny snippet of the ABI. Unit and integration tests will catch any
+    // issues that may arise from this definition becoming out of date.
+    const iface = new ethers.utils.Interface([
+      "function freeFilledAmountStorage(bytes[] orderUids)",
+      "function freePreSignatureStorage(bytes[] orderUids)",
+    ]);
+
+    const interactions = [];
+    for (const [functionName, orderUids] of [
+      ["freeFilledAmountStorage", filledAmounts] as const,
+      ["freePreSignatureStorage", preSignatures] as const,
+    ].filter(([, orderUids]) => orderUids.length > 0)) {
+      interactions.push(
+        normalizeInteraction({
+          target: settlement,
+          callData: iface.encodeFunctionData(functionName, [orderUids]),
+        }),
+      );
+    }
+
+    return interactions;
   }
 
   /**
@@ -314,7 +337,7 @@ export class SettlementEncoder {
     signature: Signature,
     tradeExecution?: Partial<TradeExecution>,
   ): void {
-    const { executedAmount, feeDiscount } = tradeExecution || {};
+    const { executedAmount } = tradeExecution || {};
     if (order.partiallyFillable && executedAmount === undefined) {
       throw new Error("missing executed amount for partially fillable trade");
     }
@@ -340,7 +363,6 @@ export class SettlementEncoder {
       feeAmount: o.feeAmount,
       flags: encodeTradeFlags(tradeFlags),
       executedAmount: executedAmount || 0,
-      feeDiscount: feeDiscount || 0,
       signature: encodeSignatureData(signature),
     });
   }
@@ -381,9 +403,14 @@ export class SettlementEncoder {
   /**
    * Encodes order UIDs for gas refunds.
    *
+   * @param settlement The address of the settlement contract.
    * @param orderRefunds The order refunds to encode.
    */
   public encodeOrderRefunds(orderRefunds: Partial<OrderRefunds>): void {
+    if (this.domain.verifyingContract === undefined) {
+      throw new Error("domain missing settlement contract address");
+    }
+
     const filledAmounts = orderRefunds.filledAmounts ?? [];
     const preSignatures = orderRefunds.preSignatures ?? [];
 
@@ -408,7 +435,6 @@ export class SettlementEncoder {
       this.clearingPrices(prices),
       this.trades,
       this.interactions,
-      this.orderRefunds,
     ];
   }
 

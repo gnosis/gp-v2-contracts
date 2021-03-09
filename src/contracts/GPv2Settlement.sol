@@ -22,12 +22,6 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     using GPv2TradeExecution for GPv2TradeExecution.Data;
     using SafeMath for uint256;
 
-    /// @dev Data used for freeing storage and claiming a gas refund.
-    struct OrderRefunds {
-        bytes[] filledAmounts;
-        bytes[] preSignatures;
-    }
-
     /// @dev The authenticator is used to determine who can call the settle function.
     /// That is, only authorised solvers have the ability to invoke settlements.
     /// Any valid authenticator implements an isSolver method called by the onlySolver
@@ -88,6 +82,13 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         _;
     }
 
+    /// @dev Modifier to ensure that an external function is only callable as a
+    /// settlement interaction.
+    modifier onlyInteraction {
+        require(address(this) == msg.sender, "GPv2: not an interaction");
+        _;
+    }
+
     /// @dev Settle the specified orders at a clearing price. Note that it is
     /// the responsibility of the caller to ensure that all GPv2 invariants are
     /// upheld for the input settlement, otherwise this call will revert.
@@ -110,14 +111,11 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     /// @param interactions Smart contract interactions split into three
     /// separate lists to be run before the settlement, during the settlement
     /// and after the settlement respectively.
-    /// @param orderRefunds Order refunds for clearing storage related to
-    /// expired orders.
     function settle(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
         GPv2Trade.Data[] calldata trades,
-        GPv2Interaction.Data[][3] calldata interactions,
-        OrderRefunds calldata orderRefunds
+        GPv2Interaction.Data[][3] calldata interactions
     ) external nonReentrant onlySolver {
         executeInteractions(interactions[0]);
 
@@ -131,8 +129,6 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         transferOut(executedTrades);
 
         executeInteractions(interactions[2]);
-
-        claimOrderRefunds(orderRefunds);
 
         emit Settlement(msg.sender);
     }
@@ -148,6 +144,30 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         require(owner == msg.sender, "GPv2: caller does not own order");
         filledAmount[orderUid] = uint256(-1);
         emit OrderInvalidated(owner, orderUid);
+    }
+
+    /// @dev Free storage from the filled amounts of **expired** orders to claim
+    /// a gas refund. This method can only be called as an interaction.
+    ///
+    /// @param orderUids The unique identifiers of the expired order to free
+    /// storage for.
+    function freeFilledAmountStorage(bytes[] calldata orderUids)
+        external
+        onlyInteraction
+    {
+        freeOrderStorage(filledAmount, orderUids);
+    }
+
+    /// @dev Free storage from the pre signatures of **expired** orders to claim
+    /// a gas refund. This method can only be called as an interaction.
+    ///
+    /// @param orderUids The unique identifiers of the expired order to free
+    /// storage for.
+    function freePreSignatureStorage(bytes[] calldata orderUids)
+        external
+        onlyInteraction
+    {
+        freeOrderStorage(preSignature, orderUids);
     }
 
     /// @dev Process all trades one at a time returning the computed net in and
@@ -177,7 +197,6 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
                 clearingPrices[trade.sellTokenIndex],
                 clearingPrices[trade.buyTokenIndex],
                 trade.executedAmount,
-                trade.feeDiscount,
                 executedTrades[i]
             );
         }
@@ -195,14 +214,12 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     /// @param buyPrice The price of the order's buy token.
     /// @param executedAmount The portion of the order to execute. This will be
     /// ignored for fill-or-kill orders.
-    /// @param feeDiscount The discount to apply to the final executed fees.
     /// @param executedTrade Memory location for computed executed trade data.
     function computeTradeExecution(
         RecoveredOrder memory recoveredOrder,
         uint256 sellPrice,
         uint256 buyPrice,
         uint256 executedAmount,
-        uint256 feeDiscount,
         GPv2TradeExecution.Data memory executedTrade
     ) internal {
         GPv2Order.Data memory order = recoveredOrder.data;
@@ -289,12 +306,6 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
             );
         }
 
-        require(
-            feeDiscount <= executedFeeAmount,
-            "GPv2: fee discount too large"
-        );
-        executedFeeAmount = executedFeeAmount - feeDiscount;
-
         executedTrade.sellAmount = executedSellAmount.add(executedFeeAmount);
         executedTrade.buyAmount = executedBuyAmount;
 
@@ -346,14 +357,6 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         }
     }
 
-    /// @dev Claims order gas refunds.
-    ///
-    /// @param orderRefunds Order refund data for freeing storage.
-    function claimOrderRefunds(OrderRefunds calldata orderRefunds) internal {
-        freeOrderStorage(orderRefunds.filledAmounts, filledAmount);
-        freeOrderStorage(orderRefunds.preSignatures, preSignature);
-    }
-
     /// @dev Claims refund for the specified storage and order UIDs.
     ///
     /// This method reverts if any of the orders are still valid.
@@ -361,8 +364,8 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     /// @param orderUids Order refund data for freeing storage.
     /// @param orderStorage Order storage mapped on a UID.
     function freeOrderStorage(
-        bytes[] calldata orderUids,
-        mapping(bytes => uint256) storage orderStorage
+        mapping(bytes => uint256) storage orderStorage,
+        bytes[] calldata orderUids
     ) internal {
         for (uint256 i = 0; i < orderUids.length; i++) {
             bytes calldata orderUid = orderUids[i];

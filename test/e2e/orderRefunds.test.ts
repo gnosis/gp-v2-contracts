@@ -167,6 +167,6 @@ describe("E2E: Expired Order Gas Refunds", () => {
       );
     debug(`Gas savings per refund: ${gasSavingsPerRefund}`);
 
-    expect(gasSavingsPerRefund.gt(8000)).to.be.true;
+    expect(gasSavingsPerRefund.gt(4000)).to.be.true;
   });
 });

@@ -8,6 +8,7 @@ import {
   InteractionStage,
   OrderFlags,
   OrderKind,
+  PRE_SIGNED,
   SettlementEncoder,
   SigningScheme,
   TradeExecution,
@@ -19,11 +20,7 @@ import {
 } from "../src/ts";
 
 import { builtAndDeployedMetadataCoincide } from "./bytecode";
-import {
-  encodeFilledAmountRefunds,
-  encodeOutTransfers,
-  encodePreSignatureRefunds,
-} from "./encoding";
+import { encodeOutTransfers } from "./encoding";
 
 function toNumberLossy(value: BigNumber): number {
   // NOTE: BigNumber throws an exception when if is outside the range of
@@ -232,28 +229,16 @@ describe("GPv2Settlement", () => {
     it("reverts if encoded interactions has incorrect number of stages", async () => {
       await authenticator.connect(owner).addSolver(solver.address);
 
-      const [tokens, clearingPrices, trades, , encodedOrderRefunds] = empty;
+      const [tokens, clearingPrices, trades] = empty;
       await expect(
         settlement
           .connect(solver)
-          .settle([
-            tokens,
-            clearingPrices,
-            trades,
-            ["0x", "0x"],
-            encodedOrderRefunds,
-          ]),
+          .settle([tokens, clearingPrices, trades, ["0x", "0x"]]),
       ).to.be.reverted;
       await expect(
         settlement
           .connect(solver)
-          .settle([
-            tokens,
-            clearingPrices,
-            trades,
-            ["0x", "0x", "0x", "0x"],
-            encodedOrderRefunds,
-          ]),
+          .settle([tokens, clearingPrices, trades, ["0x", "0x", "0x", "0x"]]),
       ).to.be.reverted;
     });
   });
@@ -764,21 +749,6 @@ describe("GPv2Settlement", () => {
           executedSellAmount.add(executedFee),
         );
       });
-
-      it("should apply the fee discount to the executed fees", async () => {
-        const feeDiscount = feeAmount.div(100); // 1% discount.
-        const trade = await computeExecutedTradeForOrderVariant(
-          {
-            kind: OrderKind.SELL,
-            partiallyFillable: false,
-          },
-          { feeDiscount },
-        );
-
-        expect(trade.sellAmount).to.deep.equal(
-          sellAmount.add(feeAmount.sub(feeDiscount)),
-        );
-      });
     });
 
     describe("Order Filled Amounts", () => {
@@ -878,31 +848,6 @@ describe("GPv2Settlement", () => {
       );
 
       expect(trades[0]).to.deep.equal(trades[1]);
-    });
-
-    it("should revert on invalid fee discount values", async () => {
-      const feeAmount = ethers.utils.parseEther("1.0");
-
-      const encoder = new SettlementEncoder(testDomain);
-      await encoder.signEncodeTrade(
-        {
-          ...partialOrder,
-          kind: OrderKind.BUY,
-          partiallyFillable: false,
-          feeAmount,
-        },
-        traders[0],
-        SigningScheme.EIP712,
-        { feeDiscount: feeAmount.add(1) },
-      );
-
-      await expect(
-        settlement.computeTradeExecutionsTest(
-          encoder.tokens,
-          encoder.clearingPrices(prices),
-          encoder.trades,
-        ),
-      ).to.be.revertedWith("fee discount too large");
     });
 
     it("should emit a trade event", async () => {
@@ -1146,98 +1091,100 @@ describe("GPv2Settlement", () => {
     });
   });
 
-  describe("claimOrderRefunds", () => {
-    it("should set filled amount to 0 for all orders", async () => {
-      const orderUids = [
-        packOrderUidParams({
-          orderDigest: `0x${"11".repeat(32)}`,
-          owner: traders[0].address,
-          validTo: 0,
-        }),
-        packOrderUidParams({
-          orderDigest: `0x${"22".repeat(32)}`,
-          owner: traders[0].address,
-          validTo: 0,
-        }),
-        packOrderUidParams({
-          orderDigest: `0x${"33".repeat(32)}`,
-          owner: traders[0].address,
-          validTo: 0,
-        }),
-      ];
-
-      for (const orderUid of orderUids) {
-        await settlement.connect(traders[0]).invalidateOrder(orderUid);
-        expect(await settlement.filledAmount(orderUid)).to.not.deep.equal(
-          ethers.constants.Zero,
-        );
-      }
-
-      await settlement.claimOrderRefundsTest(
-        encodeFilledAmountRefunds(...orderUids),
-      );
-      for (const orderUid of orderUids) {
-        expect(await settlement.filledAmount(orderUid)).to.deep.equal(
-          ethers.constants.Zero,
-        );
-      }
-    });
-
-    it("should clear pre-signatures", async () => {
-      const orderUid = packOrderUidParams({
+  describe("Order Refunds", () => {
+    const orderUids = [
+      packOrderUidParams({
         orderDigest: `0x${"11".repeat(32)}`,
         owner: traders[0].address,
         validTo: 0,
-      });
-
-      await settlement.connect(traders[0]).setPreSignature(orderUid, true);
-      await settlement.claimOrderRefundsTest(
-        encodePreSignatureRefunds(orderUid),
-      );
-
-      expect(await settlement.preSignature(orderUid)).to.equal(
-        ethers.constants.Zero,
-      );
-    });
-
-    it("should revert if the encoded order UIDs are malformed", async () => {
-      const orderUid = packOrderUidParams({
-        orderDigest: ethers.constants.HashZero,
-        owner: ethers.constants.AddressZero,
-        validTo: 0,
-      });
-
-      for (const malformedOrderUid of [
-        ethers.utils.hexDataSlice(orderUid, 0, 55),
-        ethers.utils.hexZeroPad(orderUid, 57),
-      ]) {
-        await expect(
-          settlement.claimOrderRefundsTest(
-            encodeFilledAmountRefunds(malformedOrderUid),
-          ),
-        ).to.be.reverted;
-        await expect(
-          settlement.claimOrderRefundsTest(
-            encodePreSignatureRefunds(malformedOrderUid),
-          ),
-        ).to.be.reverted;
-      }
-    });
-
-    it("should revert if the order is still valid", async () => {
-      const orderDigest = "0x" + "11".repeat(32);
-      const orderUid = packOrderUidParams({
-        orderDigest,
+      }),
+      packOrderUidParams({
+        orderDigest: `0x${"22".repeat(32)}`,
         owner: traders[0].address,
-        validTo: 0xffffffff,
+        validTo: 0,
+      }),
+      packOrderUidParams({
+        orderDigest: `0x${"33".repeat(32)}`,
+        owner: traders[0].address,
+        validTo: 0,
+      }),
+    ];
+
+    const commonTests = (freeStorageFunction: string) => {
+      const testFunction = `${freeStorageFunction}Test`;
+
+      it("should revert if not called from an interaction", async () => {
+        await expect(settlement[freeStorageFunction]([])).to.be.revertedWith(
+          "not an interaction",
+        );
       });
 
-      await expect(
-        settlement.claimOrderRefundsTest(encodeFilledAmountRefunds(orderUid)),
-      ).to.be.revertedWith("order still valid");
-      await expect(
-        settlement.claimOrderRefundsTest(encodePreSignatureRefunds(orderUid)),
-      ).to.be.revertedWith("order still valid");
+      it("should revert if the encoded order UIDs are malformed", async () => {
+        const orderUid = packOrderUidParams({
+          orderDigest: ethers.constants.HashZero,
+          owner: ethers.constants.AddressZero,
+          validTo: 0,
+        });
+
+        for (const malformedOrderUid of [
+          ethers.utils.hexDataSlice(orderUid, 0, 55),
+          ethers.utils.hexZeroPad(orderUid, 57),
+        ]) {
+          await expect(
+            settlement[testFunction]([malformedOrderUid]),
+          ).to.be.revertedWith("invalid uid");
+        }
+      });
+
+      it("should revert if the order is still valid", async () => {
+        const orderUid = packOrderUidParams({
+          orderDigest: `0x${"42".repeat(32)}`,
+          owner: traders[0].address,
+          validTo: 0xffffffff,
+        });
+
+        await expect(settlement[testFunction]([orderUid])).to.be.revertedWith(
+          "order still valid",
+        );
+      });
+    };
+
+    describe("freeFilledAmountStorage", () => {
+      it("should set filled amount to 0 for all orders", async () => {
+        for (const orderUid of orderUids) {
+          await settlement.connect(traders[0]).invalidateOrder(orderUid);
+          expect(await settlement.filledAmount(orderUid)).to.not.deep.equal(
+            ethers.constants.Zero,
+          );
+        }
+
+        await settlement.freeFilledAmountStorageTest(orderUids);
+        for (const orderUid of orderUids) {
+          expect(await settlement.filledAmount(orderUid)).to.equal(
+            ethers.constants.Zero,
+          );
+        }
+      });
+
+      commonTests("freeFilledAmountStorage");
+    });
+
+    describe("freePreSignatureStorage", () => {
+      it("should clear pre-signatures", async () => {
+        for (const orderUid of orderUids) {
+          await settlement.connect(traders[0]).setPreSignature(orderUid, true);
+          expect(await settlement.preSignature(orderUid)).to.equal(PRE_SIGNED);
+        }
+
+        await settlement.freePreSignatureStorageTest(orderUids);
+        for (const orderUid of orderUids) {
+          expect(await settlement.preSignature(orderUid)).to.equal(
+            ethers.constants.Zero,
+          );
+        }
+      });
+
+      commonTests("freePreSignatureStorage");
     });
   });
 });
