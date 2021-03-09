@@ -56,10 +56,6 @@ const updateNetworks: DeployFunction = async function ({
     "GPv2Settlement",
     settlementRecord.address,
   );
-  updateRecord("GPv2AllowanceManager", {
-    address: await settlement.allowanceManager(),
-    transactionHash: settlementRecord.transactionHash,
-  });
   updateRecord("GPv2VaultRelayer", {
     address: await settlement.vaultRelayer(),
     transactionHash: settlementRecord.transactionHash,

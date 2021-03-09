@@ -9,7 +9,6 @@ export interface TestDeployment {
   authenticator: Contract;
   vault: Contract;
   settlement: Contract;
-  allowanceManager: Contract;
   vaultRelayer: Contract;
   gasToken: Contract;
 }
@@ -45,10 +44,6 @@ export const deployTestContracts: () => Promise<TestDeployment> = deployments.cr
       "GPv2Settlement",
       GPv2Settlement.address,
     );
-    const allowanceManager = await ethers.getContractAt(
-      "GPv2AllowanceManager",
-      await settlement.allowanceManager(),
-    );
     const vaultRelayer = await ethers.getContractAt(
       "GPv2VaultRelayer",
       await settlement.vaultRelayer(),
@@ -64,7 +59,6 @@ export const deployTestContracts: () => Promise<TestDeployment> = deployments.cr
       authenticator,
       vault,
       settlement,
-      allowanceManager,
       vaultRelayer,
       gasToken: await deployGasToken(allWallets[0]),
     };

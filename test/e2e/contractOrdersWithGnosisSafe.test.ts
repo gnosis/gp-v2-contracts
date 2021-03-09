@@ -143,7 +143,7 @@ describe("E2E: Order From A Gnosis Safe", () => {
   let safeOwners: Wallet[];
 
   let settlement: Contract;
-  let allowanceManager: Contract;
+  let vaultRelayer: Contract;
   let safe: Contract;
   let domainSeparator: TypedDataDomain;
   let gnosisSafeManager: GnosisSafeManager;
@@ -155,7 +155,7 @@ describe("E2E: Order From A Gnosis Safe", () => {
     ({
       deployer,
       settlement,
-      allowanceManager,
+      vaultRelayer,
       wallets: [solver, trader, ...safeOwners],
     } = deployment);
 
@@ -199,7 +199,7 @@ describe("E2E: Order From A Gnosis Safe", () => {
     await weth.mint(trader.address, TRADER_SOLD_AMOUNT.add(TRADER_FEE));
     await weth
       .connect(trader)
-      .approve(allowanceManager.address, ethers.constants.MaxUint256);
+      .approve(vaultRelayer.address, ethers.constants.MaxUint256);
 
     encoder.signEncodeTrade(
       {
@@ -225,13 +225,13 @@ describe("E2E: Order From A Gnosis Safe", () => {
     const approveTransaction = {
       to: dai.address,
       data: dai.interface.encodeFunctionData("approve", [
-        allowanceManager.address,
+        vaultRelayer.address,
         ethers.constants.MaxUint256,
       ]),
     };
     await execSafeTransaction(safe, approveTransaction, safeOwners);
     expect(
-      await dai.allowance(safe.address, allowanceManager.address),
+      await dai.allowance(safe.address, vaultRelayer.address),
     ).to.deep.equal(ethers.constants.MaxUint256);
 
     const order = {
