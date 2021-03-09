@@ -42,7 +42,7 @@ export class TokenManager {
   }
 
   public async addToken(): Promise<Contract> {
-    const { allowanceManager, settlement, deployer } = this.deployment;
+    const { vaultRelayer, settlement, deployer } = this.deployment;
 
     const symbol = `T${this.instances.length.toString().padStart(3, "0")}`;
     debug(`creating token ${symbol} and funding traders`);
@@ -58,7 +58,7 @@ export class TokenManager {
 
     for (const trader of this.traders) {
       await token.mint(trader.address, LOTS);
-      await token.connect(trader).approve(allowanceManager.address, LOTS);
+      await token.connect(trader).approve(vaultRelayer.address, LOTS);
     }
 
     this.instances.push(token);
