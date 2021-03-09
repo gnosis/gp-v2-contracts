@@ -18,7 +18,7 @@ describe("E2E: EIP-2612 Permit", () => {
   let traders: Wallet[];
 
   let settlement: Contract;
-  let allowanceManager: Contract;
+  let vaultRelayer: Contract;
   let domainSeparator: TypedDataDomain;
 
   let eurs: [Contract, Contract];
@@ -28,7 +28,7 @@ describe("E2E: EIP-2612 Permit", () => {
 
     ({
       settlement,
-      allowanceManager,
+      vaultRelayer,
       wallets: [solver, ...traders],
     } = deployment);
 
@@ -52,7 +52,7 @@ describe("E2E: EIP-2612 Permit", () => {
     await eurs[0].mint(traders[0].address, ONE_EUR);
     await eurs[0]
       .connect(traders[0])
-      .approve(allowanceManager.address, ethers.constants.MaxUint256);
+      .approve(vaultRelayer.address, ethers.constants.MaxUint256);
     await encoder.signEncodeTrade(
       {
         kind: OrderKind.SELL,
@@ -73,7 +73,7 @@ describe("E2E: EIP-2612 Permit", () => {
 
     const permit = {
       owner: traders[1].address,
-      spender: allowanceManager.address,
+      spender: vaultRelayer.address,
       value: ONE_EUR,
       nonce: await eurs[1].nonces(traders[1].address),
       deadline: 0xffffffff,

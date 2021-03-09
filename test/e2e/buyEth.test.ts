@@ -21,7 +21,7 @@ describe("E2E: Buy Ether", () => {
   let traders: Wallet[];
 
   let settlement: Contract;
-  let allowanceManager: Contract;
+  let vaultRelayer: Contract;
   let domainSeparator: TypedDataDomain;
 
   let weth: Contract;
@@ -33,7 +33,7 @@ describe("E2E: Buy Ether", () => {
     ({
       deployer,
       settlement,
-      allowanceManager,
+      vaultRelayer,
       wallets: [solver, ...traders],
     } = deployment);
 
@@ -63,7 +63,7 @@ describe("E2E: Buy Ether", () => {
       .deposit({ value: ethers.utils.parseEther("1.001") });
     await weth
       .connect(traders[0])
-      .approve(allowanceManager.address, ethers.constants.MaxUint256);
+      .approve(vaultRelayer.address, ethers.constants.MaxUint256);
     await encoder.signEncodeTrade(
       {
         kind: OrderKind.SELL,
@@ -83,7 +83,7 @@ describe("E2E: Buy Ether", () => {
     await usdt.mint(traders[1].address, ethers.utils.parseUnits("1201.2", 6));
     await usdt
       .connect(traders[1])
-      .approve(allowanceManager.address, ethers.constants.MaxUint256);
+      .approve(vaultRelayer.address, ethers.constants.MaxUint256);
     await encoder.signEncodeTrade(
       {
         kind: OrderKind.BUY,
