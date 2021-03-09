@@ -34,7 +34,7 @@ contract GPv2VaultRelayer {
     /// owners to the caller.
     ///
     /// This function reverts if:
-    /// - The caller is not the creator of the allowance manager
+    /// - The caller is not the creator of the vault relayer
     /// - Any ERC20 transfer fails
     ///
     /// @param trades The executed trades whose sell amounts need to be
