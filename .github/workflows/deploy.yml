@@ -7,4 +7,27 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - run: 'true'
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+      - run: yarn --frozen-lockfile
+      - run: yarn build
+      - run: bash src/workflows/deploy.sh "automated-contract-deployment-${{github.run_number}}"
+        env:
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+          INFURA_KEY: ${{ secrets.INFURA_KEY }}
+          PK: ${{ secrets.PK }}
+      - uses: actions/github-script@v3
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          # https://octokit.github.io/rest.js/v18#pulls-create
+          script: |
+            await github.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: "Contract deployment",
+              head: "automated-contract-deployment-${{github.run_number}}",
+              base: "${{github.event.repository.default_branch}}",
+              body: "Build artifacts from automated contract deployment",
+            })

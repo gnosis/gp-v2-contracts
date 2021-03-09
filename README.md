@@ -56,7 +56,13 @@ yarn bench:trace
 
 ## Deployment
 
-### Deploying contracts
+Contracts deployment (including contract verification) is run automatically with GitHub Actions. The deployment process is triggered manually.
+Maintainers of this repository can deploy a new version of the contract in the "Actions" tab, "Deploy GPv2 contracts", "Run workflow". The target branch can be selected before running.
+A successful workflow results in a new PR asking to merge the deployment artifacts into the main branch.
+
+Contracts can also be deployed and verified manually as follows.
+
+### Deploying Contracts
 
 Choose the network and gas price in wei for the deployment.
 After replacing these values, run:
@@ -77,7 +83,7 @@ ETHERSCAN_API_KEY=<Your Key>
 yarn verify --network $NETWORK
 ```
 
-### Deployed Contract Addresses
+## Deployed Contract Addresses
 
 This package additionally contains a `networks.json` file at the root with the address of each deployed contract as well the hash of the Ethereum transaction used to create the contract.
 
