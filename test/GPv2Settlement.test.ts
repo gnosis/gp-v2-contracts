@@ -22,7 +22,6 @@ import {
 
 import {
   builtAndDeployedMetadataCoincide,
-  readAllowanceManagerImmutables,
   readVaultRelayerImmutables,
 } from "./bytecode";
 import { encodeOutTransfers } from "./encoding";
@@ -69,26 +68,6 @@ describe("GPv2Settlement", () => {
   describe("authenticator", () => {
     it("should be set to the authenticator the contract was initialized with", async () => {
       expect(await settlement.authenticator()).to.equal(authenticator.address);
-    });
-  });
-
-  describe("allowanceManager", () => {
-    it("should deploy an allowance manager", async () => {
-      const deployedAllowanceManager = await settlement.allowanceManager();
-      expect(
-        await builtAndDeployedMetadataCoincide(
-          deployedAllowanceManager,
-          "GPv2AllowanceManager",
-        ),
-      ).to.be.true;
-    });
-
-    it("should have the settlement contract as the creator", async () => {
-      const { creator } = await readAllowanceManagerImmutables(
-        await settlement.allowanceManager(),
-      );
-
-      expect(creator).to.equal(settlement.address);
     });
   });
 
@@ -1007,18 +986,6 @@ describe("GPv2Settlement", () => {
           ]),
         ),
       ).to.be.revertedWith("test error");
-    });
-
-    it("should revert when target is allowanceManager", async () => {
-      const invalidInteraction: Interaction = {
-        target: await settlement.allowanceManager(),
-        callData: [],
-        value: 0,
-      };
-
-      await expect(
-        settlement.executeInteractionsTest([invalidInteraction]),
-      ).to.be.revertedWith("GPv2: forbidden interaction");
     });
 
     it("should revert when target is vaultRelayer", async () => {
