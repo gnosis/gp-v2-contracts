@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-import "./GPv2AllowanceManager.sol";
 import "./GPv2VaultRelayer.sol";
 import "./interfaces/GPv2Authentication.sol";
 import "./interfaces/IVault.sol";
@@ -29,10 +28,6 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     /// Any valid authenticator implements an isSolver method called by the onlySolver
     /// modifier below.
     GPv2Authentication public immutable authenticator;
-
-    /// @dev The allowance manager which has access to order funds. This
-    /// contract is created during deployment
-    GPv2AllowanceManager public immutable allowanceManager;
 
     /// @dev The Balancer Vault relayer which can interact on behalf of users.
     /// This contract is created during deployment
@@ -72,7 +67,6 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
 
     constructor(GPv2Authentication authenticator_, IVault vault) {
         authenticator = authenticator_;
-        allowanceManager = new GPv2AllowanceManager();
         vaultRelayer = new GPv2VaultRelayer(vault);
     }
 
@@ -129,7 +123,7 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         GPv2TradeExecution.Data[] memory executedTrades =
             computeTradeExecutions(tokens, clearingPrices, trades);
 
-        allowanceManager.transferIn(executedTrades);
+        vaultRelayer.transferIn(executedTrades);
 
         executeInteractions(interactions[1]);
 
@@ -331,10 +325,9 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
             GPv2Interaction.Data calldata interaction = interactions[i];
 
             // To prevent possible attack on user funds, we explicitly disable
-            // any interactions with AllowanceManager contract.
+            // any interactions with the vault relayer contract.
             require(
-                interaction.target != address(allowanceManager) &&
-                    interaction.target != address(vaultRelayer),
+                interaction.target != address(vaultRelayer),
                 "GPv2: forbidden interaction"
             );
             GPv2Interaction.execute(interaction);

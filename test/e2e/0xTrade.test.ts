@@ -27,7 +27,7 @@ describe("E2E: Can settle a 0x trade", () => {
   let marketMaker: Wallet;
 
   let settlement: Contract;
-  let allowanceManager: Contract;
+  let vaultRelayer: Contract;
   let domainSeparator: TypedDataDomain;
 
   let owl: Contract;
@@ -39,7 +39,7 @@ describe("E2E: Can settle a 0x trade", () => {
     ({
       deployer,
       settlement,
-      allowanceManager,
+      vaultRelayer,
       wallets: [solver, trader, marketMaker],
     } = deployment);
 
@@ -123,7 +123,7 @@ describe("E2E: Can settle a 0x trade", () => {
       await owl.mint(trader.address, ethers.utils.parseEther("140"));
       await owl
         .connect(trader)
-        .approve(allowanceManager.address, ethers.constants.MaxUint256);
+        .approve(vaultRelayer.address, ethers.constants.MaxUint256);
 
       const zeroEx = await ZeroExV2.deployExchange(deployer);
 

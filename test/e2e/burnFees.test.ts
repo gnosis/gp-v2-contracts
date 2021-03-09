@@ -20,7 +20,7 @@ describe("E2E: Burn fees", () => {
   let traders: Wallet[];
 
   let settlement: Contract;
-  let allowanceManager: Contract;
+  let vaultRelayer: Contract;
   let domainSeparator: TypedDataDomain;
 
   let owl: Contract;
@@ -32,7 +32,7 @@ describe("E2E: Burn fees", () => {
     ({
       deployer,
       settlement,
-      allowanceManager,
+      vaultRelayer,
       wallets: [solver, ...traders],
     } = deployment);
 
@@ -56,7 +56,7 @@ describe("E2E: Burn fees", () => {
     await owl.mint(traders[0].address, ONE_USD.mul(1001));
     await owl
       .connect(traders[0])
-      .approve(allowanceManager.address, ethers.constants.MaxUint256);
+      .approve(vaultRelayer.address, ethers.constants.MaxUint256);
     await encoder.signEncodeTrade(
       {
         kind: OrderKind.SELL,
@@ -76,7 +76,7 @@ describe("E2E: Burn fees", () => {
     await dai.mint(traders[1].address, ONE_USD.mul(1000));
     await dai
       .connect(traders[1])
-      .approve(allowanceManager.address, ethers.constants.MaxUint256);
+      .approve(vaultRelayer.address, ethers.constants.MaxUint256);
 
     await encoder.signEncodeTrade(
       {
