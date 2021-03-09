@@ -69,34 +69,19 @@ export function immutableAsAddress(value: string): string {
   );
 }
 
-export async function readAllowanceManagerImmutables(
-  contractAddress: string,
-): Promise<{
-  creator: string;
-}> {
-  const [creator] = await readImmutables(
-    "src/contracts/GPv2AllowanceManager.sol:GPv2AllowanceManager",
-    contractAddress,
-  );
-
-  return {
-    creator: immutableAsAddress(creator),
-  };
-}
-
 export async function readVaultRelayerImmutables(
   contractAddress: string,
 ): Promise<{
   vault: string;
   creator: string;
 }> {
-  const [vault, creator] = await readImmutables(
+  const [creator, vault] = await readImmutables(
     "src/contracts/GPv2VaultRelayer.sol:GPv2VaultRelayer",
     contractAddress,
   );
 
   return {
-    vault: immutableAsAddress(vault),
     creator: immutableAsAddress(creator),
+    vault: immutableAsAddress(vault),
   };
 }
