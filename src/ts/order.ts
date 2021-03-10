@@ -62,7 +62,7 @@ export interface Order {
 }
 
 export interface OrderCancellation {
-  uid: BytesLike;
+  orderUid: BytesLike;
 }
 
 /**
@@ -207,7 +207,7 @@ export function hashOrderCancellation(
   return ethers.utils._TypedDataEncoder.hash(
     domain,
     { OrderCancellation: CANCELLATION_TYPE_FIELDS },
-    { orderUid: cancellation.uid },
+    cancellation,
   );
 }
 

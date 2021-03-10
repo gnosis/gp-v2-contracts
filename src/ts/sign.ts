@@ -161,7 +161,7 @@ function ecdsaSignOrderCancellation(
       return owner._signTypedData(
         domain,
         { OrderCancellation: CANCELLATION_TYPE_FIELDS },
-        { orderUid: cancellation.uid },
+        cancellation,
       );
 
     case SigningScheme.ETHSIGN:
