@@ -5,7 +5,7 @@ import "@tenderly/hardhat-tenderly";
 import { Deployment } from "hardhat-deploy/types";
 import { task } from "hardhat/config";
 
-function separateProxyedContracts(
+function separateProxiedContracts(
   allDeployments: Record<string, Deployment>,
 ): { proxied: string[]; unproxied: string[] } {
   const proxied = Object.entries(allDeployments)
@@ -26,7 +26,7 @@ const setupTenderlyTask: () => void = () => {
   task("tenderly", "Verifies smart contract code on Tenderly.").setAction(
     async (_, { deployments, tenderly }) => {
       const allDeployments = await deployments.all();
-      const { proxied, unproxied } = separateProxyedContracts(allDeployments);
+      const { proxied, unproxied } = separateProxiedContracts(allDeployments);
 
       const verificationInput = [];
       verificationInput.push(
