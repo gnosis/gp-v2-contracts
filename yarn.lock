@@ -757,6 +757,15 @@
   dependencies:
     defer-to-connect "^1.0.1"
 
+"@tenderly/hardhat-tenderly@^1.0.11":
+  version "1.0.11"
+  resolved "https://registry.yarnpkg.com/@tenderly/hardhat-tenderly/-/hardhat-tenderly-1.0.11.tgz#1c3938b2ee4bbd53a5e86e75526e1cbb9ff52eb7"
+  integrity sha512-ZWE8NYUaCNQfzLk4psVcwRXDadDzOWT6Il8hdazzOGYo4EF6vunv6/DHJTGR1JD/FLx7ub0HOwCAHJU8wL2l2A==
+  dependencies:
+    axios "^0.21.1"
+    fs-extra "^9.0.1"
+    js-yaml "^3.14.0"
+
 "@truffle/abi-utils@^0.1.5":
   version "0.1.5"
   resolved "https://registry.yarnpkg.com/@truffle/abi-utils/-/abi-utils-0.1.5.tgz#95b39ee0cb6baf777fdbaa2ac6d901ab8b0f8c58"
@@ -5111,7 +5120,7 @@ fs-extra@^8.1.0:
     jsonfile "^4.0.0"
     universalify "^0.1.0"
 
-fs-extra@^9.0.0:
+fs-extra@^9.0.0, fs-extra@^9.0.1:
   version "9.1.0"
   resolved "https://registry.yarnpkg.com/fs-extra/-/fs-extra-9.1.0.tgz#5954460c764a8da2094ba3554bf839e6b9a7c86d"
   integrity sha512-hcg3ZmepS30/7BSFqRvoo3DOMQu7IjqxO5nCDt+zM9XWjb33Wg7ziNT+Qvqbuc3+gWpzO02JubVyk2G4Zvo1OQ==
@@ -6309,7 +6318,7 @@ js-yaml@3.14.0:
     argparse "^1.0.7"
     esprima "^4.0.0"
 
-js-yaml@3.x, js-yaml@^3.12.0, js-yaml@^3.13.0, js-yaml@^3.13.1:
+js-yaml@3.x, js-yaml@^3.12.0, js-yaml@^3.13.0, js-yaml@^3.13.1, js-yaml@^3.14.0:
   version "3.14.1"
   resolved "https://registry.yarnpkg.com/js-yaml/-/js-yaml-3.14.1.tgz#dae812fdb3825fa306609a8717383c50c36a0537"
   integrity sha512-okMH7OXXJ7YrN9Ok3/SXrnu4iX9yOk+25nqX4imS2npuvTYDmo/QEZoqwZkYaIDk3jVvBOTOIEgEhaLOynBS9g==

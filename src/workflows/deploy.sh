@@ -38,8 +38,9 @@ yarn deploy --network mainnet --gasprice "$GAS_PRICE_WEI_MAINNET"
 # wait for Etherscan to register the new contracts on the blockchain
 sleep 60
 
-yarn verify --network rinkeby
-yarn verify --network mainnet
+yarn verify:etherscan --network rinkeby
+yarn verify:etherscan --network mainnet
+yarn verify:tenderly --network xdai
 
 if [ -n "$GIT_BRANCH" ]; then
   GIT_USERNAME="GitHub Actions"
