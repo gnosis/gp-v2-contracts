@@ -15,7 +15,6 @@ import {
   hashOrder,
   packOrderUidParams,
   signOrder,
-  signOrderCancellation,
 } from "../src/ts";
 
 import { decodeOrder, encodeOrder } from "./encoding";

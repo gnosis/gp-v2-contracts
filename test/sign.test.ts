@@ -24,7 +24,7 @@ function recoverSigningDigest(
 }
 
 describe("signOrderCancellation", () => {
-  it.only("should recover signing address for EIP712 scheme", async () => {
+  it("should recover signing address for EIP712 scheme", async () => {
     const [signer] = waffle.provider.getWallets();
     const domain = { name: "test" };
     const sampleOrderCancellation = {

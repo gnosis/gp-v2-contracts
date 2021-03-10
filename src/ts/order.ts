@@ -1,4 +1,4 @@
-import { BigNumberish, Bytes, BytesLike, ethers } from "ethers";
+import { BigNumberish, BytesLike, ethers } from "ethers";
 
 import { TypedDataDomain } from "./types/ethers";
 
