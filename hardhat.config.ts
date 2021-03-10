@@ -2,6 +2,7 @@ import "@nomiclabs/hardhat-waffle";
 import "hardhat-deploy";
 import "hardhat-gas-reporter";
 import "solidity-coverage";
+import "@tenderly/hardhat-tenderly";
 
 import dotenv from "dotenv";
 import type { HttpNetworkUserConfig } from "hardhat/types";
@@ -9,6 +10,7 @@ import type { MochaOptions } from "mocha";
 import yargs from "yargs";
 
 import { setupSolversTask } from "./src/tasks/solvers";
+import { setupTenderlyTask } from "./src/tasks/tenderly";
 
 const argv = yargs
   .option("network", {
@@ -60,6 +62,7 @@ switch (MOCHA_CONF) {
 }
 
 setupSolversTask();
+setupTenderlyTask();
 
 export default {
   mocha,
