@@ -204,15 +204,12 @@ export async function signOrder(
  * Returns the signature for the Order Cancellation with the signing scheme encoded
  * into the signature bytes.
  *
- * @param domain The domain to sign the order for. This is used by the smart
- * contract to ensure orders can't be replayed across different applications,
- * but also different deployments (as the contract chain ID and address are
- * mixed into to the domain value).
+ * @param domain The domain to sign the cancellation.
  * @param cancellation The cancellation to be signed.
  * @param owner The owner for the order used to sign.
  * @param scheme The signing scheme to use. See {@link SigningScheme} for more
  * details.
- * @return Encoded signature including signing scheme for the order.
+ * @return Encoded signature including signing scheme for the cancellation.
  */
 export async function signOrderCancellation(
   domain: TypedDataDomain,
