@@ -1,6 +1,14 @@
 import { BytesLike, ethers, Signer } from "ethers";
 
-import { ORDER_TYPE_FIELDS, Order, normalizeOrder, hashOrder } from "./order";
+import {
+  ORDER_TYPE_FIELDS,
+  CANCELLATION_TYPE_FIELDS,
+  Order,
+  normalizeOrder,
+  hashOrder,
+  hashOrderCancellation,
+  OrderCancellation,
+} from "./order";
 import {
   SignatureLike,
   isTypedDataSigner,
@@ -139,6 +147,33 @@ function ecdsaSignOrder(
   }
 }
 
+function ecdsaSignOrderCancellation(
+  domain: TypedDataDomain,
+  cancellation: OrderCancellation,
+  owner: Signer,
+  scheme: EcdsaSigningScheme,
+): Promise<string> {
+  switch (scheme) {
+    case SigningScheme.EIP712:
+      if (!isTypedDataSigner(owner)) {
+        throw new Error("signer does not support signing typed data");
+      }
+      return owner._signTypedData(
+        domain,
+        { OrderCancellation: CANCELLATION_TYPE_FIELDS },
+        { orderUid: cancellation.uid },
+      );
+
+    case SigningScheme.ETHSIGN:
+      return owner.signMessage(
+        ethers.utils.arrayify(hashOrderCancellation(domain, cancellation)),
+      );
+
+    default:
+      throw new Error("invalid signing scheme");
+  }
+}
+
 /**
  * Returns the signature for the specified order with the signing scheme encoded
  * into the signature bytes.
@@ -162,6 +197,32 @@ export async function signOrder(
   return {
     scheme,
     data: await ecdsaSignOrder(domain, order, owner, scheme),
+  };
+}
+
+/**
+ * Returns the signature for the Order Cancellation with the signing scheme encoded
+ * into the signature bytes.
+ *
+ * @param domain The domain to sign the order for. This is used by the smart
+ * contract to ensure orders can't be replayed across different applications,
+ * but also different deployments (as the contract chain ID and address are
+ * mixed into to the domain value).
+ * @param cancellation The cancellation to be signed.
+ * @param owner The owner for the order used to sign.
+ * @param scheme The signing scheme to use. See {@link SigningScheme} for more
+ * details.
+ * @return Encoded signature including signing scheme for the order.
+ */
+export async function signOrderCancellation(
+  domain: TypedDataDomain,
+  cancellation: OrderCancellation,
+  owner: Signer,
+  scheme: EcdsaSigningScheme,
+): Promise<EcdsaSignature> {
+  return {
+    scheme,
+    data: await ecdsaSignOrderCancellation(domain, cancellation, owner, scheme),
   };
 }
 

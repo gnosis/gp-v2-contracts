@@ -1,4 +1,4 @@
-import { BigNumberish, BytesLike, ethers } from "ethers";
+import { BigNumberish, Bytes, BytesLike, ethers } from "ethers";
 
 import { TypedDataDomain } from "./types/ethers";
 
@@ -61,6 +61,10 @@ export interface Order {
   partiallyFillable: boolean;
 }
 
+export interface OrderCancellation {
+  uid: BytesLike;
+}
+
 /**
  * Marker address to indicate that an order is buying Ether.
  *
@@ -114,6 +118,11 @@ export const ORDER_TYPE_FIELDS = [
   { name: "kind", type: "string" },
   { name: "partiallyFillable", type: "bool" },
 ];
+
+/**
+ * The EIP-712 type fields definition for a Gnosis Protocol v2 order.
+ */
+export const CANCELLATION_TYPE_FIELDS = [{ name: "orderUid", type: "bytes" }];
 
 /**
  * The EIP-712 type hash for a Gnosis Protocol v2 order.
@@ -181,6 +190,24 @@ export function hashOrder(domain: TypedDataDomain, order: Order): string {
     domain,
     { Order: ORDER_TYPE_FIELDS },
     normalizeOrder(order),
+  );
+}
+
+/**
+ * Compute the 32-byte signing hash for the specified cancellation.
+ *
+ * @param domain The EIP-712 domain separator to compute the hash for.
+ * @param cancellation The cancellation to compute the digest for.
+ * @return Hex-encoded 32-byte order digest.
+ */
+export function hashOrderCancellation(
+  domain: TypedDataDomain,
+  cancellation: OrderCancellation,
+): string {
+  return ethers.utils._TypedDataEncoder.hash(
+    domain,
+    { OrderCancellation: CANCELLATION_TYPE_FIELDS },
+    { orderUid: cancellation.uid },
   );
 }
 

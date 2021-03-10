@@ -15,6 +15,7 @@ import {
   hashOrder,
   packOrderUidParams,
   signOrder,
+  signOrderCancellation,
 } from "../src/ts";
 
 import { decodeOrder, encodeOrder } from "./encoding";
@@ -312,6 +313,44 @@ describe("GPv2Signing", () => {
             signature,
           ),
         ).to.equal(traders[0].address);
+      }
+    });
+
+    it.only("should recover signing address for all supported ECDSA-based schemes", async () => {
+      console.log(
+        "TEST DOMAIN",
+        ethers.utils._TypedDataEncoder.hashDomain({ name: "test" }),
+      );
+      const orderUid = packOrderUidParams({
+        orderDigest: ethers.constants.HashZero,
+        owner: traders[0].address,
+        validTo: 0xffffffff,
+      });
+      console.log("OrderUid", orderUid);
+      console.log("Signer Address", traders[0].address);
+      const sampleOrderCancellation = {
+        uid: orderUid,
+      };
+      for (const scheme of [
+        SigningScheme.EIP712,
+        SigningScheme.ETHSIGN,
+      ] as const) {
+        const { data: signature } = await signOrderCancellation(
+          testDomain,
+          sampleOrderCancellation,
+          traders[0],
+          scheme,
+        );
+        console.log("Scheme", scheme);
+        console.log("Signature", signature);
+
+        // expect(
+        //   await signing.recoverOrderSignerTest(
+        //     encodeOrder(sampleOrder),
+        //     scheme,
+        //     signature,
+        //   ),
+        // ).to.equal(traders[0].address);
       }
     });
 
