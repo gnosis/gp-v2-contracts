@@ -5,8 +5,6 @@ import {
   SigningScheme,
   signOrderCancellation,
   hashOrderCancellation,
-  // TypedDataDomain,
-  // OrderCancellation,
 } from "../src/ts";
 
 function recoverSigningDigest(
