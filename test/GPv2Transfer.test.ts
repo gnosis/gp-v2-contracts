@@ -74,23 +74,29 @@ describe("GPv2Transfer", () => {
         useInternalBalance: (i & 1) == 1,
       }));
 
-      for (const { account } of transfers.filter(
-        (transfer) => !transfer.useInternalBalance,
-      )) {
+      const [externalTransfers, internalTransfers] = [
+        transfers.filter((transfer) => !transfer.useInternalBalance),
+        transfers.filter((transfer) => transfer.useInternalBalance),
+      ];
+      // NOTE: Make sure we have at least 2 of each flavour of transfer, this
+      // avoids this test not achieving what it expects because of reasonable
+      // changes elsewhere in the file (like only having 3 traders for example).
+      expect(externalTransfers).to.have.length.above(1);
+      expect(internalTransfers).to.have.length.above(1);
+
+      for (const { account } of externalTransfers) {
         await token.mock.transferFrom
           .withArgs(account, recipient.address, amount)
           .returns(true);
       }
       await vault.mock.withdrawFromInternalBalance
         .withArgs(
-          transfers
-            .filter((transfer) => transfer.useInternalBalance)
-            .map(({ account }) => ({
-              token: token.address,
-              amount,
-              sender: account,
-              recipient: recipient.address,
-            })),
+          internalTransfers.map(({ account }) => ({
+            token: token.address,
+            amount,
+            sender: account,
+            recipient: recipient.address,
+          })),
         )
         .returns();
 
@@ -103,17 +109,19 @@ describe("GPv2Transfer", () => {
       ).to.not.be.reverted;
     });
 
-    it("reverts when mistakenly trying to transfer ETH", async () => {
-      await expect(
-        transfer.transferToRecipientTest(vault.address, recipient.address, [
-          {
-            account: traders[0].address,
-            token: BUY_ETH_ADDRESS,
-            amount: amount,
-            useInternalBalance: false,
-          },
-        ]),
-      ).to.be.revertedWith("GPv2: cannot transfer native ETH");
+    it("reverts when mistakenly trying to transfer Ether", async () => {
+      for (const useInternalBalance of [false, true]) {
+        await expect(
+          transfer.transferToRecipientTest(vault.address, recipient.address, [
+            {
+              account: traders[0].address,
+              token: BUY_ETH_ADDRESS,
+              amount: amount,
+              useInternalBalance,
+            },
+          ]),
+        ).to.be.revertedWith("GPv2: cannot transfer native ETH");
+      }
     });
 
     it("should revert on failed ERC20 transfers", async () => {
