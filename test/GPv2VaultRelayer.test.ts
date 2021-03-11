@@ -4,8 +4,6 @@ import { MockContract } from "ethereum-waffle";
 import { Contract } from "ethers";
 import { artifacts, ethers, waffle } from "hardhat";
 
-import { encodeInTransfers } from "./encoding";
-
 describe("GPv2VaultRelayer", () => {
   const [
     deployer,
@@ -28,14 +26,14 @@ describe("GPv2VaultRelayer", () => {
     vaultRelayer = await GPv2VaultRelayer.deploy(vault.address);
   });
 
-  describe("transferIn", () => {
+  describe("transferFromAccounts", () => {
     it("should revert if not called by the creator", async () => {
       await expect(
-        vaultRelayer.connect(nonCreator).transferIn([]),
+        vaultRelayer.connect(nonCreator).transferFromAccounts([]),
       ).to.be.revertedWith("not creator");
     });
 
-    it("should execute ERC20 transfers", async () => {
+    it("should execute ERC20 and Vault transfers", async () => {
       const tokens = [
         await waffle.deployMockContract(deployer, IERC20.abi),
         await waffle.deployMockContract(deployer, IERC20.abi),
@@ -45,25 +43,32 @@ describe("GPv2VaultRelayer", () => {
       await tokens[0].mock.transferFrom
         .withArgs(traders[0].address, creator.address, amount)
         .returns(true);
-      await tokens[1].mock.transferFrom
-        .withArgs(traders[1].address, creator.address, amount)
-        .returns(true);
+      await vault.mock.withdrawFromInternalBalance
+        .withArgs([
+          {
+            token: tokens[1].address,
+            amount,
+            sender: traders[1].address,
+            recipient: creator.address,
+          },
+        ])
+        .returns();
 
       await expect(
-        vaultRelayer.transferIn(
-          encodeInTransfers([
-            {
-              owner: traders[0].address,
-              sellToken: tokens[0].address,
-              sellAmount: amount,
-            },
-            {
-              owner: traders[1].address,
-              sellToken: tokens[1].address,
-              sellAmount: amount,
-            },
-          ]),
-        ),
+        vaultRelayer.transferFromAccounts([
+          {
+            account: traders[0].address,
+            token: tokens[0].address,
+            amount,
+            useInternalBalance: false,
+          },
+          {
+            account: traders[1].address,
+            token: tokens[1].address,
+            amount,
+            useInternalBalance: true,
+          },
+        ]),
       ).to.not.be.reverted;
     });
 
@@ -76,15 +81,41 @@ describe("GPv2VaultRelayer", () => {
         .revertsWithReason("test error");
 
       await expect(
-        vaultRelayer.transferIn(
-          encodeInTransfers([
-            {
-              owner: traders[0].address,
-              sellToken: token.address,
-              sellAmount: amount,
-            },
-          ]),
-        ),
+        vaultRelayer.transferFromAccounts([
+          {
+            account: traders[0].address,
+            token: token.address,
+            amount,
+            useInternalBalance: false,
+          },
+        ]),
+      ).to.be.revertedWith("test error");
+    });
+
+    it("should revert on failed Vault withdrawals", async () => {
+      const token = await waffle.deployMockContract(deployer, IERC20.abi);
+
+      const amount = ethers.utils.parseEther("4.2");
+      await vault.mock.withdrawFromInternalBalance
+        .withArgs([
+          {
+            token: token.address,
+            amount,
+            sender: traders[0].address,
+            recipient: creator.address,
+          },
+        ])
+        .revertsWithReason("test error");
+
+      await expect(
+        vaultRelayer.transferFromAccounts([
+          {
+            account: traders[0].address,
+            token: token.address,
+            amount,
+            useInternalBalance: true,
+          },
+        ]),
       ).to.be.revertedWith("test error");
     });
   });
