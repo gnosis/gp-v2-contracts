@@ -9,8 +9,7 @@ import type { HttpNetworkUserConfig } from "hardhat/types";
 import type { MochaOptions } from "mocha";
 import yargs from "yargs";
 
-import { setupSolversTask } from "./src/tasks/solvers";
-import { setupTenderlyTask } from "./src/tasks/tenderly";
+import { setupTasks } from "./src/tasks";
 
 const argv = yargs
   .option("network", {
@@ -61,8 +60,7 @@ switch (MOCHA_CONF) {
     throw new Error("Invalid MOCHA_CONF");
 }
 
-setupSolversTask();
-setupTenderlyTask();
+setupTasks();
 
 export default {
   mocha,
