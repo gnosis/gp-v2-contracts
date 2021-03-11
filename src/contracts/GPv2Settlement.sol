@@ -335,9 +335,9 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
             orderUid
         );
 
-        inTransfer.amount = executedSellAmount;
         inTransfer.account = recoveredOrder.owner;
         inTransfer.token = order.sellToken;
+        inTransfer.amount = executedSellAmount;
         inTransfer.useInternalBalance = order.useInternalSellTokenBalance;
 
         outTransfer.account = recoveredOrder.receiver;
