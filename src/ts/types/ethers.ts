@@ -12,6 +12,9 @@ export type TypedDataDomain = Parameters<
   typeof ethers.utils._TypedDataEncoder.hashDomain
 >[0];
 
+/**
+ * Ethers EIP-712 typed data signer interface.
+ */
 export interface TypedDataSigner extends Signer {
   /**
    * Signs the typed data value with types data structure for domain using the
@@ -20,6 +23,9 @@ export interface TypedDataSigner extends Signer {
   _signTypedData: typeof ethers.VoidSigner.prototype._signTypedData;
 }
 
+/**
+ * Checks whether the specified signer is a typed data signer.
+ */
 export function isTypedDataSigner(signer: Signer): signer is TypedDataSigner {
   return "_signTypedData" in signer;
 }

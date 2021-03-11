@@ -1,5 +1,4 @@
 import { utils } from "ethers";
-import { Artifact } from "hardhat/types";
 
 /**
  * The salt used when deterministically deploying smart contracts.
@@ -40,9 +39,17 @@ export type DeploymentArguments<
   : unknown[];
 
 /**
+ * Allowed ABI definition types by Ethers.js.
+ */
+export type Abi = ConstructorParameters<typeof utils.Interface>[0];
+
+/**
  * Artifact information important for computing deterministic deployments.
  */
-export type ArtifactDeployment = Pick<Artifact, "abi" | "bytecode">;
+export interface ArtifactDeployment {
+  abi: Abi;
+  bytecode: string;
+}
 
 /**
  * An artifact with a contract name matching one of the deterministically
