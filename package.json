@@ -3,11 +3,16 @@
   "version": "0.0.1-alpha.13",
   "license": "LGPL-3.0-or-later",
   "scripts": {
-    "build": "tsc && hardhat compile",
     "deploy": "hardhat deploy",
     "verify:etherscan": "hardhat etherscan-verify --license LGPL-3.0 --force-license",
     "verify:tenderly": "hardhat tenderly",
     "solvers": "hardhat solvers",
+    "build": "yarn build:sol && yarn build:ts",
+    "build:sol": "hardhat compile",
+    "build:ts": "tsc && tsc -p tsconfig.lib.esm.json && tsc -p tsconfig.lib.commonjs.json",
+    "lint": "yarn lint:sol && yarn lint:ts",
+    "lint:sol": "solhint 'src/contracts/**/*.sol'",
+    "lint:ts": "eslint --max-warnings 0 .",
     "test": "hardhat test",
     "test:ignored-in-coverage": "MOCHA_CONF='ignored in coverage' hardhat test",
     "coverage": "MOCHA_CONF='coverage' hardhat coverage",
@@ -16,9 +21,6 @@
     "bench:single": "hardhat run bench/single.ts",
     "bench:trace": "hardhat run bench/trace/index.ts",
     "bench:uniswap": "hardhat run bench/uniswap/index.ts",
-    "lint": "yarn lint:sol && yarn lint:ts",
-    "lint:sol": "solhint 'src/contracts/**/*.sol'",
-    "lint:ts": "eslint --max-warnings 0 .",
     "fmt:sol": "prettier 'src/contracts/**/*.sol' -w",
     "prepack": "yarn build"
   },
@@ -65,12 +67,13 @@
     "typescript": "^4.2.3",
     "yargs": "^16.2.0"
   },
-  "main": "lib/src/ts/index.js",
-  "types": "lib/src/ts/index.d.ts",
+  "main": "lib/commonjs/index.js",
+  "module": "lib/esm/index.js",
+  "types": "lib/esm/index.d.ts",
   "files": [
     "build/",
     "deployments/",
-    "lib/src/",
+    "lib/",
     "networks.json",
     "src/"
   ]
