@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.lib.commonjs.json",
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "es2020",
+    "moduleResolution": "node",
+    "outDir": "lib/esm/",
+    "declaration": false
+  }
+}
