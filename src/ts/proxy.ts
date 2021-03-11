@@ -1,15 +1,18 @@
-// defined in https://eips.ethereum.org/EIPS/eip-1967
+import { BigNumber, BytesLike, Contract, ethers } from "ethers";
 
-import { BigNumber, Contract, ethers } from "ethers";
-
-// The proxy contract used by hardhat-deploy implements EIP-1967 (Standard Proxy
-// Storage Slot). See <https://eips.ethereum.org/EIPS/eip-1967>.
-function slot(string: string) {
+/**
+ * Compute an EIP-1967 slot for the specified name. The proxy contract used by
+ * `hardhat-deploy` implements EIP-1967 (Standard Proxy Storage Slot).
+ *
+ * <https://eips.ethereum.org/EIPS/eip-1967>.
+ */
+function slot(name: string): BytesLike {
   return ethers.utils.defaultAbiCoder.encode(
     ["bytes32"],
-    [BigNumber.from(ethers.utils.id(string)).sub(1)],
+    [BigNumber.from(ethers.utils.id(name)).sub(1)],
   );
 }
+
 const IMPLEMENTATION_STORAGE_SLOT = slot("eip1967.proxy.implementation");
 const OWNER_STORAGE_SLOT = slot("eip1967.proxy.admin");
 
@@ -50,7 +53,9 @@ export async function ownerAddress(
 }
 
 /**
- * EIP-173 proxy ABI in "Human-readable ABI format".
+ * EIP-173 proxy ABI in "human-readable ABI" format. The proxy used by the
+ * deployment plugin implements this interface, and copying it here avoids
+ * pulling in `hardhat` as a dependency for just this ABI.
  *
  * <https://eips.ethereum.org/EIPS/eip-173#specification>
  */
