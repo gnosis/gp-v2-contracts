@@ -9,7 +9,7 @@
     "solvers": "hardhat solvers",
     "build": "yarn build:sol && yarn build:ts",
     "build:sol": "hardhat compile",
-    "build:ts": "tsc && tsc -p tsconfig.lib.commonjs.json && tsc -p tsconfig.lib.esm.json",
+    "build:ts": "tsc && tsc -p tsconfig.lib.esm.json && tsc -p tsconfig.lib.commonjs.json",
     "lint": "yarn lint:sol && yarn lint:ts",
     "lint:sol": "solhint 'src/contracts/**/*.sol'",
     "lint:ts": "eslint --max-warnings 0 .",
@@ -68,8 +68,8 @@
     "yargs": "^16.2.0"
   },
   "main": "lib/commonjs/index.js",
-  "types": "lib/commonjs/index.d.ts",
   "module": "lib/esm/index.js",
+  "types": "lib/esm/index.d.ts",
   "files": [
     "build/",
     "deployments/",

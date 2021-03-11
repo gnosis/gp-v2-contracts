@@ -1,13 +1,9 @@
 {
-  "extends": "./tsconfig.json",
+  "extends": "./tsconfig.lib.esm.json",
   "compilerOptions": {
     "target": "es5",
     "module": "commonjs",
     "outDir": "lib/commonjs/",
-    "declaration": true,
-    "sourceMap": true,
-    "rootDir": "src/ts/",
-    "noEmit": false
-  },
-  "include": ["src/ts/**/*"]
+    "declaration": false
+  }
 }

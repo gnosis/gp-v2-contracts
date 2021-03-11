@@ -1,10 +1,13 @@
 {
-  "extends": "./tsconfig.lib.commonjs.json",
+  "extends": "./tsconfig.json",
   "compilerOptions": {
     "target": "es2020",
     "module": "es2020",
-    "moduleResolution": "node",
     "outDir": "lib/esm/",
-    "declaration": false
-  }
+    "declaration": true,
+    "sourceMap": true,
+    "rootDir": "src/ts/",
+    "noEmit": false
+  },
+  "include": ["src/ts/**/*"]
 }
