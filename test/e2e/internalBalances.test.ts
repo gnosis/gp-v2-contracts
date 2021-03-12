@@ -90,20 +90,19 @@ describe("E2E: Should allow trading with Vault internal balances", () => {
         feeAmount: ethers.utils.parseEther("0.001"),
         validTo: 0xffffffff,
         appData: 1,
-        useInternalBuyTokenBalance: true,
       },
       traders[0],
       SigningScheme.EIP712,
     );
 
-    await tokens[1].mint(traders[1].address, ethers.utils.parseEther("600.6"));
+    await tokens[1].mint(traders[1].address, ethers.utils.parseEther("300.3"));
     await tokens[1]
       .connect(traders[1])
       .approve(vault.address, ethers.constants.MaxUint256);
     await vault.connect(traders[1]).depositToInternalBalance([
       {
         token: tokens[1].address,
-        amount: ethers.utils.parseEther("600.6"),
+        amount: ethers.utils.parseEther("300.3"),
         sender: traders[1].address,
         recipient: traders[1].address,
       },
@@ -117,14 +116,68 @@ describe("E2E: Should allow trading with Vault internal balances", () => {
         partiallyFillable: false,
         buyToken: tokens[0].address,
         sellToken: tokens[1].address,
-        buyAmount: ethers.utils.parseEther("1.0"),
-        sellAmount: ethers.utils.parseEther("600.0"),
-        feeAmount: ethers.utils.parseEther("0.6"),
+        buyAmount: ethers.utils.parseEther("0.5"),
+        sellAmount: ethers.utils.parseEther("300.0"),
+        feeAmount: ethers.utils.parseEther("0.3"),
         validTo: 0xffffffff,
         appData: 2,
         useInternalSellTokenBalance: true,
       },
       traders[1],
+      SigningScheme.EIP712,
+    );
+
+    await tokens[0].mint(traders[2].address, ethers.utils.parseEther("2.002"));
+    await tokens[0]
+      .connect(traders[2])
+      .approve(vaultRelayer.address, ethers.constants.MaxUint256);
+    await encoder.signEncodeTrade(
+      {
+        kind: OrderKind.SELL,
+        partiallyFillable: false,
+        sellToken: tokens[0].address,
+        buyToken: tokens[1].address,
+        sellAmount: ethers.utils.parseEther("2.0"),
+        buyAmount: ethers.utils.parseEther("1000.0"),
+        feeAmount: ethers.utils.parseEther("0.002"),
+        validTo: 0xffffffff,
+        appData: 2,
+        useInternalBuyTokenBalance: true,
+      },
+      traders[2],
+      SigningScheme.EIP712,
+    );
+
+    await tokens[1].mint(traders[3].address, ethers.utils.parseEther("1501.5"));
+    await tokens[1]
+      .connect(traders[3])
+      .approve(vault.address, ethers.constants.MaxUint256);
+    await vault.connect(traders[3]).depositToInternalBalance([
+      {
+        token: tokens[1].address,
+        amount: ethers.utils.parseEther("1501.5"),
+        sender: traders[3].address,
+        recipient: traders[3].address,
+      },
+    ]);
+    await vault
+      .connect(traders[3])
+      .changeRelayerAllowance(vaultRelayer.address, true);
+    await encoder.signEncodeTrade(
+      {
+        kind: OrderKind.BUY,
+        partiallyFillable: false,
+        buyToken: tokens[0].address,
+        sellToken: tokens[1].address,
+        buyAmount: ethers.utils.parseEther("2.5"),
+        sellAmount: ethers.utils.parseEther("1500.0"),
+        feeAmount: ethers.utils.parseEther("1.5"),
+        validTo: 0xffffffff,
+        appData: 2,
+        useInternalSellTokenBalance: true,
+        useInternalBuyTokenBalance: true,
+      },
+      traders[3],
       SigningScheme.EIP712,
     );
 
@@ -135,18 +188,24 @@ describe("E2E: Should allow trading with Vault internal balances", () => {
       }),
     );
 
-    expect(
-      await vault.getInternalBalance(traders[0].address, [tokens[1].address]),
-    ).to.deep.equal([ethers.utils.parseEther("550")]);
-    expect(await tokens[0].balanceOf(traders[1].address)).to.equal(
-      ethers.utils.parseEther("1.0"),
+    expect(await tokens[1].balanceOf(traders[0].address)).to.equal(
+      ethers.utils.parseEther("550.0"),
     );
+    expect(await tokens[0].balanceOf(traders[1].address)).to.equal(
+      ethers.utils.parseEther("0.5"),
+    );
+    expect(
+      await vault.getInternalBalance(traders[2].address, [tokens[1].address]),
+    ).to.deep.equal([ethers.utils.parseEther("1100")]);
+    expect(
+      await vault.getInternalBalance(traders[3].address, [tokens[0].address]),
+    ).to.deep.equal([ethers.utils.parseEther("2.5")]);
 
     expect(await tokens[0].balanceOf(settlement.address)).to.equal(
-      ethers.utils.parseEther("0.001"),
+      ethers.utils.parseEther("0.003"),
     );
     expect(await tokens[1].balanceOf(settlement.address)).to.equal(
-      ethers.utils.parseEther("0.6"),
+      ethers.utils.parseEther("1.8"),
     );
   });
 });
