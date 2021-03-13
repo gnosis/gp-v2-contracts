@@ -1,3 +1,4 @@
+import { TypedDataField } from "@ethersproject/abstract-signer";
 import { BigNumberish, BytesLike, ethers } from "ethers";
 
 import { TypedDataDomain } from "./types/ethers";
@@ -182,11 +183,26 @@ export function normalizeOrder(order: Order): NormalizedOrder {
  * Compute the 32-byte signing hash for the specified order.
  *
  * @param domain The EIP-712 domain separator to compute the hash for.
+ * @param types The order to compute the digest for.
+ * @return Hex-encoded 32-byte order digest.
+ */
+export function hashTypedData(
+  domain: TypedDataDomain,
+  types: Record<string, TypedDataField[]>,
+  data: NormalizedOrder | OrderCancellation,
+): string {
+  return ethers.utils._TypedDataEncoder.hash(domain, types, data);
+}
+
+/**
+ * Compute the 32-byte signing hash for the specified order.
+ *
+ * @param domain The EIP-712 domain separator to compute the hash for.
  * @param order The order to compute the digest for.
  * @return Hex-encoded 32-byte order digest.
  */
 export function hashOrder(domain: TypedDataDomain, order: Order): string {
-  return ethers.utils._TypedDataEncoder.hash(
+  return hashTypedData(
     domain,
     { Order: ORDER_TYPE_FIELDS },
     normalizeOrder(order),
@@ -204,7 +220,7 @@ export function hashOrderCancellation(
   domain: TypedDataDomain,
   cancellation: OrderCancellation,
 ): string {
-  return ethers.utils._TypedDataEncoder.hash(
+  return hashTypedData(
     domain,
     { OrderCancellation: CANCELLATION_TYPE_FIELDS },
     cancellation,

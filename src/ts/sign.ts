@@ -1,3 +1,4 @@
+import { TypedDataField } from "@ethersproject/abstract-signer";
 import { BytesLike, ethers, Signer } from "ethers";
 
 import {
@@ -8,6 +9,7 @@ import {
   hashOrder,
   hashOrderCancellation,
   OrderCancellation,
+  NormalizedOrder,
 } from "./order";
 import {
   SignatureLike,
@@ -122,52 +124,23 @@ export interface PreSignSignature {
   data: string;
 }
 
-function ecdsaSignOrder(
-  domain: TypedDataDomain,
-  order: Order,
-  owner: Signer,
+function ecdsaSignTypedData(
   scheme: EcdsaSigningScheme,
+  owner: Signer,
+  domain: TypedDataDomain,
+  types: Record<string, TypedDataField[]>,
+  eip712Value: NormalizedOrder | OrderCancellation,
+  ethSignValue: string,
 ): Promise<string> {
   switch (scheme) {
     case SigningScheme.EIP712:
       if (!isTypedDataSigner(owner)) {
         throw new Error("signer does not support signing typed data");
       }
-      return owner._signTypedData(
-        domain,
-        { Order: ORDER_TYPE_FIELDS },
-        normalizeOrder(order),
-      );
+      return owner._signTypedData(domain, types, eip712Value);
 
     case SigningScheme.ETHSIGN:
-      return owner.signMessage(ethers.utils.arrayify(hashOrder(domain, order)));
-
-    default:
-      throw new Error("invalid signing scheme");
-  }
-}
-
-function ecdsaSignOrderCancellation(
-  domain: TypedDataDomain,
-  cancellation: OrderCancellation,
-  owner: Signer,
-  scheme: EcdsaSigningScheme,
-): Promise<string> {
-  switch (scheme) {
-    case SigningScheme.EIP712:
-      if (!isTypedDataSigner(owner)) {
-        throw new Error("signer does not support signing typed data");
-      }
-      return owner._signTypedData(
-        domain,
-        { OrderCancellation: CANCELLATION_TYPE_FIELDS },
-        cancellation,
-      );
-
-    case SigningScheme.ETHSIGN:
-      return owner.signMessage(
-        ethers.utils.arrayify(hashOrderCancellation(domain, cancellation)),
-      );
+      return owner.signMessage(ethers.utils.arrayify(ethSignValue));
 
     default:
       throw new Error("invalid signing scheme");
@@ -196,7 +169,14 @@ export async function signOrder(
 ): Promise<EcdsaSignature> {
   return {
     scheme,
-    data: await ecdsaSignOrder(domain, order, owner, scheme),
+    data: await ecdsaSignTypedData(
+      scheme,
+      owner,
+      domain,
+      { Order: ORDER_TYPE_FIELDS },
+      normalizeOrder(order),
+      hashOrder(domain, order),
+    ),
   };
 }
 
@@ -213,13 +193,20 @@ export async function signOrder(
  */
 export async function signOrderCancellation(
   domain: TypedDataDomain,
-  cancellation: OrderCancellation,
+  orderUid: BytesLike,
   owner: Signer,
   scheme: EcdsaSigningScheme,
 ): Promise<EcdsaSignature> {
   return {
     scheme,
-    data: await ecdsaSignOrderCancellation(domain, cancellation, owner, scheme),
+    data: await ecdsaSignTypedData(
+      scheme,
+      owner,
+      domain,
+      { OrderCancellation: CANCELLATION_TYPE_FIELDS },
+      { orderUid },
+      hashOrderCancellation(domain, { orderUid }),
+    ),
   };
 }
 

@@ -25,23 +25,22 @@ describe("signOrderCancellation", () => {
   it("should recover signing address for all supported signing schemes", async () => {
     const [signer] = waffle.provider.getWallets();
     const domain = { name: "test" };
-    const sampleOrderCancellation = {
-      orderUid: `0x${"2a".repeat(56)}`,
-    };
+    const orderUid = `0x${"2a".repeat(56)}`;
+
     for (const scheme of [
       SigningScheme.EIP712,
       SigningScheme.ETHSIGN,
     ] as const) {
       const { data: signature } = await signOrderCancellation(
         domain,
-        sampleOrderCancellation,
+        orderUid,
         signer,
         scheme,
       );
 
       const signingHash = recoverSigningDigest(
         scheme,
-        hashOrderCancellation(domain, sampleOrderCancellation),
+        hashOrderCancellation(domain, { orderUid }),
       );
       expect(ethers.utils.recoverAddress(signingHash, signature)).to.equal(
         signer.address,
