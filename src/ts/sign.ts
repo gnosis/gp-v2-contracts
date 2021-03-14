@@ -6,10 +6,9 @@ import {
   CANCELLATION_TYPE_FIELDS,
   Order,
   normalizeOrder,
-  hashOrder,
-  hashOrderCancellation,
   OrderCancellation,
   NormalizedOrder,
+  hashTypedData,
 } from "./order";
 import {
   SignatureLike,
@@ -129,18 +128,19 @@ function ecdsaSignTypedData(
   owner: Signer,
   domain: TypedDataDomain,
   types: Record<string, TypedDataField[]>,
-  eip712Value: NormalizedOrder | OrderCancellation,
-  ethSignValue: string,
+  data: NormalizedOrder | OrderCancellation,
 ): Promise<string> {
   switch (scheme) {
     case SigningScheme.EIP712:
       if (!isTypedDataSigner(owner)) {
         throw new Error("signer does not support signing typed data");
       }
-      return owner._signTypedData(domain, types, eip712Value);
+      return owner._signTypedData(domain, types, data);
 
     case SigningScheme.ETHSIGN:
-      return owner.signMessage(ethers.utils.arrayify(ethSignValue));
+      return owner.signMessage(
+        ethers.utils.arrayify(hashTypedData(domain, types, data)),
+      );
 
     default:
       throw new Error("invalid signing scheme");
@@ -175,7 +175,6 @@ export async function signOrder(
       domain,
       { Order: ORDER_TYPE_FIELDS },
       normalizeOrder(order),
-      hashOrder(domain, order),
     ),
   };
 }
@@ -205,7 +204,6 @@ export async function signOrderCancellation(
       domain,
       { OrderCancellation: CANCELLATION_TYPE_FIELDS },
       { orderUid },
-      hashOrderCancellation(domain, { orderUid }),
     ),
   };
 }
