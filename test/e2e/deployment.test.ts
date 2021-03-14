@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { Contract, Wallet } from "ethers";
-import { artifacts } from "hardhat";
+import { artifacts, ethers } from "hardhat";
 import Proxy from "hardhat-deploy/extendedArtifacts/EIP173Proxy.json";
 
 import {
@@ -50,7 +50,7 @@ describe("E2E: Deployment", () => {
     it("authenticator", async () => {
       expect(
         await builtAndDeployedMetadataCoincide(
-          await implementationAddress(authenticator.address),
+          await implementationAddress(ethers.provider, authenticator.address),
           "GPv2AllowListAuthentication",
         ),
       ).to.be.true;
@@ -80,7 +80,7 @@ describe("E2E: Deployment", () => {
       it("proxy", async () => {
         expect(
           deterministicDeploymentAddress(Proxy, [
-            await implementationAddress(authenticator.address),
+            await implementationAddress(ethers.provider, authenticator.address),
             authenticator.interface.encodeFunctionData("initializeManager", [
               manager.address,
             ]),
@@ -91,7 +91,7 @@ describe("E2E: Deployment", () => {
 
       it("implementation", async () => {
         expect(await contractAddress("GPv2AllowListAuthentication")).to.equal(
-          await implementationAddress(authenticator.address),
+          await implementationAddress(ethers.provider, authenticator.address),
         );
       });
     });

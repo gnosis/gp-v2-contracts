@@ -1,13 +1,12 @@
 {
   "compilerOptions": {
-    "declaration": true,
-    "esModuleInterop": true,
+    "target": "es2020",
     "module": "commonjs",
     "moduleResolution": "node",
-    "outDir": "lib",
-    "resolveJsonModule": true,
-    "skipLibCheck": true,
+    "noEmit": true,
     "strict": true,
-    "target": "es2020"
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true
   }
 }

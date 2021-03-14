@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.lib.esm.json",
+  "compilerOptions": {
+    "target": "es5",
+    "module": "commonjs",
+    "outDir": "lib/commonjs/",
+    "declaration": false
+  }
+}

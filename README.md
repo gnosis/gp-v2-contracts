@@ -76,11 +76,29 @@ yarn deploy --network $NETWORK --gasprice $GAS_PRICE_WEI
 New files containing details of this deployment will be created in the `deployment` folder.
 These files should be committed to this repository.
 
-### Verify Contracts on Etherscan
+### Verify Deployed Contracts
+
+#### Etherscan
+
+For verifying all deployed contracts:
 
 ```sh
-ETHERSCAN_API_KEY=<Your Key>
-yarn verify --network $NETWORK
+export ETHERSCAN_API_KEY=<Your Key>
+yarn verify:etherscan --network $NETWORK
+```
+
+#### Tenderly
+
+For verifying all deployed contracts:
+
+```sh
+yarn verify:tenderly --network $NETWORK
+```
+
+For a single contract, named `GPv2Contract` and located at address `0xFeDbc87123caF3925145e1bD1Be844c03b36722f` in the example:
+
+```sh
+npx hardhat tenderly:verify --network $NETWORK GPv2Contract=0xFeDbc87123caF3925145e1bD1Be844c03b36722f
 ```
 
 ## Deployed Contract Addresses
