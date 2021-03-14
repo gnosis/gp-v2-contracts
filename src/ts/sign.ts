@@ -149,7 +149,7 @@ function ecdsaSignTypedData(
 
 /**
  * Returns the signature for the specified order with the signing scheme encoded
- * into the signature bytes.
+ * into the signature.
  *
  * @param domain The domain to sign the order for. This is used by the smart
  * contract to ensure orders can't be replayed across different applications,
@@ -181,7 +181,7 @@ export async function signOrder(
 
 /**
  * Returns the signature for the Order Cancellation with the signing scheme encoded
- * into the signature bytes.
+ * into the signature.
  *
  * @param domain The domain to sign the cancellation.
  * @param cancellation The cancellation to be signed.
