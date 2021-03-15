@@ -1,13 +1,18 @@
 import IERC20 from "@openzeppelin/contracts/build/contracts/IERC20.json";
 import { expect } from "chai";
 import { MockContract } from "ethereum-waffle";
-import { Contract } from "ethers";
+import { BigNumber, Contract } from "ethers";
 import { artifacts, ethers, waffle } from "hardhat";
 
 import { BUY_ETH_ADDRESS } from "../src/ts";
 
 describe("GPv2Transfer", () => {
-  const [deployer, recipient, ...traders] = waffle.provider.getWallets();
+  const [
+    deployer,
+    recipient,
+    funder,
+    ...traders
+  ] = waffle.provider.getWallets();
 
   let transfer: Contract;
   let vault: MockContract;
@@ -24,9 +29,9 @@ describe("GPv2Transfer", () => {
     token = await waffle.deployMockContract(deployer, IERC20.abi);
   });
 
-  describe("transferToRecipient", () => {
-    const amount = ethers.utils.parseEther("13.37");
+  const amount = ethers.utils.parseEther("0.1337");
 
+  describe("transferToRecipient", () => {
     it("should transfer external amount to recipient", async () => {
       await token.mock.transferFrom
         .withArgs(traders[0].address, recipient.address, amount)
@@ -36,7 +41,7 @@ describe("GPv2Transfer", () => {
           {
             account: traders[0].address,
             token: token.address,
-            amount: amount,
+            amount,
             useInternalBalance: false,
           },
         ]),
@@ -116,7 +121,7 @@ describe("GPv2Transfer", () => {
             {
               account: traders[0].address,
               token: BUY_ETH_ADDRESS,
-              amount: amount,
+              amount,
               useInternalBalance,
             },
           ]),
@@ -134,7 +139,7 @@ describe("GPv2Transfer", () => {
           {
             account: traders[0].address,
             token: token.address,
-            amount: amount,
+            amount,
             useInternalBalance: false,
           },
         ]),
@@ -163,6 +168,196 @@ describe("GPv2Transfer", () => {
           },
         ]),
       ).to.be.revertedWith("test error");
+    });
+  });
+
+  describe("transferToAccounts", () => {
+    it("should transfer external amount to account", async () => {
+      await token.mock.transfer
+        .withArgs(traders[0].address, amount)
+        .returns(true);
+      await expect(
+        transfer.transferToAccountsTest(vault.address, [
+          {
+            account: traders[0].address,
+            token: token.address,
+            amount,
+            useInternalBalance: false,
+          },
+        ]),
+      ).to.not.be.reverted;
+    });
+
+    it("should transfer internal amount to account", async () => {
+      await vault.mock.depositToInternalBalance
+        .withArgs([
+          {
+            token: token.address,
+            amount,
+            sender: transfer.address,
+            recipient: traders[0].address,
+          },
+        ])
+        .returns();
+      await expect(
+        transfer.transferToAccountsTest(vault.address, [
+          {
+            account: traders[0].address,
+            token: token.address,
+            amount,
+            useInternalBalance: true,
+          },
+        ]),
+      ).to.not.be.reverted;
+    });
+
+    it("should transfer Ether amount to account", async () => {
+      await funder.sendTransaction({
+        to: transfer.address,
+        value: amount,
+      });
+
+      const initialBalance = await traders[0].getBalance();
+      await transfer.transferToAccountsTest(vault.address, [
+        {
+          account: traders[0].address,
+          token: BUY_ETH_ADDRESS,
+          amount,
+          useInternalBalance: false,
+        },
+      ]);
+
+      expect(await traders[0].getBalance()).to.deep.equal(
+        initialBalance.add(amount),
+      );
+    });
+
+    it("should transfer many external and internal amounts to recipient", async () => {
+      // NOTE: Make sure we have enough traders for our test :)
+      expect(traders).to.have.length.above(5);
+
+      const externalTransfers = [];
+      const internalTransfers = [];
+      const ethTransfers = [];
+
+      for (const [i, trader] of traders.entries()) {
+        switch (i % 3) {
+          case 0:
+            externalTransfers.push({
+              account: trader.address,
+              token: token.address,
+              amount,
+              useInternalBalance: false,
+            });
+            break;
+          case 1:
+            internalTransfers.push({
+              account: trader.address,
+              token: token.address,
+              amount,
+              useInternalBalance: true,
+            });
+            break;
+          case 2:
+            ethTransfers.push({
+              account: trader.address,
+              token: BUY_ETH_ADDRESS,
+              amount,
+              useInternalBalance: false,
+            });
+            break;
+        }
+      }
+
+      for (const { account } of externalTransfers) {
+        await token.mock.transfer.withArgs(account, amount).returns(true);
+      }
+      await vault.mock.depositToInternalBalance
+        .withArgs(
+          internalTransfers.map(({ account }) => ({
+            token: token.address,
+            amount,
+            sender: transfer.address,
+            recipient: account,
+          })),
+        )
+        .returns();
+      const ethBalances: Record<string, BigNumber> = {};
+      for (const { account } of ethTransfers) {
+        ethBalances[account] = await ethers.provider.getBalance(account);
+        await funder.sendTransaction({
+          to: transfer.address,
+          value: amount,
+        });
+      }
+
+      await expect(
+        transfer.transferToAccountsTest(vault.address, [
+          ...externalTransfers,
+          ...internalTransfers,
+          ...ethTransfers,
+        ]),
+      ).to.not.be.reverted;
+
+      for (const { account } of ethTransfers) {
+        expect(await ethers.provider.getBalance(account)).to.equal(
+          ethBalances[account].add(amount),
+        );
+      }
+    });
+
+    it("should revert on failed ERC20 transfers", async () => {
+      await token.mock.transfer
+        .withArgs(traders[0].address, amount)
+        .revertsWithReason("test error");
+
+      await expect(
+        transfer.transferToAccountsTest(vault.address, [
+          {
+            account: traders[0].address,
+            token: token.address,
+            amount,
+            useInternalBalance: false,
+          },
+        ]),
+      ).to.be.revertedWith("test error");
+    });
+
+    it("should revert on failed Vault withdrawal", async () => {
+      await vault.mock.depositToInternalBalance
+        .withArgs([
+          {
+            token: token.address,
+            amount,
+            sender: transfer.address,
+            recipient: traders[0].address,
+          },
+        ])
+        .revertsWithReason("test error");
+
+      await expect(
+        transfer.transferToAccountsTest(vault.address, [
+          {
+            account: traders[0].address,
+            token: token.address,
+            amount,
+            useInternalBalance: true,
+          },
+        ]),
+      ).to.be.revertedWith("test error");
+    });
+
+    it("should revert when transfering Ether with internal balance", async () => {
+      await expect(
+        transfer.transferToAccountsTest(vault.address, [
+          {
+            account: traders[0].address,
+            token: BUY_ETH_ADDRESS,
+            amount,
+            useInternalBalance: true,
+          },
+        ]),
+      ).to.be.revertedWith("unsupported internal ETH");
     });
   });
 });
