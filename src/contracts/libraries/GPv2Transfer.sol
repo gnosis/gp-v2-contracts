@@ -2,7 +2,7 @@
 pragma solidity ^0.7.6;
 pragma abicoder v2;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "../interfaces/IERC20.sol";
 import "../interfaces/IVault.sol";
 import "./GPv2SafeERC20.sol";
 
@@ -32,7 +32,7 @@ library GPv2Transfer {
     /// @param vault The Balancer vault to use.
     /// @param recipient The single recipient for all the transfers.
     /// @param transfers The batched transfers to perform.
-    function transferToRecipient(
+    function transferFromAccounts(
         IVault vault,
         address recipient,
         Data[] calldata transfers
