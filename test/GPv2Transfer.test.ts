@@ -31,13 +31,13 @@ describe("GPv2Transfer", () => {
 
   const amount = ethers.utils.parseEther("0.1337");
 
-  describe("transferToRecipient", () => {
+  describe("transferFromAccounts", () => {
     it("should transfer external amount to recipient", async () => {
       await token.mock.transferFrom
         .withArgs(traders[0].address, recipient.address, amount)
         .returns(true);
       await expect(
-        transfer.transferToRecipientTest(vault.address, recipient.address, [
+        transfer.transferFromAccountsTest(vault.address, recipient.address, [
           {
             account: traders[0].address,
             token: token.address,
@@ -60,7 +60,7 @@ describe("GPv2Transfer", () => {
         ])
         .returns();
       await expect(
-        transfer.transferToRecipientTest(vault.address, recipient.address, [
+        transfer.transferFromAccountsTest(vault.address, recipient.address, [
           {
             account: traders[0].address,
             token: token.address,
@@ -106,7 +106,7 @@ describe("GPv2Transfer", () => {
         .returns();
 
       await expect(
-        transfer.transferToRecipientTest(
+        transfer.transferFromAccountsTest(
           vault.address,
           recipient.address,
           transfers,
@@ -117,7 +117,7 @@ describe("GPv2Transfer", () => {
     it("reverts when mistakenly trying to transfer Ether", async () => {
       for (const useInternalBalance of [false, true]) {
         await expect(
-          transfer.transferToRecipientTest(vault.address, recipient.address, [
+          transfer.transferFromAccountsTest(vault.address, recipient.address, [
             {
               account: traders[0].address,
               token: BUY_ETH_ADDRESS,
@@ -135,7 +135,7 @@ describe("GPv2Transfer", () => {
         .revertsWithReason("test error");
 
       await expect(
-        transfer.transferToRecipientTest(vault.address, recipient.address, [
+        transfer.transferFromAccountsTest(vault.address, recipient.address, [
           {
             account: traders[0].address,
             token: token.address,
@@ -159,7 +159,7 @@ describe("GPv2Transfer", () => {
         .revertsWithReason("test error");
 
       await expect(
-        transfer.transferToRecipientTest(vault.address, recipient.address, [
+        transfer.transferFromAccountsTest(vault.address, recipient.address, [
           {
             account: traders[0].address,
             token: token.address,
