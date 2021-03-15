@@ -46,7 +46,7 @@ describe("E2E: Burn fees", () => {
     dai = await waffle.deployContract(deployer, ERC20, ["DAI", 18]);
   });
 
-  it("permits trader allowance with settlement", async () => {
+  it("uses post-interation to burn settlement fees", async () => {
     // Settle a trivial 1:1 trade between DAI and OWL.
 
     const ONE_USD = ethers.utils.parseEther("1.0");
