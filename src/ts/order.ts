@@ -1,7 +1,6 @@
-import { TypedDataField } from "@ethersproject/abstract-signer";
 import { BigNumberish, BytesLike, ethers } from "ethers";
 
-import { TypedDataDomain } from "./types/ethers";
+import { TypedDataDomain, TypedDataTypes } from "./types/ethers";
 
 /**
  * Gnosis Protocol v2 order data.
@@ -194,7 +193,7 @@ export function normalizeOrder(order: Order): NormalizedOrder {
  */
 export function hashTypedData(
   domain: TypedDataDomain,
-  types: Record<string, TypedDataField[]>,
+  types: TypedDataTypes,
   data: Record<string, unknown>,
 ): string {
   return ethers.utils._TypedDataEncoder.hash(domain, types, data);

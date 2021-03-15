@@ -1,4 +1,3 @@
-import { TypedDataField } from "@ethersproject/abstract-signer";
 import { BytesLike, ethers, Signer } from "ethers";
 
 import {
@@ -9,6 +8,7 @@ import {
   hashTypedData,
 } from "./order";
 import {
+  TypedDataTypes,
   SignatureLike,
   isTypedDataSigner,
   TypedDataDomain,
@@ -125,7 +125,7 @@ function ecdsaSignTypedData(
   scheme: EcdsaSigningScheme,
   owner: Signer,
   domain: TypedDataDomain,
-  types: Record<string, TypedDataField[]>,
+  types: TypedDataTypes,
   data: Record<string, unknown>,
 ): Promise<string> {
   switch (scheme) {
