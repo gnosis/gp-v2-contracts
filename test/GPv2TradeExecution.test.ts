@@ -5,8 +5,6 @@ import { ethers, waffle } from "hardhat";
 
 import { BUY_ETH_ADDRESS } from "../src/ts";
 
-import { NON_STANDARD_ERC20 } from "./ERC20";
-
 describe("GPv2TradeExecution", () => {
   const [deployer, recipient, ...traders] = waffle.provider.getWallets();
 
@@ -96,53 +94,6 @@ describe("GPv2TradeExecution", () => {
           recipient.address,
         ),
       ).to.be.revertedWith("GPv2: cannot transfer native ETH");
-    });
-
-    describe("Non-Standard ERC20 Tokens", () => {
-      it("should not revert when ERC20 transfer has no return data", async () => {
-        const amount = ethers.utils.parseEther("13.37");
-
-        const sellToken = await waffle.deployMockContract(
-          deployer,
-          NON_STANDARD_ERC20,
-        );
-        await sellToken.mock.transferFrom
-          .withArgs(traders[0].address, recipient.address, amount)
-          .returns();
-
-        await expect(
-          tradeExecution.transferSellAmountToRecipientTest(
-            {
-              owner: traders[0].address,
-              sellToken: sellToken.address,
-              sellAmount: amount,
-              ...withoutBuy,
-            },
-            recipient.address,
-          ),
-        ).to.not.be.reverted;
-      });
-
-      it("should revert when ERC20 transfer returns false", async () => {
-        const amount = ethers.utils.parseEther("4.2");
-
-        const sellToken = await waffle.deployMockContract(deployer, IERC20.abi);
-        await sellToken.mock.transferFrom
-          .withArgs(traders[0].address, recipient.address, amount)
-          .returns(false);
-
-        await expect(
-          tradeExecution.transferSellAmountToRecipientTest(
-            {
-              owner: traders[0].address,
-              sellToken: sellToken.address,
-              sellAmount: amount,
-              ...withoutBuy,
-            },
-            recipient.address,
-          ),
-        ).to.be.revertedWith("failed transferFrom");
-      });
     });
   });
 
@@ -267,49 +218,6 @@ describe("GPv2TradeExecution", () => {
       expect(await traders[0].getBalance()).to.deep.equal(
         initialBalance.add(amount),
       );
-    });
-
-    describe("Non-Standard ERC20 Tokens", () => {
-      it("should not revert when ERC20 trasnfer has no return data", async () => {
-        const amount = ethers.utils.parseEther("13.37");
-
-        const buyToken = await waffle.deployMockContract(
-          deployer,
-          NON_STANDARD_ERC20,
-        );
-        await buyToken.mock.transfer
-          .withArgs(traders[0].address, amount)
-          .returns();
-
-        await expect(
-          tradeExecution.transferBuyAmountToOwnerTest({
-            owner: traders[0].address,
-            receiver: traders[0].address,
-            buyToken: buyToken.address,
-            buyAmount: amount,
-            ...withoutSell,
-          }),
-        ).to.not.be.reverted;
-      });
-
-      it("should revert when ERC20 transfer returns false", async () => {
-        const amount = ethers.utils.parseEther("4.2");
-
-        const buyToken = await waffle.deployMockContract(deployer, IERC20.abi);
-        await buyToken.mock.transfer
-          .withArgs(traders[0].address, amount)
-          .returns(false);
-
-        await expect(
-          tradeExecution.transferBuyAmountToOwnerTest({
-            owner: traders[0].address,
-            receiver: traders[0].address,
-            buyToken: buyToken.address,
-            buyAmount: amount,
-            ...withoutSell,
-          }),
-        ).to.be.revertedWith("failed transfer");
-      });
     });
   });
 });
