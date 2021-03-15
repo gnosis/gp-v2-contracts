@@ -5,7 +5,7 @@ pragma abicoder v2;
 import "../GPv2Settlement.sol";
 import "../libraries/GPv2Interaction.sol";
 import "../libraries/GPv2Trade.sol";
-import "../libraries/GPv2TradeExecution.sol";
+import "../libraries/GPv2Transfer.sol";
 
 contract GPv2SettlementTestInterface is GPv2Settlement {
     constructor(GPv2Authentication authenticator_, IVault vault)
@@ -19,13 +19,24 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
         GPv2Trade.Data[] calldata trades
-    ) external returns (GPv2TradeExecution.Data[] memory executedTrades) {
-        executedTrades = computeTradeExecutions(tokens, clearingPrices, trades);
+    )
+        external
+        returns (
+            GPv2Transfer.Data[] memory inTransfers,
+            GPv2Transfer.Data[] memory outTransfers
+        )
+    {
+        (inTransfers, outTransfers) = computeTradeExecutions(
+            tokens,
+            clearingPrices,
+            trades
+        );
     }
 
     function computeTradeExecutionMemoryTest() external returns (uint256 mem) {
         RecoveredOrder memory recoveredOrder;
-        GPv2TradeExecution.Data memory executedTrade;
+        GPv2Transfer.Data memory inTransfer;
+        GPv2Transfer.Data memory outTransfer;
 
         // NOTE: Solidity stores the free memory pointer at address 0x40. Read
         // it before and after calling `processOrder` to ensure that there are
@@ -37,16 +48,12 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
 
         // solhint-disable-next-line not-rely-on-time
         recoveredOrder.data.validTo = uint32(block.timestamp);
-        computeTradeExecution(recoveredOrder, 1, 1, 0, executedTrade);
+        computeTradeExecution(recoveredOrder, 1, 1, 0, inTransfer, outTransfer);
 
         // solhint-disable-next-line no-inline-assembly
         assembly {
             mem := sub(mload(0x40), mem)
         }
-    }
-
-    function transferOutTest(GPv2TradeExecution.Data[] memory trades) external {
-        transferOut(trades);
     }
 
     function executeInteractionsTest(
