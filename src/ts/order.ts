@@ -1,3 +1,4 @@
+import { TypedDataField } from "@ethersproject/abstract-signer";
 import { BigNumberish, BytesLike, ethers } from "ethers";
 
 import { TypedDataDomain } from "./types/ethers";
@@ -62,6 +63,16 @@ export interface Order {
 }
 
 /**
+ * Gnosis Protocol v2 order cancellation data.
+ */
+export interface OrderCancellation {
+  /**
+   * The unique identifier of the order to be cancelled.
+   */
+  orderUid: BytesLike;
+}
+
+/**
  * Marker address to indicate that an order is buying Ether.
  *
  * Note that this address is only has special meaning in the `buyToken` and will
@@ -114,6 +125,11 @@ export const ORDER_TYPE_FIELDS = [
   { name: "kind", type: "string" },
   { name: "partiallyFillable", type: "bool" },
 ];
+
+/**
+ * The EIP-712 type fields definition for a Gnosis Protocol v2 order.
+ */
+export const CANCELLATION_TYPE_FIELDS = [{ name: "orderUid", type: "bytes" }];
 
 /**
  * The EIP-712 type hash for a Gnosis Protocol v2 order.
@@ -173,14 +189,47 @@ export function normalizeOrder(order: Order): NormalizedOrder {
  * Compute the 32-byte signing hash for the specified order.
  *
  * @param domain The EIP-712 domain separator to compute the hash for.
+ * @param types The order to compute the digest for.
+ * @return Hex-encoded 32-byte order digest.
+ */
+export function hashTypedData(
+  domain: TypedDataDomain,
+  types: Record<string, TypedDataField[]>,
+  data: Record<string, unknown>,
+): string {
+  return ethers.utils._TypedDataEncoder.hash(domain, types, data);
+}
+
+/**
+ * Compute the 32-byte signing hash for the specified order.
+ *
+ * @param domain The EIP-712 domain separator to compute the hash for.
  * @param order The order to compute the digest for.
  * @return Hex-encoded 32-byte order digest.
  */
 export function hashOrder(domain: TypedDataDomain, order: Order): string {
-  return ethers.utils._TypedDataEncoder.hash(
+  return hashTypedData(
     domain,
     { Order: ORDER_TYPE_FIELDS },
     normalizeOrder(order),
+  );
+}
+
+/**
+ * Compute the 32-byte signing hash for the specified cancellation.
+ *
+ * @param domain The EIP-712 domain separator to compute the hash for.
+ * @param orderUid The unique identifier of the order to cancel.
+ * @return Hex-encoded 32-byte order digest.
+ */
+export function hashOrderCancellation(
+  domain: TypedDataDomain,
+  orderUid: BytesLike,
+): string {
+  return hashTypedData(
+    domain,
+    { OrderCancellation: CANCELLATION_TYPE_FIELDS },
+    { orderUid },
   );
 }
 

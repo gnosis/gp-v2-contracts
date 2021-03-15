@@ -1,6 +1,13 @@
+import { TypedDataField } from "@ethersproject/abstract-signer";
 import { BytesLike, ethers, Signer } from "ethers";
 
-import { ORDER_TYPE_FIELDS, Order, normalizeOrder, hashOrder } from "./order";
+import {
+  ORDER_TYPE_FIELDS,
+  CANCELLATION_TYPE_FIELDS,
+  Order,
+  normalizeOrder,
+  hashTypedData,
+} from "./order";
 import {
   SignatureLike,
   isTypedDataSigner,
@@ -114,25 +121,24 @@ export interface PreSignSignature {
   data: string;
 }
 
-function ecdsaSignOrder(
-  domain: TypedDataDomain,
-  order: Order,
-  owner: Signer,
+function ecdsaSignTypedData(
   scheme: EcdsaSigningScheme,
+  owner: Signer,
+  domain: TypedDataDomain,
+  types: Record<string, TypedDataField[]>,
+  data: Record<string, unknown>,
 ): Promise<string> {
   switch (scheme) {
     case SigningScheme.EIP712:
       if (!isTypedDataSigner(owner)) {
         throw new Error("signer does not support signing typed data");
       }
-      return owner._signTypedData(
-        domain,
-        { Order: ORDER_TYPE_FIELDS },
-        normalizeOrder(order),
-      );
+      return owner._signTypedData(domain, types, data);
 
     case SigningScheme.ETHSIGN:
-      return owner.signMessage(ethers.utils.arrayify(hashOrder(domain, order)));
+      return owner.signMessage(
+        ethers.utils.arrayify(hashTypedData(domain, types, data)),
+      );
 
     default:
       throw new Error("invalid signing scheme");
@@ -141,7 +147,7 @@ function ecdsaSignOrder(
 
 /**
  * Returns the signature for the specified order with the signing scheme encoded
- * into the signature bytes.
+ * into the signature.
  *
  * @param domain The domain to sign the order for. This is used by the smart
  * contract to ensure orders can't be replayed across different applications,
@@ -161,7 +167,42 @@ export async function signOrder(
 ): Promise<EcdsaSignature> {
   return {
     scheme,
-    data: await ecdsaSignOrder(domain, order, owner, scheme),
+    data: await ecdsaSignTypedData(
+      scheme,
+      owner,
+      domain,
+      { Order: ORDER_TYPE_FIELDS },
+      normalizeOrder(order),
+    ),
+  };
+}
+
+/**
+ * Returns the signature for the Order Cancellation with the signing scheme encoded
+ * into the signature.
+ *
+ * @param domain The domain to sign the cancellation.
+ * @param orderUid The unique identifier of the order being cancelled.
+ * @param owner The owner for the order used to sign.
+ * @param scheme The signing scheme to use. See {@link SigningScheme} for more
+ * details.
+ * @return Encoded signature including signing scheme for the cancellation.
+ */
+export async function signOrderCancellation(
+  domain: TypedDataDomain,
+  orderUid: BytesLike,
+  owner: Signer,
+  scheme: EcdsaSigningScheme,
+): Promise<EcdsaSignature> {
+  return {
+    scheme,
+    data: await ecdsaSignTypedData(
+      scheme,
+      owner,
+      domain,
+      { OrderCancellation: CANCELLATION_TYPE_FIELDS },
+      { orderUid },
+    ),
   };
 }
 
