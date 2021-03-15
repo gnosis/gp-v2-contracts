@@ -13,6 +13,13 @@ export type TypedDataDomain = Parameters<
 >[0];
 
 /**
+ * EIP-712 typed data type definitions.
+ */
+export type TypedDataTypes = Parameters<
+  typeof ethers.utils._TypedDataEncoder.hashStruct
+>[1];
+
+/**
  * Ethers EIP-712 typed data signer interface.
  */
 export interface TypedDataSigner extends Signer {
