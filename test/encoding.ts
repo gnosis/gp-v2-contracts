@@ -86,39 +86,3 @@ export function decodeOrder(order: AbiOrder): Order {
     useInternalBuyTokenBalance: order[11],
   };
 }
-
-export interface ExecutedTrade {
-  owner: string;
-  receiver: string;
-  sellToken: string;
-  buyToken: string;
-  sellAmount: BigNumber;
-  buyAmount: BigNumber;
-}
-
-export type InTransfer = Pick<
-  ExecutedTrade,
-  "owner" | "sellToken" | "sellAmount"
->;
-
-export function encodeInTransfers(transfers: InTransfer[]): ExecutedTrade[] {
-  return transfers.map((transfer) => ({
-    ...transfer,
-    receiver: ethers.constants.AddressZero,
-    buyToken: ethers.constants.AddressZero,
-    buyAmount: ethers.constants.Zero,
-  }));
-}
-
-export type OutTransfer = Pick<
-  ExecutedTrade,
-  "owner" | "receiver" | "buyToken" | "buyAmount"
->;
-
-export function encodeOutTransfers(transfers: OutTransfer[]): ExecutedTrade[] {
-  return transfers.map((transfer) => ({
-    ...transfer,
-    sellToken: ethers.constants.AddressZero,
-    sellAmount: ethers.constants.Zero,
-  }));
-}

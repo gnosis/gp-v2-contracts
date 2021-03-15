@@ -4,12 +4,12 @@ pragma abicoder v2;
 
 import "./interfaces/IERC20.sol";
 import "./interfaces/IVault.sol";
-import "./libraries/GPv2TradeExecution.sol";
+import "./libraries/GPv2Transfer.sol";
 
 /// @title Gnosis Protocol v2 Vault Relayer Contract
 /// @author Gnosis Developers
 contract GPv2VaultRelayer {
-    using GPv2TradeExecution for GPv2TradeExecution.Data;
+    using GPv2Transfer for IVault;
 
     /// @dev The creator of the contract which has special permissions. This
     /// value is set at creation time and cannot change.
@@ -37,24 +37,11 @@ contract GPv2VaultRelayer {
     /// - The caller is not the creator of the vault relayer
     /// - Any ERC20 transfer fails
     ///
-    /// @param trades The executed trades whose sell amounts need to be
-    /// transferred in.
-    function transferIn(GPv2TradeExecution.Data[] calldata trades)
+    /// @param transfers The transfers to execute.
+    function transferFromAccounts(GPv2Transfer.Data[] calldata transfers)
         external
         onlyCreator
     {
-        for (uint256 i = 0; i < trades.length; i++) {
-            GPv2TradeExecution.transferSellAmountToRecipient(
-                trades[i],
-                msg.sender
-            );
-        }
-    }
-
-    // NOTE: Add a unused external method so that the compiler doesn't optimize
-    // away the `vault` immutable so we can read them for unit testing. Once
-    // this contract actually does something, this can be removed.
-    function unused() external view returns (bytes32 random) {
-        random = keccak256(abi.encodePacked(vault));
+        vault.transferFromAccounts(msg.sender, transfers);
     }
 }
