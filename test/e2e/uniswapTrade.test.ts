@@ -27,8 +27,12 @@ describe("E2E: Should Trade Surplus With Uniswap", () => {
 
   let weth: Contract;
   let usdt: Contract;
-  let uniswapPair: Contract;
-  let isWethToken0: boolean;
+  let dai: Contract;
+
+  let wethUsdtPair: Contract;
+  let wethDaiPair: Contract;
+
+  let uniswapWrapper: Contract;
 
   beforeEach(async () => {
     const deployment = await deployTestContracts();
@@ -48,6 +52,7 @@ describe("E2E: Should Trade Surplus With Uniswap", () => {
 
     weth = await waffle.deployContract(deployer, ERC20, ["WETH", 18]);
     usdt = await waffle.deployContract(deployer, ERC20, ["USDT", 6]);
+    dai = await waffle.deployContract(deployer, ERC20, ["DAI", 18]);
 
     const uniswapFactory = await waffle.deployContract(
       deployer,
@@ -55,17 +60,26 @@ describe("E2E: Should Trade Surplus With Uniswap", () => {
       [deployer.address],
     );
     await uniswapFactory.createPair(weth.address, usdt.address);
-    uniswapPair = new Contract(
+    wethUsdtPair = new Contract(
       await uniswapFactory.getPair(weth.address, usdt.address),
       UniswapV2Pair.abi,
       deployer,
     );
+    await uniswapFactory.createPair(weth.address, dai.address);
+    wethDaiPair = new Contract(
+      await uniswapFactory.getPair(weth.address, dai.address),
+      UniswapV2Pair.abi,
+      deployer,
+    );
 
-    // NOTE: Which token ends up as token 0 or token 1 depends on the addresses
-    // of the WETH and USDT token which can change depending on which order the
-    // tests are run. Because of this, check the Uniswap pair to see which token
-    // ended up on which index.
-    isWethToken0 = (await uniswapPair.token0()) === weth.address;
+    const UniswapV2SettlementWrapper = await ethers.getContractFactory(
+      "UniswapV2SettlementWrapper",
+    );
+    uniswapWrapper = await UniswapV2SettlementWrapper.deploy(
+      settlement.address,
+      uniswapFactory.address,
+    );
+    await authenticator.connect(manager).addSolver(uniswapWrapper.address);
   });
 
   it("should settle two overlapping orders and trade surplus with Uniswap", async () => {
@@ -81,9 +95,9 @@ describe("E2E: Should Trade Surplus With Uniswap", () => {
 
     const uniswapWethReserve = ethers.utils.parseEther("1000.0");
     const uniswapUsdtReserve = ethers.utils.parseUnits("600000.0", 6);
-    await weth.mint(uniswapPair.address, uniswapWethReserve);
-    await usdt.mint(uniswapPair.address, uniswapUsdtReserve);
-    await uniswapPair.mint(pooler.address);
+    await weth.mint(wethUsdtPair.address, uniswapWethReserve);
+    await usdt.mint(wethUsdtPair.address, uniswapUsdtReserve);
+    await wethUsdtPair.mint(pooler.address);
 
     // The current batch has a sell order selling 1 WETH and a buy order buying
     // 0.5 WETH. This means there is exactly a surplus 0.5 WETH that needs to be
@@ -146,17 +160,18 @@ describe("E2E: Should Trade Surplus With Uniswap", () => {
     encoder.encodeInteraction({
       target: weth.address,
       callData: weth.interface.encodeFunctionData("transfer", [
-        uniswapPair.address,
+        wethUsdtPair.address,
         uniswapWethInAmount,
       ]),
     });
 
+    const isWethToken0 = (await wethUsdtPair.token0()) === weth.address;
     const [amount0Out, amount1Out] = isWethToken0
       ? [0, uniswapUsdtOutAmount]
       : [uniswapUsdtOutAmount, 0];
     encoder.encodeInteraction({
-      target: uniswapPair.address,
-      callData: uniswapPair.interface.encodeFunctionData("swap", [
+      target: wethUsdtPair.address,
+      callData: wethUsdtPair.interface.encodeFunctionData("swap", [
         amount0Out,
         amount1Out,
         settlement.address,
@@ -194,7 +209,7 @@ describe("E2E: Should Trade Surplus With Uniswap", () => {
         .sub(uniswapUsdtOutAmount.add(ethers.utils.parseUnits("0.3", 6))),
     );
 
-    const [token0Reserve, token1Reserve] = await uniswapPair.getReserves();
+    const [token0Reserve, token1Reserve] = await wethUsdtPair.getReserves();
     const [finalWethReserve, finalUsdtReserve] = isWethToken0
       ? [token0Reserve, token1Reserve]
       : [token1Reserve, token0Reserve];
@@ -202,5 +217,51 @@ describe("E2E: Should Trade Surplus With Uniswap", () => {
       uniswapWethReserve.add(uniswapWethInAmount),
       uniswapUsdtReserve.sub(uniswapUsdtOutAmount),
     ]);
+  });
+
+  it("allows wrapping settlements so users keep positive slippage", async () => {
+    await weth.mint(wethUsdtPair.address, ethers.utils.parseEther("1000.0"));
+    await usdt.mint(
+      wethUsdtPair.address,
+      ethers.utils.parseUnits("1750000.0", 6),
+    );
+    await wethUsdtPair.mint(pooler.address);
+
+    await weth.mint(wethDaiPair.address, ethers.utils.parseEther("1000.0"));
+    await dai.mint(wethDaiPair.address, ethers.utils.parseEther("1700000.0"));
+    await wethDaiPair.mint(pooler.address);
+
+    const buyAmount = ethers.utils.parseUnits("800.0", 6);
+    const encoder = new SettlementEncoder(domainSeparator);
+
+    await dai.mint(traders[0].address, ethers.utils.parseEther("1001.0"));
+    await dai
+      .connect(traders[0])
+      .approve(allowanceManager.address, ethers.constants.MaxUint256);
+    await encoder.signEncodeTrade(
+      {
+        kind: OrderKind.SELL,
+        partiallyFillable: false,
+        sellToken: dai.address,
+        buyToken: usdt.address,
+        sellAmount: ethers.utils.parseEther("1000.0"),
+        buyAmount,
+        feeAmount: ethers.utils.parseEther("1.0"),
+        validTo: 0xffffffff,
+        appData: 1,
+      },
+      traders[0],
+      SigningScheme.EIP712,
+    );
+
+    await uniswapWrapper.settleSwap([dai.address, weth.address, usdt.address], {
+      ...encoder.trades[0],
+      sellTokenIndex: 0,
+      buyTokenIndex: 2,
+    });
+
+    // NOTE: Check that there is a surplus, that is they received more than they
+    // asked for.
+    expect(buyAmount.lt(await usdt.balanceOf(traders[0].address))).to.be.true;
   });
 });
