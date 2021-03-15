@@ -40,7 +40,7 @@ describe("signOrderCancellation", () => {
 
       const signingHash = recoverSigningDigest(
         scheme,
-        hashOrderCancellation(domain, { orderUid }),
+        hashOrderCancellation(domain, orderUid),
       );
       expect(ethers.utils.recoverAddress(signingHash, signature)).to.equal(
         signer.address,

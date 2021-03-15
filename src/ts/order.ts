@@ -219,17 +219,17 @@ export function hashOrder(domain: TypedDataDomain, order: Order): string {
  * Compute the 32-byte signing hash for the specified cancellation.
  *
  * @param domain The EIP-712 domain separator to compute the hash for.
- * @param cancellation The cancellation to compute the digest for.
+ * @param orderUid The unique identifier of the order to cancel.
  * @return Hex-encoded 32-byte order digest.
  */
 export function hashOrderCancellation(
   domain: TypedDataDomain,
-  cancellation: OrderCancellation,
+  orderUid: BytesLike,
 ): string {
   return hashTypedData(
     domain,
     { OrderCancellation: CANCELLATION_TYPE_FIELDS },
-    cancellation,
+    { orderUid },
   );
 }
 
