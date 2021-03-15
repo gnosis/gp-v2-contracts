@@ -62,7 +62,13 @@ export interface Order {
   partiallyFillable: boolean;
 }
 
+/**
+ * Gnosis Protocol v2 order cancellation data.
+ */
 export interface OrderCancellation {
+  /**
+   * The unique identifier of the order to be cancelled.
+   */
   orderUid: BytesLike;
 }
 
@@ -189,7 +195,7 @@ export function normalizeOrder(order: Order): NormalizedOrder {
 export function hashTypedData(
   domain: TypedDataDomain,
   types: Record<string, TypedDataField[]>,
-  data: NormalizedOrder | OrderCancellation,
+  data: Record<string, unknown>,
 ): string {
   return ethers.utils._TypedDataEncoder.hash(domain, types, data);
 }

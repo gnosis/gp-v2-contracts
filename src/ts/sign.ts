@@ -6,8 +6,6 @@ import {
   CANCELLATION_TYPE_FIELDS,
   Order,
   normalizeOrder,
-  OrderCancellation,
-  NormalizedOrder,
   hashTypedData,
 } from "./order";
 import {
@@ -128,7 +126,7 @@ function ecdsaSignTypedData(
   owner: Signer,
   domain: TypedDataDomain,
   types: Record<string, TypedDataField[]>,
-  data: NormalizedOrder | OrderCancellation,
+  data: Record<string, unknown>,
 ): Promise<string> {
   switch (scheme) {
     case SigningScheme.EIP712:
