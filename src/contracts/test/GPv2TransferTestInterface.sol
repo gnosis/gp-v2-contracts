@@ -13,6 +13,13 @@ contract GPv2TransferTestInterface {
         GPv2Transfer.transferToRecipient(vault, recipient, transfers);
     }
 
+    function transferToAccountsTest(
+        IVault vault,
+        GPv2Transfer.Data[] memory transfers
+    ) external {
+        GPv2Transfer.transferToAccounts(vault, transfers);
+    }
+
     // solhint-disable-next-line no-empty-blocks
     receive() external payable {}
 }
