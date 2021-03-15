@@ -569,6 +569,23 @@ export class SettlementEncoder {
     ];
   }
 
+  /**
+   * Returns an encoded settlement that exclusively performs setup interactions.
+   * This method can be used, for example, to set the settlement contract's
+   * allowances to other protocols it may interact with.
+   *
+   * @param interactions The list of setup interactions to encode.
+   */
+  public static encodedSetup(
+    ...interactions: InteractionLike[]
+  ): EncodedSettlement {
+    const encoder = new SettlementEncoder({ name: "unused" });
+    for (const interaction of interactions) {
+      encoder.encodeInteraction(interaction);
+    }
+    return encoder.encodedSettlement({});
+  }
+
   private tokenIndex(token: string): number {
     // NOTE: Verify and normalize the address into a case-checksummed address.
     // Not only does this ensure validity of the addresses early on, it also
