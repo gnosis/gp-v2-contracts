@@ -182,7 +182,7 @@ export async function signOrder(
  * into the signature.
  *
  * @param domain The domain to sign the cancellation.
- * @param cancellation The cancellation to be signed.
+ * @param orderUid The unique identifier of the order being cancelled.
  * @param owner The owner for the order used to sign.
  * @param scheme The signing scheme to use. See {@link SigningScheme} for more
  * details.
