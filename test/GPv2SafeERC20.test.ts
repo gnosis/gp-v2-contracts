@@ -1,25 +1,25 @@
 import IERC20 from "@openzeppelin/contracts/build/contracts/IERC20.json";
 import { expect } from "chai";
 import { Contract } from "ethers";
-import { ethers, waffle } from "hardhat";
-
-import {
-  NON_STANDARD_ERC20,
-  ERC20_RETURNING_BYTES,
-  ERC20_RETURNING_UINT,
-} from "./ERC20";
+import { artifacts, ethers, waffle } from "hardhat";
+import { Artifact } from "hardhat/types";
 
 describe("GPv2SafeERC20.sol", () => {
   const [deployer, recipient, ...traders] = waffle.provider.getWallets();
 
   let executor: Contract;
 
+  let ERC20NoReturn: Artifact;
+  let ERC20ReturningUint: Artifact;
+
   beforeEach(async () => {
     const GPv2SafeERC20TestInterface = await ethers.getContractFactory(
       "GPv2SafeERC20TestInterface",
     );
-
     executor = await GPv2SafeERC20TestInterface.deploy();
+
+    ERC20NoReturn = await artifacts.readArtifact("ERC20NoReturn");
+    ERC20ReturningUint = await artifacts.readArtifact("ERC20ReturningUint");
   });
 
   describe("transfer", () => {
@@ -55,7 +55,7 @@ describe("GPv2SafeERC20.sol", () => {
 
         const sellToken = await waffle.deployMockContract(
           deployer,
-          NON_STANDARD_ERC20,
+          ERC20NoReturn.abi,
         );
         await sellToken.mock.transfer
           .withArgs(recipient.address, amount)
@@ -82,10 +82,9 @@ describe("GPv2SafeERC20.sol", () => {
       it("reverts when too much data is returned", async () => {
         const amount = ethers.utils.parseEther("1.0");
 
-        const sellToken = await waffle.deployMockContract(
-          deployer,
-          ERC20_RETURNING_BYTES,
-        );
+        const sellToken = await waffle.deployMockContract(deployer, [
+          "function transfer(address, uint256) returns (bytes)",
+        ]);
         await sellToken.mock.transfer
           .withArgs(recipient.address, amount)
           .returns(ethers.utils.hexlify([...Array(256)].map((_, i) => i)));
@@ -100,7 +99,7 @@ describe("GPv2SafeERC20.sol", () => {
 
         const sellToken = await waffle.deployMockContract(
           deployer,
-          ERC20_RETURNING_UINT,
+          ERC20ReturningUint.abi,
         );
         await sellToken.mock.transfer
           .withArgs(recipient.address, amount)
@@ -164,7 +163,7 @@ describe("GPv2SafeERC20.sol", () => {
 
         const sellToken = await waffle.deployMockContract(
           deployer,
-          NON_STANDARD_ERC20,
+          ERC20NoReturn.abi,
         );
         await sellToken.mock.transferFrom
           .withArgs(traders[0].address, recipient.address, amount)
@@ -201,10 +200,9 @@ describe("GPv2SafeERC20.sol", () => {
       it("reverts when too much data is returned", async () => {
         const amount = ethers.utils.parseEther("1.0");
 
-        const sellToken = await waffle.deployMockContract(
-          deployer,
-          ERC20_RETURNING_BYTES,
-        );
+        const sellToken = await waffle.deployMockContract(deployer, [
+          "function transferFrom(address, address, uint256) returns (bytes)",
+        ]);
         await sellToken.mock.transferFrom
           .withArgs(traders[0].address, recipient.address, amount)
           .returns(ethers.utils.hexlify([...Array(256)].map((_, i) => i)));
@@ -224,7 +222,7 @@ describe("GPv2SafeERC20.sol", () => {
 
         const sellToken = await waffle.deployMockContract(
           deployer,
-          ERC20_RETURNING_UINT,
+          ERC20ReturningUint.abi,
         );
         await sellToken.mock.transferFrom
           .withArgs(traders[0].address, recipient.address, amount)
