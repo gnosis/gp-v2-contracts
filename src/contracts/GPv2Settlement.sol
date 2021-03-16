@@ -260,24 +260,18 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         uint256 executedFeeAmount;
         uint256 currentFilledAmount;
 
-        // NOTE: Don't use `SafeMath.div` or `SafeMath.sub` anywhere here as it
-        // allocates a string even if it does not revert. Additionally, `div`
-        // only checks that the divisor is non-zero and `revert`s in that case
-        // instead of consuming all of the remaining transaction gas when
-        // dividing by zero, so no extra checks are needed for those operations.
-
         if (order.kind == GPv2Order.SELL) {
             if (order.partiallyFillable) {
                 executedSellAmount = executedAmount;
-                executedFeeAmount =
-                    order.feeAmount.mul(executedSellAmount) /
-                    order.sellAmount;
+                executedFeeAmount = order.feeAmount.mul(executedSellAmount).div(
+                    order.sellAmount
+                );
             } else {
                 executedSellAmount = order.sellAmount;
                 executedFeeAmount = order.feeAmount;
             }
 
-            executedBuyAmount = executedSellAmount.mul(sellPrice) / buyPrice;
+            executedBuyAmount = executedSellAmount.mul(sellPrice).div(buyPrice);
 
             currentFilledAmount = filledAmount[orderUid].add(
                 executedSellAmount
@@ -289,15 +283,15 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         } else {
             if (order.partiallyFillable) {
                 executedBuyAmount = executedAmount;
-                executedFeeAmount =
-                    order.feeAmount.mul(executedBuyAmount) /
-                    order.buyAmount;
+                executedFeeAmount = order.feeAmount.mul(executedBuyAmount).div(
+                    order.buyAmount
+                );
             } else {
                 executedBuyAmount = order.buyAmount;
                 executedFeeAmount = order.feeAmount;
             }
 
-            executedSellAmount = executedBuyAmount.mul(buyPrice) / sellPrice;
+            executedSellAmount = executedBuyAmount.mul(buyPrice).div(sellPrice);
 
             currentFilledAmount = filledAmount[orderUid].add(executedBuyAmount);
             require(
