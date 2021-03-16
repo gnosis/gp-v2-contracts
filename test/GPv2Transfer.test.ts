@@ -47,7 +47,7 @@ describe("GPv2Transfer", () => {
     });
 
     it("should transfer internal amount to recipient", async () => {
-      await vault.mock.withdrawFromInternalBalance
+      await vault.mock.transferInternalBalance
         .withArgs([
           {
             token: token.address,
@@ -95,8 +95,8 @@ describe("GPv2Transfer", () => {
       ).to.be.revertedWith("test error");
     });
 
-    it("should revert on failed Vault withdrawal", async () => {
-      await vault.mock.withdrawFromInternalBalance
+    it("should revert on failed Vault transfer", async () => {
+      await vault.mock.transferInternalBalance
         .withArgs([
           {
             token: token.address,

@@ -24,7 +24,9 @@ library GPv2Transfer {
         0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
     /// @dev Execute the specified transfer from the specified account to a
-    /// recipient.
+    /// recipient. The recipient will either receive internal Vault balances or
+    /// ERC20 token balances depending on whether the account is using internal
+    /// balances or not.
     ///
     /// This method is used for transferring fees to the settlement contract
     /// when settling a single order directly with Balancer.
@@ -52,7 +54,7 @@ library GPv2Transfer {
             vaultTransfer.sender = transfer.account;
             vaultTransfer.recipient = recipient;
 
-            vault.withdrawFromInternalBalance(vaultTransfers);
+            vault.transferInternalBalance(vaultTransfers);
         } else {
             transfer.token.safeTransferFrom(
                 transfer.account,
@@ -63,7 +65,9 @@ library GPv2Transfer {
     }
 
     /// @dev Execute the specified transfers from the specified accounts to a
-    /// single recipient.
+    /// single recipient. The recipient will receive all transfers as ERC20
+    /// token balances, regardless of whether or not the accounts are using
+    /// internal Vault balances.
     ///
     /// This method is used for accumulating user balances into the settlement
     /// contract.
