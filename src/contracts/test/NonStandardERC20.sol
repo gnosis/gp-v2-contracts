@@ -2,7 +2,6 @@
 pragma solidity ^0.7.6;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "hardhat/console.sol";
 
 abstract contract NonStandardERC20 {
     using SafeMath for uint256;
