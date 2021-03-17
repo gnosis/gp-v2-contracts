@@ -15,6 +15,10 @@ contract GPv2SettlementTestInterface is GPv2Settlement {
 
     }
 
+    function setFilledAmount(bytes calldata orderUid, uint256 amount) external {
+        filledAmount[orderUid] = amount;
+    }
+
     function computeTradeExecutionsTest(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,

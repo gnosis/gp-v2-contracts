@@ -131,65 +131,109 @@ export class SwapEncoder {
   }
 
   /**
+   * Gets the encoded trade.
+   */
+  public get trade(): Trade {
+    if (this._trade === undefined) {
+      throw new Error("trade not encoded");
+    }
+    return this._trade;
+  }
+
+  /**
    * Encodes the swap as a swap request and appends it to the swaps encoded so
    * far.
    *
    * @param swap The Balancer swap to encode.
    */
-  public encodeSwapRequest(swap: Swap): void {
-    this._swaps.push(encodeSwapRequest(this._tokens, swap));
+  public encodeSwapRequest(...swaps: Swap[]): void {
+    this._swaps.push(
+      ...swaps.map((swap) => encodeSwapRequest(this._tokens, swap)),
+    );
   }
 
   /**
-   * Returns the encoded swap parameters for the given order and signature.
+   * Encodes a trade from a signed order.
+   *
+   * Additionally, if the order references new tokens that the encoder has not
+   * yet seen, they are added to the tokens array.
+   *
+   * @param order The order of the trade to encode.
+   * @param signature The signature for the order data.
    */
-  public encodedSwap(order: Order, signature: Signature): EncodedSwap;
+  public encodeTrade(order: Order, signature: Signature): void {
+    this._trade = encodeTrade(this._tokens, order, signature, {
+      executedAmount: 0,
+    });
+  }
 
   /**
-   * Signs an order and returns the encoded swap parameters for trading the
-   * signed order.
+   * Signs an order and encodes a trade with that order.
+   *
+   * @param order The order to sign for the trade.
+   * @param owner The externally owned account that should sign the order.
+   * @param scheme The signing scheme to use. See {@link SigningScheme} for more
+   * details.
    */
-  public async encodedSwap(
+  public async signEncodeTrade(
+    order: Order,
+    owner: Signer,
+    scheme: EcdsaSigningScheme,
+  ): Promise<void> {
+    const signature = await signOrder(this.domain, order, owner, scheme);
+    this.encodeTrade(order, signature);
+  }
+
+  /**
+   * Returns the encoded swap parameters for the current state of the encoder.
+   *
+   * This method with raise an exception if a trade has not been encoded.
+   */
+  public encodedSwap(): EncodedSwap {
+    return [this.swaps, this.tokens, this.trade];
+  }
+
+  public static encodeSwap(
+    swaps: Swap[],
+    order: Order,
+    signature: Signature,
+  ): EncodedSwap;
+
+  public static encodeSwap(
+    domain: TypedDataDomain,
+    swaps: Swap[],
     order: Order,
     owner: Signer,
     scheme: EcdsaSigningScheme,
   ): Promise<EncodedSwap>;
 
-  public encodedSwap(
-    ...args: [Order, Signature] | [Order, Signer, EcdsaSigningScheme]
+  /**
+   * Utility method for encoding a direct swap between an order and Balancer
+   * pools.
+   *
+   * This method functions identically to using a {@link SwapEncoder} and is
+   * provided as a short-cut.
+   */
+  public static encodeSwap(
+    ...args:
+      | [Swap[], Order, Signature]
+      | [TypedDataDomain, Swap[], Order, Signer, EcdsaSigningScheme]
   ): EncodedSwap | Promise<EncodedSwap> {
-    if (args.length === 2) {
-      const [order, signature] = args;
-      const trade = encodeTrade(this._tokens, order, signature, {
-        executedAmount: 0,
-      });
-      return [this.swaps, this.tokens, trade];
+    const [domain, swaps, order, ...signatureOrSigner] =
+      args.length === 3 ? [{ name: "unused" }, ...args] : args;
+
+    const encoder = new SwapEncoder(domain);
+    encoder.encodeSwapRequest(...swaps);
+
+    if (signatureOrSigner.length === 1) {
+      const [signature] = signatureOrSigner;
+      encoder.encodeTrade(order, signature);
+      return encoder.encodedSwap();
     } else {
-      const [order, owner, scheme] = args;
-      return signOrder(this.domain, order, owner, scheme).then((signature) =>
-        this.encodedSwap(order, signature),
-      );
+      const [owner, scheme] = signatureOrSigner;
+      return encoder
+        .signEncodeTrade(order, owner, scheme)
+        .then(() => encoder.encodedSwap());
     }
   }
-}
-
-/**
- * Utility method for encoding a direct swap between an order and Balancer
- * pools.
- *
- * This method functions identically to using a {@link SwapEncoder} and is
- * provided as a short-cut.
- */
-export function encodeSwap(
-  domain: TypedDataDomain,
-  swaps: Swap[],
-  order: Order,
-  owner: Signer,
-  scheme: EcdsaSigningScheme,
-): Promise<EncodedSwap> {
-  const encoder = new SwapEncoder(domain);
-  for (const swap of swaps) {
-    encoder.encodeSwapRequest(swap);
-  }
-  return encoder.encodedSwap(order, owner, scheme);
 }
