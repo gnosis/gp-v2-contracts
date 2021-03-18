@@ -196,6 +196,10 @@ export type NormalizedOrder = Omit<Order, "validTo" | "appData" | "kind"> & {
  * @returns A 32-byte hash encoded as a hex-string.
  */
 export function normalizeOrder(order: Order): NormalizedOrder {
+  if (order.receiver === ethers.constants.AddressZero) {
+    throw new Error("receiver cannot be address(0)");
+  }
+
   return {
     receiver: ethers.constants.AddressZero,
     useInternalSellTokenBalance: false,

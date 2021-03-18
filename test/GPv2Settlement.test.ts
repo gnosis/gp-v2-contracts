@@ -1,3 +1,4 @@
+import IERC20 from "@openzeppelin/contracts/build/contracts/IERC20.json";
 import { expect } from "chai";
 import { MockContract } from "ethereum-waffle";
 import { BigNumber, Contract, ContractReceipt, Event } from "ethers";
@@ -11,6 +12,7 @@ import {
   PRE_SIGNED,
   SettlementEncoder,
   SigningScheme,
+  SwapEncoder,
   TradeExecution,
   TypedDataDomain,
   computeOrderUid,
@@ -23,6 +25,10 @@ import {
   builtAndDeployedMetadataCoincide,
   readVaultRelayerImmutables,
 } from "./bytecode";
+
+function fillBytes(count: number, byte: number): string {
+  return ethers.utils.hexlify([...Array(count)].map(() => byte));
+}
 
 function toNumberLossy(value: BigNumber): number {
   // NOTE: BigNumber throws an exception when if is outside the range of
@@ -137,32 +143,62 @@ describe("GPv2Settlement", () => {
       );
     });
 
-    it("rejects reentrancy attempts via interactions", async () => {
-      await authenticator.connect(owner).addSolver(solver.address);
-      const encoder = new SettlementEncoder(testDomain);
-      encoder.encodeInteraction({
-        target: settlement.address,
-        callData: settlement.interface.encodeFunctionData("settle", empty),
-      });
+    describe("Reentrancy Protection", () => {
+      for (const { name, params } of [
+        {
+          name: "settle",
+          params: empty,
+        },
+        {
+          name: "swap",
+          params: SwapEncoder.encodeSwap(
+            [],
+            {
+              sellToken: ethers.constants.AddressZero,
+              buyToken: ethers.constants.AddressZero,
+              sellAmount: ethers.constants.Zero,
+              buyAmount: ethers.constants.Zero,
+              validTo: 0,
+              appData: 0,
+              feeAmount: ethers.constants.Zero,
+              kind: OrderKind.SELL,
+              partiallyFillable: false,
+            },
+            {
+              scheme: SigningScheme.EIP712,
+              data: `0x${"00".repeat(65)}`,
+            },
+          ),
+        },
+      ]) {
+        it(`rejects ${name} reentrancy attempts via interactions`, async () => {
+          await authenticator.connect(owner).addSolver(solver.address);
+          const encoder = new SettlementEncoder(testDomain);
+          encoder.encodeInteraction({
+            target: settlement.address,
+            callData: settlement.interface.encodeFunctionData(name, params),
+          });
 
-      await expect(
-        settlement.connect(solver).settle(...encoder.encodedSettlement({})),
-      ).to.be.revertedWith("ReentrancyGuard: reentrant call");
-    });
+          await expect(
+            settlement.connect(solver).settle(...encoder.encodedSettlement({})),
+          ).to.be.revertedWith("ReentrancyGuard: reentrant call");
+        });
 
-    it("rejects reentrancy attempt even if settlement contract is registered solver", async () => {
-      await authenticator.connect(owner).addSolver(solver.address);
-      // Add settlement contract address as registered solver
-      await authenticator.connect(owner).addSolver(settlement.address);
-      const encoder = new SettlementEncoder(testDomain);
-      encoder.encodeInteraction({
-        target: settlement.address,
-        callData: settlement.interface.encodeFunctionData("settle", empty),
-      });
+        it(`rejects ${name} reentrancy attempt even as a registered solver`, async () => {
+          await authenticator.connect(owner).addSolver(solver.address);
+          // Add settlement contract address as registered solver
+          await authenticator.connect(owner).addSolver(settlement.address);
+          const encoder = new SettlementEncoder(testDomain);
+          encoder.encodeInteraction({
+            target: settlement.address,
+            callData: settlement.interface.encodeFunctionData(name, params),
+          });
 
-      await expect(
-        settlement.connect(solver).settle(...encoder.encodedSettlement({})),
-      ).to.be.revertedWith("ReentrancyGuard: reentrant call");
+          await expect(
+            settlement.connect(solver).settle(...encoder.encodedSettlement({})),
+          ).to.be.revertedWith("ReentrancyGuard: reentrant call");
+        });
+      }
     });
 
     it("accepts transactions from solvers", async () => {
@@ -236,6 +272,377 @@ describe("GPv2Settlement", () => {
           .connect(solver)
           .settle([tokens, clearingPrices, trades, ["0x", "0x", "0x", "0x"]]),
       ).to.be.reverted;
+    });
+  });
+
+  describe("swap", () => {
+    let alwaysSuccessfulTokens: [Contract, Contract];
+
+    before(async () => {
+      alwaysSuccessfulTokens = [
+        await waffle.deployMockContract(deployer, IERC20.abi),
+        await waffle.deployMockContract(deployer, IERC20.abi),
+      ];
+      for (const token of alwaysSuccessfulTokens) {
+        await token.mock.transfer.returns(true);
+        await token.mock.transferFrom.returns(true);
+      }
+    });
+
+    const emptySwap = () =>
+      SwapEncoder.encodeSwap(
+        testDomain,
+        [],
+        {
+          sellToken: alwaysSuccessfulTokens[0].address,
+          buyToken: alwaysSuccessfulTokens[1].address,
+          sellAmount: ethers.constants.Zero,
+          buyAmount: ethers.constants.Zero,
+          validTo: 0,
+          appData: 0,
+          feeAmount: ethers.constants.Zero,
+          kind: OrderKind.SELL,
+          partiallyFillable: false,
+        },
+        traders[0],
+        SigningScheme.EIP712,
+      );
+
+    it("rejects transactions from non-solvers", async () => {
+      await expect(settlement.swap(...(await emptySwap()))).to.be.revertedWith(
+        "GPv2: not a solver",
+      );
+    });
+
+    it("executes swap and fee transfer with correct amounts", async () => {
+      const order = {
+        kind: OrderKind.BUY,
+        receiver: traders[1].address,
+        sellToken: fillBytes(20, 1),
+        buyToken: fillBytes(20, 4),
+        sellAmount: ethers.utils.parseEther("4.2"),
+        buyAmount: ethers.utils.parseEther("13.37"),
+        validTo: 0x01020304,
+        appData: 0,
+        feeAmount: ethers.utils.parseEther("1.0"),
+        partiallyFillable: false,
+        useInternalSellTokenBalance: true,
+        useInternalBuyTokenBalance: false,
+      };
+
+      const encoder = new SwapEncoder(testDomain);
+      encoder.encodeSwapRequest({
+        poolId: fillBytes(32, 0xff),
+        tokenIn: fillBytes(20, 1),
+        tokenOut: fillBytes(20, 2),
+        amount: ethers.utils.parseEther("42.0"),
+      });
+      encoder.encodeSwapRequest({
+        poolId: fillBytes(32, 0xfe),
+        tokenIn: fillBytes(20, 2),
+        tokenOut: fillBytes(20, 3),
+        amount: ethers.utils.parseEther("1337.0"),
+        userData: "0x010203",
+      });
+      encoder.encodeSwapRequest({
+        poolId: fillBytes(32, 0xfd),
+        tokenIn: fillBytes(20, 3),
+        tokenOut: fillBytes(20, 4),
+        amount: ethers.utils.parseEther("6.0"),
+      });
+      await encoder.signEncodeTrade(order, traders[0], SigningScheme.EIP712);
+
+      await vault.mock.batchSwapGivenOut
+        .withArgs(
+          encoder.swaps.map(({ amount, ...swap }) => ({
+            ...swap,
+            amountOut: amount,
+          })),
+          encoder.tokens,
+          {
+            sender: traders[0].address,
+            fromInternalBalance: true,
+            recipient: traders[1].address,
+            toInternalBalance: false,
+          },
+          [order.sellAmount, 0, 0, order.buyAmount.mul(-1)],
+          order.validTo,
+        )
+        .returns([order.sellAmount.div(2), 0, 0, order.buyAmount.mul(-1)]);
+      await vault.mock.transferInternalBalance
+        .withArgs([
+          {
+            token: order.sellToken,
+            amount: order.feeAmount,
+            sender: traders[0].address,
+            recipient: settlement.address,
+          },
+        ])
+        .returns();
+
+      await authenticator.connect(owner).addSolver(solver.address);
+      await expect(settlement.connect(solver).swap(...encoder.encodedSwap())).to
+        .not.be.reverted;
+    });
+
+    describe("Balances", () => {
+      for (const { name, ...flags } of [
+        {
+          name: "external to external",
+          useInternalSellTokenBalance: false,
+          useInternalBuyTokenBalance: false,
+        },
+        {
+          name: "external to internal",
+          useInternalSellTokenBalance: false,
+          useInternalBuyTokenBalance: true,
+        },
+        {
+          name: "internal to external",
+          useInternalSellTokenBalance: true,
+          useInternalBuyTokenBalance: false,
+        },
+        {
+          name: "internal to internal",
+          useInternalSellTokenBalance: true,
+          useInternalBuyTokenBalance: true,
+        },
+      ]) {
+        it(`performs an ${name} swap when specified`, async () => {
+          const sellToken = await waffle.deployMockContract(
+            deployer,
+            IERC20.abi,
+          );
+          const buyToken = `0x${"cc".repeat(20)}`;
+          const feeAmount = ethers.utils.parseEther("1.0");
+
+          const encoder = new SwapEncoder(testDomain);
+          await encoder.signEncodeTrade(
+            {
+              sellToken: sellToken.address,
+              buyToken,
+              receiver: traders[1].address,
+              sellAmount: ethers.constants.Zero,
+              buyAmount: ethers.constants.Zero,
+              validTo: 0,
+              appData: 0,
+              feeAmount,
+              kind: OrderKind.SELL,
+              partiallyFillable: false,
+              ...flags,
+            },
+            traders[0],
+            SigningScheme.EIP712,
+          );
+
+          await vault.mock.batchSwapGivenIn
+            .withArgs(
+              [],
+              encoder.tokens,
+              {
+                sender: traders[0].address,
+                fromInternalBalance: flags.useInternalSellTokenBalance,
+                recipient: traders[1].address,
+                toInternalBalance: flags.useInternalBuyTokenBalance,
+              },
+              [0, 0],
+              0,
+            )
+            .returns([0, 0]);
+          if (flags.useInternalSellTokenBalance) {
+            await vault.mock.transferInternalBalance
+              .withArgs([
+                {
+                  token: sellToken.address,
+                  amount: feeAmount,
+                  sender: traders[0].address,
+                  recipient: settlement.address,
+                },
+              ])
+              .returns();
+          } else {
+            await sellToken.mock.transferFrom
+              .withArgs(traders[0].address, settlement.address, feeAmount)
+              .returns(true);
+          }
+
+          await authenticator.connect(owner).addSolver(solver.address);
+          await settlement.connect(solver).swap(...encoder.encodedSwap());
+          await expect(
+            settlement.connect(solver).swap(...encoder.encodedSwap()),
+          ).to.not.be.reverted;
+        });
+      }
+    });
+
+    describe("Swap Variants", () => {
+      const sellAmount = ethers.utils.parseEther("4.2");
+      const buyAmount = ethers.utils.parseEther("13.37");
+
+      for (const { kind, swapFunction } of [
+        {
+          kind: OrderKind.SELL,
+          swapFunction: "batchSwapGivenIn",
+        },
+        {
+          kind: OrderKind.BUY,
+          swapFunction: "batchSwapGivenOut",
+        },
+      ]) {
+        const order = {
+          kind,
+          sellToken: fillBytes(20, 1),
+          buyToken: fillBytes(20, 2),
+          sellAmount,
+          buyAmount,
+          validTo: 0x01020304,
+          appData: 0,
+          feeAmount: ethers.utils.parseEther("1.0"),
+          useInternalSellTokenBalance: true,
+          partiallyFillable: true,
+        };
+        const orderUid = () =>
+          computeOrderUid(testDomain, order, traders[0].address);
+        const encodeSwap = () =>
+          SwapEncoder.encodeSwap(
+            testDomain,
+            [],
+            order,
+            traders[0],
+            SigningScheme.ETHSIGN,
+          );
+
+        it(`executes ${kind} order against swap given in`, async () => {
+          await vault.mock[swapFunction].returns([
+            sellAmount,
+            buyAmount.mul(-1),
+          ]);
+          await vault.mock.transferInternalBalance.returns();
+
+          await authenticator.connect(owner).addSolver(solver.address);
+          await expect(settlement.connect(solver).swap(...(await encodeSwap())))
+            .to.not.be.reverted;
+        });
+
+        it(`updates the filled amount to be the full ${kind} amount`, async () => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const filledAmount = (order as any)[`${kind}Amount`];
+
+          await vault.mock[swapFunction].returns([
+            sellAmount,
+            buyAmount.mul(-1),
+          ]);
+          await vault.mock.transferInternalBalance.returns();
+
+          await authenticator.connect(owner).addSolver(solver.address);
+          await settlement.connect(solver).swap(...(await encodeSwap()));
+
+          expect(await settlement.filledAmount(orderUid())).to.equal(
+            filledAmount,
+          );
+        });
+
+        it(`reverts for cancelled ${kind} orders`, async () => {
+          await vault.mock[swapFunction].returns([0, 0]);
+          await vault.mock.transferInternalBalance.returns();
+
+          await settlement.connect(traders[0]).invalidateOrder(orderUid());
+          await authenticator.connect(owner).addSolver(solver.address);
+          await expect(
+            settlement.connect(solver).swap(...(await encodeSwap())),
+          ).to.be.revertedWith("order filled");
+        });
+
+        it(`reverts for partially filled ${kind} orders`, async () => {
+          await vault.mock[swapFunction].returns([0, 0]);
+          await vault.mock.transferInternalBalance.returns();
+
+          await settlement.setFilledAmount(orderUid(), 1);
+          await authenticator.connect(owner).addSolver(solver.address);
+          await expect(
+            settlement.connect(solver).swap(...(await encodeSwap())),
+          ).to.be.revertedWith("order filled");
+        });
+
+        it(`reverts when not exactly trading ${kind} amount`, async () => {
+          await vault.mock[swapFunction].returns([
+            sellAmount.sub(1),
+            buyAmount.add(1).mul(-1),
+          ]);
+          await vault.mock.transferInternalBalance.returns();
+
+          await authenticator.connect(owner).addSolver(solver.address);
+          await expect(
+            settlement.connect(solver).swap(...(await encodeSwap())),
+          ).to.be.revertedWith(`${kind} amount not respected`);
+        });
+
+        it(`emits a ${kind} trade event`, async () => {
+          const [executedSellAmount, executedBuyAmount] =
+            kind == OrderKind.SELL
+              ? [order.sellAmount, order.buyAmount.mul(2)]
+              : [order.sellAmount.div(2), order.buyAmount];
+          await vault.mock[swapFunction].returns([
+            executedSellAmount,
+            executedBuyAmount.mul(-1),
+          ]);
+          await vault.mock.transferInternalBalance.returns();
+
+          await authenticator.connect(owner).addSolver(solver.address);
+          await expect(settlement.connect(solver).swap(...(await encodeSwap())))
+            .to.emit(settlement, "Trade")
+            .withArgs(
+              traders[0].address,
+              order.sellToken,
+              order.buyToken,
+              executedSellAmount,
+              executedBuyAmount,
+              order.feeAmount,
+              orderUid(),
+            );
+        });
+      }
+    });
+
+    it("should emit a settlement event", async () => {
+      await vault.mock.batchSwapGivenIn.returns([0, 0]);
+      await vault.mock.transferInternalBalance.returns();
+
+      await authenticator.connect(owner).addSolver(solver.address);
+      await expect(settlement.connect(solver).swap(...(await emptySwap())))
+        .to.emit(settlement, "Settlement")
+        .withArgs(solver.address);
+    });
+
+    it("reverts on negative sell amounts", async () => {
+      await vault.mock.batchSwapGivenIn.returns([-1, 0]);
+      await vault.mock.transferInternalBalance.returns();
+
+      await authenticator.connect(owner).addSolver(solver.address);
+      await expect(
+        settlement.connect(solver).swap(...(await emptySwap())),
+      ).to.be.revertedWith("SafeCast: not positive");
+    });
+
+    it("reverts on positive buy amounts", async () => {
+      await vault.mock.batchSwapGivenIn.returns([0, 1]);
+      await vault.mock.transferInternalBalance.returns();
+
+      await authenticator.connect(owner).addSolver(solver.address);
+      await expect(
+        settlement.connect(solver).swap(...(await emptySwap())),
+      ).to.be.revertedWith("SafeCast: not positive");
+    });
+
+    it("reverts on unary negation overflow for buy amounts", async () => {
+      const INT256_MIN = `-0x80${"00".repeat(31)}`;
+      await vault.mock.batchSwapGivenIn.returns([0, INT256_MIN]);
+      await vault.mock.transferInternalBalance.returns();
+
+      await authenticator.connect(owner).addSolver(solver.address);
+      await expect(
+        settlement.connect(solver).swap(...(await emptySwap())),
+      ).to.be.revertedWith("SafeCast: not positive");
     });
   });
 
