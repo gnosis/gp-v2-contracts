@@ -42,6 +42,93 @@ contract GPv2VaultRelayer {
         external
         onlyCreator
     {
-        vault.transferFromAccounts(msg.sender, transfers);
+        vault.transferFromAccounts(transfers, msg.sender);
+    }
+
+    /// @dev Performs a Balancer batched swap on behalf of a user and sends a
+    /// fee to the caller.
+    ///
+    /// This function reverts if:
+    /// - The caller is not the creator of the vault relayer
+    /// - The swap fails
+    /// - The fee transfer fails
+    ///
+    /// @param kind The Balancer swap kind, this can either be `GIVEN_IN` for
+    /// sell orders or `GIVEN_OUT` for buy orders.
+    /// @param swaps The swaps to perform.
+    /// @param tokens The tokens for the swaps. Swaps encode to and from tokens
+    /// as indices into this array.
+    /// @param funds The fund management settings, specifying the user the swap
+    /// is being performed for as well as the recipient of the proceeds.
+    /// @param limits Swap limits for encoding limit prices.
+    /// @param deadline The deadline for the swap.
+    /// @param feeTransfer The transfer data for the caller fee.
+    /// @return tokenDeltas The executed swap amounts.
+    function batchSwapWithFee(
+        IVault.SwapKind kind,
+        IVault.SwapRequest[] calldata swaps,
+        IERC20[] memory tokens,
+        IVault.FundManagement memory funds,
+        int256[] memory limits,
+        uint256 deadline,
+        GPv2Transfer.Data calldata feeTransfer
+    ) external onlyCreator returns (int256[] memory tokenDeltas) {
+        if (kind == IVault.SwapKind.GIVEN_IN) {
+            tokenDeltas = vault.batchSwapGivenIn(
+                swapRequestToIn(swaps),
+                tokens,
+                funds,
+                limits,
+                deadline
+            );
+        } else {
+            tokenDeltas = vault.batchSwapGivenOut(
+                swapRequestToOut(swaps),
+                tokens,
+                funds,
+                limits,
+                deadline
+            );
+        }
+
+        vault.transferFromAccount(feeTransfer, msg.sender);
+    }
+
+    /// @dev Converts an array of Vault `SwapRequest`s into `SwapIn`s.
+    ///
+    /// This method leverages the fact that both structs have identical memory
+    /// representations. For more information, consult conversion methods from:
+    /// <https://github.com/balancer-labs/balancer-core-v2/blob/master/contracts/vault/Swaps.sol>
+    ///
+    /// @param swaps The swap requests.
+    /// @return swapIns The swap ins.
+    function swapRequestToIn(IVault.SwapRequest[] calldata swaps)
+        private
+        pure
+        returns (IVault.SwapIn[] calldata swapIns)
+    {
+        // NOTE: Use assembly to cast the swap requests.
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            swapIns.offset := swaps.offset
+            swapIns.length := swaps.length
+        }
+    }
+
+    /// @dev Converts an array of Vault `SwapRequest`s into `SwapOut`s.
+    ///
+    /// @param swaps The swap requests.
+    /// @return swapOuts The swap outs.
+    function swapRequestToOut(IVault.SwapRequest[] calldata swaps)
+        private
+        pure
+        returns (IVault.SwapOut[] calldata swapOuts)
+    {
+        // NOTE: Use assembly to cast the swap requests.
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            swapOuts.offset := swaps.offset
+            swapOuts.length := swaps.length
+        }
     }
 }

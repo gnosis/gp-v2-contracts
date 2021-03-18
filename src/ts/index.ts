@@ -19,11 +19,12 @@ export function domain(
   };
 }
 
-export * from "./order";
-export * from "./interaction";
-export * from "./settlement";
-export * from "./reader";
 export * from "./deploy";
-export * from "./sign";
+export * from "./interaction";
+export * from "./order";
 export * from "./proxy";
+export * from "./reader";
+export * from "./settlement";
+export * from "./sign";
+export * from "./swap";
 export * from "./types/ethers";
