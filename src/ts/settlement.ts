@@ -332,6 +332,82 @@ export function decodeSignatureOwner(
 }
 
 /**
+ * Encodes a trade to be used with the settlement contract.
+ */
+export function encodeTrade(
+  tokens: TokenRegistry,
+  order: Order,
+  signature: Signature,
+  { executedAmount }: TradeExecution,
+): Trade {
+  const tradeFlags = {
+    ...order,
+    signingScheme: signature.scheme,
+  };
+  const o = normalizeOrder(order);
+
+  return {
+    sellTokenIndex: tokens.index(o.sellToken),
+    buyTokenIndex: tokens.index(o.buyToken),
+    receiver: o.receiver,
+    sellAmount: o.sellAmount,
+    buyAmount: o.buyAmount,
+    validTo: o.validTo,
+    appData: o.appData,
+    feeAmount: o.feeAmount,
+    flags: encodeTradeFlags(tradeFlags),
+    executedAmount,
+    signature: encodeSignatureData(signature),
+  };
+}
+
+/**
+ * A class used for tracking tokens when encoding settlements.
+ *
+ * This is used as settlement trades reference tokens by index instead of
+ * directly by address for multiple reasons:
+ * - Reduce encoding size of orders to save on `calldata` gas.
+ * - Direct access to a token's clearing price on settlement instead of
+ *   requiring a search.
+ */
+export class TokenRegistry {
+  private readonly _tokens: string[] = [];
+  private readonly _tokenMap: Record<string, number | undefined> = {};
+
+  /**
+   * Gets the array of token addresses currently stored in the registry.
+   */
+  public get addresses(): string[] {
+    // NOTE: Make sure to slice the original array, so it cannot be modified
+    // outside of this class.
+    return this._tokens.slice();
+  }
+
+  /**
+   * Retrieves the token index for the specified token address. If the token is
+   * not in the registry, it will be added.
+   *
+   * @param token The token address to add to the registry.
+   * @return The token index.
+   */
+  public index(token: string): number {
+    // NOTE: Verify and normalize the address into a case-checksummed address.
+    // Not only does this ensure validity of the addresses early on, it also
+    // makes it so `0xff...f` and `0xFF..F` map to the same ID.
+    const tokenAddress = ethers.utils.getAddress(token);
+
+    let tokenIndex = this._tokenMap[tokenAddress];
+    if (tokenIndex === undefined) {
+      tokenIndex = this._tokens.length;
+      this._tokens.push(tokenAddress);
+      this._tokenMap[tokenAddress] = tokenIndex;
+    }
+
+    return tokenIndex;
+  }
+}
+
+/**
  * A class for building calldata for a settlement.
  *
  * The encoder ensures that token addresses are kept track of and performs
@@ -339,15 +415,14 @@ export function decodeSignatureOwner(
  * properly encode order parameters for trades.
  */
 export class SettlementEncoder {
-  private readonly _tokens: string[] = [];
-  private readonly _tokenMap: Record<string, number | undefined> = {};
-  private _trades: Trade[] = [];
-  private _interactions: Record<InteractionStage, Interaction[]> = {
+  private readonly _tokens = new TokenRegistry();
+  private readonly _trades: Trade[] = [];
+  private readonly _interactions: Record<InteractionStage, Interaction[]> = {
     [InteractionStage.PRE]: [],
     [InteractionStage.INTRA]: [],
     [InteractionStage.POST]: [],
   };
-  private _orderRefunds: OrderRefunds = {
+  private readonly _orderRefunds: OrderRefunds = {
     filledAmounts: [],
     preSignatures: [],
   };
@@ -361,21 +436,15 @@ export class SettlementEncoder {
 
   /**
    * Gets the array of token addresses used by the currently encoded orders.
-   *
-   * This is used as encoded orders reference tokens by index instead of
-   * directly by address for multiple reasons:
-   * - Reduce encoding size of orders to save on `calldata` gas.
-   * - Direct access to a token's clearing price on settlement instead of
-   *   requiring a search.
    */
   public get tokens(): string[] {
     // NOTE: Make sure to slice the original array, so it cannot be modified
     // outside of this class.
-    return this._tokens.slice();
+    return this._tokens.addresses;
   }
 
   /**
-   * Gets the encoded trades as a hex-encoded string.
+   * Gets the encoded trades.
    */
   public get trades(): Trade[] {
     return this._trades.slice();
@@ -466,36 +535,17 @@ export class SettlementEncoder {
   public encodeTrade(
     order: Order,
     signature: Signature,
-    tradeExecution?: Partial<TradeExecution>,
+    { executedAmount }: Partial<TradeExecution> = {},
   ): void {
-    const { executedAmount } = tradeExecution || {};
     if (order.partiallyFillable && executedAmount === undefined) {
       throw new Error("missing executed amount for partially fillable trade");
     }
 
-    if (order.receiver === ethers.constants.AddressZero) {
-      throw new Error("receiver cannot be address(0)");
-    }
-
-    const tradeFlags = {
-      ...order,
-      signingScheme: signature.scheme,
-    };
-    const o = normalizeOrder(order);
-
-    this._trades.push({
-      sellTokenIndex: this.tokenIndex(o.sellToken),
-      buyTokenIndex: this.tokenIndex(o.buyToken),
-      receiver: o.receiver,
-      sellAmount: o.sellAmount,
-      buyAmount: o.buyAmount,
-      validTo: o.validTo,
-      appData: o.appData,
-      feeAmount: o.feeAmount,
-      flags: encodeTradeFlags(tradeFlags),
-      executedAmount: executedAmount || 0,
-      signature: encodeSignatureData(signature),
-    });
+    this._trades.push(
+      encodeTrade(this._tokens, order, signature, {
+        executedAmount: executedAmount ?? 0,
+      }),
+    );
   }
 
   /**
@@ -584,22 +634,6 @@ export class SettlementEncoder {
       encoder.encodeInteraction(interaction);
     }
     return encoder.encodedSettlement({});
-  }
-
-  private tokenIndex(token: string): number {
-    // NOTE: Verify and normalize the address into a case-checksummed address.
-    // Not only does this ensure validity of the addresses early on, it also
-    // makes it so `0xff...f` and `0xFF..F` map to the same ID.
-    const tokenAddress = ethers.utils.getAddress(token);
-
-    let tokenIndex = this._tokenMap[tokenAddress];
-    if (tokenIndex === undefined) {
-      tokenIndex = this._tokens.length;
-      this._tokens.push(tokenAddress);
-      this._tokenMap[tokenAddress] = tokenIndex;
-    }
-
-    return tokenIndex;
   }
 }
 
