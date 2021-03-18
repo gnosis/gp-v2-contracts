@@ -233,7 +233,7 @@ describe("GPv2Transfer", () => {
           recipient: recipient.address,
         }));
       await vault.mock.transferToExternalBalance
-        .withArgs(toVaultTransfers(externalTransfers).reverse())
+        .withArgs(toVaultTransfers(externalTransfers))
         .returns();
       await vault.mock.withdrawFromInternalBalance
         .withArgs(toVaultTransfers(internalTransfers))
