@@ -124,9 +124,7 @@ function callName({ address, bytecode, calldata }: CallMessageTrace): string {
       "function batchSwapGivenIn((bytes32, uint256, uint256, uint256, bytes)[], address[], (address, bool, address, bool), int256[], uint256)",
       "function batchSwapGivenOut((bytes32, uint256, uint256, uint256, bytes)[], address[], (address, bool, address, bool), int256[], uint256)",
     ],
-    Authorizer: [
-      "function hasRole(bytes32, address)",
-    ],
+    Authorizer: ["function hasRole(bytes32, address)"],
   });
 
   let contractName, functionName;

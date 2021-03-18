@@ -15,4 +15,13 @@ contract GPv2SafeERC20TestInterface {
     ) public {
         token.safeTransfer(to, value);
     }
+
+    function transferFrom(
+        IERC20 token,
+        address from,
+        address to,
+        uint256 value
+    ) public {
+        token.safeTransferFrom(from, to, value);
+    }
 }
