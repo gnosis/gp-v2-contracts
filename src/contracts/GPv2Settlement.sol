@@ -3,9 +3,10 @@ pragma solidity ^0.7.6;
 pragma abicoder v2;
 
 import "@gnosis.pm/util-contracts/contracts/StorageAccessible.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/SafeCast.sol";
 
 import "./GPv2VaultRelayer.sol";
 import "./interfaces/GPv2Authentication.sol";
@@ -21,6 +22,8 @@ import "./mixins/GPv2Signing.sol";
 contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     using GPv2Order for bytes;
     using GPv2Transfer for IVault;
+    using SafeCast for int256;
+    using SafeCast for uint256;
     using SafeMath for uint256;
 
     /// @dev The authenticator is used to determine who can call the settle function.
@@ -137,6 +140,90 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
 
         executeInteractions(interactions[2]);
 
+        emit Settlement(msg.sender);
+    }
+
+    /// @dev Settle an order directly against Balancer V2 pools.
+    function swap(
+        IVault.SwapRequest[] calldata swaps,
+        IERC20[] calldata tokens,
+        GPv2Trade.Data calldata trade
+    ) external nonReentrant onlySolver {
+        RecoveredOrder memory recoveredOrder = allocateRecoveredOrder();
+        GPv2Order.Data memory order = recoveredOrder.data;
+        recoverOrderFromTrade(recoveredOrder, tokens, trade);
+
+        IVault.SwapKind kind =
+            order.kind == GPv2Order.SELL
+                ? IVault.SwapKind.GIVEN_IN
+                : IVault.SwapKind.GIVEN_OUT;
+
+        IVault.FundManagement memory funds;
+        funds.sender = recoveredOrder.owner;
+        funds.fromInternalBalance = order.useInternalSellTokenBalance;
+        funds.recipient = recoveredOrder.receiver;
+        funds.toInternalBalance = order.useInternalBuyTokenBalance;
+
+        int256[] memory limits = new int256[](tokens.length);
+        // NOTE: Array allocation initializes elements to 0, so we only need to
+        // set the limits we care about. This ensures that the swap will respect
+        // the order's limit price.
+        limits[trade.sellTokenIndex] = order.sellAmount.toInt256();
+        limits[trade.buyTokenIndex] = -order.buyAmount.toInt256();
+
+        GPv2Transfer.Data memory feeTransfer;
+        feeTransfer.account = recoveredOrder.owner;
+        feeTransfer.token = order.sellToken;
+        feeTransfer.amount = order.feeAmount;
+        feeTransfer.useInternalBalance = order.useInternalSellTokenBalance;
+
+        int256[] memory tokenDeltas =
+            vaultRelayer.batchSwapWithFee(
+                kind,
+                swaps,
+                tokens,
+                funds,
+                limits,
+                // NOTE: Specify a deadline to ensure that an expire order
+                // cannot be used to trade.
+                order.validTo,
+                feeTransfer
+            );
+
+        bytes memory orderUid = recoveredOrder.uid;
+        uint256 executedSellAmount =
+            tokenDeltas[trade.sellTokenIndex].toUint256();
+        uint256 executedBuyAmount =
+            (-tokenDeltas[trade.buyTokenIndex]).toUint256();
+
+        // NOTE: Check that the orders were completely filled and update their
+        // filled amounts to avoid replaying them. The limit price and order
+        // validity have already been verified when executing the swap through
+        // the `limit` and `deadline` parameters.
+        require(filledAmount[orderUid] == 0, "GPv2: order filled");
+        if (order.kind == GPv2Order.SELL) {
+            require(
+                executedSellAmount == order.sellAmount,
+                "GPv2: sell amount not respected"
+            );
+            filledAmount[orderUid] = order.sellAmount;
+        } else {
+            require(
+                executedBuyAmount == order.buyAmount,
+                "GPv2: buy amount not respected"
+            );
+            filledAmount[orderUid] = order.buyAmount;
+        }
+
+        emit Trade(
+            recoveredOrder.owner,
+            order.sellToken,
+            order.buyToken,
+            executedSellAmount,
+            executedBuyAmount,
+            order.feeAmount,
+            orderUid
+        );
         emit Settlement(msg.sender);
     }
 
