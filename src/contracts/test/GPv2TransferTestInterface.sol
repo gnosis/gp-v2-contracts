@@ -7,18 +7,18 @@ import "../libraries/GPv2Transfer.sol";
 contract GPv2TransferTestInterface {
     function transferFromAccountTest(
         IVault vault,
-        address recipient,
-        GPv2Transfer.Data calldata transfer
+        GPv2Transfer.Data calldata transfer,
+        address recipient
     ) external {
-        GPv2Transfer.transferFromAccount(vault, recipient, transfer);
+        GPv2Transfer.transferFromAccount(vault, transfer, recipient);
     }
 
     function transferFromAccountsTest(
         IVault vault,
-        address recipient,
-        GPv2Transfer.Data[] calldata transfers
+        GPv2Transfer.Data[] calldata transfers,
+        address recipient
     ) external {
-        GPv2Transfer.transferFromAccounts(vault, recipient, transfers);
+        GPv2Transfer.transferFromAccounts(vault, transfers, recipient);
     }
 
     function transferToAccountsTest(
