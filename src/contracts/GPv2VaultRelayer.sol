@@ -42,7 +42,7 @@ contract GPv2VaultRelayer {
         external
         onlyCreator
     {
-        vault.transferFromAccounts(msg.sender, transfers);
+        vault.transferFromAccounts(transfers, msg.sender);
     }
 
     /// @dev Performs a Balancer batched swap on behalf of a user and sends a
@@ -91,7 +91,7 @@ contract GPv2VaultRelayer {
             );
         }
 
-        vault.transferFromAccount(msg.sender, feeTransfer);
+        vault.transferFromAccount(feeTransfer, msg.sender);
     }
 
     /// @dev Converts an array of Vault `SwapRequest`s into `SwapIn`s.
