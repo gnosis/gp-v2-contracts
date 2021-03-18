@@ -116,6 +116,17 @@ function callName({ address, bytecode, calldata }: CallMessageTrace): string {
       "function transfer(address, uint256)",
     ],
     UniswapV2Pair: ["function swap(uint256, uint256, address, bytes)"],
+    Vault: [
+      "function depositToInternalBalance((address, uint256, address, address)[])",
+      "function transferToExternalBalance((address, uint256, address, address)[])",
+      "function withdrawFromInternal((address, uint256, address, address)[])",
+      "function transferInternalBalance((address, uint256, address, address)[])",
+      "function batchSwapGivenIn((bytes32, uint256, uint256, uint256, bytes)[], address[], (address, bool, address, bool), int256[], uint256)",
+      "function batchSwapGivenOut((bytes32, uint256, uint256, uint256, bytes)[], address[], (address, bool, address, bool), int256[], uint256)",
+    ],
+    Authorizer: [
+      "function hasRole(bytes32, address)",
+    ],
   });
 
   let contractName, functionName;
