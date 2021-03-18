@@ -31,6 +31,93 @@ describe("GPv2Transfer", () => {
 
   const amount = ethers.utils.parseEther("0.1337");
 
+  describe("transferFromAccount", () => {
+    it("should transfer external amount to recipient", async () => {
+      await token.mock.transferFrom
+        .withArgs(traders[0].address, recipient.address, amount)
+        .returns(true);
+      await expect(
+        transfer.transferFromAccountTest(vault.address, recipient.address, {
+          account: traders[0].address,
+          token: token.address,
+          amount,
+          useInternalBalance: false,
+        }),
+      ).to.not.be.reverted;
+    });
+
+    it("should transfer internal amount to recipient", async () => {
+      await vault.mock.transferInternalBalance
+        .withArgs([
+          {
+            token: token.address,
+            amount,
+            sender: traders[0].address,
+            recipient: recipient.address,
+          },
+        ])
+        .returns();
+      await expect(
+        transfer.transferFromAccountTest(vault.address, recipient.address, {
+          account: traders[0].address,
+          token: token.address,
+          amount,
+          useInternalBalance: true,
+        }),
+      ).to.not.be.reverted;
+    });
+
+    it("reverts when mistakenly trying to transfer Ether", async () => {
+      for (const useInternalBalance of [false, true]) {
+        await expect(
+          transfer.transferFromAccountTest(vault.address, recipient.address, {
+            account: traders[0].address,
+            token: BUY_ETH_ADDRESS,
+            amount,
+            useInternalBalance,
+          }),
+        ).to.be.revertedWith("GPv2: cannot transfer native ETH");
+      }
+    });
+
+    it("should revert on failed ERC20 transfers", async () => {
+      await token.mock.transferFrom
+        .withArgs(traders[0].address, recipient.address, amount)
+        .revertsWithReason("test error");
+
+      await expect(
+        transfer.transferFromAccountTest(vault.address, recipient.address, {
+          account: traders[0].address,
+          token: token.address,
+          amount,
+          useInternalBalance: false,
+        }),
+      ).to.be.revertedWith("test error");
+    });
+
+    it("should revert on failed Vault transfer", async () => {
+      await vault.mock.transferInternalBalance
+        .withArgs([
+          {
+            token: token.address,
+            amount,
+            sender: traders[0].address,
+            recipient: recipient.address,
+          },
+        ])
+        .revertsWithReason("test error");
+
+      await expect(
+        transfer.transferFromAccountTest(vault.address, recipient.address, {
+          account: traders[0].address,
+          token: token.address,
+          amount,
+          useInternalBalance: true,
+        }),
+      ).to.be.revertedWith("test error");
+    });
+  });
+
   describe("transferFromAccounts", () => {
     it("should transfer external amount to recipient", async () => {
       await token.mock.transferFrom
