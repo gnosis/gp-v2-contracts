@@ -23,8 +23,51 @@ library GPv2Transfer {
     address internal constant BUY_ETH_ADDRESS =
         0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
+    /// @dev Execute the specified transfer from the specified account to a
+    /// recipient. The recipient will either receive internal Vault balances or
+    /// ERC20 token balances depending on whether the account is using internal
+    /// balances or not.
+    ///
+    /// This method is used for transferring fees to the settlement contract
+    /// when settling a single order directly with Balancer.
+    ///
+    /// @param vault The Balancer vault to use.
+    /// @param recipient The recipient for the transfer.
+    /// @param transfer The transfer to perform.
+    function transferFromAccount(
+        IVault vault,
+        address recipient,
+        Data calldata transfer
+    ) internal {
+        require(
+            address(transfer.token) != BUY_ETH_ADDRESS,
+            "GPv2: cannot transfer native ETH"
+        );
+
+        if (transfer.useInternalBalance) {
+            IVault.BalanceTransfer[] memory vaultTransfers =
+                new IVault.BalanceTransfer[](1);
+
+            IVault.BalanceTransfer memory vaultTransfer = vaultTransfers[0];
+            vaultTransfer.token = transfer.token;
+            vaultTransfer.amount = transfer.amount;
+            vaultTransfer.sender = transfer.account;
+            vaultTransfer.recipient = recipient;
+
+            vault.transferInternalBalance(vaultTransfers);
+        } else {
+            transfer.token.safeTransferFrom(
+                transfer.account,
+                recipient,
+                transfer.amount
+            );
+        }
+    }
+
     /// @dev Execute the specified transfers from the specified accounts to a
-    /// single recipient.
+    /// single recipient. The recipient will receive all transfers as ERC20
+    /// token balances, regardless of whether or not the accounts are using
+    /// internal Vault balances.
     ///
     /// This method is used for accumulating user balances into the settlement
     /// contract.
