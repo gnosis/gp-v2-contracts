@@ -37,12 +37,16 @@ describe("GPv2Transfer", () => {
         .withArgs(traders[0].address, recipient.address, amount)
         .returns(true);
       await expect(
-        transfer.transferFromAccountTest(vault.address, recipient.address, {
-          account: traders[0].address,
-          token: token.address,
-          amount,
-          useInternalBalance: false,
-        }),
+        transfer.transferFromAccountTest(
+          vault.address,
+          {
+            account: traders[0].address,
+            token: token.address,
+            amount,
+            useInternalBalance: false,
+          },
+          recipient.address,
+        ),
       ).to.not.be.reverted;
     });
 
@@ -58,24 +62,32 @@ describe("GPv2Transfer", () => {
         ])
         .returns();
       await expect(
-        transfer.transferFromAccountTest(vault.address, recipient.address, {
-          account: traders[0].address,
-          token: token.address,
-          amount,
-          useInternalBalance: true,
-        }),
+        transfer.transferFromAccountTest(
+          vault.address,
+          {
+            account: traders[0].address,
+            token: token.address,
+            amount,
+            useInternalBalance: true,
+          },
+          recipient.address,
+        ),
       ).to.not.be.reverted;
     });
 
     it("reverts when mistakenly trying to transfer Ether", async () => {
       for (const useInternalBalance of [false, true]) {
         await expect(
-          transfer.transferFromAccountTest(vault.address, recipient.address, {
-            account: traders[0].address,
-            token: BUY_ETH_ADDRESS,
-            amount,
-            useInternalBalance,
-          }),
+          transfer.transferFromAccountTest(
+            vault.address,
+            {
+              account: traders[0].address,
+              token: BUY_ETH_ADDRESS,
+              amount,
+              useInternalBalance,
+            },
+            recipient.address,
+          ),
         ).to.be.revertedWith("GPv2: cannot transfer native ETH");
       }
     });
@@ -86,12 +98,16 @@ describe("GPv2Transfer", () => {
         .revertsWithReason("test error");
 
       await expect(
-        transfer.transferFromAccountTest(vault.address, recipient.address, {
-          account: traders[0].address,
-          token: token.address,
-          amount,
-          useInternalBalance: false,
-        }),
+        transfer.transferFromAccountTest(
+          vault.address,
+          {
+            account: traders[0].address,
+            token: token.address,
+            amount,
+            useInternalBalance: false,
+          },
+          recipient.address,
+        ),
       ).to.be.revertedWith("test error");
     });
 
@@ -108,12 +124,16 @@ describe("GPv2Transfer", () => {
         .revertsWithReason("test error");
 
       await expect(
-        transfer.transferFromAccountTest(vault.address, recipient.address, {
-          account: traders[0].address,
-          token: token.address,
-          amount,
-          useInternalBalance: true,
-        }),
+        transfer.transferFromAccountTest(
+          vault.address,
+          {
+            account: traders[0].address,
+            token: token.address,
+            amount,
+            useInternalBalance: true,
+          },
+          recipient.address,
+        ),
       ).to.be.revertedWith("test error");
     });
   });
@@ -124,14 +144,18 @@ describe("GPv2Transfer", () => {
         .withArgs(traders[0].address, recipient.address, amount)
         .returns(true);
       await expect(
-        transfer.transferFromAccountsTest(vault.address, recipient.address, [
-          {
-            account: traders[0].address,
-            token: token.address,
-            amount,
-            useInternalBalance: false,
-          },
-        ]),
+        transfer.transferFromAccountsTest(
+          vault.address,
+          [
+            {
+              account: traders[0].address,
+              token: token.address,
+              amount,
+              useInternalBalance: false,
+            },
+          ],
+          recipient.address,
+        ),
       ).to.not.be.reverted;
     });
 
@@ -147,14 +171,18 @@ describe("GPv2Transfer", () => {
         ])
         .returns();
       await expect(
-        transfer.transferFromAccountsTest(vault.address, recipient.address, [
-          {
-            account: traders[0].address,
-            token: token.address,
-            amount,
-            useInternalBalance: true,
-          },
-        ]),
+        transfer.transferFromAccountsTest(
+          vault.address,
+          [
+            {
+              account: traders[0].address,
+              token: token.address,
+              amount,
+              useInternalBalance: true,
+            },
+          ],
+          recipient.address,
+        ),
       ).to.not.be.reverted;
     });
 
@@ -195,8 +223,8 @@ describe("GPv2Transfer", () => {
       await expect(
         transfer.transferFromAccountsTest(
           vault.address,
-          recipient.address,
           transfers,
+          recipient.address,
         ),
       ).to.not.be.reverted;
     });
@@ -204,14 +232,18 @@ describe("GPv2Transfer", () => {
     it("reverts when mistakenly trying to transfer Ether", async () => {
       for (const useInternalBalance of [false, true]) {
         await expect(
-          transfer.transferFromAccountsTest(vault.address, recipient.address, [
-            {
-              account: traders[0].address,
-              token: BUY_ETH_ADDRESS,
-              amount,
-              useInternalBalance,
-            },
-          ]),
+          transfer.transferFromAccountsTest(
+            vault.address,
+            [
+              {
+                account: traders[0].address,
+                token: BUY_ETH_ADDRESS,
+                amount,
+                useInternalBalance,
+              },
+            ],
+            recipient.address,
+          ),
         ).to.be.revertedWith("GPv2: cannot transfer native ETH");
       }
     });
@@ -222,14 +254,18 @@ describe("GPv2Transfer", () => {
         .revertsWithReason("test error");
 
       await expect(
-        transfer.transferFromAccountsTest(vault.address, recipient.address, [
-          {
-            account: traders[0].address,
-            token: token.address,
-            amount,
-            useInternalBalance: false,
-          },
-        ]),
+        transfer.transferFromAccountsTest(
+          vault.address,
+          [
+            {
+              account: traders[0].address,
+              token: token.address,
+              amount,
+              useInternalBalance: false,
+            },
+          ],
+          recipient.address,
+        ),
       ).to.be.revertedWith("test error");
     });
 
@@ -246,14 +282,18 @@ describe("GPv2Transfer", () => {
         .revertsWithReason("test error");
 
       await expect(
-        transfer.transferFromAccountsTest(vault.address, recipient.address, [
-          {
-            account: traders[0].address,
-            token: token.address,
-            amount,
-            useInternalBalance: true,
-          },
-        ]),
+        transfer.transferFromAccountsTest(
+          vault.address,
+          [
+            {
+              account: traders[0].address,
+              token: token.address,
+              amount,
+              useInternalBalance: true,
+            },
+          ],
+          recipient.address,
+        ),
       ).to.be.revertedWith("test error");
     });
   });

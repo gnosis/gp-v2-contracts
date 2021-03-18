@@ -12,13 +12,6 @@ interface IVault {
         address recipient;
     }
 
-    struct FundManagement {
-        address sender;
-        bool fromInternalBalance;
-        address recipient;
-        bool toInternalBalance;
-    }
-
     struct SwapIn {
         bytes32 poolId;
         uint256 tokenInIndex;
@@ -32,6 +25,23 @@ interface IVault {
         uint256 tokenInIndex;
         uint256 tokenOutIndex;
         uint256 amountOut;
+        bytes userData;
+    }
+
+    struct FundManagement {
+        address sender;
+        bool fromInternalBalance;
+        address recipient;
+        bool toInternalBalance;
+    }
+
+    enum SwapKind {GIVEN_IN, GIVEN_OUT}
+
+    struct SwapRequest {
+        bytes32 poolId;
+        uint256 tokenInIndex;
+        uint256 tokenOutIndex;
+        uint256 amount;
         bytes userData;
     }
 

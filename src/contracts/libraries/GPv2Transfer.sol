@@ -32,12 +32,12 @@ library GPv2Transfer {
     /// when settling a single order directly with Balancer.
     ///
     /// @param vault The Balancer vault to use.
+    /// @param transfer The transfer to perform specifying the sender account.
     /// @param recipient The recipient for the transfer.
-    /// @param transfer The transfer to perform.
     function transferFromAccount(
         IVault vault,
-        address recipient,
-        Data calldata transfer
+        Data calldata transfer,
+        address recipient
     ) internal {
         require(
             address(transfer.token) != BUY_ETH_ADDRESS,
@@ -73,12 +73,13 @@ library GPv2Transfer {
     /// contract.
     ///
     /// @param vault The Balancer vault to use.
+    /// @param transfers The batched transfers to perform specifying the
+    /// sender accounts.
     /// @param recipient The single recipient for all the transfers.
-    /// @param transfers The batched transfers to perform.
     function transferFromAccounts(
         IVault vault,
-        address recipient,
-        Data[] calldata transfers
+        Data[] calldata transfers,
+        address recipient
     ) internal {
         // NOTE: Pre-allocate an array of vault balance tranfers large enough to
         // hold all transfers. This allows us to efficiently batch internal
