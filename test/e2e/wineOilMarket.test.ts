@@ -19,6 +19,7 @@ describe("E2E: RetrETH Red Wine and Olive Oil Market", () => {
   let solver: Wallet;
   let traders: Wallet[];
 
+  let vault: Contract;
   let settlement: Contract;
   let vaultRelayer: Contract;
   let domainSeparator: TypedDataDomain;
@@ -28,12 +29,25 @@ describe("E2E: RetrETH Red Wine and Olive Oil Market", () => {
 
     ({
       deployer,
+      vault,
       settlement,
       vaultRelayer,
       wallets: [solver, ...traders],
     } = deployment);
 
-    const { authenticator, manager } = deployment;
+    const { vaultAuthorizer, authenticator, manager } = deployment;
+    await vaultAuthorizer
+      .connect(manager)
+      .grantRole(
+        ethers.utils.solidityKeccak256(
+          ["address", "bytes4"],
+          [
+            vault.address,
+            vault.interface.getSighash("transferToExternalBalance"),
+          ],
+        ),
+        vaultRelayer.address,
+      );
     await authenticator.connect(manager).addSolver(solver.address);
 
     const { chainId } = await ethers.provider.getNetwork();
@@ -79,7 +93,10 @@ describe("E2E: RetrETH Red Wine and Olive Oil Market", () => {
       await sellToken.mint(trader.address, STARTING_BALANCE);
       await sellToken
         .connect(trader)
-        .approve(vaultRelayer.address, ethers.constants.MaxUint256);
+        .approve(vault.address, ethers.constants.MaxUint256);
+      await vault
+        .connect(trader)
+        .changeRelayerAllowance(vaultRelayer.address, true);
 
       await encoder.signEncodeTrade(order, trader, SigningScheme.EIP712, {
         executedAmount,

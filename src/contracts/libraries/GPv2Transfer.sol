@@ -44,23 +44,19 @@ library GPv2Transfer {
             "GPv2: cannot transfer native ETH"
         );
 
+        IVault.BalanceTransfer[] memory vaultTransfers =
+            new IVault.BalanceTransfer[](1);
+
+        IVault.BalanceTransfer memory vaultTransfer = vaultTransfers[0];
+        vaultTransfer.token = transfer.token;
+        vaultTransfer.amount = transfer.amount;
+        vaultTransfer.sender = transfer.account;
+        vaultTransfer.recipient = recipient;
+
         if (transfer.useInternalBalance) {
-            IVault.BalanceTransfer[] memory vaultTransfers =
-                new IVault.BalanceTransfer[](1);
-
-            IVault.BalanceTransfer memory vaultTransfer = vaultTransfers[0];
-            vaultTransfer.token = transfer.token;
-            vaultTransfer.amount = transfer.amount;
-            vaultTransfer.sender = transfer.account;
-            vaultTransfer.recipient = recipient;
-
             vault.transferInternalBalance(vaultTransfers);
         } else {
-            transfer.token.safeTransferFrom(
-                transfer.account,
-                recipient,
-                transfer.amount
-            );
+            vault.transferToExternalBalance(vaultTransfers);
         }
     }
 
@@ -81,39 +77,68 @@ library GPv2Transfer {
         Data[] calldata transfers,
         address recipient
     ) internal {
-        // NOTE: Pre-allocate an array of vault balance tranfers large enough to
-        // hold all transfers. This allows us to efficiently batch internal
-        // balance transfers into a single Vault call.
-        IVault.BalanceTransfer[] memory vaultTransfers =
-            new IVault.BalanceTransfer[](transfers.length);
-        uint256 vaultTransferCount = 0;
+        uint256 transferCount = transfers.length;
 
-        for (uint256 i = 0; i < transfers.length; i++) {
+        // NOTE: Allocate an array of Vault balance transfers large enough
+        // to hold all transfers plus an extra slot used for splitting.
+        // Withdrawals are appended from the start of the array, while external
+        // transfers are added to the end. This buffer gets split into two
+        // memory arrays, using the extra slot that was allocated to hold the
+        // length of the second array. This allows us to efficiently batch
+        // transfers into at most two Vault calls.
+        IVault.BalanceTransfer[] memory vaultTransfers =
+            new IVault.BalanceTransfer[](transferCount + 1);
+        uint256 withdrawCount = 0;
+        uint256 externalTransferCount = 0;
+
+        for (uint256 i = 0; i < transferCount; i++) {
             Data calldata transfer = transfers[i];
             require(
                 address(transfer.token) != BUY_ETH_ADDRESS,
                 "GPv2: cannot transfer native ETH"
             );
 
-            if (transfer.useInternalBalance) {
-                IVault.BalanceTransfer memory vaultTransfer =
-                    vaultTransfers[vaultTransferCount++];
-                vaultTransfer.token = transfer.token;
-                vaultTransfer.amount = transfer.amount;
-                vaultTransfer.sender = transfer.account;
-                vaultTransfer.recipient = recipient;
-            } else {
-                transfer.token.safeTransferFrom(
-                    transfer.account,
-                    recipient,
-                    transfer.amount
-                );
-            }
+            IVault.BalanceTransfer memory vaultTransfer =
+                transfer.useInternalBalance
+                    ? vaultTransfers[withdrawCount++]
+                    : vaultTransfers[transferCount - (externalTransferCount++)];
+
+            vaultTransfer.token = transfer.token;
+            vaultTransfer.amount = transfer.amount;
+            vaultTransfer.sender = transfer.account;
+            vaultTransfer.recipient = recipient;
         }
 
-        if (vaultTransferCount > 0) {
-            truncateTransfersArray(vaultTransfers, vaultTransferCount);
-            vault.withdrawFromInternalBalance(vaultTransfers);
+        // NOTE: At this point, our Vault balance transfers array looks like
+        // the following in memory:
+        // ```
+        // offset |   0   |   1   |       |   N   |  N+1  |  N+2  |       |  N+M
+        // -------+-------+-------+  ...  +-------+-------+-------+  ...  +-------
+        //  value | N+M+1 |  wdl0 |       |  wdlN |   -   | xferM |       | xfer0
+        // ```
+        // In order to split the memory array, we need to update two memory
+        // slots, the first slot so that it reflects the length of withdrawals,
+        // as well as the (N+1)th slot, so that it reflects the length of the
+        // external transfers.
+        // <https://docs.soliditylang.org/en/v0.7.6/internals/layout_in_memory.html>
+        IVault.BalanceTransfer[] memory withdrawals;
+        IVault.BalanceTransfer[] memory externalTransfers;
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            withdrawals := vaultTransfers
+            mstore(withdrawals, withdrawCount)
+            externalTransfers := add(
+                vaultTransfers,
+                mul(add(withdrawCount, 1), 0x20)
+            )
+            mstore(externalTransfers, externalTransferCount)
+        }
+
+        if (withdrawCount > 0) {
+            vault.withdrawFromInternalBalance(withdrawals);
+        }
+        if (externalTransferCount > 0) {
+            vault.transferToExternalBalance(externalTransfers);
         }
     }
 
@@ -127,9 +152,14 @@ library GPv2Transfer {
     function transferToAccounts(IVault vault, Data[] memory transfers)
         internal
     {
-        IVault.BalanceTransfer[] memory vaultTransfers =
+        // NOTE: Allocate a buffer of Vault balance transfers large enough to
+        // hold all transfers, even if not all of them use internal balances.
+        // This is done to avoid re-allocations (which are gas inefficient)
+        // while still allowing all deposits to be batched into a single Vault
+        // call.
+        IVault.BalanceTransfer[] memory deposits =
             new IVault.BalanceTransfer[](transfers.length);
-        uint256 vaultTransferCount = 0;
+        uint256 depositCount = 0;
 
         for (uint256 i = 0; i < transfers.length; i++) {
             Data memory transfer = transfers[i];
@@ -141,42 +171,27 @@ library GPv2Transfer {
                 );
                 payable(transfer.account).transfer(transfer.amount);
             } else if (transfer.useInternalBalance) {
-                IVault.BalanceTransfer memory vaultTransfer =
-                    vaultTransfers[vaultTransferCount++];
-                vaultTransfer.token = transfer.token;
-                vaultTransfer.amount = transfer.amount;
-                vaultTransfer.sender = address(this);
-                vaultTransfer.recipient = transfer.account;
+                IVault.BalanceTransfer memory deposit =
+                    deposits[depositCount++];
+                deposit.token = transfer.token;
+                deposit.amount = transfer.amount;
+                deposit.sender = address(this);
+                deposit.recipient = transfer.account;
             } else {
                 transfer.token.safeTransfer(transfer.account, transfer.amount);
             }
         }
 
-        if (vaultTransferCount > 0) {
-            truncateTransfersArray(vaultTransfers, vaultTransferCount);
-            vault.depositToInternalBalance(vaultTransfers);
-        }
-    }
-
-    /// @dev Truncate a Vault balance transfer array to its actual size.
-    ///
-    /// This method **does not** check whether or not the new length is valid,
-    /// and specifying a size that is larger than the array's actual length is
-    /// undefined behaviour.
-    ///
-    /// @param vaultTransfers The memory array of vault transfers to truncate.
-    /// @param length The new length to set.
-    function truncateTransfersArray(
-        IVault.BalanceTransfer[] memory vaultTransfers,
-        uint256 length
-    ) private pure {
-        // NOTE: Truncate the vault transfers array to the specified length.
-        // This is done by setting the array's length which occupies the first
-        // word in memory pointed to by the `vaultTransfers` memory variable.
-        // <https://docs.soliditylang.org/en/v0.7.6/internals/layout_in_memory.html>
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            mstore(vaultTransfers, length)
+        if (depositCount > 0) {
+            // NOTE: Truncate the vault transfers array to the specified length.
+            // This is done by setting the array's length which occupies the
+            // first word in memory pointed to by the `deposits` variable.
+            // <https://docs.soliditylang.org/en/v0.7.6/internals/layout_in_memory.html>
+            // solhint-disable-next-line no-inline-assembly
+            assembly {
+                mstore(deposits, depositCount)
+            }
+            vault.depositToInternalBalance(deposits);
         }
     }
 }

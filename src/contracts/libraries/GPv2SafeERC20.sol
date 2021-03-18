@@ -15,8 +15,16 @@ library GPv2SafeERC20 {
         address to,
         uint256 value
     ) internal {
-        bytes4 selector_ = token.transfer.selector;
+        bytes4 selector_ = IERC20.transfer.selector;
 
+        // NOTE: Perform an assembly transfer call and inspect the return data.
+        // Note that we write the return data to memory 0 in the case where the
+        // return data size is 32, this is OK since the first 64 bytes of memory
+        // are reserved by Solidy as a scratch space that can be used within
+        // assembly blocks.
+        // <https://docs.soliditylang.org/en/v0.7.6/internals/layout_in_memory.html>
+        bool badReturnSize;
+        bool success;
         // solhint-disable-next-line no-inline-assembly
         assembly {
             let freeMemoryPointer := mload(0x40)
@@ -31,58 +39,7 @@ library GPv2SafeERC20 {
                 returndatacopy(0, 0, returndatasize())
                 revert(0, returndatasize())
             }
-        }
 
-        require(getLastTansferResult(), "GPv2: failed transfer");
-    }
-
-    /// @dev Wrapper around a call to the ERC20 function `transferFrom` that
-    /// reverts also when the token returns `false`.
-    function safeTransferFrom(
-        IERC20 token,
-        address from,
-        address to,
-        uint256 value
-    ) internal {
-        bytes4 selector_ = token.transferFrom.selector;
-
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            let freeMemoryPointer := mload(0x40)
-            mstore(freeMemoryPointer, selector_)
-            mstore(
-                add(freeMemoryPointer, 4),
-                and(from, 0xffffffffffffffffffffffffffffffffffffffff)
-            )
-            mstore(
-                add(freeMemoryPointer, 36),
-                and(to, 0xffffffffffffffffffffffffffffffffffffffff)
-            )
-            mstore(add(freeMemoryPointer, 68), value)
-
-            if iszero(call(gas(), token, 0, freeMemoryPointer, 100, 0, 0)) {
-                returndatacopy(0, 0, returndatasize())
-                revert(0, returndatasize())
-            }
-        }
-
-        require(getLastTansferResult(), "GPv2: failed transferFrom");
-    }
-
-    /// @dev Verifies that the last return was a successful `transfer*` call.
-    /// This is done by checking that the return data is either empty, or
-    /// is a valid ABI encoded boolean.
-    function getLastTansferResult() private pure returns (bool success) {
-        bool badReturnSize;
-
-        // NOTE: Inspecting previous return data requires assembly. Note that
-        // we write the return data to memory 0 in the case where the return
-        // data size is 32, this is OK since the first 64 bytes of memory are
-        // reserved by Solidy as a scratch space that can be used within
-        // assembly blocks.
-        // <https://docs.soliditylang.org/en/v0.7.6/internals/layout_in_memory.html>
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
             switch returndatasize()
                 // Non-standard ERC20 transfer without return.
                 case 0 {
@@ -97,7 +54,7 @@ library GPv2SafeERC20 {
                     // OpenZeppelin's `SafeERC20` library which is known to work
                     // with the existing ERC20 implementation we care about,
                     // make sure we return success for any non-zero return value
-                    // from the `transfer*` call.
+                    // from the transfer call.
                     success := iszero(iszero(mload(0)))
                 }
                 default {
@@ -106,5 +63,6 @@ library GPv2SafeERC20 {
         }
 
         require(!badReturnSize, "GPv2: malformed transfer result");
+        require(success, "GPv2: failed transfer");
     }
 }

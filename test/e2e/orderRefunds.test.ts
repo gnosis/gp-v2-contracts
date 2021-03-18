@@ -23,6 +23,7 @@ describe("E2E: Expired Order Gas Refunds", () => {
   let solver: Wallet;
   let traders: Wallet[];
 
+  let vault: Contract;
   let settlement: Contract;
   let vaultRelayer: Contract;
   let domainSeparator: TypedDataDomain;
@@ -35,12 +36,25 @@ describe("E2E: Expired Order Gas Refunds", () => {
 
     ({
       deployer,
+      vault,
       settlement,
       vaultRelayer,
       wallets: [solver, ...traders],
     } = deployment);
 
-    const { authenticator, manager } = deployment;
+    const { vaultAuthorizer, authenticator, manager } = deployment;
+    await vaultAuthorizer
+      .connect(manager)
+      .grantRole(
+        ethers.utils.solidityKeccak256(
+          ["address", "bytes4"],
+          [
+            vault.address,
+            vault.interface.getSighash("transferToExternalBalance"),
+          ],
+        ),
+        vaultRelayer.address,
+      );
     await authenticator.connect(manager).addSolver(solver.address);
 
     const { chainId } = await ethers.provider.getNetwork();
@@ -68,7 +82,10 @@ describe("E2E: Expired Order Gas Refunds", () => {
         await token.mint(trader.address, ethers.utils.parseEther("1000000.0"));
         await token
           .connect(trader)
-          .approve(vaultRelayer.address, ethers.constants.MaxUint256);
+          .approve(vault.address, ethers.constants.MaxUint256);
+        await vault
+          .connect(trader)
+          .changeRelayerAllowance(vaultRelayer.address, true);
       }
     }
 

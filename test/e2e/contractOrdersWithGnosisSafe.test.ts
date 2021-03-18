@@ -142,6 +142,7 @@ describe("E2E: Order From A Gnosis Safe", () => {
   let trader: Wallet;
   let safeOwners: Wallet[];
 
+  let vault: Contract;
   let settlement: Contract;
   let vaultRelayer: Contract;
   let safe: Contract;
@@ -154,12 +155,25 @@ describe("E2E: Order From A Gnosis Safe", () => {
 
     ({
       deployer,
+      vault,
       settlement,
       vaultRelayer,
       wallets: [solver, trader, ...safeOwners],
     } = deployment);
 
-    const { authenticator, manager } = deployment;
+    const { vaultAuthorizer, authenticator, manager } = deployment;
+    await vaultAuthorizer
+      .connect(manager)
+      .grantRole(
+        ethers.utils.solidityKeccak256(
+          ["address", "bytes4"],
+          [
+            vault.address,
+            vault.interface.getSighash("transferToExternalBalance"),
+          ],
+        ),
+        vaultRelayer.address,
+      );
     await authenticator.connect(manager).addSolver(solver.address);
 
     const { chainId } = await ethers.provider.getNetwork();
@@ -199,7 +213,10 @@ describe("E2E: Order From A Gnosis Safe", () => {
     await weth.mint(trader.address, TRADER_SOLD_AMOUNT.add(TRADER_FEE));
     await weth
       .connect(trader)
-      .approve(vaultRelayer.address, ethers.constants.MaxUint256);
+      .approve(vault.address, ethers.constants.MaxUint256);
+    await vault
+      .connect(trader)
+      .changeRelayerAllowance(vaultRelayer.address, true);
 
     encoder.signEncodeTrade(
       {
@@ -222,17 +239,31 @@ describe("E2E: Order From A Gnosis Safe", () => {
     const SAFE_BOUGHT_AMOUNT = ethers.utils.parseEther("1.0");
 
     await dai.mint(safe.address, SAFE_SOLD_AMOUNT.add(SAFE_FEE));
-    const approveTransaction = {
-      to: dai.address,
-      data: dai.interface.encodeFunctionData("approve", [
-        vaultRelayer.address,
-        ethers.constants.MaxUint256,
-      ]),
-    };
-    await execSafeTransaction(safe, approveTransaction, safeOwners);
-    expect(
-      await dai.allowance(safe.address, vaultRelayer.address),
-    ).to.deep.equal(ethers.constants.MaxUint256);
+    await execSafeTransaction(
+      safe,
+      {
+        to: dai.address,
+        data: dai.interface.encodeFunctionData("approve", [
+          vault.address,
+          ethers.constants.MaxUint256,
+        ]),
+      },
+      safeOwners,
+    );
+    await execSafeTransaction(
+      safe,
+      {
+        to: vault.address,
+        data: vault.interface.encodeFunctionData("changeRelayerAllowance", [
+          vaultRelayer.address,
+          true,
+        ]),
+      },
+      safeOwners,
+    );
+    expect(await dai.allowance(safe.address, vault.address)).to.deep.equal(
+      ethers.constants.MaxUint256,
+    );
 
     const order = {
       kind: OrderKind.BUY,

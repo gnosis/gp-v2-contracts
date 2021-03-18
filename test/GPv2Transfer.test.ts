@@ -33,9 +33,16 @@ describe("GPv2Transfer", () => {
 
   describe("transferFromAccount", () => {
     it("should transfer external amount to recipient", async () => {
-      await token.mock.transferFrom
-        .withArgs(traders[0].address, recipient.address, amount)
-        .returns(true);
+      await vault.mock.transferToExternalBalance
+        .withArgs([
+          {
+            token: token.address,
+            amount,
+            sender: traders[0].address,
+            recipient: recipient.address,
+          },
+        ])
+        .returns();
       await expect(
         transfer.transferFromAccountTest(
           vault.address,
@@ -93,8 +100,15 @@ describe("GPv2Transfer", () => {
     });
 
     it("should revert on failed ERC20 transfers", async () => {
-      await token.mock.transferFrom
-        .withArgs(traders[0].address, recipient.address, amount)
+      await vault.mock.transferToExternalBalance
+        .withArgs([
+          {
+            token: token.address,
+            amount,
+            sender: traders[0].address,
+            recipient: recipient.address,
+          },
+        ])
         .revertsWithReason("test error");
 
       await expect(
@@ -140,9 +154,16 @@ describe("GPv2Transfer", () => {
 
   describe("transferFromAccounts", () => {
     it("should transfer external amount to recipient", async () => {
-      await token.mock.transferFrom
-        .withArgs(traders[0].address, recipient.address, amount)
-        .returns(true);
+      await vault.mock.transferToExternalBalance
+        .withArgs([
+          {
+            token: token.address,
+            amount,
+            sender: traders[0].address,
+            recipient: recipient.address,
+          },
+        ])
+        .returns();
       await expect(
         transfer.transferFromAccountsTest(
           vault.address,
@@ -204,20 +225,18 @@ describe("GPv2Transfer", () => {
       expect(externalTransfers).to.have.length.above(1);
       expect(internalTransfers).to.have.length.above(1);
 
-      for (const { account } of externalTransfers) {
-        await token.mock.transferFrom
-          .withArgs(account, recipient.address, amount)
-          .returns(true);
-      }
+      const toVaultTransfers = (xfrs: typeof transfers) =>
+        xfrs.map(({ account }) => ({
+          token: token.address,
+          amount,
+          sender: account,
+          recipient: recipient.address,
+        }));
+      await vault.mock.transferToExternalBalance
+        .withArgs(toVaultTransfers(externalTransfers).reverse())
+        .returns();
       await vault.mock.withdrawFromInternalBalance
-        .withArgs(
-          internalTransfers.map(({ account }) => ({
-            token: token.address,
-            amount,
-            sender: account,
-            recipient: recipient.address,
-          })),
-        )
+        .withArgs(toVaultTransfers(internalTransfers))
         .returns();
 
       await expect(
@@ -248,9 +267,16 @@ describe("GPv2Transfer", () => {
       }
     });
 
-    it("should revert on failed ERC20 transfers", async () => {
-      await token.mock.transferFrom
-        .withArgs(traders[0].address, recipient.address, amount)
+    it("should revert on failed Vault external transfers", async () => {
+      await vault.mock.transferToExternalBalance
+        .withArgs([
+          {
+            token: token.address,
+            amount,
+            sender: traders[0].address,
+            recipient: recipient.address,
+          },
+        ])
         .revertsWithReason("test error");
 
       await expect(
@@ -450,7 +476,7 @@ describe("GPv2Transfer", () => {
       ).to.be.revertedWith("test error");
     });
 
-    it("should revert on failed Vault withdrawal", async () => {
+    it("should revert on failed Vault deposits", async () => {
       await vault.mock.depositToInternalBalance
         .withArgs([
           {

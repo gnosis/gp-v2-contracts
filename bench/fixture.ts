@@ -42,7 +42,7 @@ export class TokenManager {
   }
 
   public async addToken(): Promise<Contract> {
-    const { vaultRelayer, settlement, deployer } = this.deployment;
+    const { vault, vaultRelayer, settlement, deployer } = this.deployment;
 
     const symbol = `T${this.instances.length.toString().padStart(3, "0")}`;
     debug(`creating token ${symbol} and funding traders`);
@@ -58,7 +58,10 @@ export class TokenManager {
 
     for (const trader of this.traders) {
       await token.mint(trader.address, LOTS);
-      await token.connect(trader).approve(vaultRelayer.address, LOTS);
+      await token.connect(trader).approve(vault.address, LOTS);
+      await vault
+        .connect(trader)
+        .changeRelayerAllowance(vaultRelayer.address, true);
     }
 
     this.instances.push(token);
@@ -93,8 +96,11 @@ export class BenchFixture {
     debug("deploying GPv2 contracts");
     const deployment = await deployTestContracts();
     const {
+      vaultAuthorizer,
       authenticator,
+      vault,
       settlement,
+      vaultRelayer,
       deployer,
       manager,
       wallets: [solver, pooler, ...traders],
@@ -103,6 +109,20 @@ export class BenchFixture {
     const { chainId } = await ethers.provider.getNetwork();
     const domainSeparator = domain(chainId, settlement.address);
 
+    for (const method of [
+      "transferToExternalBalance",
+      "withdrawFromInternalBalance",
+    ]) {
+      await vaultAuthorizer
+        .connect(manager)
+        .grantRole(
+          ethers.utils.solidityKeccak256(
+            ["address", "bytes4"],
+            [vault.address, vault.interface.getSighash(method)],
+          ),
+          vaultRelayer.address,
+        );
+    }
     await authenticator.connect(manager).addSolver(solver.address);
 
     const tokens = new TokenManager(deployment, traders);

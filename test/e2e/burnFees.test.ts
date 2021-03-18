@@ -19,6 +19,7 @@ describe("E2E: Burn fees", () => {
   let solver: Wallet;
   let traders: Wallet[];
 
+  let vault: Contract;
   let settlement: Contract;
   let vaultRelayer: Contract;
   let domainSeparator: TypedDataDomain;
@@ -31,12 +32,25 @@ describe("E2E: Burn fees", () => {
 
     ({
       deployer,
+      vault,
       settlement,
       vaultRelayer,
       wallets: [solver, ...traders],
     } = deployment);
 
-    const { authenticator, manager } = deployment;
+    const { vaultAuthorizer, authenticator, manager } = deployment;
+    await vaultAuthorizer
+      .connect(manager)
+      .grantRole(
+        ethers.utils.solidityKeccak256(
+          ["address", "bytes4"],
+          [
+            vault.address,
+            vault.interface.getSighash("transferToExternalBalance"),
+          ],
+        ),
+        vaultRelayer.address,
+      );
     await authenticator.connect(manager).addSolver(solver.address);
 
     const { chainId } = await ethers.provider.getNetwork();
@@ -56,7 +70,10 @@ describe("E2E: Burn fees", () => {
     await owl.mint(traders[0].address, ONE_USD.mul(1001));
     await owl
       .connect(traders[0])
-      .approve(vaultRelayer.address, ethers.constants.MaxUint256);
+      .approve(vault.address, ethers.constants.MaxUint256);
+    await vault
+      .connect(traders[0])
+      .changeRelayerAllowance(vaultRelayer.address, true);
     await encoder.signEncodeTrade(
       {
         kind: OrderKind.SELL,
@@ -76,7 +93,10 @@ describe("E2E: Burn fees", () => {
     await dai.mint(traders[1].address, ONE_USD.mul(1000));
     await dai
       .connect(traders[1])
-      .approve(vaultRelayer.address, ethers.constants.MaxUint256);
+      .approve(vault.address, ethers.constants.MaxUint256);
+    await vault
+      .connect(traders[1])
+      .changeRelayerAllowance(vaultRelayer.address, true);
 
     await encoder.signEncodeTrade(
       {

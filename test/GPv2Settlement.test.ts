@@ -1,4 +1,3 @@
-import IERC20 from "@openzeppelin/contracts/build/contracts/IERC20.json";
 import { expect } from "chai";
 import { MockContract } from "ethereum-waffle";
 import { BigNumber, Contract, ContractReceipt, Event } from "ethers";
@@ -396,17 +395,14 @@ describe("GPv2Settlement", () => {
         },
       ]) {
         it(`performs an ${name} swap when specified`, async () => {
-          const sellToken = await waffle.deployMockContract(
-            deployer,
-            IERC20.abi,
-          );
+          const sellToken = `0x${"aa".repeat(20)}`;
           const buyToken = `0x${"cc".repeat(20)}`;
           const feeAmount = ethers.utils.parseEther("1.0");
 
           const encoder = new SwapEncoder(testDomain);
           await encoder.signEncodeTrade(
             {
-              sellToken: sellToken.address,
+              sellToken,
               buyToken,
               receiver: traders[1].address,
               sellAmount: ethers.constants.Zero,
@@ -436,22 +432,19 @@ describe("GPv2Settlement", () => {
               0,
             )
             .returns([0, 0]);
-          if (flags.useInternalSellTokenBalance) {
-            await vault.mock.transferInternalBalance
-              .withArgs([
-                {
-                  token: sellToken.address,
-                  amount: feeAmount,
-                  sender: traders[0].address,
-                  recipient: settlement.address,
-                },
-              ])
-              .returns();
-          } else {
-            await sellToken.mock.transferFrom
-              .withArgs(traders[0].address, settlement.address, feeAmount)
-              .returns(true);
-          }
+          const transferMethod = flags.useInternalSellTokenBalance
+            ? "transferInternalBalance"
+            : "transferToExternalBalance";
+          await vault.mock[transferMethod]
+            .withArgs([
+              {
+                token: sellToken,
+                amount: feeAmount,
+                sender: traders[0].address,
+                recipient: settlement.address,
+              },
+            ])
+            .returns();
 
           await authenticator.connect(owner).addSolver(solver.address);
           await settlement.connect(solver).swap(...encoder.encodedSwap());
@@ -593,7 +586,7 @@ describe("GPv2Settlement", () => {
 
     it("should emit a settlement event", async () => {
       await vault.mock.batchSwapGivenIn.returns([0, 0]);
-      await vault.mock.transferInternalBalance.returns();
+      await vault.mock.transferToExternalBalance.returns();
 
       await authenticator.connect(owner).addSolver(solver.address);
       await expect(settlement.connect(solver).swap(...(await emptySwap())))
@@ -603,7 +596,7 @@ describe("GPv2Settlement", () => {
 
     it("reverts on negative sell amounts", async () => {
       await vault.mock.batchSwapGivenIn.returns([-1, 0]);
-      await vault.mock.transferInternalBalance.returns();
+      await vault.mock.transferToExternalBalance.returns();
 
       await authenticator.connect(owner).addSolver(solver.address);
       await expect(
@@ -613,7 +606,7 @@ describe("GPv2Settlement", () => {
 
     it("reverts on positive buy amounts", async () => {
       await vault.mock.batchSwapGivenIn.returns([0, 1]);
-      await vault.mock.transferInternalBalance.returns();
+      await vault.mock.transferToExternalBalance.returns();
 
       await authenticator.connect(owner).addSolver(solver.address);
       await expect(
@@ -624,7 +617,7 @@ describe("GPv2Settlement", () => {
     it("reverts on unary negation overflow for buy amounts", async () => {
       const INT256_MIN = `-0x80${"00".repeat(31)}`;
       await vault.mock.batchSwapGivenIn.returns([0, INT256_MIN]);
-      await vault.mock.transferInternalBalance.returns();
+      await vault.mock.transferToExternalBalance.returns();
 
       await authenticator.connect(owner).addSolver(solver.address);
       await expect(

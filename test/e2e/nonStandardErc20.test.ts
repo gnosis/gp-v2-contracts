@@ -16,6 +16,7 @@ describe("E2E: Non-Standard ERC20 Tokens", () => {
   let solver: Wallet;
   let traders: Wallet[];
 
+  let vault: Contract;
   let settlement: Contract;
   let vaultRelayer: Contract;
   let domainSeparator: TypedDataDomain;
@@ -26,22 +27,32 @@ describe("E2E: Non-Standard ERC20 Tokens", () => {
     const deployment = await deployTestContracts();
 
     ({
+      vault,
       settlement,
       vaultRelayer,
       wallets: [solver, ...traders],
     } = deployment);
 
-    const { authenticator, manager } = deployment;
+    const { vaultAuthorizer, authenticator, manager } = deployment;
+    await vaultAuthorizer
+      .connect(manager)
+      .grantRole(
+        ethers.utils.solidityKeccak256(
+          ["address", "bytes4"],
+          [
+            vault.address,
+            vault.interface.getSighash("transferToExternalBalance"),
+          ],
+        ),
+        vaultRelayer.address,
+      );
     await authenticator.connect(manager).addSolver(solver.address);
 
     const { chainId } = await ethers.provider.getNetwork();
     domainSeparator = domain(chainId, settlement.address);
 
     const ERC20NoReturn = await ethers.getContractFactory("ERC20NoReturn");
-    const ERC20ReturningUint = await ethers.getContractFactory(
-      "ERC20ReturningUint",
-    );
-    tokens = [await ERC20NoReturn.deploy(), await ERC20ReturningUint.deploy()];
+    tokens = [await ERC20NoReturn.deploy(), await ERC20NoReturn.deploy()];
   });
 
   it("should allow trading non-standard ERC20 tokens", async () => {
@@ -54,7 +65,10 @@ describe("E2E: Non-Standard ERC20 Tokens", () => {
     await tokens[0].mint(traders[0].address, amount.add(feeAmount));
     await tokens[0]
       .connect(traders[0])
-      .approve(vaultRelayer.address, ethers.constants.MaxUint256);
+      .approve(vault.address, ethers.constants.MaxUint256);
+    await vault
+      .connect(traders[0])
+      .changeRelayerAllowance(vaultRelayer.address, true);
     await encoder.signEncodeTrade(
       {
         kind: OrderKind.SELL,
@@ -74,7 +88,10 @@ describe("E2E: Non-Standard ERC20 Tokens", () => {
     await tokens[1].mint(traders[1].address, amount.add(feeAmount));
     await tokens[1]
       .connect(traders[1])
-      .approve(vaultRelayer.address, ethers.constants.MaxUint256);
+      .approve(vault.address, ethers.constants.MaxUint256);
+    await vault
+      .connect(traders[1])
+      .changeRelayerAllowance(vaultRelayer.address, true);
     await encoder.signEncodeTrade(
       {
         kind: OrderKind.BUY,

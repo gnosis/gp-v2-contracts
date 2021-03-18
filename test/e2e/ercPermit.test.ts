@@ -17,6 +17,7 @@ describe("E2E: EIP-2612 Permit", () => {
   let solver: Wallet;
   let traders: Wallet[];
 
+  let vault: Contract;
   let settlement: Contract;
   let vaultRelayer: Contract;
   let domainSeparator: TypedDataDomain;
@@ -27,12 +28,25 @@ describe("E2E: EIP-2612 Permit", () => {
     const deployment = await deployTestContracts();
 
     ({
+      vault,
       settlement,
       vaultRelayer,
       wallets: [solver, ...traders],
     } = deployment);
 
-    const { authenticator, manager } = deployment;
+    const { vaultAuthorizer, authenticator, manager } = deployment;
+    await vaultAuthorizer
+      .connect(manager)
+      .grantRole(
+        ethers.utils.solidityKeccak256(
+          ["address", "bytes4"],
+          [
+            vault.address,
+            vault.interface.getSighash("transferToExternalBalance"),
+          ],
+        ),
+        vaultRelayer.address,
+      );
     await authenticator.connect(manager).addSolver(solver.address);
 
     const { chainId } = await ethers.provider.getNetwork();
@@ -52,7 +66,10 @@ describe("E2E: EIP-2612 Permit", () => {
     await eurs[0].mint(traders[0].address, ONE_EUR);
     await eurs[0]
       .connect(traders[0])
-      .approve(vaultRelayer.address, ethers.constants.MaxUint256);
+      .approve(vault.address, ethers.constants.MaxUint256);
+    await vault
+      .connect(traders[0])
+      .changeRelayerAllowance(vaultRelayer.address, true);
     await encoder.signEncodeTrade(
       {
         kind: OrderKind.SELL,
@@ -73,7 +90,7 @@ describe("E2E: EIP-2612 Permit", () => {
 
     const permit = {
       owner: traders[1].address,
-      spender: vaultRelayer.address,
+      spender: vault.address,
       value: ONE_EUR,
       nonce: await eurs[1].nonces(traders[1].address),
       deadline: 0xffffffff,
@@ -126,6 +143,12 @@ describe("E2E: EIP-2612 Permit", () => {
       },
       InteractionStage.PRE,
     );
+
+    // NOTE: At the moment it isn't possible to set vault relayer approval by
+    // offline signature, although it may be added in the future.
+    await vault
+      .connect(traders[1])
+      .changeRelayerAllowance(vaultRelayer.address, true);
 
     await encoder.signEncodeTrade(
       {

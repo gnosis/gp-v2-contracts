@@ -37,18 +37,20 @@ describe("E2E: Should allow trading with Vault internal balances", () => {
     } = deployment);
 
     const { vaultAuthorizer, authenticator, manager } = deployment;
-    await vaultAuthorizer
-      .connect(manager)
-      .grantRole(
-        ethers.utils.solidityKeccak256(
-          ["address", "bytes4"],
-          [
-            vault.address,
-            vault.interface.getSighash("withdrawFromInternalBalance"),
-          ],
-        ),
-        vaultRelayer.address,
-      );
+    for (const method of [
+      "transferToExternalBalance",
+      "withdrawFromInternalBalance",
+    ]) {
+      await vaultAuthorizer
+        .connect(manager)
+        .grantRole(
+          ethers.utils.solidityKeccak256(
+            ["address", "bytes4"],
+            [vault.address, vault.interface.getSighash(method)],
+          ),
+          vaultRelayer.address,
+        );
+    }
     await authenticator.connect(manager).addSolver(solver.address);
 
     const { chainId } = await ethers.provider.getNetwork();
@@ -78,7 +80,10 @@ describe("E2E: Should allow trading with Vault internal balances", () => {
     await tokens[0].mint(traders[0].address, ethers.utils.parseEther("1.001"));
     await tokens[0]
       .connect(traders[0])
-      .approve(vaultRelayer.address, ethers.constants.MaxUint256);
+      .approve(vault.address, ethers.constants.MaxUint256);
+    await vault
+      .connect(traders[0])
+      .changeRelayerAllowance(vaultRelayer.address, true);
     await encoder.signEncodeTrade(
       {
         kind: OrderKind.SELL,
@@ -130,7 +135,10 @@ describe("E2E: Should allow trading with Vault internal balances", () => {
     await tokens[0].mint(traders[2].address, ethers.utils.parseEther("2.002"));
     await tokens[0]
       .connect(traders[2])
-      .approve(vaultRelayer.address, ethers.constants.MaxUint256);
+      .approve(vault.address, ethers.constants.MaxUint256);
+    await vault
+      .connect(traders[2])
+      .changeRelayerAllowance(vaultRelayer.address, true);
     await encoder.signEncodeTrade(
       {
         kind: OrderKind.SELL,
