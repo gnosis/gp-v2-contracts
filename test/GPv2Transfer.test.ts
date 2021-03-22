@@ -6,6 +6,8 @@ import { artifacts, ethers, waffle } from "hardhat";
 
 import { BUY_ETH_ADDRESS } from "../src/ts";
 
+import { OrderBalanceId } from "./encoding";
+
 describe("GPv2Transfer", () => {
   const [
     deployer,
@@ -43,7 +45,7 @@ describe("GPv2Transfer", () => {
             account: traders[0].address,
             token: token.address,
             amount,
-            useInternalBalance: false,
+            balance: OrderBalanceId.ERC20,
           },
           recipient.address,
         ),
@@ -68,7 +70,7 @@ describe("GPv2Transfer", () => {
             account: traders[0].address,
             token: token.address,
             amount,
-            useInternalBalance: true,
+            balance: OrderBalanceId.INTERNAL,
           },
           recipient.address,
         ),
@@ -76,7 +78,11 @@ describe("GPv2Transfer", () => {
     });
 
     it("reverts when mistakenly trying to transfer Ether", async () => {
-      for (const useInternalBalance of [false, true]) {
+      for (const balance of [
+        OrderBalanceId.ERC20,
+        OrderBalanceId.EXTERNAL,
+        OrderBalanceId.INTERNAL,
+      ]) {
         await expect(
           transfer.transferFromAccountTest(
             vault.address,
@@ -84,7 +90,7 @@ describe("GPv2Transfer", () => {
               account: traders[0].address,
               token: BUY_ETH_ADDRESS,
               amount,
-              useInternalBalance,
+              balance,
             },
             recipient.address,
           ),
@@ -104,7 +110,7 @@ describe("GPv2Transfer", () => {
             account: traders[0].address,
             token: token.address,
             amount,
-            useInternalBalance: false,
+            balance: OrderBalanceId.ERC20,
           },
           recipient.address,
         ),
@@ -130,7 +136,7 @@ describe("GPv2Transfer", () => {
             account: traders[0].address,
             token: token.address,
             amount,
-            useInternalBalance: true,
+            balance: OrderBalanceId.INTERNAL,
           },
           recipient.address,
         ),
@@ -151,7 +157,7 @@ describe("GPv2Transfer", () => {
               account: traders[0].address,
               token: token.address,
               amount,
-              useInternalBalance: false,
+              balance: OrderBalanceId.ERC20,
             },
           ],
           recipient.address,
@@ -178,7 +184,7 @@ describe("GPv2Transfer", () => {
               account: traders[0].address,
               token: token.address,
               amount,
-              useInternalBalance: true,
+              balance: OrderBalanceId.INTERNAL,
             },
           ],
           recipient.address,
@@ -230,7 +236,11 @@ describe("GPv2Transfer", () => {
     });
 
     it("reverts when mistakenly trying to transfer Ether", async () => {
-      for (const useInternalBalance of [false, true]) {
+      for (const balance of [
+        OrderBalanceId.ERC20,
+        OrderBalanceId.EXTERNAL,
+        OrderBalanceId.INTERNAL,
+      ]) {
         await expect(
           transfer.transferFromAccountsTest(
             vault.address,
@@ -239,7 +249,7 @@ describe("GPv2Transfer", () => {
                 account: traders[0].address,
                 token: BUY_ETH_ADDRESS,
                 amount,
-                useInternalBalance,
+                balance,
               },
             ],
             recipient.address,
@@ -261,7 +271,7 @@ describe("GPv2Transfer", () => {
               account: traders[0].address,
               token: token.address,
               amount,
-              useInternalBalance: false,
+              balance: OrderBalanceId.ERC20,
             },
           ],
           recipient.address,
@@ -289,7 +299,7 @@ describe("GPv2Transfer", () => {
               account: traders[0].address,
               token: token.address,
               amount,
-              useInternalBalance: true,
+              balance: OrderBalanceId.INTERNAL,
             },
           ],
           recipient.address,
@@ -309,7 +319,7 @@ describe("GPv2Transfer", () => {
             account: traders[0].address,
             token: token.address,
             amount,
-            useInternalBalance: false,
+            balance: OrderBalanceId.ERC20,
           },
         ]),
       ).to.not.be.reverted;
@@ -332,7 +342,7 @@ describe("GPv2Transfer", () => {
             account: traders[0].address,
             token: token.address,
             amount,
-            useInternalBalance: true,
+            balance: OrderBalanceId.INTERNAL,
           },
         ]),
       ).to.not.be.reverted;
@@ -350,7 +360,7 @@ describe("GPv2Transfer", () => {
           account: traders[0].address,
           token: BUY_ETH_ADDRESS,
           amount,
-          useInternalBalance: false,
+          balance: OrderBalanceId.ERC20,
         },
       ]);
 
@@ -374,7 +384,7 @@ describe("GPv2Transfer", () => {
               account: trader.address,
               token: token.address,
               amount,
-              useInternalBalance: false,
+              balance: OrderBalanceId.ERC20,
             });
             break;
           case 1:
@@ -382,7 +392,7 @@ describe("GPv2Transfer", () => {
               account: trader.address,
               token: token.address,
               amount,
-              useInternalBalance: true,
+              balance: OrderBalanceId.INTERNAL,
             });
             break;
           case 2:
@@ -390,7 +400,7 @@ describe("GPv2Transfer", () => {
               account: trader.address,
               token: BUY_ETH_ADDRESS,
               amount,
-              useInternalBalance: false,
+              balance: OrderBalanceId.ERC20,
             });
             break;
         }
@@ -444,7 +454,7 @@ describe("GPv2Transfer", () => {
             account: traders[0].address,
             token: token.address,
             amount,
-            useInternalBalance: false,
+            balance: OrderBalanceId.ERC20,
           },
         ]),
       ).to.be.revertedWith("test error");
@@ -468,7 +478,7 @@ describe("GPv2Transfer", () => {
             account: traders[0].address,
             token: token.address,
             amount,
-            useInternalBalance: true,
+            balance: OrderBalanceId.INTERNAL,
           },
         ]),
       ).to.be.revertedWith("test error");
@@ -481,7 +491,7 @@ describe("GPv2Transfer", () => {
             account: traders[0].address,
             token: BUY_ETH_ADDRESS,
             amount,
-            useInternalBalance: true,
+            balance: OrderBalanceId.INTERNAL,
           },
         ]),
       ).to.be.revertedWith("unsupported internal ETH");

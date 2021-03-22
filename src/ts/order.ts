@@ -60,15 +60,16 @@ export interface Order {
    */
   partiallyFillable: boolean;
   /**
-   * Specifies whether or not internal balances should be used for transferring
-   * sell tokens when settling directly with Balancer.
+   * Specifies how the sell token balance will be withdrawn. It can either be
+   * taken using ERC20 token allowances made directly to the Vault relayer
+   * (default) or using Balancer Vault internal or external balances.
    */
-  useInternalSellTokenBalance?: boolean;
+  sellTokenBalance?: OrderBalance;
   /**
-   * Specifies whether or not trade proceeds in the buy token should be payed in
-   * internal balances when settling directly with Balancer.
+   * Specifies how the buy token balance will be paid. It can either be paid
+   * directly in ERC20 tokens (default) in Balancer Vault internal balances.
    */
-  useInternalBuyTokenBalance?: boolean;
+  buyTokenBalance?: OrderBalance;
 }
 
 /**
@@ -95,10 +96,7 @@ export const BUY_ETH_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
  */
 export type OrderFlags = Pick<
   Order,
-  | "kind"
-  | "partiallyFillable"
-  | "useInternalSellTokenBalance"
-  | "useInternalBuyTokenBalance"
+  "kind" | "partiallyFillable" | "sellTokenBalance" | "buyTokenBalance"
 >;
 
 /**
@@ -126,6 +124,28 @@ export enum OrderKind {
 }
 
 /**
+ * Order balance configuration.
+ */
+export enum OrderBalance {
+  /**
+   * Use ERC20 token balances.
+   */
+  ERC20 = "erc20",
+  /**
+   * Use Balancer Vault external balances.
+   *
+   * This can only be specified specified for the sell balance and allows orders
+   * to re-use Vault ERC20 allowances. When specified for the buy balance, it
+   * will be treated as {@link OrderBalance.ERC20}.
+   */
+  EXTERNAL = "external",
+  /**
+   * Use Balancer Vault external balances.
+   */
+  INTERNAL = "internal",
+}
+
+/**
  * The EIP-712 type fields definition for a Gnosis Protocol v2 order.
  */
 export const ORDER_TYPE_FIELDS = [
@@ -139,8 +159,8 @@ export const ORDER_TYPE_FIELDS = [
   { name: "feeAmount", type: "uint256" },
   { name: "kind", type: "string" },
   { name: "partiallyFillable", type: "bool" },
-  { name: "useInternalSellTokenBalance", type: "bool" },
-  { name: "useInternalBuyTokenBalance", type: "bool" },
+  { name: "sellTokenBalance", type: "string" },
+  { name: "buyTokenBalance", type: "string" },
 ];
 
 /**
@@ -178,15 +198,41 @@ export function hashify(h: HashLike): string {
 }
 
 /**
- * Normalized representation of an [`Order`] for EIP-712 operations.
+ * Normalizes the balance configuration for a buy token. Specifically, this
+ * function ensures that {@link OrderBalance.EXTERNAL} gets normalized to
+ * {@link OrderBalance.ERC20}.
+ *
+ * @param balance The balance configuration.
+ * @returns The normalized balance configuration.
  */
-export type NormalizedOrder = Omit<Order, "validTo" | "appData" | "kind"> & {
+export function normalizeBuyTokenBalance(
+  balance: OrderBalance | undefined,
+): OrderBalance.ERC20 | OrderBalance.INTERNAL {
+  switch (balance) {
+    case undefined:
+    case OrderBalance.ERC20:
+    case OrderBalance.EXTERNAL:
+      return OrderBalance.ERC20;
+    case OrderBalance.INTERNAL:
+      return OrderBalance.INTERNAL;
+    default:
+      throw new Error(`invalid order balance ${balance}`);
+  }
+}
+
+/**
+ * Normalized representation of an {@link Order} for EIP-712 operations.
+ */
+export type NormalizedOrder = Omit<
+  Order,
+  "validTo" | "appData" | "kind" | "sellTokenBalance" | "buyTokenBalance"
+> & {
   receiver: string;
   validTo: number;
   appData: string;
-  kind: string;
-  useInternalSellTokenBalance: boolean;
-  useInternalBuyTokenBalance: boolean;
+  kind: "sell" | "buy";
+  sellTokenBalance: "erc20" | "external" | "internal";
+  buyTokenBalance: "erc20" | "internal";
 };
 
 /**
@@ -202,11 +248,11 @@ export function normalizeOrder(order: Order): NormalizedOrder {
 
   return {
     receiver: ethers.constants.AddressZero,
-    useInternalSellTokenBalance: false,
-    useInternalBuyTokenBalance: false,
+    sellTokenBalance: OrderBalance.ERC20,
     ...order,
     validTo: timestamp(order.validTo),
     appData: hashify(order.appData),
+    buyTokenBalance: normalizeBuyTokenBalance(order.buyTokenBalance),
   };
 }
 
