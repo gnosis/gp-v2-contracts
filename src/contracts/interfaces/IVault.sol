@@ -45,13 +45,16 @@ interface IVault {
         bytes userData;
     }
 
-    function depositToInternalBalance(BalanceTransfer[] calldata transfers)
+    function depositToInternalBalance(BalanceTransfer[] memory transfers)
         external;
 
-    function withdrawFromInternalBalance(BalanceTransfer[] calldata transfers)
+    function transferToExternalBalance(BalanceTransfer[] memory transfers)
         external;
 
-    function transferInternalBalance(BalanceTransfer[] calldata transfers)
+    function withdrawFromInternalBalance(BalanceTransfer[] memory transfers)
+        external;
+
+    function transferInternalBalance(BalanceTransfer[] memory transfers)
         external;
 
     function batchSwapGivenIn(
