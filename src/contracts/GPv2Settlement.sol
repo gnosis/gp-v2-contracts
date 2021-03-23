@@ -153,15 +153,17 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         recoverOrderFromTrade(recoveredOrder, tokens, trade);
 
         IVault.SwapKind kind =
-            order.kind == GPv2Order.SELL
+            order.kind == GPv2Order.KIND_SELL
                 ? IVault.SwapKind.GIVEN_IN
                 : IVault.SwapKind.GIVEN_OUT;
 
         IVault.FundManagement memory funds;
         funds.sender = recoveredOrder.owner;
-        funds.fromInternalBalance = order.useInternalSellTokenBalance;
+        funds.fromInternalBalance =
+            order.sellTokenBalance == GPv2Order.BALANCE_INTERNAL;
         funds.recipient = recoveredOrder.receiver;
-        funds.toInternalBalance = order.useInternalBuyTokenBalance;
+        funds.toInternalBalance =
+            order.buyTokenBalance == GPv2Order.BALANCE_INTERNAL;
 
         int256[] memory limits = new int256[](tokens.length);
         // NOTE: Array allocation initializes elements to 0, so we only need to
@@ -174,7 +176,7 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         feeTransfer.account = recoveredOrder.owner;
         feeTransfer.token = order.sellToken;
         feeTransfer.amount = order.feeAmount;
-        feeTransfer.useInternalBalance = order.useInternalSellTokenBalance;
+        feeTransfer.balance = order.sellTokenBalance;
 
         int256[] memory tokenDeltas =
             vaultRelayer.batchSwapWithFee(
@@ -200,7 +202,7 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         // validity have already been verified when executing the swap through
         // the `limit` and `deadline` parameters.
         require(filledAmount[orderUid] == 0, "GPv2: order filled");
-        if (order.kind == GPv2Order.SELL) {
+        if (order.kind == GPv2Order.KIND_SELL) {
             require(
                 executedSellAmount == order.sellAmount,
                 "GPv2: sell amount not respected"
@@ -362,7 +364,7 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         uint256 executedFeeAmount;
         uint256 currentFilledAmount;
 
-        if (order.kind == GPv2Order.SELL) {
+        if (order.kind == GPv2Order.KIND_SELL) {
             if (order.partiallyFillable) {
                 executedSellAmount = executedAmount;
                 executedFeeAmount = order.feeAmount.mul(executedSellAmount).div(
@@ -418,12 +420,12 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         inTransfer.account = recoveredOrder.owner;
         inTransfer.token = order.sellToken;
         inTransfer.amount = executedSellAmount;
-        inTransfer.useInternalBalance = order.useInternalSellTokenBalance;
+        inTransfer.balance = order.sellTokenBalance;
 
         outTransfer.account = recoveredOrder.receiver;
         outTransfer.token = order.buyToken;
         outTransfer.amount = executedBuyAmount;
-        outTransfer.useInternalBalance = order.useInternalBuyTokenBalance;
+        outTransfer.balance = order.buyTokenBalance;
     }
 
     /// @dev Execute a list of arbitrary contract calls from this contract.
