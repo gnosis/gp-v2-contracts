@@ -34,7 +34,7 @@ describe("GPv2Transfer", () => {
   const amount = ethers.utils.parseEther("0.1337");
 
   describe("transferFromAccount", () => {
-    it("should transfer external amount to recipient", async () => {
+    it("should transfer ERC20 amount to recipient", async () => {
       await token.mock.transferFrom
         .withArgs(traders[0].address, recipient.address, amount)
         .returns(true);
@@ -46,6 +46,31 @@ describe("GPv2Transfer", () => {
             token: token.address,
             amount,
             balance: OrderBalanceId.ERC20,
+          },
+          recipient.address,
+        ),
+      ).to.not.be.reverted;
+    });
+
+    it("should transfer external amount to recipient", async () => {
+      await vault.mock.transferToExternalBalance
+        .withArgs([
+          {
+            token: token.address,
+            amount,
+            sender: traders[0].address,
+            recipient: recipient.address,
+          },
+        ])
+        .returns();
+      await expect(
+        transfer.transferFromAccountTest(
+          vault.address,
+          {
+            account: traders[0].address,
+            token: token.address,
+            amount,
+            balance: OrderBalanceId.EXTERNAL,
           },
           recipient.address,
         ),
@@ -117,7 +142,33 @@ describe("GPv2Transfer", () => {
       ).to.be.revertedWith("test error");
     });
 
-    it("should revert on failed Vault transfer", async () => {
+    it("should revert on failed Vault external transfer", async () => {
+      await vault.mock.transferToExternalBalance
+        .withArgs([
+          {
+            token: token.address,
+            amount,
+            sender: traders[0].address,
+            recipient: recipient.address,
+          },
+        ])
+        .revertsWithReason("test error");
+
+      await expect(
+        transfer.transferFromAccountTest(
+          vault.address,
+          {
+            account: traders[0].address,
+            token: token.address,
+            amount,
+            balance: OrderBalanceId.EXTERNAL,
+          },
+          recipient.address,
+        ),
+      ).to.be.revertedWith("test error");
+    });
+
+    it("should revert on failed Vault internal transfer", async () => {
       await vault.mock.transferInternalBalance
         .withArgs([
           {
@@ -145,7 +196,7 @@ describe("GPv2Transfer", () => {
   });
 
   describe("transferFromAccounts", () => {
-    it("should transfer external amount to recipient", async () => {
+    it("should transfer ERC20 amount to recipient", async () => {
       await token.mock.transferFrom
         .withArgs(traders[0].address, recipient.address, amount)
         .returns(true);
@@ -158,6 +209,33 @@ describe("GPv2Transfer", () => {
               token: token.address,
               amount,
               balance: OrderBalanceId.ERC20,
+            },
+          ],
+          recipient.address,
+        ),
+      ).to.not.be.reverted;
+    });
+
+    it("should transfer external amount to recipient", async () => {
+      await vault.mock.transferToExternalBalance
+        .withArgs([
+          {
+            token: token.address,
+            amount,
+            sender: traders[0].address,
+            recipient: recipient.address,
+          },
+        ])
+        .returns();
+      await expect(
+        transfer.transferFromAccountsTest(
+          vault.address,
+          [
+            {
+              account: traders[0].address,
+              token: token.address,
+              amount,
+              balance: OrderBalanceId.EXTERNAL,
             },
           ],
           recipient.address,
@@ -198,28 +276,60 @@ describe("GPv2Transfer", () => {
         token: token.address,
         amount,
         balance:
-          (i & 1) == 0 ? OrderBalanceId.EXTERNAL : OrderBalanceId.INTERNAL,
+          i % 3 == 0
+            ? OrderBalanceId.ERC20
+            : i % 3 == 1
+            ? OrderBalanceId.EXTERNAL
+            : OrderBalanceId.INTERNAL,
       }));
 
-      const [externalTransfers, internalTransfers] = [
-        transfers.filter(
-          (transfer) => transfer.balance != OrderBalanceId.INTERNAL,
-        ),
-        transfers.filter(
-          (transfer) => transfer.balance == OrderBalanceId.INTERNAL,
-        ),
-      ];
+      const {
+        erc20Transfers,
+        externalTransfers,
+        internalTransfers,
+      } = transfers.reduce((result, transfer) => {
+        let group;
+        switch (transfer.balance) {
+          case OrderBalanceId.ERC20:
+            group = "erc20Transfers";
+            break;
+          case OrderBalanceId.EXTERNAL:
+            group = "externalTransfers";
+            break;
+          case OrderBalanceId.INTERNAL:
+            group = "internalTransfers";
+            break;
+          default:
+            throw new Error(
+              `invalid balance configuration ${transfer.balance}`,
+            );
+        }
+        (result[group] = result[group] || []).push(transfer);
+        return result;
+      }, {} as Record<string, typeof transfers>);
+
       // NOTE: Make sure we have at least 2 of each flavour of transfer, this
       // avoids this test not achieving what it expects because of reasonable
       // changes elsewhere in the file (like only having 3 traders for example).
+      expect(erc20Transfers).to.have.length.above(1);
       expect(externalTransfers).to.have.length.above(1);
       expect(internalTransfers).to.have.length.above(1);
 
-      for (const { account } of externalTransfers) {
+      for (const { account } of erc20Transfers) {
         await token.mock.transferFrom
           .withArgs(account, recipient.address, amount)
           .returns(true);
       }
+      await vault.mock.transferToExternalBalance
+        .withArgs(
+          externalTransfers.map(({ account }) => ({
+            token: token.address,
+            amount,
+            sender: account,
+            recipient: recipient.address,
+          })),
+        )
+        .returns();
       await vault.mock.withdrawFromInternalBalance
         .withArgs(
           internalTransfers.map(({ account }) => ({
@@ -277,6 +387,34 @@ describe("GPv2Transfer", () => {
               token: token.address,
               amount,
               balance: OrderBalanceId.ERC20,
+            },
+          ],
+          recipient.address,
+        ),
+      ).to.be.revertedWith("test error");
+    });
+
+    it("should revert on failed Vault transfer", async () => {
+      await vault.mock.transferToExternalBalance
+        .withArgs([
+          {
+            token: token.address,
+            amount,
+            sender: traders[0].address,
+            recipient: recipient.address,
+          },
+        ])
+        .revertsWithReason("test error");
+
+      await expect(
+        transfer.transferFromAccountsTest(
+          vault.address,
+          [
+            {
+              account: traders[0].address,
+              token: token.address,
+              amount,
+              balance: OrderBalanceId.EXTERNAL,
             },
           ],
           recipient.address,
@@ -465,7 +603,7 @@ describe("GPv2Transfer", () => {
       ).to.be.revertedWith("test error");
     });
 
-    it("should revert on failed Vault withdrawal", async () => {
+    it("should revert on failed Vault deposit", async () => {
       await vault.mock.depositToInternalBalance
         .withArgs([
           {
