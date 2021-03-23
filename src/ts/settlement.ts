@@ -7,13 +7,15 @@ import {
 } from "./interaction";
 import {
   NormalizedOrder,
+  ORDER_TYPE_FIELDS,
   ORDER_UID_LENGTH,
   Order,
+  OrderBalance,
   OrderFlags,
   OrderKind,
-  normalizeOrder,
   hashTypedData,
-  ORDER_TYPE_FIELDS,
+  normalizeBuyTokenBalance,
+  normalizeOrder,
 } from "./order";
 import {
   EcdsaSigningScheme,
@@ -74,8 +76,8 @@ export type Trade = TradeExecution &
     | "buyToken"
     | "kind"
     | "partiallyFillable"
-    | "useInternalSellTokenBalance"
-    | "useInternalBuyTokenBalance"
+    | "sellTokenBalance"
+    | "buyTokenBalance"
   > & {
     /**
      * The index of the sell token in the settlement.
@@ -152,16 +154,21 @@ export const FLAG_MASKS = {
     offset: 1,
     options: [false, true],
   },
-  useInternalSellTokenBalance: {
+  sellTokenBalance: {
     offset: 2,
-    options: [false, true],
+    options: [
+      OrderBalance.ERC20,
+      undefined, // unused
+      OrderBalance.EXTERNAL,
+      OrderBalance.INTERNAL,
+    ],
   },
-  useInternalBuyTokenBalance: {
-    offset: 3,
-    options: [false, true],
+  buyTokenBalance: {
+    offset: 4,
+    options: [OrderBalance.ERC20, OrderBalance.INTERNAL],
   },
   signingScheme: {
-    offset: 4,
+    offset: 5,
     options: [
       SigningScheme.EIP712,
       SigningScheme.ETHSIGN,
@@ -173,7 +180,10 @@ export const FLAG_MASKS = {
 
 export type FlagKey = keyof typeof FLAG_MASKS;
 export type FlagOptions<K extends FlagKey> = typeof FLAG_MASKS[K]["options"];
-export type FlagValue<K extends FlagKey> = FlagOptions<K>[number];
+export type FlagValue<K extends FlagKey> = Exclude<
+  FlagOptions<K>[number],
+  undefined
+>;
 
 function encodeFlag<K extends FlagKey>(key: K, flag: FlagValue<K>): number {
   const index = FLAG_MASKS[key].options.findIndex(
@@ -235,10 +245,13 @@ export function encodeOrderFlags(flags: OrderFlags): number {
     encodeFlag("kind", flags.kind) |
     encodeFlag("partiallyFillable", flags.partiallyFillable) |
     encodeFlag(
-      "useInternalSellTokenBalance",
-      !!flags.useInternalSellTokenBalance,
+      "sellTokenBalance",
+      flags.sellTokenBalance ?? OrderBalance.ERC20,
     ) |
-    encodeFlag("useInternalBuyTokenBalance", !!flags.useInternalBuyTokenBalance)
+    encodeFlag(
+      "buyTokenBalance",
+      normalizeBuyTokenBalance(flags.buyTokenBalance),
+    )
   );
 }
 
@@ -252,11 +265,8 @@ export function decodeOrderFlags(flags: number): OrderFlags {
   return {
     kind: decodeFlag("kind", flags),
     partiallyFillable: decodeFlag("partiallyFillable", flags),
-    useInternalSellTokenBalance: decodeFlag(
-      "useInternalSellTokenBalance",
-      flags,
-    ),
-    useInternalBuyTokenBalance: decodeFlag("useInternalBuyTokenBalance", flags),
+    sellTokenBalance: decodeFlag("sellTokenBalance", flags),
+    buyTokenBalance: decodeFlag("buyTokenBalance", flags),
   };
 }
 

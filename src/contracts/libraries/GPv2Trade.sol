@@ -49,8 +49,8 @@ library GPv2Trade {
         (
             order.kind,
             order.partiallyFillable,
-            order.useInternalSellTokenBalance,
-            order.useInternalBuyTokenBalance,
+            order.sellTokenBalance,
+            order.buyTokenBalance,
             signingScheme
         ) = extractFlags(trade.flags);
     }
@@ -67,27 +67,30 @@ library GPv2Trade {
     /// order. The flags byte uses the following format:
     ///
     /// ```
-    /// bit | 31 ...   | 5 | 4 | 3 | 2 | 1 | 0 |
+    /// bit | 31 ...   | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
     /// ----+----------+---+---+-------+---+---+
-    ///     | reserved | *   * | * | * | * | * |
+    ///     | reserved | *   * | * | *   * | * | * |
+    ///                  |   |   |   |   |   |   |
+    ///                  |   |   |   |   |   |   +---- order kind bit, 0 for a sell order
+    ///                  |   |   |   |   |   |         and 1 for a buy order
     ///                  |   |   |   |   |   |
-    ///                  |   |   |   |   |   +---- order kind bit, 0 for a sell order
-    ///                  |   |   |   |   |         and 1 for a buy order
+    ///                  |   |   |   |   |   +-------- order fill bit, 0 for fill-or-kill
+    ///                  |   |   |   |   |             and 1 for a partially fillable order
     ///                  |   |   |   |   |
-    ///                  |   |   |   |   +-------- order fill bit, 0 for fill-or-kill
-    ///                  |   |   |   |             and 1 for a partially fillable order
-    ///                  |   |   |   |
-    ///                  |   |   |   +------------ use internal sell token balance bit:
-    ///                  |   |   |                 0: external ERC20 token balance
-    ///                  |   |   |                 1: internal Balancer vault balance
+    ///                  |   |   |   +---+------------ use internal sell token balance bit:
+    ///                  |   |   |                     0x: ERC20 token balance
+    ///                  |   |   |                     10: external Balancer Vault balance
+    ///                  |   |   |                     11: internal Balancer Vault balance
     ///                  |   |   |
-    ///                  |   |   +---------------- use internal buy token balance bit
+    ///                  |   |   +-------------------- use buy token balance bit
+    ///                  |   |                         0: ERC20 token balance
+    ///                  |   |                         1: internal Balancer Vault balance
     ///                  |   |
-    ///                  +---+-------------------- signature scheme bits:
-    ///                                            00: EIP-712
-    ///                                            01: eth_sign
-    ///                                            10: EIP-1271
-    ///                                            11: pre_sign
+    ///                  +---+------------------------ signature scheme bits:
+    ///                                                00: EIP-712
+    ///                                                01: eth_sign
+    ///                                                10: EIP-1271
+    ///                                                11: pre_sign
     /// ```
     function extractFlags(uint256 flags)
         internal
@@ -95,23 +98,33 @@ library GPv2Trade {
         returns (
             bytes32 kind,
             bool partiallyFillable,
-            bool useInternalSellTokenBalance,
-            bool useInternalBuyTokenBalance,
+            bytes32 sellTokenBalance,
+            bytes32 buyTokenBalance,
             GPv2Signing.Scheme signingScheme
         )
     {
         if (flags & 0x01 == 0) {
-            kind = GPv2Order.SELL;
+            kind = GPv2Order.KIND_SELL;
         } else {
-            kind = GPv2Order.BUY;
+            kind = GPv2Order.KIND_BUY;
         }
         partiallyFillable = flags & 0x02 != 0;
-        useInternalSellTokenBalance = flags & 0x04 != 0;
-        useInternalBuyTokenBalance = flags & 0x08 != 0;
+        if (flags & 0x08 == 0) {
+            sellTokenBalance = GPv2Order.BALANCE_ERC20;
+        } else if (flags & 0x04 == 0) {
+            sellTokenBalance = GPv2Order.BALANCE_EXTERNAL;
+        } else {
+            sellTokenBalance = GPv2Order.BALANCE_INTERNAL;
+        }
+        if (flags & 0x10 == 0) {
+            buyTokenBalance = GPv2Order.BALANCE_ERC20;
+        } else {
+            buyTokenBalance = GPv2Order.BALANCE_INTERNAL;
+        }
 
         // NOTE: Take advantage of the fact that Solidity will revert if the
         // following expression does not produce a valid enum value. This means
         // we check here that the leading reserved bits must be 0.
-        signingScheme = GPv2Signing.Scheme(flags >> 4);
+        signingScheme = GPv2Signing.Scheme(flags >> 5);
     }
 }

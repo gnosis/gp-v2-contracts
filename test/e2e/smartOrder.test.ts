@@ -4,6 +4,7 @@ import { Contract, ContractFactory, Wallet } from "ethers";
 import { ethers, waffle } from "hardhat";
 
 import {
+  OrderBalance,
   OrderKind,
   SettlementEncoder,
   SigningScheme,
@@ -103,8 +104,8 @@ describe("E2E: Dumb Smart Order", () => {
       feeAmount: ethers.utils.parseEther("0.05"),
       validTo: 0xffffffff,
       appData: await smartOrder.APPDATA(),
-      useInternalSellTokenBalance: false,
-      useInternalBuyTokenBalance: false,
+      sellTokenBalance: OrderBalance.ERC20,
+      buyTokenBalance: OrderBalance.ERC20,
     });
 
     await encoder.encodeTrade(smartOrderTrade, {

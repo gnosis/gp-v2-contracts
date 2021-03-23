@@ -7,6 +7,7 @@ import { artifacts, ethers, waffle } from "hardhat";
 import {
   Interaction,
   InteractionStage,
+  OrderBalance,
   OrderFlags,
   OrderKind,
   PRE_SIGNED,
@@ -326,8 +327,8 @@ describe("GPv2Settlement", () => {
         appData: 0,
         feeAmount: ethers.utils.parseEther("1.0"),
         partiallyFillable: false,
-        useInternalSellTokenBalance: true,
-        useInternalBuyTokenBalance: false,
+        sellTokenBalance: OrderBalance.INTERNAL,
+        buyTokenBalance: OrderBalance.ERC20,
       };
 
       const encoder = new SwapEncoder(testDomain);
@@ -388,24 +389,34 @@ describe("GPv2Settlement", () => {
     describe("Balances", () => {
       for (const { name, ...flags } of [
         {
-          name: "external to external",
-          useInternalSellTokenBalance: false,
-          useInternalBuyTokenBalance: false,
+          name: "erc20 to erc20",
+          sellTokenBalance: OrderBalance.ERC20,
+          buyTokenBalance: OrderBalance.ERC20,
+        },
+        {
+          name: "erc20 to internal",
+          sellTokenBalance: OrderBalance.ERC20,
+          buyTokenBalance: OrderBalance.INTERNAL,
+        },
+        {
+          name: "external to erc20",
+          sellTokenBalance: OrderBalance.EXTERNAL,
+          buyTokenBalance: OrderBalance.ERC20,
         },
         {
           name: "external to internal",
-          useInternalSellTokenBalance: false,
-          useInternalBuyTokenBalance: true,
+          sellTokenBalance: OrderBalance.EXTERNAL,
+          buyTokenBalance: OrderBalance.INTERNAL,
         },
         {
-          name: "internal to external",
-          useInternalSellTokenBalance: true,
-          useInternalBuyTokenBalance: false,
+          name: "internal to erc20",
+          sellTokenBalance: OrderBalance.INTERNAL,
+          buyTokenBalance: OrderBalance.ERC20,
         },
         {
           name: "internal to internal",
-          useInternalSellTokenBalance: true,
-          useInternalBuyTokenBalance: true,
+          sellTokenBalance: OrderBalance.INTERNAL,
+          buyTokenBalance: OrderBalance.INTERNAL,
         },
       ]) {
         it(`performs an ${name} swap when specified`, async () => {
@@ -441,15 +452,17 @@ describe("GPv2Settlement", () => {
               encoder.tokens,
               {
                 sender: traders[0].address,
-                fromInternalBalance: flags.useInternalSellTokenBalance,
+                fromInternalBalance:
+                  flags.sellTokenBalance == OrderBalance.INTERNAL,
                 recipient: traders[1].address,
-                toInternalBalance: flags.useInternalBuyTokenBalance,
+                toInternalBalance:
+                  flags.buyTokenBalance == OrderBalance.INTERNAL,
               },
               [0, 0],
               0,
             )
             .returns([0, 0]);
-          if (flags.useInternalSellTokenBalance) {
+          if (flags.sellTokenBalance == OrderBalance.INTERNAL) {
             await vault.mock.transferInternalBalance
               .withArgs([
                 {
@@ -498,7 +511,7 @@ describe("GPv2Settlement", () => {
           validTo: 0x01020304,
           appData: 0,
           feeAmount: ethers.utils.parseEther("1.0"),
-          useInternalSellTokenBalance: true,
+          sellTokenBalance: OrderBalance.INTERNAL,
           partiallyFillable: true,
         };
         const orderUid = () =>

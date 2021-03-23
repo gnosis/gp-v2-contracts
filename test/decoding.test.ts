@@ -3,20 +3,21 @@ import { constants, utils, Wallet } from "ethers";
 import { waffle } from "hardhat";
 
 import {
-  encodeTradeFlags,
-  decodeTradeFlags,
-  FLAG_MASKS,
-  TradeFlags,
-  FlagKey,
-  signOrder,
-  SigningScheme,
-  decodeSignatureOwner,
   EcdsaSigningScheme,
-  encodeEip1271SignatureData,
-  SettlementEncoder,
-  decodeOrder,
+  FLAG_MASKS,
+  FlagKey,
+  OrderBalance,
   OrderKind,
+  SettlementEncoder,
+  SigningScheme,
+  TradeFlags,
+  decodeOrder,
+  decodeSignatureOwner,
+  decodeTradeFlags,
   domain,
+  encodeEip1271SignatureData,
+  encodeTradeFlags,
+  signOrder,
 } from "../src/ts";
 
 import { fillDistinctBytes, SAMPLE_ORDER } from "./testHelpers";
@@ -78,9 +79,13 @@ function validEncodedFlags(): number[] {
 function allEncodedFlagOptions<Out extends Record<FlagKey, number[]>>(): Out {
   const result: Partial<Out> = {};
   Object.entries(FLAG_MASKS).map(([key, { offset, options }]) => {
-    result[key as FlagKey] = (options as readonly unknown[]).map(
-      (_, index) => index << offset,
-    );
+    result[key as FlagKey] = (options as readonly unknown[])
+      .map((option, index) => ({
+        option,
+        value: index << offset,
+      }))
+      .filter(({ option }) => option !== undefined)
+      .map(({ value }) => value);
   });
   return result as Out;
 }
@@ -88,7 +93,9 @@ function allEncodedFlagOptions<Out extends Record<FlagKey, number[]>>(): Out {
 function validFlags(): TradeFlags[] {
   /* eslint-disable @typescript-eslint/no-explicit-any */
   const keyedOptions = Object.entries(FLAG_MASKS).map(([key, { options }]) =>
-    options.map((option: unknown) => [key, option]),
+    options
+      .map((option: unknown) => [key, option])
+      .filter(([, option]) => option !== undefined),
   );
   const combinations = cartesian(...keyedOptions);
   return combinations.map((transposedKeyedOptions) => {
@@ -182,8 +189,8 @@ describe("Trade", async () => {
       ...SAMPLE_ORDER,
       partiallyFillable: true,
       kind: OrderKind.BUY,
-      useInternalSellTokenBalance: true,
-      useInternalBuyTokenBalance: false,
+      sellTokenBalance: OrderBalance.EXTERNAL,
+      buyTokenBalance: OrderBalance.INTERNAL,
     };
     encoder.encodeTrade(
       order,
