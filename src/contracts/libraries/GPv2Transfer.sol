@@ -4,6 +4,7 @@ pragma abicoder v2;
 
 import "../interfaces/IERC20.sol";
 import "../interfaces/IVault.sol";
+import "./GPv2Order.sol";
 import "./GPv2SafeERC20.sol";
 
 /// @title Gnosis Protocol v2 Transfers
@@ -16,7 +17,7 @@ library GPv2Transfer {
         address account;
         IERC20 token;
         uint256 amount;
-        bool useInternalBalance;
+        bytes32 balance;
     }
 
     /// @dev Ether marker address used to indicate an Ether transfer.
@@ -44,7 +45,7 @@ library GPv2Transfer {
             "GPv2: cannot transfer native ETH"
         );
 
-        if (transfer.useInternalBalance) {
+        if (transfer.balance == GPv2Order.BALANCE_INTERNAL) {
             IVault.BalanceTransfer[] memory vaultTransfers =
                 new IVault.BalanceTransfer[](1);
 
@@ -95,7 +96,7 @@ library GPv2Transfer {
                 "GPv2: cannot transfer native ETH"
             );
 
-            if (transfer.useInternalBalance) {
+            if (transfer.balance == GPv2Order.BALANCE_INTERNAL) {
                 IVault.BalanceTransfer memory vaultTransfer =
                     vaultTransfers[vaultTransferCount++];
                 vaultTransfer.token = transfer.token;
@@ -136,11 +137,11 @@ library GPv2Transfer {
 
             if (address(transfer.token) == BUY_ETH_ADDRESS) {
                 require(
-                    !transfer.useInternalBalance,
+                    transfer.balance != GPv2Order.BALANCE_INTERNAL,
                     "GPv2: unsupported internal ETH"
                 );
                 payable(transfer.account).transfer(transfer.amount);
-            } else if (transfer.useInternalBalance) {
+            } else if (transfer.balance == GPv2Order.BALANCE_INTERNAL) {
                 IVault.BalanceTransfer memory vaultTransfer =
                     vaultTransfers[vaultTransferCount++];
                 vaultTransfer.token = transfer.token;

@@ -4,6 +4,7 @@ import { artifacts, ethers, waffle } from "hardhat";
 
 import {
   EIP1271_MAGICVALUE,
+  OrderBalance,
   OrderKind,
   PRE_SIGNED,
   SettlementEncoder,
@@ -117,8 +118,8 @@ describe("GPv2Signing", () => {
         feeAmount: fillUint(256, 0x08),
         kind: OrderKind.BUY,
         partiallyFillable: true,
-        useInternalSellTokenBalance: true,
-        useInternalBuyTokenBalance: true,
+        sellTokenBalance: OrderBalance.EXTERNAL,
+        buyTokenBalance: OrderBalance.INTERNAL,
       };
       const tradeExecution = {
         executedAmount: fillUint(256, 0x09),

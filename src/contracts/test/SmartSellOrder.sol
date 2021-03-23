@@ -92,14 +92,14 @@ contract SmartSellOrder is EIP1271Verifier {
         order.validTo = validTo;
         order.appData = APPDATA;
         order.feeAmount = totalFeeAmount.mul(sellAmount).div(totalSellAmount);
-        order.kind = GPv2Order.SELL;
+        order.kind = GPv2Order.KIND_SELL;
         // NOTE: We counter-intuitively set `partiallyFillable` to `false`, even
         // if the smart order as a whole acts like a partially fillable order.
         // This is done since, once a settlement commits to a specific sell
         // amount, then it is expected to use it completely and not partially.
         order.partiallyFillable = false;
-        order.useInternalSellTokenBalance = false;
-        order.useInternalBuyTokenBalance = false;
+        order.sellTokenBalance = GPv2Order.BALANCE_ERC20;
+        order.buyTokenBalance = GPv2Order.BALANCE_ERC20;
     }
 
     function buyAmountForSellAmount(uint256 sellAmount)
