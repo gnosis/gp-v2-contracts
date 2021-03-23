@@ -9,6 +9,7 @@ import {
   NormalizedOrder,
   ORDER_UID_LENGTH,
   Order,
+  OrderBalance,
   OrderFlags,
   OrderKind,
   normalizeOrder,
@@ -71,8 +72,8 @@ export type Trade = TradeExecution &
     | "buyToken"
     | "kind"
     | "partiallyFillable"
-    | "useInternalSellTokenBalance"
-    | "useInternalBuyTokenBalance"
+    | "sellTokenBalance"
+    | "buyTokenBalance"
   > & {
     /**
      * The index of the sell token in the settlement.
@@ -144,7 +145,7 @@ export type EncodedSettlement = [
  * @return The bitfield result.
  */
 export function encodeSigningScheme(scheme: SigningScheme): number {
-  const SIGNING_SCHEME_BIT_OFFSET = 4;
+  const SIGNING_SCHEME_BIT_OFFSET = 5;
   switch (scheme) {
     case SigningScheme.EIP712:
     case SigningScheme.ETHSIGN:
@@ -166,20 +167,45 @@ export function encodeOrderFlags(flags: OrderFlags): number {
   let kind;
   switch (flags.kind) {
     case OrderKind.SELL:
-      kind = 0b0000;
+      kind = 0b00000;
       break;
     case OrderKind.BUY:
-      kind = 0b0001;
+      kind = 0b00001;
       break;
     default:
-      throw new Error(`invalid error kind '${kind}'`);
+      throw new Error(`invalid order kind '${flags.kind}'`);
   }
   const partiallyFillable = flags.partiallyFillable ? 0b0010 : 0b0000;
-  const internalBalances =
-    (flags.useInternalSellTokenBalance ? 0b0100 : 0b0000) |
-    (flags.useInternalBuyTokenBalance ? 0b1000 : 0b0000);
+  let sellTokenBalance;
+  switch (flags.sellTokenBalance) {
+    case undefined:
+    case OrderBalance.ERC20:
+      sellTokenBalance = 0b00000;
+      break;
+    case OrderBalance.EXTERNAL:
+      sellTokenBalance = 0b01000;
+      break;
+    case OrderBalance.INTERNAL:
+      sellTokenBalance = 0b01100;
+      break;
+    default:
+      throw new Error(`invalid balance flag '${flags.sellTokenBalance}'`);
+  }
+  let buyTokenBalance;
+  switch (flags.buyTokenBalance) {
+    case undefined:
+    case OrderBalance.EXTERNAL:
+    case OrderBalance.ERC20:
+      buyTokenBalance = 0b00000;
+      break;
+    case OrderBalance.INTERNAL:
+      buyTokenBalance = 0b10000;
+      break;
+    default:
+      throw new Error(`invalid balance flag '${flags.buyTokenBalance}'`);
+  }
 
-  return kind | partiallyFillable | internalBalances;
+  return kind | partiallyFillable | sellTokenBalance | buyTokenBalance;
 }
 
 /**

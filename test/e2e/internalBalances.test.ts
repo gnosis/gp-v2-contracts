@@ -4,6 +4,7 @@ import { Contract, Wallet } from "ethers";
 import { ethers, waffle } from "hardhat";
 
 import {
+  OrderBalance,
   OrderKind,
   SettlementEncoder,
   SigningScheme,
@@ -121,7 +122,7 @@ describe("E2E: Should allow trading with Vault internal balances", () => {
         feeAmount: ethers.utils.parseEther("0.3"),
         validTo: 0xffffffff,
         appData: 2,
-        useInternalSellTokenBalance: true,
+        sellTokenBalance: OrderBalance.INTERNAL,
       },
       traders[1],
       SigningScheme.EIP712,
@@ -142,7 +143,7 @@ describe("E2E: Should allow trading with Vault internal balances", () => {
         feeAmount: ethers.utils.parseEther("0.002"),
         validTo: 0xffffffff,
         appData: 2,
-        useInternalBuyTokenBalance: true,
+        buyTokenBalance: OrderBalance.INTERNAL,
       },
       traders[2],
       SigningScheme.EIP712,
@@ -174,8 +175,8 @@ describe("E2E: Should allow trading with Vault internal balances", () => {
         feeAmount: ethers.utils.parseEther("1.5"),
         validTo: 0xffffffff,
         appData: 2,
-        useInternalSellTokenBalance: true,
-        useInternalBuyTokenBalance: true,
+        sellTokenBalance: OrderBalance.INTERNAL,
+        buyTokenBalance: OrderBalance.INTERNAL,
       },
       traders[3],
       SigningScheme.EIP712,

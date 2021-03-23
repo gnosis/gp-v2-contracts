@@ -6,6 +6,8 @@ import { artifacts, ethers, waffle } from "hardhat";
 
 import { SwapRequest } from "../src/ts";
 
+import { OrderBalanceId } from "./encoding";
+
 const GIVEN_IN = 0;
 const GIVEN_OUT = 1;
 
@@ -65,13 +67,13 @@ describe("GPv2VaultRelayer", () => {
             account: traders[0].address,
             token: tokens[0].address,
             amount,
-            useInternalBalance: false,
+            balance: OrderBalanceId.ERC20,
           },
           {
             account: traders[1].address,
             token: tokens[1].address,
             amount,
-            useInternalBalance: true,
+            balance: OrderBalanceId.INTERNAL,
           },
         ]),
       ).to.not.be.reverted;
@@ -91,7 +93,7 @@ describe("GPv2VaultRelayer", () => {
             account: traders[0].address,
             token: token.address,
             amount,
-            useInternalBalance: false,
+            balance: OrderBalanceId.ERC20,
           },
         ]),
       ).to.be.revertedWith("test error");
@@ -118,7 +120,7 @@ describe("GPv2VaultRelayer", () => {
             account: traders[0].address,
             token: token.address,
             amount,
-            useInternalBalance: true,
+            balance: OrderBalanceId.INTERNAL,
           },
         ]),
       ).to.be.revertedWith("test error");
@@ -142,7 +144,7 @@ describe("GPv2VaultRelayer", () => {
         account: string;
         token: string;
         amount: BigNumberish;
-        useInternalBalance: boolean;
+        balance: string;
       };
     }
 
@@ -163,7 +165,7 @@ describe("GPv2VaultRelayer", () => {
           account: ethers.constants.AddressZero,
           token: ethers.constants.AddressZero,
           amount: ethers.constants.Zero,
-          useInternalBalance: false,
+          balance: OrderBalanceId.ERC20,
         },
       ];
     };
@@ -218,7 +220,7 @@ describe("GPv2VaultRelayer", () => {
             account: traders[0].address,
             token: tokens[0].address,
             amount: ethers.utils.parseEther("1.0"),
-            useInternalBalance: false,
+            balance: OrderBalanceId.ERC20,
           };
 
           await vault.mock[`batchSwapGiven${name}`]
@@ -260,7 +262,7 @@ describe("GPv2VaultRelayer", () => {
             account: traders[0].address,
             token: token.address,
             amount: ethers.utils.parseEther("1.0"),
-            useInternalBalance: false,
+            balance: OrderBalanceId.ERC20,
           };
 
           await vault.mock[`batchSwapGiven${name}`].returns(deltas);
@@ -305,7 +307,7 @@ describe("GPv2VaultRelayer", () => {
                 account: traders[0].address,
                 token: token.address,
                 amount,
-                useInternalBalance: false,
+                balance: OrderBalanceId.ERC20,
               },
             }),
           ),
@@ -335,7 +337,7 @@ describe("GPv2VaultRelayer", () => {
                 account: traders[0].address,
                 token: token.address,
                 amount,
-                useInternalBalance: true,
+                balance: OrderBalanceId.INTERNAL,
               },
             }),
           ),
@@ -358,7 +360,7 @@ describe("GPv2VaultRelayer", () => {
                 account: traders[0].address,
                 token: token.address,
                 amount,
-                useInternalBalance: false,
+                balance: OrderBalanceId.ERC20,
               },
             }),
           ),
@@ -388,7 +390,7 @@ describe("GPv2VaultRelayer", () => {
                 account: traders[0].address,
                 token: token.address,
                 amount,
-                useInternalBalance: true,
+                balance: OrderBalanceId.INTERNAL,
               },
             }),
           ),

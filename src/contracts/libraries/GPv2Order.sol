@@ -19,8 +19,8 @@ library GPv2Order {
         uint256 feeAmount;
         bytes32 kind;
         bool partiallyFillable;
-        bool useInternalSellTokenBalance;
-        bool useInternalBuyTokenBalance;
+        bytes32 sellTokenBalance;
+        bytes32 buyTokenBalance;
     }
 
     /// @dev The order EIP-712 type hash for the [`GPv2Order.Data`] struct.
@@ -39,13 +39,13 @@ library GPv2Order {
     ///         "uint256 feeAmount," +
     ///         "string kind," +
     ///         "bool partiallyFillable" +
-    ///         "bool useInternalSellTokenBalance" +
-    ///         "bool useInternalBuyTokenBalance" +
+    ///         "string sellTokenBalance" +
+    ///         "string buyTokenBalance" +
     ///     ")"
     /// )
     /// ```
     bytes32 internal constant TYPE_HASH =
-        hex"e2dc073fc74b3a79b74490a80ce2541fc2191b237c79ab2b8a60f3be54432ce9";
+        hex"d5a25ba2e97094ad7d83dc28a6572da797d6b3e7fc6663bd93efb789fc17e489";
 
     /// @dev The marker value for a sell order for computing the order struct
     /// hash. This allows the EIP-712 compatible wallets to display a
@@ -55,7 +55,7 @@ library GPv2Order {
     /// ```
     /// keccak256("sell")
     /// ```
-    bytes32 internal constant SELL =
+    bytes32 internal constant KIND_SELL =
         hex"f3b277728b3fee749481eb3e0b3b48980dbbab78658fc419025cb16eee346775";
 
     /// @dev The OrderKind marker value for a buy order for computing the order
@@ -65,8 +65,39 @@ library GPv2Order {
     /// ```
     /// keccak256("buy")
     /// ```
-    bytes32 internal constant BUY =
+    bytes32 internal constant KIND_BUY =
         hex"6ed88e868af0a1983e3886d5f3e95a2fafbd6c3450bc229e27342283dc429ccc";
+
+    /// @dev The TokenBalance marker value for using direct ERC20 balances for
+    /// computing the order struct hash.
+    ///
+    /// This value is pre-computed from the following expression:
+    /// ```
+    /// keccak256("erc20")
+    /// ```
+    bytes32 internal constant BALANCE_ERC20 =
+        hex"5a28e9363bb942b639270062aa6bb295f434bcdfc42c97267bf003f272060dc9";
+
+    /// @dev The TokenBalance marker value for using Balancer Vault external
+    /// balances (in order to re-use Vault ERC20 approvals) for computing the
+    /// order struct hash.
+    ///
+    /// This value is pre-computed from the following expression:
+    /// ```
+    /// keccak256("external")
+    /// ```
+    bytes32 internal constant BALANCE_EXTERNAL =
+        hex"abee3b73373acd583a130924aad6dc38cfdc44ba0555ba94ce2ff63980ea0632";
+
+    /// @dev The TokenBalance marker value for using Balancer Vault internal
+    /// balances for computing the order struct hash.
+    ///
+    /// This value is pre-computed from the following expression:
+    /// ```
+    /// keccak256("internal")
+    /// ```
+    bytes32 internal constant BALANCE_INTERNAL =
+        hex"4ac99ace14ee0a5ef932dc609df0943ab7ac16b7583634612f8dc35a4289a6ce";
 
     /// @dev Marker address used to indicate that the receiver of the trade
     /// proceeds should the owner of the order.
