@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 pragma solidity ^0.7.6;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
+import "../libraries/SafeMath.sol";
 
 abstract contract NonStandardERC20 {
     using SafeMath for uint256;

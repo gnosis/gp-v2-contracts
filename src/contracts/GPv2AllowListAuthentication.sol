@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 pragma solidity ^0.7.6;
 
-import "@gnosis.pm/util-contracts/contracts/StorageAccessible.sol";
-import "@openzeppelin/contracts/proxy/Initializable.sol";
 import "./interfaces/GPv2Authentication.sol";
 import "./libraries/GPv2EIP1967.sol";
+import "./mixins/Initializable.sol";
+import "./mixins/StorageAccessible.sol";
 
 /// @title Gnosis Protocol v2 Access Control Contract
 /// @author Gnosis Developers

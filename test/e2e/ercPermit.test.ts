@@ -38,8 +38,8 @@ describe("E2E: EIP-2612 Permit", () => {
     const { chainId } = await ethers.provider.getNetwork();
     domainSeparator = domain(chainId, settlement.address);
 
-    const ERC20Permit = await ethers.getContractFactory("ERC20Permit");
-    eurs = [await ERC20Permit.deploy("EUR1"), await ERC20Permit.deploy("EUR2")];
+    const ERC20 = await ethers.getContractFactory("ERC20PresetPermit");
+    eurs = [await ERC20.deploy("EUR1"), await ERC20.deploy("EUR2")];
   });
 
   it("permits trader allowance with settlement", async () => {
@@ -82,6 +82,8 @@ describe("E2E: EIP-2612 Permit", () => {
       await traders[1]._signTypedData(
         {
           name: await eurs[1].name(),
+          version: "1",
+          chainId: domainSeparator.chainId,
           verifyingContract: eurs[1].address,
         },
         {
