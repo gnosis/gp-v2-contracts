@@ -1,10 +1,8 @@
-import { BigNumber, BigNumberish, BytesLike, Contract } from "ethers";
+import { BigNumber, BytesLike, Contract } from "ethers";
 
-type AllowListReaderMethods = "getSolverAt" | "numSolvers";
-type AllowListReaderParameters<M> = M extends "getSolverAt"
-  ? [BigNumberish]
-  : M extends "numSolvers"
-  ? []
+type AllowListReaderMethods = "areSolvers";
+type AllowListReaderParameters<M> = M extends "areSolvers"
+  ? [BytesLike[]]
   : never;
 
 type SettlementReaderMethods = "filledAmountsForOrders";
@@ -52,17 +50,10 @@ export class AllowListReader {
   ) {}
 
   /**
-   * Read the address of the solver at the specified index.
+   * Returns true if all the specified addresses are allowed solvers.
    */
-  public getSolverAt(index: number): Promise<string> {
-    return readStorage(this.allowList, this.reader, "getSolverAt", [index]);
-  }
-
-  /**
-   * Read the total number of authorized solvers in the allow list contract.
-   */
-  public numSolvers(): Promise<number> {
-    return readStorage(this.allowList, this.reader, "numSolvers", []);
+  public areSolvers(solvers: BytesLike[]): Promise<string> {
+    return readStorage(this.allowList, this.reader, "areSolvers", [solvers]);
   }
 }
 
