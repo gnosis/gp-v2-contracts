@@ -111,12 +111,12 @@ describe("GPv2SafeERC20.sol", () => {
       });
     });
 
-    it("does not revert when calling a non-contract", async () => {
+    it("reverts when calling a non-contract", async () => {
       const amount = ethers.utils.parseEther("4.2");
 
       await expect(
         executor.transfer(traders[1].address, recipient.address, amount),
-      ).not.to.be.reverted;
+      ).to.be.revertedWith("not a contract");
     });
   });
 
@@ -239,7 +239,7 @@ describe("GPv2SafeERC20.sol", () => {
       });
     });
 
-    it("does not revert when calling a non-contract", async () => {
+    it("reverts when calling a non-contract", async () => {
       const amount = ethers.utils.parseEther("4.2");
 
       await expect(
@@ -249,7 +249,7 @@ describe("GPv2SafeERC20.sol", () => {
           recipient.address,
           amount,
         ),
-      ).not.to.be.reverted;
+      ).to.be.revertedWith("not a contract");
     });
   });
 });
