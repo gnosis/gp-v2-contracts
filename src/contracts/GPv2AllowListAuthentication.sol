@@ -36,6 +36,8 @@ contract GPv2AllowListAuthentication is
     /// creation. An initializer is used instead of a constructor so that this
     /// contract can be used behind a proxy.
     ///
+    /// This initializer is idempotent.
+    ///
     /// @param manager_ The manager to initialize the contract with.
     function initializeManager(address manager_) external initializer {
         manager = manager_;
@@ -78,6 +80,8 @@ contract GPv2AllowListAuthentication is
     /// @dev Add an address to the set of allowed solvers. This method can only
     /// be called by the contract manager.
     ///
+    /// This function is idempotent.
+    ///
     /// @param solver The solver address to add.
     function addSolver(address solver) external onlyManager {
         solvers[solver] = true;
@@ -86,6 +90,8 @@ contract GPv2AllowListAuthentication is
 
     /// @dev Removes an address to the set of allowed solvers. This method can
     /// only be called by the contract manager.
+    ///
+    /// This function is idempotent.
     ///
     /// @param solver The solver address to remove.
     function removeSolver(address solver) external onlyManager {
