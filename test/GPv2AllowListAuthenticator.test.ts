@@ -43,12 +43,12 @@ describe("GPv2AllowListAuthentication", () => {
     it("should be idempotent", async () => {
       await expect(
         authenticator.initializeManager(nobody.address),
-      ).to.revertedWith("contract is already initialized");
+      ).to.revertedWith("initialized");
 
       // Also reverts when called by owner.
       await expect(
         authenticator.connect(owner).initializeManager(nobody.address),
-      ).to.revertedWith("contract is already initialized");
+      ).to.revertedWith("initialized");
     });
 
     it("should emit a ManagerChanged event", async () => {
