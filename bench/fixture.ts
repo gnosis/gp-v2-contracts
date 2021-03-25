@@ -7,23 +7,30 @@ import { ethers, waffle } from "hardhat";
 
 import {
   Order,
+  OrderBalance,
   OrderKind,
   SettlementEncoder,
   SigningScheme,
+  SwapEncoder,
   TypedDataDomain,
   domain,
+  grantRequiredRoles,
   packOrderUidParams,
 } from "../src/ts";
+import MockPool from "../test/e2e/balancer/MockPool.json";
 import { deployTestContracts, TestDeployment } from "../test/e2e/fixture";
 
 const debug = Debug("bench:fixture");
 const LOTS = ethers.utils.parseEther("1000000000.0");
+const MINIMAL_SWAP_INFO_SPECIALIZATION = 1;
 
 export class TokenManager {
   public readonly instances: Contract[] = [];
 
   public constructor(
     private readonly deployment: TestDeployment,
+    private readonly balancerPool: Contract,
+    private readonly pooler: Wallet,
     private readonly traders: Wallet[],
   ) {}
 
@@ -42,7 +49,11 @@ export class TokenManager {
   }
 
   public async addToken(): Promise<Contract> {
-    const { vaultRelayer, settlement, deployer } = this.deployment;
+    const {
+      deployment: { vault, vaultRelayer, settlement, deployer },
+      balancerPool,
+      pooler,
+    } = this;
 
     const symbol = `T${this.instances.length.toString().padStart(3, "0")}`;
     debug(`creating token ${symbol} and funding traders`);
@@ -57,9 +68,45 @@ export class TokenManager {
     await token.mint(settlement.address, LOTS);
 
     for (const trader of this.traders) {
-      await token.mint(trader.address, LOTS);
+      await token.mint(trader.address, LOTS.mul(3));
       await token.connect(trader).approve(vaultRelayer.address, LOTS);
+      await token.connect(trader).approve(vault.address, LOTS.mul(2));
+      await vault.connect(trader).depositToInternalBalance([
+        {
+          token: token.address,
+          amount: LOTS,
+          sender: trader.address,
+          recipient: trader.address,
+        },
+      ]);
     }
+
+    await balancerPool.registerTokens(
+      [token.address],
+      [ethers.constants.AddressZero],
+    );
+    await token.mint(pooler.address, LOTS);
+    await token.connect(pooler).approve(vault.address, LOTS);
+    const existingTokens = this.instances.map(({ address }) => address);
+    const zeros = this.instances.map(() => 0);
+    await vault.connect(pooler).joinPool(
+      await balancerPool.getPoolId(),
+      pooler.address,
+      pooler.address,
+      [...existingTokens, token.address],
+      [...zeros, LOTS],
+      false,
+      // NOTE: The mock pool uses this for encoding the pool share amounts
+      // that a user (here `pooler`) gets when joining the pool (first value)
+      // as well as the pool fees (second value).
+      ethers.utils.defaultAbiCoder.encode(
+        ["uint256[]", "uint256[]"],
+        [
+          [...zeros, LOTS],
+          [...zeros, 0],
+        ],
+      ),
+    );
 
     this.instances.push(token);
     return token;
@@ -74,6 +121,13 @@ export interface SettlementOptions {
   gasToken: number;
 }
 
+export interface SwapOptions {
+  hops: number;
+  kind: OrderKind;
+  sellTokenBalance: OrderBalance;
+  buyTokenBalance: OrderBalance;
+}
+
 export class BenchFixture {
   private _nonce = 0;
 
@@ -84,6 +138,7 @@ export class BenchFixture {
     public readonly pooler: Wallet,
     public readonly traders: Wallet[],
     public readonly tokens: TokenManager,
+    public readonly balancerPool: Contract,
     public readonly uniswapFactory: Contract,
     public readonly uniswapTokens: Contract[],
     public readonly uniswapPair: Contract,
@@ -93,8 +148,11 @@ export class BenchFixture {
     debug("deploying GPv2 contracts");
     const deployment = await deployTestContracts();
     const {
+      vaultAuthorizer,
+      vault,
       authenticator,
       settlement,
+      vaultRelayer,
       deployer,
       manager,
       wallets: [solver, pooler, ...traders],
@@ -103,9 +161,21 @@ export class BenchFixture {
     const { chainId } = await ethers.provider.getNetwork();
     const domainSeparator = domain(chainId, settlement.address);
 
+    await grantRequiredRoles(
+      vaultAuthorizer.connect(manager),
+      vault.address,
+      vaultRelayer.address,
+    );
+    await vault
+      .connect(traders[0])
+      .changeRelayerAllowance(vaultRelayer.address, true);
     await authenticator.connect(manager).addSolver(solver.address);
 
-    const tokens = new TokenManager(deployment, traders);
+    const balancerPool = await waffle.deployContract(deployer, MockPool, [
+      vault.address,
+      MINIMAL_SWAP_INFO_SPECIALIZATION,
+    ]);
+    const tokens = new TokenManager(deployment, balancerPool, pooler, traders);
 
     debug("creating Uniswap pair");
     const uniswapFactory = await waffle.deployContract(
@@ -150,6 +220,7 @@ export class BenchFixture {
       pooler,
       traders,
       tokens,
+      balancerPool,
       uniswapFactory,
       uniswapTokens,
       uniswapPair,
@@ -343,5 +414,61 @@ export class BenchFixture {
       .settle(...encoder.encodedSettlement(prices));
 
     return await transaction.wait();
+  }
+
+  public async swap({
+    hops,
+    ...orderFlags
+  }: SwapOptions): Promise<ContractReceipt> {
+    debug(`running fixture with ${JSON.stringify({ hops, ...orderFlags })}`);
+
+    const {
+      domainSeparator,
+      solver,
+      tokens,
+      traders: [trader],
+      settlement,
+      balancerPool,
+    } = this;
+
+    await tokens.ensureTokenCount(hops + 1);
+
+    const amount = ethers.utils.parseEther("1.0");
+    const encoder = new SwapEncoder(domainSeparator);
+    await encoder.signEncodeTrade(
+      {
+        ...orderFlags,
+        sellToken: tokens.instances[0].address,
+        buyToken: tokens.instances[hops].address,
+        buyAmount: amount,
+        sellAmount: amount,
+        feeAmount: ethers.utils.parseEther("0.1"),
+        validTo: 0xffffffff,
+        appData: this.nonce,
+        partiallyFillable: false,
+      },
+      trader,
+      SigningScheme.EIP712,
+    );
+    const poolId = await balancerPool.getPoolId();
+    for (let i = 0; i < hops; i++) {
+      const index = orderFlags.kind == OrderKind.SELL ? i : hops - 1 - i;
+      const [tokenIn, tokenOut] = [
+        tokens.instances[index],
+        tokens.instances[index + 1],
+      ];
+      encoder.encodeSwapRequest({
+        poolId,
+        tokenIn: tokenIn.address,
+        tokenOut: tokenOut.address,
+        // NOTE: Use the swap amount for the first swap, and then 0 for the
+        // other swaps to indicate a "multi-hop" which uses the computed in/out
+        // amount from the previous swap.
+        amount: i == 0 ? amount : 0,
+      });
+    }
+
+    const tx = await settlement.connect(solver).swap(...encoder.encodedSwap());
+    return await tx.wait();
   }
 }
