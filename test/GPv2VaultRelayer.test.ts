@@ -44,18 +44,29 @@ describe("GPv2VaultRelayer", () => {
       const tokens = [
         await waffle.deployMockContract(deployer, IERC20.abi),
         await waffle.deployMockContract(deployer, IERC20.abi),
+        await waffle.deployMockContract(deployer, IERC20.abi),
       ];
 
       const amount = ethers.utils.parseEther("13.37");
       await tokens[0].mock.transferFrom
         .withArgs(traders[0].address, creator.address, amount)
         .returns(true);
-      await vault.mock.withdrawFromInternalBalance
+      await vault.mock.transferToExternalBalance
         .withArgs([
           {
             token: tokens[1].address,
             amount,
             sender: traders[1].address,
+            recipient: creator.address,
+          },
+        ])
+        .returns();
+      await vault.mock.withdrawFromInternalBalance
+        .withArgs([
+          {
+            token: tokens[2].address,
+            amount,
+            sender: traders[2].address,
             recipient: creator.address,
           },
         ])
@@ -72,6 +83,12 @@ describe("GPv2VaultRelayer", () => {
           {
             account: traders[1].address,
             token: tokens[1].address,
+            amount,
+            balance: OrderBalanceId.EXTERNAL,
+          },
+          {
+            account: traders[2].address,
+            token: tokens[2].address,
             amount,
             balance: OrderBalanceId.INTERNAL,
           },
@@ -94,6 +111,33 @@ describe("GPv2VaultRelayer", () => {
             token: token.address,
             amount,
             balance: OrderBalanceId.ERC20,
+          },
+        ]),
+      ).to.be.revertedWith("test error");
+    });
+
+    it("should revert on failed Vault transfers", async () => {
+      const token = await waffle.deployMockContract(deployer, IERC20.abi);
+
+      const amount = ethers.utils.parseEther("4.2");
+      await vault.mock.transferToExternalBalance
+        .withArgs([
+          {
+            token: token.address,
+            amount,
+            sender: traders[0].address,
+            recipient: creator.address,
+          },
+        ])
+        .revertsWithReason("test error");
+
+      await expect(
+        vaultRelayer.transferFromAccounts([
+          {
+            account: traders[0].address,
+            token: token.address,
+            amount,
+            balance: OrderBalanceId.EXTERNAL,
           },
         ]),
       ).to.be.revertedWith("test error");
@@ -291,7 +335,7 @@ describe("GPv2VaultRelayer", () => {
     }
 
     describe("Fee Transfer", () => {
-      it("should perform ERC20 transfer when not using internal balance", async () => {
+      it("should perform ERC20 transfer when not using direct ERC20 balance", async () => {
         const token = await waffle.deployMockContract(deployer, IERC20.abi);
         const amount = ethers.utils.parseEther("4.2");
 
@@ -308,6 +352,36 @@ describe("GPv2VaultRelayer", () => {
                 token: token.address,
                 amount,
                 balance: OrderBalanceId.ERC20,
+              },
+            }),
+          ),
+        ).to.not.be.reverted;
+      });
+
+      it("should perform Vault external balance transfer when specified", async () => {
+        const token = await waffle.deployMockContract(deployer, IERC20.abi);
+        const amount = ethers.utils.parseEther("4.2");
+
+        await vault.mock.batchSwapGivenIn.returns([]);
+        await vault.mock.transferToExternalBalance
+          .withArgs([
+            {
+              token: token.address,
+              amount,
+              sender: traders[0].address,
+              recipient: creator.address,
+            },
+          ])
+          .returns();
+
+        await expect(
+          vaultRelayer.batchSwapWithFee(
+            ...encodeSwapParams({
+              feeTransfer: {
+                account: traders[0].address,
+                token: token.address,
+                amount,
+                balance: OrderBalanceId.EXTERNAL,
               },
             }),
           ),
@@ -367,7 +441,37 @@ describe("GPv2VaultRelayer", () => {
         ).to.be.revertedWith("test error");
       });
 
-      it("should revert on failed Vault transfer", async () => {
+      it("should revert on failed Vault external transfer", async () => {
+        const token = await waffle.deployMockContract(deployer, IERC20.abi);
+        const amount = ethers.utils.parseEther("4.2");
+
+        await vault.mock.batchSwapGivenIn.returns([]);
+        await vault.mock.transferToExternalBalance
+          .withArgs([
+            {
+              token: token.address,
+              amount,
+              sender: traders[0].address,
+              recipient: creator.address,
+            },
+          ])
+          .revertsWithReason("test error");
+
+        await expect(
+          vaultRelayer.batchSwapWithFee(
+            ...encodeSwapParams({
+              feeTransfer: {
+                account: traders[0].address,
+                token: token.address,
+                amount,
+                balance: OrderBalanceId.EXTERNAL,
+              },
+            }),
+          ),
+        ).to.be.revertedWith("test error");
+      });
+
+      it("should revert on failed Vault internal transfer", async () => {
         const token = await waffle.deployMockContract(deployer, IERC20.abi);
         const amount = ethers.utils.parseEther("4.2");
 
