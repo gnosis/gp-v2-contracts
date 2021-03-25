@@ -387,38 +387,20 @@ describe("GPv2Settlement", () => {
     });
 
     describe("Balances", () => {
-      for (const { name, ...flags } of [
-        {
-          name: "erc20 to erc20",
-          sellTokenBalance: OrderBalance.ERC20,
-          buyTokenBalance: OrderBalance.ERC20,
-        },
-        {
-          name: "erc20 to internal",
-          sellTokenBalance: OrderBalance.ERC20,
-          buyTokenBalance: OrderBalance.INTERNAL,
-        },
-        {
-          name: "external to erc20",
-          sellTokenBalance: OrderBalance.EXTERNAL,
-          buyTokenBalance: OrderBalance.ERC20,
-        },
-        {
-          name: "external to internal",
-          sellTokenBalance: OrderBalance.EXTERNAL,
-          buyTokenBalance: OrderBalance.INTERNAL,
-        },
-        {
-          name: "internal to erc20",
-          sellTokenBalance: OrderBalance.INTERNAL,
-          buyTokenBalance: OrderBalance.ERC20,
-        },
-        {
-          name: "internal to internal",
-          sellTokenBalance: OrderBalance.INTERNAL,
-          buyTokenBalance: OrderBalance.INTERNAL,
-        },
-      ]) {
+      const balanceVariants = [
+        OrderBalance.ERC20,
+        OrderBalance.EXTERNAL,
+        OrderBalance.INTERNAL,
+      ].flatMap((sellTokenBalance) =>
+        [OrderBalance.ERC20, OrderBalance.INTERNAL].map((buyTokenBalance) => {
+          return {
+            name: `${sellTokenBalance} to ${buyTokenBalance}`,
+            sellTokenBalance,
+            buyTokenBalance,
+          };
+        }),
+      );
+      for (const { name, ...flags } of balanceVariants) {
         it(`performs an ${name} swap when specified`, async () => {
           const sellToken = await waffle.deployMockContract(
             deployer,
@@ -462,21 +444,36 @@ describe("GPv2Settlement", () => {
               0,
             )
             .returns([0, 0]);
-          if (flags.sellTokenBalance == OrderBalance.INTERNAL) {
-            await vault.mock.transferInternalBalance
-              .withArgs([
-                {
-                  token: sellToken.address,
-                  amount: feeAmount,
-                  sender: traders[0].address,
-                  recipient: settlement.address,
-                },
-              ])
-              .returns();
-          } else {
-            await sellToken.mock.transferFrom
-              .withArgs(traders[0].address, settlement.address, feeAmount)
-              .returns(true);
+          switch (flags.sellTokenBalance) {
+            case OrderBalance.ERC20:
+              await sellToken.mock.transferFrom
+                .withArgs(traders[0].address, settlement.address, feeAmount)
+                .returns(true);
+              break;
+            case OrderBalance.EXTERNAL:
+              await vault.mock.transferToExternalBalance
+                .withArgs([
+                  {
+                    token: sellToken.address,
+                    amount: feeAmount,
+                    sender: traders[0].address,
+                    recipient: settlement.address,
+                  },
+                ])
+                .returns();
+              break;
+            case OrderBalance.INTERNAL:
+              await vault.mock.transferInternalBalance
+                .withArgs([
+                  {
+                    token: sellToken.address,
+                    amount: feeAmount,
+                    sender: traders[0].address,
+                    recipient: settlement.address,
+                  },
+                ])
+                .returns();
+              break;
           }
 
           await authenticator.connect(owner).addSolver(solver.address);
