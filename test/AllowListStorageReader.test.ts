@@ -1,11 +1,11 @@
 import { expect } from "chai";
-import { BigNumber, Contract } from "ethers";
+import { Contract } from "ethers";
 import { ethers, waffle } from "hardhat";
 
 import { AllowListReader } from "../src/ts/reader";
 
 describe("AllowListStorageReader", () => {
-  const [deployer, owner, solver] = waffle.provider.getWallets();
+  const [deployer, owner, nonSolver, ...solvers] = waffle.provider.getWallets();
   let authenticator: Contract;
   let reader: Contract;
   let allowListReader: AllowListReader;
@@ -26,33 +26,26 @@ describe("AllowListStorageReader", () => {
     allowListReader = new AllowListReader(authenticator, reader);
   });
 
-  describe("getSolverAt(uint256)", () => {
-    it("returns expected address when called correctly", async () => {
-      await authenticator.connect(owner).addSolver(solver.address);
-      expect(await allowListReader.getSolverAt(0)).to.equal(solver.address);
+  describe("areSolvers", () => {
+    it("returns true when all specified addresses are solvers", async () => {
+      await authenticator.connect(owner).addSolver(solvers[0].address);
+      await authenticator.connect(owner).addSolver(solvers[1].address);
+      expect(
+        await allowListReader.areSolvers([
+          solvers[0].address,
+          solvers[1].address,
+        ]),
+      ).to.be.true;
     });
 
-    it("returns with index error when appropriate", async () => {
-      await expect(allowListReader.getSolverAt(0)).to.be.revertedWith(
-        "EnumerableSet: index out of bounds",
-      );
-
-      await authenticator.connect(owner).addSolver(solver.address);
-
-      await expect(allowListReader.getSolverAt(1)).to.be.revertedWith(
-        "EnumerableSet: index out of bounds",
-      );
-    });
-  });
-
-  describe("numSolvers()", () => {
-    it("returns 0 when there are no solvers", async () => {
-      expect(await allowListReader.numSolvers()).to.equal(BigNumber.from(0));
-    });
-
-    it("returns 1 when there is one solver", async () => {
-      await authenticator.connect(owner).addSolver(solver.address);
-      expect(await allowListReader.numSolvers()).to.equal(BigNumber.from(1));
+    it("returns false when one or more specified addresses are not solvers", async () => {
+      await authenticator.connect(owner).addSolver(solvers[0].address);
+      expect(
+        await allowListReader.areSolvers([
+          solvers[1].address,
+          nonSolver.address,
+        ]),
+      ).to.be.false;
     });
   });
 });
