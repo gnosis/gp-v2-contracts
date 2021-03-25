@@ -23,7 +23,7 @@ describe("GPv2UniswapRouter", () => {
       deployer,
       UniswapV2Factory.abi,
     );
-    uniswapFactory.mock.getPair.returns(ethers.constants.AddressZero);
+    await uniswapFactory.mock.getPair.returns(ethers.constants.AddressZero);
 
     const GPv2UniswapRouter = await ethers.getContractFactory(
       "GPv2UniswapRouterTestInterface",
