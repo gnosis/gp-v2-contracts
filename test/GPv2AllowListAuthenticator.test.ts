@@ -12,6 +12,7 @@ describe("GPv2AllowListAuthentication", () => {
     solver,
   ] = waffle.provider.getWallets();
   let authenticator: Contract;
+  let initilization: Promise<unknown>;
 
   beforeEach(async () => {
     const GPv2AllowListAuthentication = await ethers.getContractFactory(
@@ -22,7 +23,8 @@ describe("GPv2AllowListAuthentication", () => {
     // NOTE: This deploys the test interface contract which emulates being
     // proxied by an EIP-1967 compatible proxy for unit testing purposes.
     authenticator = await GPv2AllowListAuthentication.deploy(owner.address);
-    await authenticator.initializeManager(manager.address);
+    initilization = authenticator.initializeManager(manager.address);
+    await initilization;
   });
 
   describe("initializeManager", () => {
@@ -48,6 +50,12 @@ describe("GPv2AllowListAuthentication", () => {
         authenticator.connect(owner).initializeManager(nobody.address),
       ).to.revertedWith("contract is already initialized");
     });
+
+    it("should emit a ManagerChanged event", async () => {
+      await expect(initilization)
+        .to.emit(authenticator, "ManagerChanged")
+        .withArgs(manager.address, ethers.constants.AddressZero);
+    });
   });
 
   describe("setManager", () => {
@@ -65,6 +73,14 @@ describe("GPv2AllowListAuthentication", () => {
       await expect(
         authenticator.connect(nobody).setManager(ethers.constants.AddressZero),
       ).to.be.revertedWith("not authorized");
+    });
+
+    it("should emit a ManagerChanged event", async () => {
+      await expect(
+        authenticator.connect(manager).setManager(newManager.address),
+      )
+        .to.emit(authenticator, "ManagerChanged")
+        .withArgs(newManager.address, manager.address);
     });
   });
 
@@ -85,6 +101,12 @@ describe("GPv2AllowListAuthentication", () => {
         authenticator.connect(nobody).addSolver(solver.address),
       ).to.be.revertedWith("GPv2: caller not manager");
     });
+
+    it("should emit a SolverAdded event", async () => {
+      await expect(authenticator.connect(manager).addSolver(solver.address))
+        .to.emit(authenticator, "SolverAdded")
+        .withArgs(solver.address);
+    });
   });
 
   describe("removeSolver(address)", () => {
@@ -103,6 +125,12 @@ describe("GPv2AllowListAuthentication", () => {
       await expect(
         authenticator.connect(nobody).removeSolver(solver.address),
       ).to.be.revertedWith("GPv2: caller not manager");
+    });
+
+    it("should emit a SolverRemoved event", async () => {
+      await expect(authenticator.connect(manager).removeSolver(solver.address))
+        .to.emit(authenticator, "SolverRemoved")
+        .withArgs(solver.address);
     });
   });
 
