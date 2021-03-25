@@ -13,17 +13,19 @@ contract GPv2UniswapRouterTestInterface is GPv2UniswapRouter {
     }
 
     function pairFor(
-        address factory_,
-        address tokenA,
-        address tokenB
-    ) internal view override returns (address pair) {
+        IUniswapV2Factory factory_,
+        IERC20 tokenA,
+        IERC20 tokenB
+    ) internal view override returns (IUniswapV2Pair pair) {
         // NOTE: We setup the mock in such a way that if `address(0)` is
         // returned, then the Uniswap pair `CREATE2` address is computed so it
         // can be tested. However, setting up the mock to return different
         // pairs for certain token addresses allows us to do a full unit test
         // with mocked Uniswap pairs.
-        pair = IUniswapV2Factory(factory_).getPair(tokenA, tokenB);
-        if (pair == address(0)) {
+        pair = IUniswapV2Pair(
+            factory_.getPair(address(tokenA), address(tokenB))
+        );
+        if (address(pair) == address(0)) {
             pair = UniswapV2Library.pairFor(factory_, tokenA, tokenB);
         }
     }

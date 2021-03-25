@@ -3,47 +3,54 @@
 // Vendored from Uniswap core contracts with minor modifications:
 // - Added appropriate SPDX license comment
 // - Modified Solidity version
+// - Removed unused method
 // - Formatted code
 // - Shortened revert messages
 // - Converted to an abstract contract with virtual `pairFor` for testing
+// - Use interface types instead of opaque `address`es
+// - Use `calldata` instead of `memory` array types
 // <https://github.com/Uniswap/uniswap-v2-core/blob/v1.0.1/contracts/interfaces/IUniswapV2Factory.sol>
 
 pragma solidity ^0.7.6;
 
+import "../interfaces/IERC20.sol";
 import "../libraries/SafeMath.sol";
+import "./IUniswapV2Factory.sol";
 import "./IUniswapV2Pair.sol";
 
 abstract contract UniswapV2Library {
     using SafeMath for uint256;
 
     // returns sorted token addresses, used to handle return values from pairs sorted in this order
-    function sortTokens(address tokenA, address tokenB)
+    function sortTokens(IERC20 tokenA, IERC20 tokenB)
         internal
         pure
-        returns (address token0, address token1)
+        returns (IERC20 token0, IERC20 token1)
     {
         require(tokenA != tokenB, "UniswapV2: IDENTICAL_ADDRESSES");
         (token0, token1) = tokenA < tokenB
             ? (tokenA, tokenB)
             : (tokenB, tokenA);
-        require(token0 != address(0), "UniswapV2: ZERO_ADDRESS");
+        require(address(token0) != address(0), "UniswapV2: ZERO_ADDRESS");
     }
 
     // calculates the CREATE2 address for a pair without making any external calls
     function pairFor(
-        address factory,
-        address tokenA,
-        address tokenB
-    ) internal view virtual returns (address pair) {
-        (address token0, address token1) = sortTokens(tokenA, tokenB);
-        pair = address(
-            uint256(
-                keccak256(
-                    abi.encodePacked(
-                        hex"ff",
-                        factory,
-                        keccak256(abi.encodePacked(token0, token1)),
-                        hex"96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f" // init code hash
+        IUniswapV2Factory factory,
+        IERC20 tokenA,
+        IERC20 tokenB
+    ) internal view virtual returns (IUniswapV2Pair pair) {
+        (IERC20 token0, IERC20 token1) = sortTokens(tokenA, tokenB);
+        pair = IUniswapV2Pair(
+            address(
+                uint256(
+                    keccak256(
+                        abi.encodePacked(
+                            hex"ff",
+                            factory,
+                            keccak256(abi.encodePacked(token0, token1)),
+                            hex"96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f" // init code hash
+                        )
                     )
                 )
             )
@@ -52,27 +59,16 @@ abstract contract UniswapV2Library {
 
     // fetches and sorts the reserves for a pair
     function getReserves(
-        address factory,
-        address tokenA,
-        address tokenB
+        IUniswapV2Factory factory,
+        IERC20 tokenA,
+        IERC20 tokenB
     ) internal view returns (uint256 reserveA, uint256 reserveB) {
-        (address token0, ) = sortTokens(tokenA, tokenB);
+        (IERC20 token0, ) = sortTokens(tokenA, tokenB);
         (uint256 reserve0, uint256 reserve1, ) =
-            IUniswapV2Pair(pairFor(factory, tokenA, tokenB)).getReserves();
+            pairFor(factory, tokenA, tokenB).getReserves();
         (reserveA, reserveB) = tokenA == token0
             ? (reserve0, reserve1)
             : (reserve1, reserve0);
-    }
-
-    // given some amount of an asset and pair reserves, returns an equivalent amount of the other asset
-    function quote(
-        uint256 amountA,
-        uint256 reserveA,
-        uint256 reserveB
-    ) internal pure returns (uint256 amountB) {
-        require(amountA > 0, "UniswapV2: INSUFFICIENT_AMOUNT");
-        require(reserveA > 0 && reserveB > 0, "UniswapV2: INSUFFICIENT_LQDTY");
-        amountB = amountA.mul(reserveB) / reserveA;
     }
 
     // given an input amount of an asset and pair reserves, returns the maximum output amount of the other asset
@@ -110,9 +106,9 @@ abstract contract UniswapV2Library {
 
     // performs chained getAmountOut calculations on any number of pairs
     function getAmountsOut(
-        address factory,
+        IUniswapV2Factory factory,
         uint256 amountIn,
-        address[] memory path
+        IERC20[] calldata path
     ) internal view returns (uint256[] memory amounts) {
         require(path.length >= 2, "UniswapV2: INVALID_PATH");
         amounts = new uint256[](path.length);
@@ -126,9 +122,9 @@ abstract contract UniswapV2Library {
 
     // performs chained getAmountIn calculations on any number of pairs
     function getAmountsIn(
-        address factory,
+        IUniswapV2Factory factory,
         uint256 amountOut,
-        address[] memory path
+        IERC20[] calldata path
     ) internal view returns (uint256[] memory amounts) {
         require(path.length >= 2, "UniswapV2: INVALID_PATH");
         amounts = new uint256[](path.length);
