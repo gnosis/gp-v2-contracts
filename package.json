@@ -17,6 +17,7 @@
     "test:ignored-in-coverage": "MOCHA_CONF='ignored in coverage' hardhat test",
     "coverage": "MOCHA_CONF='coverage' hardhat coverage",
     "bench": "hardhat run bench/index.ts",
+    "bench:balancer": "hardhat run bench/balancer.ts",
     "bench:compare": "bash bench/compare.sh",
     "bench:single": "hardhat run bench/single.ts",
     "bench:trace": "hardhat run bench/trace/index.ts",

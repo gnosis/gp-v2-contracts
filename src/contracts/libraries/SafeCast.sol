@@ -6,7 +6,7 @@
 // - Shortened revert messages
 // - Removed unused methods
 // - Convert to `type(*).*` notation
-// <https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v3.4.0/contracts/math/SafeMath.sol>
+// <https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v3.4.0/contracts/utils/SafeCast.sol>
 
 pragma solidity ^0.7.6;
 
