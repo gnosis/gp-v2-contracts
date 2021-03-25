@@ -43,8 +43,50 @@ contract GPv2UniswapRouter is UniswapV2Library {
         transfer.target = address(path[0]);
         transfer.callData = abi.encodeWithSelector(
             IERC20.transfer.selector,
-            pairFor(address(factory), address(path[0]), address(path[1])),
+            pairFor(path[0], path[1]),
             amounts[0]
+        );
+    }
+
+    /// @dev Encode a Uniswap pair swap interaction.
+    ///
+    /// @param tokenIn The input token for the swap.
+    /// @param tokenOut The output token for the swap.
+    /// @param amountOut The desired output amount.
+    /// @param to The address to receive the output amount.
+    /// @param swap The interaction to encode the swap for.
+    function swapInteraction(
+        IERC20 tokenIn,
+        IERC20 tokenOut,
+        uint256 amountOut,
+        address to,
+        GPv2Interaction.Data memory swap
+    ) internal view {
+        (address token0, ) = sortTokens(address(tokenIn), address(tokenOut));
+        (uint256 amount0Out, uint256 amount1Out) =
+            address(tokenIn) == token0
+                ? (uint256(0), amountOut)
+                : (amountOut, uint256(0));
+        swap.target = address(pairFor(tokenIn, tokenOut));
+        swap.callData = abi.encodeWithSelector(
+            IUniswapV2Pair.swap.selector,
+            amount0Out,
+            amount1Out,
+            to,
+            bytes("")
+        );
+    }
+
+    /// @dev Internal helper function used for calling the `UniswapV2Library`
+    /// `pairFor` method with the global `factory` value and cast interfaces to
+    /// `address`es.
+    function pairFor(IERC20 tokenA, IERC20 tokenB)
+        private
+        view
+        returns (IUniswapV2Pair pair)
+    {
+        pair = IUniswapV2Pair(
+            pairFor(address(factory), address(tokenA), address(tokenB))
         );
     }
 }
