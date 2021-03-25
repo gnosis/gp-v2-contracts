@@ -68,7 +68,7 @@ describe("GPv2TradeExecution", () => {
       ).to.be.revertedWith("test error");
     });
 
-    it("does not revert when transfering a token with no contract at its address", async () => {
+    it("reverts when transfering a token with no contract at its address", async () => {
       await expect(
         tradeExecution.transferSellAmountToRecipientTest(
           {
@@ -79,7 +79,7 @@ describe("GPv2TradeExecution", () => {
           },
           recipient.address,
         ),
-      ).not.to.be.reverted;
+      ).to.be.revertedWith("not a contract");
     });
 
     it("reverts when mistakenly trying to sell ETH using the marker buy Ether address", async () => {
@@ -162,7 +162,7 @@ describe("GPv2TradeExecution", () => {
       ).to.be.revertedWith("test error");
     });
 
-    it("should not revert when transfering from a token with no contract at its address", async () => {
+    it("reverts when transfering from a token with no contract at its address", async () => {
       await expect(
         tradeExecution.transferBuyAmountToOwnerTest({
           owner: traders[0].address,
@@ -171,7 +171,7 @@ describe("GPv2TradeExecution", () => {
           buyAmount: ethers.utils.parseEther("1.0"),
           ...withoutSell,
         }),
-      ).not.to.be.reverted;
+      ).to.be.revertedWith("not a contract");
     });
 
     it("should transfer Ether to receiver if the marker address is used", async () => {

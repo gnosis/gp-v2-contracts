@@ -33,7 +33,7 @@ library GPv2SafeERC20 {
             }
         }
 
-        require(getLastTansferResult(), "GPv2: failed transfer");
+        require(getLastTansferResult(token), "GPv2: failed transfer");
     }
 
     /// @dev Wrapper around a call to the ERC20 function `transferFrom` that
@@ -66,15 +66,17 @@ library GPv2SafeERC20 {
             }
         }
 
-        require(getLastTansferResult(), "GPv2: failed transferFrom");
+        require(getLastTansferResult(token), "GPv2: failed transferFrom");
     }
 
     /// @dev Verifies that the last return was a successful `transfer*` call.
     /// This is done by checking that the return data is either empty, or
     /// is a valid ABI encoded boolean.
-    function getLastTansferResult() private pure returns (bool success) {
-        bool badReturnSize;
-
+    function getLastTansferResult(IERC20 token)
+        private
+        view
+        returns (bool success)
+    {
         // NOTE: Inspecting previous return data requires assembly. Note that
         // we write the return data to memory 0 in the case where the return
         // data size is 32, this is OK since the first 64 bytes of memory are
@@ -83,9 +85,37 @@ library GPv2SafeERC20 {
         // <https://docs.soliditylang.org/en/v0.7.6/internals/layout_in_memory.html>
         // solhint-disable-next-line no-inline-assembly
         assembly {
+            /// @dev Revert with an ABI encoded Solidity error with a message
+            /// that fits into 32-bytes.
+            ///
+            /// An ABI encoded Solidity error has the following memory layout:
+            ///
+            /// ------------+----------------------------------
+            ///  byte range | value
+            /// ------------+----------------------------------
+            ///  0x00..0x04 |        selector("Error(string)")
+            ///  0x04..0x24 |      string offset (always 0x20)
+            ///  0x24..0x44 |                    string length
+            ///  0x44..0x64 | string value, padded to 32-bytes
+            function revertWithMessage(length, message) {
+                mstore(0x00, "\x08\xc3\x79\xa0")
+                mstore(0x04, 0x20)
+                mstore(0x24, length)
+                mstore(0x44, message)
+                revert(0x00, 0x64)
+            }
+
             switch returndatasize()
                 // Non-standard ERC20 transfer without return.
                 case 0 {
+                    // NOTE: When the return data size is 0, verify that there
+                    // is code at the address. This is done in order to maintain
+                    // compatibility with Solidity calling conventions.
+                    // <https://docs.soliditylang.org/en/v0.7.6/control-structures.html#external-function-calls>
+                    if iszero(extcodesize(token)) {
+                        revertWithMessage(20, "GPv2: not a contract")
+                    }
+
                     success := 1
                 }
                 // Standard ERC20 transfer returning boolean success value.
@@ -101,10 +131,8 @@ library GPv2SafeERC20 {
                     success := iszero(iszero(mload(0)))
                 }
                 default {
-                    badReturnSize := 1
+                    revertWithMessage(31, "GPv2: malformed transfer result")
                 }
         }
-
-        require(!badReturnSize, "GPv2: malformed transfer result");
     }
 }
