@@ -11,6 +11,7 @@ import {
   SigningScheme,
   TypedDataDomain,
   domain,
+  grantRequiredRoles,
 } from "../../src/ts";
 
 import MockPool from "./balancer/MockPool.json";
@@ -47,23 +48,11 @@ describe("E2E: Direct Balancer swap", () => {
     } = deployment);
 
     const { vaultAuthorizer, authenticator, manager } = deployment;
-    for (const method of [
-      "batchSwapGivenIn",
-      "batchSwapGivenOut",
-      "transferInternalBalance",
-      "transferToExternalBalance",
-      "withdrawFromInternalBalance",
-    ]) {
-      await vaultAuthorizer
-        .connect(manager)
-        .grantRole(
-          ethers.utils.solidityKeccak256(
-            ["address", "bytes4"],
-            [vault.address, vault.interface.getSighash(method)],
-          ),
-          vaultRelayer.address,
-        );
-    }
+    await grantRequiredRoles(
+      vaultAuthorizer.connect(manager),
+      vault.address,
+      vaultRelayer.address,
+    );
     await authenticator.connect(manager).addSolver(solver.address);
 
     const { chainId } = await ethers.provider.getNetwork();
