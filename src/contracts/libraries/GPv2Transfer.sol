@@ -45,23 +45,26 @@ library GPv2Transfer {
             "GPv2: cannot transfer native ETH"
         );
 
-        if (transfer.balance == GPv2Order.BALANCE_INTERNAL) {
+        if (transfer.balance == GPv2Order.BALANCE_ERC20) {
+            transfer.token.safeTransferFrom(
+                transfer.account,
+                recipient,
+                transfer.amount
+            );
+        } else {
             IVault.BalanceTransfer[] memory vaultTransfers =
                 new IVault.BalanceTransfer[](1);
-
             IVault.BalanceTransfer memory vaultTransfer = vaultTransfers[0];
             vaultTransfer.token = transfer.token;
             vaultTransfer.amount = transfer.amount;
             vaultTransfer.sender = transfer.account;
             vaultTransfer.recipient = recipient;
 
-            vault.transferInternalBalance(vaultTransfers);
-        } else {
-            transfer.token.safeTransferFrom(
-                transfer.account,
-                recipient,
-                transfer.amount
-            );
+            if (transfer.balance == GPv2Order.BALANCE_EXTERNAL) {
+                vault.transferToExternalBalance(vaultTransfers);
+            } else {
+                vault.transferInternalBalance(vaultTransfers);
+            }
         }
     }
 
@@ -85,9 +88,17 @@ library GPv2Transfer {
         // NOTE: Pre-allocate an array of vault balance tranfers large enough to
         // hold all transfers. This allows us to efficiently batch internal
         // balance transfers into a single Vault call.
-        IVault.BalanceTransfer[] memory vaultTransfers =
+        // NOTE: Allocate buffers of Vault balance transfers, one for external
+        // transfers and another for internal transfers large enough to hold all
+        // GP transfers. This is done to avoid re-allocations (which are gas
+        // inefficient) while still allowing all transfers to be batched into at
+        // most two Vault calls.
+        IVault.BalanceTransfer[] memory externalTransfers =
             new IVault.BalanceTransfer[](transfers.length);
-        uint256 vaultTransferCount = 0;
+        uint256 externalTransferCount = 0;
+        IVault.BalanceTransfer[] memory internalTransfers =
+            new IVault.BalanceTransfer[](transfers.length);
+        uint256 internalTransferCount = 0;
 
         for (uint256 i = 0; i < transfers.length; i++) {
             Data calldata transfer = transfers[i];
@@ -96,25 +107,31 @@ library GPv2Transfer {
                 "GPv2: cannot transfer native ETH"
             );
 
-            if (transfer.balance == GPv2Order.BALANCE_INTERNAL) {
-                IVault.BalanceTransfer memory vaultTransfer =
-                    vaultTransfers[vaultTransferCount++];
-                vaultTransfer.token = transfer.token;
-                vaultTransfer.amount = transfer.amount;
-                vaultTransfer.sender = transfer.account;
-                vaultTransfer.recipient = recipient;
-            } else {
+            if (transfer.balance == GPv2Order.BALANCE_ERC20) {
                 transfer.token.safeTransferFrom(
                     transfer.account,
                     recipient,
                     transfer.amount
                 );
+            } else {
+                IVault.BalanceTransfer memory vaultTransfer =
+                    transfer.balance == GPv2Order.BALANCE_EXTERNAL
+                        ? externalTransfers[externalTransferCount++]
+                        : internalTransfers[internalTransferCount++];
+                vaultTransfer.token = transfer.token;
+                vaultTransfer.amount = transfer.amount;
+                vaultTransfer.sender = transfer.account;
+                vaultTransfer.recipient = recipient;
             }
         }
 
-        if (vaultTransferCount > 0) {
-            truncateTransfersArray(vaultTransfers, vaultTransferCount);
-            vault.withdrawFromInternalBalance(vaultTransfers);
+        if (externalTransferCount > 0) {
+            truncateTransfersArray(externalTransfers, externalTransferCount);
+            vault.transferToExternalBalance(externalTransfers);
+        }
+        if (internalTransferCount > 0) {
+            truncateTransfersArray(internalTransfers, internalTransferCount);
+            vault.withdrawFromInternalBalance(internalTransfers);
         }
     }
 
@@ -141,15 +158,15 @@ library GPv2Transfer {
                     "GPv2: unsupported internal ETH"
                 );
                 payable(transfer.account).transfer(transfer.amount);
-            } else if (transfer.balance == GPv2Order.BALANCE_INTERNAL) {
+            } else if (transfer.balance == GPv2Order.BALANCE_ERC20) {
+                transfer.token.safeTransfer(transfer.account, transfer.amount);
+            } else {
                 IVault.BalanceTransfer memory vaultTransfer =
                     vaultTransfers[vaultTransferCount++];
                 vaultTransfer.token = transfer.token;
                 vaultTransfer.amount = transfer.amount;
                 vaultTransfer.sender = address(this);
                 vaultTransfer.recipient = transfer.account;
-            } else {
-                transfer.token.safeTransfer(transfer.account, transfer.amount);
             }
         }
 
@@ -166,10 +183,10 @@ library GPv2Transfer {
     /// undefined behaviour.
     ///
     /// @param vaultTransfers The memory array of vault transfers to truncate.
-    /// @param length The new length to set.
+    /// @param newLength The new length to set.
     function truncateTransfersArray(
         IVault.BalanceTransfer[] memory vaultTransfers,
-        uint256 length
+        uint256 newLength
     ) private pure {
         // NOTE: Truncate the vault transfers array to the specified length.
         // This is done by setting the array's length which occupies the first
@@ -177,7 +194,7 @@ library GPv2Transfer {
         // <https://docs.soliditylang.org/en/v0.7.6/internals/layout_in_memory.html>
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            mstore(vaultTransfers, length)
+            mstore(vaultTransfers, newLength)
         }
     }
 }
