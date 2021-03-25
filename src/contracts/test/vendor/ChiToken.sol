@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Unlicensed
-// Vendored from: https://github.com/1inch-exchange/chi/blob/master/contracts/ChiToken.sol
+// Vendored from: <https://github.com/1inch-exchange/chi/blob/master/contracts/ChiToken.sol>
 pragma solidity ^0.7.6;
 
 import "@openzeppelin/contracts/math/Math.sol";
