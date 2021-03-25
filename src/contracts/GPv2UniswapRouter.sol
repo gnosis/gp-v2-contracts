@@ -69,6 +69,7 @@ contract GPv2UniswapRouter is UniswapV2Library {
         {
             GPv2Interaction.Data[] memory intra =
                 new GPv2Interaction.Data[](tokenCount);
+            interactions[1] = intra;
 
             transferInteraction(path, amounts, intra[0]);
             for (uint256 i = 1; i < tokenCount; i++) {
@@ -79,7 +80,6 @@ contract GPv2UniswapRouter is UniswapV2Library {
                         : address(settlement);
                 swapInteraction(tokenIn, tokenOut, amounts[i], to, intra[i]);
             }
-            interactions[1] = intra;
         }
 
         settlement.settle(path, prices, trades, interactions);
