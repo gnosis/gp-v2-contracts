@@ -14,7 +14,7 @@ import "./uniswap/UniswapV2Library.sol";
 
 /// @title Gnosis Protocol v2 Uniswap Router
 /// @author Gnosis Developers
-contract GPv2UniswapRouter {
+contract GPv2UniswapRouter is UniswapV2Library {
     using GPv2Trade for uint256;
     using SafeMath for uint256;
 
@@ -43,11 +43,7 @@ contract GPv2UniswapRouter {
         transfer.target = address(path[0]);
         transfer.callData = abi.encodeWithSelector(
             IERC20.transfer.selector,
-            UniswapV2Library.pairFor(
-                address(factory),
-                address(path[0]),
-                address(path[1])
-            ),
+            pairFor(address(factory), address(path[0]), address(path[1])),
             amounts[0]
         );
     }
