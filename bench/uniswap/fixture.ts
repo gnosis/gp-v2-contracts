@@ -22,12 +22,14 @@ export class UniswapFixture {
     public readonly base: BenchFixture,
     public readonly weth: Contract,
     public readonly uniswapRouter: Contract,
+    public readonly gpUniswapRouter: Contract,
   ) {}
 
   public static async create(): Promise<UniswapFixture> {
     const base = await BenchFixture.create();
     const {
-      deployment: { deployer },
+      deployment: { authenticator, deployer, manager },
+      settlement,
       uniswapFactory,
     } = base;
 
@@ -38,7 +40,16 @@ export class UniswapFixture {
       [uniswapFactory.address, weth.address],
     );
 
-    return new UniswapFixture(base, weth, uniswapRouter);
+    const GPv2UniswapRouter = await ethers.getContractFactory(
+      "GPv2UniswapRouter",
+    );
+    const gpUniswapRouter = await GPv2UniswapRouter.deploy(
+      settlement.address,
+      uniswapFactory.address,
+    );
+    await authenticator.connect(manager).addSolver(gpUniswapRouter.address);
+
+    return new UniswapFixture(base, weth, uniswapRouter, gpUniswapRouter);
   }
 
   public async batchSwap({
@@ -150,6 +161,43 @@ export class UniswapFixture {
       }),
     );
 
+    return await transaction.wait();
+  }
+
+  public async settleSwap(hops: number): Promise<ContractReceipt> {
+    const {
+      base: {
+        domainSeparator,
+        nonce,
+        traders: [trader],
+      },
+      gpUniswapRouter,
+    } = this;
+
+    const path = await this.makeUniswapPath(hops);
+
+    const encoder = new SettlementEncoder(domainSeparator);
+    await encoder.signEncodeTrade(
+      {
+        sellToken: path[0].address,
+        buyToken: path[hops].address,
+        sellAmount: ethers.utils.parseEther("1.0"),
+        buyAmount: ethers.utils.parseEther("0.1"),
+        validTo: 0xffffffff,
+        appData: nonce,
+        feeAmount: ethers.utils.parseEther("0.001"),
+        kind: OrderKind.SELL,
+        partiallyFillable: false,
+      },
+      trader,
+      SigningScheme.EIP712,
+    );
+
+    const transaction = await gpUniswapRouter.settleSwap(
+      path.map(({ address }) => address),
+      { ...encoder.trades[0], buyTokenIndex: hops },
+      0,
+    );
     return await transaction.wait();
   }
 
