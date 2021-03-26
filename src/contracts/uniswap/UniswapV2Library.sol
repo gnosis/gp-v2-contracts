@@ -5,6 +5,7 @@
 // - Modified Solidity version
 // - Formatted code
 // - Shortened revert messages
+// - Converted to an abstract contract for testing
 // <https://github.com/Uniswap/uniswap-v2-core/blob/v1.0.1/contracts/interfaces/IUniswapV2Factory.sol>
 
 pragma solidity ^0.7.6;
@@ -12,7 +13,7 @@ pragma solidity ^0.7.6;
 import "../libraries/SafeMath.sol";
 import "./IUniswapV2Pair.sol";
 
-library UniswapV2Library {
+abstract contract UniswapV2Library {
     using SafeMath for uint256;
 
     // returns sorted token addresses, used to handle return values from pairs sorted in this order
@@ -33,7 +34,7 @@ library UniswapV2Library {
         address factory,
         address tokenA,
         address tokenB
-    ) internal pure returns (address pair) {
+    ) internal view virtual returns (address pair) {
         (address token0, address token1) = sortTokens(tokenA, tokenB);
         pair = address(
             uint256(
