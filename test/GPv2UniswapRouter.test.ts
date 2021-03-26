@@ -161,6 +161,7 @@ describe("GPv2UniswapRouter", () => {
             sellAmount: ethers.constants.Zero,
             buyAmount: ethers.constants.Zero,
           }),
+          0,
         ),
       ).to.be.revertedWith("invalid path");
     });
@@ -177,11 +178,12 @@ describe("GPv2UniswapRouter", () => {
             sellAmount: ethers.constants.Zero,
             buyAmount: ethers.constants.Zero,
           }),
+          0,
         ),
       ).to.be.revertedWith("invalid trade for path");
     });
 
-    it("executes a GPv2 settlement", async () => {
+    it("executes a settlement with a single swap", async () => {
       const pair = await deployMockPair(fillAddress(1), fillAddress(2));
       const [reserveSell, reserveBuy] = [
         ethers.utils.parseEther("200000.0"),
@@ -189,6 +191,7 @@ describe("GPv2UniswapRouter", () => {
       ];
 
       const sellAmount = ethers.utils.parseEther("1.0");
+      const buyAmount = ethers.utils.parseEther("0.0003");
       const amountOut = getAmountOut(sellAmount, reserveSell, reserveBuy);
 
       const trade = sampleTrade({
@@ -196,7 +199,7 @@ describe("GPv2UniswapRouter", () => {
         sellTokenIndex: 0,
         buyTokenIndex: 1,
         sellAmount,
-        buyAmount: ethers.utils.parseEther("0.0003"),
+        buyAmount,
       });
 
       await pair.mock.getReserves.returns(reserveSell, reserveBuy, 0);
@@ -233,7 +236,11 @@ describe("GPv2UniswapRouter", () => {
         .returns();
 
       await expect(
-        uniswapRouter.settleSwap([fillAddress(1), fillAddress(2)], trade),
+        uniswapRouter.settleSwap(
+          [fillAddress(1), fillAddress(2)],
+          trade,
+          buyAmount,
+        ),
       ).to.not.be.reverted;
     });
 
@@ -261,6 +268,7 @@ describe("GPv2UniswapRouter", () => {
           sellAmount,
           buyAmount,
         });
+        const limitAmount = kind == OrderKind.SELL ? buyAmount : sellAmount;
 
         const pairs: MockContract[] = [];
         for (const [i, { reserve0, reserve1 }] of pairReserves.entries()) {
@@ -307,10 +315,10 @@ describe("GPv2UniswapRouter", () => {
           )
           .returns();
 
-        return uniswapRouter.settleSwap(path, trade);
+        return uniswapRouter.settleSwap(path, trade, limitAmount);
       }
 
-      it("computes correct swap amounts for sell orders", async () => {
+      it("computes correct swap amounts for multi-hop sell orders", async () => {
         const intermediateAmount = getAmountOut(
           sellAmount,
           pairReserves[0].reserve0,
@@ -333,7 +341,7 @@ describe("GPv2UniswapRouter", () => {
         ).to.not.be.reverted;
       });
 
-      it("computes correct swap amounts for buy orders", async () => {
+      it("computes correct swap amounts for multi-hop buy orders", async () => {
         const intermediateAmount = getAmountIn(
           buyAmount,
           // NOTE: The second hop has tokens in reverse sorting order, so make
@@ -354,6 +362,60 @@ describe("GPv2UniswapRouter", () => {
             buyAmount,
           ]),
         ).to.not.be.reverted;
+      });
+    });
+
+    describe("Limit Amounts", () => {
+      it("reverts when sell order swap receives less than the limit", async () => {
+        const path = [fillAddress(1), fillAddress(2)];
+        const pair = await deployMockPair(path[0], path[1]);
+
+        const sellAmount = ethers.utils.parseEther("1.0");
+        const trade = sampleTrade({
+          kind: OrderKind.SELL,
+          sellTokenIndex: 0,
+          buyTokenIndex: 1,
+          sellAmount,
+          // NOTE: Trade would be happy receiving nothing.
+          buyAmount: ethers.constants.Zero,
+        });
+
+        const [reserveSell, reserveBuy] = [
+          ethers.utils.parseEther("200.0"),
+          ethers.utils.parseEther("100.0"),
+        ];
+        const amountOut = getAmountOut(sellAmount, reserveSell, reserveBuy);
+
+        await pair.mock.getReserves.returns(reserveSell, reserveBuy, 0);
+        await expect(
+          uniswapRouter.settleSwap(path, trade, amountOut.add(1)),
+        ).to.be.revertedWith("swap out too low");
+      });
+
+      it("reverts when buy order swap sends more than the limit", async () => {
+        const path = [fillAddress(1), fillAddress(2)];
+        const pair = await deployMockPair(path[0], path[1]);
+
+        const buyAmount = ethers.utils.parseEther("1.0");
+        const trade = sampleTrade({
+          kind: OrderKind.BUY,
+          sellTokenIndex: 0,
+          buyTokenIndex: 1,
+          // NOTE: Trade would be happy paying everything.
+          sellAmount: ethers.constants.MaxUint256,
+          buyAmount,
+        });
+
+        const [reserveSell, reserveBuy] = [
+          ethers.utils.parseEther("200.0"),
+          ethers.utils.parseEther("100.0"),
+        ];
+        const amountIn = getAmountIn(buyAmount, reserveSell, reserveBuy);
+
+        await pair.mock.getReserves.returns(reserveSell, reserveBuy, 0);
+        await expect(
+          uniswapRouter.settleSwap(path, trade, amountIn.sub(1)),
+        ).to.be.revertedWith("swap in too high");
       });
     });
   });

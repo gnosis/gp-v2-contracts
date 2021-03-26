@@ -40,9 +40,13 @@ contract GPv2UniswapRouter is UniswapV2Library {
     ///
     /// @param path The Uniswap route for trading.
     /// @param trade The GPv2 trade to execute.
-    function settleSwap(IERC20[] calldata path, GPv2Trade.Data calldata trade)
-        external
-    {
+    /// @param limitAmount The input or output amount limit for the swap,
+    /// enabling solvers to specify tighter Uniswap slippage than the order.
+    function settleSwap(
+        IERC20[] calldata path,
+        GPv2Trade.Data calldata trade,
+        uint256 limitAmount
+    ) external {
         uint256 tokenCount = path.length;
         require(tokenCount > 1, "GPv2: invalid path");
         require(
@@ -53,17 +57,20 @@ contract GPv2UniswapRouter is UniswapV2Library {
         uint256[] memory amounts;
         {
             (bytes32 kind, , ) = trade.flags.extractFlags();
+            if (kind == GPv2Order.SELL) {
+                amounts = getAmountsOut(factory, trade.sellAmount, path);
+                require(
+                    limitAmount <= amounts[tokenCount - 1],
+                    "GPv2: swap out too low"
+                );
+            } else {
+                amounts = getAmountsIn(factory, trade.buyAmount, path);
+                require(limitAmount >= amounts[0], "GPv2: swap in too high");
+            }
             amounts = kind == GPv2Order.SELL
                 ? getAmountsOut(factory, trade.sellAmount, path)
                 : getAmountsIn(factory, trade.buyAmount, path);
         }
-
-        uint256[] memory prices = new uint256[](tokenCount);
-        prices[0] = amounts[tokenCount - 1];
-        prices[tokenCount - 1] = amounts[0];
-
-        GPv2Trade.Data[] memory trades = new GPv2Trade.Data[](1);
-        trades[0] = trade;
 
         GPv2Interaction.Data[][3] memory interactions;
         {
@@ -81,6 +88,13 @@ contract GPv2UniswapRouter is UniswapV2Library {
                 swapInteraction(tokenIn, tokenOut, amounts[i], to, intra[i]);
             }
         }
+
+        uint256[] memory prices = new uint256[](tokenCount);
+        prices[0] = amounts[tokenCount - 1];
+        prices[tokenCount - 1] = amounts[0];
+
+        GPv2Trade.Data[] memory trades = new GPv2Trade.Data[](1);
+        trades[0] = trade;
 
         settlement.settle(path, prices, trades, interactions);
     }
