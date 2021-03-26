@@ -1,10 +1,15 @@
 import { expect } from "chai";
 import { MockContract } from "ethereum-waffle";
-import { Contract } from "ethers";
+import { Contract, utils } from "ethers";
 import { artifacts, ethers, waffle } from "hardhat";
 
 function fillAddress(byte: number): string {
   return ethers.utils.hexlify([...Array(20)].map(() => byte));
+}
+
+async function interfaceFor(name: string): Promise<utils.Interface> {
+  const { abi } = await artifacts.readArtifact(name);
+  return new ethers.utils.Interface(abi);
 }
 
 describe("GPv2UniswapRouter", () => {
@@ -73,10 +78,9 @@ describe("GPv2UniswapRouter", () => {
 
   describe("transferInteraction", () => {
     it("should encode a transfer for the first swap amount of the first token", async () => {
-      const erc20 = new ethers.utils.Interface([
-        "function transfer(address to, uint256 amount) returns (bool)",
-      ]);
-
+      const erc20 = await interfaceFor(
+        "src/contracts/interfaces/IERC20.sol:IERC20",
+      );
       const {
         target,
         value,
@@ -94,6 +98,54 @@ describe("GPv2UniswapRouter", () => {
           ethers.utils.parseEther("1.0"),
         ]),
       });
+    });
+  });
+
+  describe("swapInteraction", () => {
+    it("should encode a swap for the given tokens and receiver", async () => {
+      const uniswapPair = await interfaceFor("IUniswapV2Pair");
+      const {
+        target,
+        value,
+        callData,
+      } = await uniswapRouter.swapInteractionTest(
+        fillAddress(1),
+        fillAddress(2),
+        ethers.utils.parseEther("1.0"),
+        fillAddress(3),
+      );
+
+      expect({ target, value, callData }).to.deep.equal({
+        target: pairFor(fillAddress(1), fillAddress(2)),
+        value: ethers.constants.Zero,
+        callData: uniswapPair.encodeFunctionData("swap", [
+          ethers.constants.Zero,
+          ethers.utils.parseEther("1.0"),
+          fillAddress(3),
+          "0x",
+        ]),
+      });
+    });
+
+    it("correctly orders the tokens", async () => {
+      const uniswapPair = await interfaceFor("IUniswapV2Pair");
+      const { callData } = await uniswapRouter.swapInteractionTest(
+        // NOTE: `fillAddress(2) > fillAddress(1)`, this means that the pair's
+        // `token0` is `tokenOut` in this case.
+        fillAddress(2),
+        fillAddress(1),
+        ethers.utils.parseEther("1.0"),
+        fillAddress(3),
+      );
+
+      expect(callData).to.deep.equal(
+        uniswapPair.encodeFunctionData("swap", [
+          ethers.utils.parseEther("1.0"),
+          ethers.constants.Zero,
+          fillAddress(3),
+          "0x",
+        ]),
+      );
     });
   });
 });

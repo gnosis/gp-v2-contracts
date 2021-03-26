@@ -34,4 +34,13 @@ contract GPv2UniswapRouterTestInterface is GPv2UniswapRouter {
     ) external view returns (GPv2Interaction.Data memory transfer) {
         transferInteraction(path, amounts, transfer);
     }
+
+    function swapInteractionTest(
+        IERC20 tokenIn,
+        IERC20 tokenOut,
+        uint256 amountOut,
+        address to
+    ) external view returns (GPv2Interaction.Data memory swap) {
+        swapInteraction(tokenIn, tokenOut, amountOut, to, swap);
+    }
 }
