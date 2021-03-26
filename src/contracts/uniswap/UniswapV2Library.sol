@@ -5,7 +5,7 @@
 // - Modified Solidity version
 // - Formatted code
 // - Shortened revert messages
-// - Converted to an abstract contract for testing
+// - Converted to an abstract contract with virtual `pairFor` for testing
 // <https://github.com/Uniswap/uniswap-v2-core/blob/v1.0.1/contracts/interfaces/IUniswapV2Factory.sol>
 
 pragma solidity ^0.7.6;
