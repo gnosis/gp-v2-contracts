@@ -29,6 +29,62 @@ contract GPv2UniswapRouter is UniswapV2Library {
         factory = factory_;
     }
 
+    /// @dev Execute a GPv2 settlement with a single trade against a Uniswap
+    /// path.
+    ///
+    /// This method performs no input validation, instead it performs on-chain
+    /// computation of the swap amounts in order to encode interactions and set
+    /// clearing prices such as the trader receives positive slippage. Verifying
+    /// the signature and validity of the trade (limit prices, expiry, etc.) is
+    /// done by the settlement contract.
+    ///
+    /// @param path The Uniswap route for trading.
+    /// @param trade The GPv2 trade to execute.
+    function settleSwap(IERC20[] calldata path, GPv2Trade.Data calldata trade)
+        external
+    {
+        uint256 tokenCount = path.length;
+        require(tokenCount > 1, "GPv2: invalid path");
+        require(
+            trade.sellTokenIndex == 0 && trade.buyTokenIndex == tokenCount - 1,
+            "GPv2: invalid trade for path"
+        );
+
+        uint256[] memory amounts;
+        {
+            (bytes32 kind, , ) = trade.flags.extractFlags();
+            amounts = kind == GPv2Order.SELL
+                ? getAmountsOut(factory, trade.sellAmount, path)
+                : getAmountsIn(factory, trade.buyAmount, path);
+        }
+
+        uint256[] memory prices = new uint256[](tokenCount);
+        prices[0] = amounts[tokenCount - 1];
+        prices[tokenCount - 1] = amounts[0];
+
+        GPv2Trade.Data[] memory trades = new GPv2Trade.Data[](1);
+        trades[0] = trade;
+
+        GPv2Interaction.Data[][3] memory interactions;
+        {
+            GPv2Interaction.Data[] memory intra =
+                new GPv2Interaction.Data[](tokenCount);
+            interactions[1] = intra;
+
+            transferInteraction(path, amounts, intra[0]);
+            for (uint256 i = 1; i < tokenCount; i++) {
+                (IERC20 tokenIn, IERC20 tokenOut) = (path[i - 1], path[i]);
+                address to =
+                    i < tokenCount - 1
+                        ? address(pairFor(factory, tokenOut, path[i + 1]))
+                        : address(settlement);
+                swapInteraction(tokenIn, tokenOut, amounts[i], to, intra[i]);
+            }
+        }
+
+        settlement.settle(path, prices, trades, interactions);
+    }
+
     /// @dev Encode the transfer interaction used for sending ERC20 tokens to
     /// the first Uniswap pair in a path to kick off the swaps.
     ///
@@ -43,7 +99,7 @@ contract GPv2UniswapRouter is UniswapV2Library {
         transfer.target = address(path[0]);
         transfer.callData = abi.encodeWithSelector(
             IERC20.transfer.selector,
-            pairFor(path[0], path[1]),
+            pairFor(factory, path[0], path[1]),
             amounts[0]
         );
     }
@@ -62,31 +118,18 @@ contract GPv2UniswapRouter is UniswapV2Library {
         address to,
         GPv2Interaction.Data memory swap
     ) internal view {
-        (address token0, ) = sortTokens(address(tokenIn), address(tokenOut));
+        (IERC20 token0, ) = sortTokens(tokenIn, tokenOut);
         (uint256 amount0Out, uint256 amount1Out) =
-            address(tokenIn) == token0
+            tokenIn == token0
                 ? (uint256(0), amountOut)
                 : (amountOut, uint256(0));
-        swap.target = address(pairFor(tokenIn, tokenOut));
+        swap.target = address(pairFor(factory, tokenIn, tokenOut));
         swap.callData = abi.encodeWithSelector(
             IUniswapV2Pair.swap.selector,
             amount0Out,
             amount1Out,
             to,
             bytes("")
-        );
-    }
-
-    /// @dev Internal helper function used for calling the `UniswapV2Library`
-    /// `pairFor` method with the global `factory` value and cast interfaces to
-    /// `address`es.
-    function pairFor(IERC20 tokenA, IERC20 tokenB)
-        private
-        view
-        returns (IUniswapV2Pair pair)
-    {
-        pair = IUniswapV2Pair(
-            pairFor(address(factory), address(tokenA), address(tokenB))
         );
     }
 }
