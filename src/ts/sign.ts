@@ -33,7 +33,7 @@ export const PRE_SIGNED = ethers.utils.id("GPv2Signing.Scheme.PreSign");
 /**
  * The signing scheme used to sign the order.
  */
-export const enum SigningScheme {
+export enum SigningScheme {
   /**
    * The EIP-712 typed data signing scheme. This is the preferred scheme as it
    * provides more infomation to wallets performing the signature on the data
