@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import { BigNumber } from "ethers";
 
 import { UniswapFixture } from "./fixture";
 
@@ -14,7 +15,7 @@ async function main() {
     ),
   );
   console.log(
-    ["hops", "use router", "batch size", "direct swap", "batch swap"]
+    ["hops", "strategy", "batch size", "direct swap", "batch swap"]
       .map((header) => chalk.cyan(pad(header)))
       .join(chalk.gray("|")),
   );
@@ -25,8 +26,22 @@ async function main() {
   );
   for (let hops = 1; hops <= 3; hops++) {
     const { gasUsed: directSwap } = await fixture.directSwap(hops);
+    const formatGas = (gasUsed: BigNumber) =>
+      (gasUsed.lt(directSwap) ? chalk.green : chalk.red)(
+        pad(gasUsed.toString()),
+      );
+
+    const { gasUsed: settleSwap } = await fixture.settleSwap(hops);
+    console.log(
+      [
+        ...[hops, "gp router", 1].map(pad),
+        chalk.yellow(pad(directSwap.toString())),
+        formatGas(settleSwap),
+      ].join(chalk.gray("|")),
+    );
 
     for (const useRouter of [true, false]) {
+      const strategy = useRouter ? "router" : "pair";
       for (let batchSize = 1; batchSize <= 5; batchSize++) {
         const { gasUsed: totalBatchSwap } = await fixture.batchSwap({
           batchSize,
@@ -35,12 +50,11 @@ async function main() {
         });
         const batchSwap = totalBatchSwap.div(batchSize);
 
-        const batchColour = batchSwap.lt(directSwap) ? chalk.green : chalk.red;
         console.log(
           [
-            ...[hops, useRouter, batchSize].map(pad),
+            ...[hops, strategy, batchSize].map(pad),
             chalk.yellow(pad(directSwap.toString())),
-            batchColour(pad(batchSwap.toString())),
+            formatGas(batchSwap),
           ].join(chalk.gray("|")),
         );
       }
