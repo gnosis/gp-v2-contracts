@@ -81,10 +81,10 @@ describe("E2E: Deployment", () => {
         expect(
           deterministicDeploymentAddress(Proxy, [
             await implementationAddress(ethers.provider, authenticator.address),
+            owner.address,
             authenticator.interface.encodeFunctionData("initializeManager", [
               manager.address,
             ]),
-            owner.address,
           ]),
         ).to.equal(authenticator.address);
       });
