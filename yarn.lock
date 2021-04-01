@@ -11398,17 +11398,17 @@ prettier-linter-helpers@^1.0.0:
   dependencies:
     fast-diff "^1.1.2"
 
-prettier-plugin-solidity@^1.0.0-beta.6:
-  version "1.0.0-beta.6"
-  resolved "https://registry.yarnpkg.com/prettier-plugin-solidity/-/prettier-plugin-solidity-1.0.0-beta.6.tgz#aa7b14a60cd6e22e46db75c84d836b569fb63f65"
-  integrity sha512-WymLqd22Hl93t5+HDNLk08TAWp4i4vZMhpihuVqkwOApjCT7mH1qwhLtvf3m+NdU//qj8vrPDmMoT+xc74skcg==
+prettier-plugin-solidity@^1.0.0-beta.7:
+  version "1.0.0-beta.7"
+  resolved "https://registry.yarnpkg.com/prettier-plugin-solidity/-/prettier-plugin-solidity-1.0.0-beta.7.tgz#c9da6bc5fe23c3a470bf357a10970c183b0961ef"
+  integrity sha512-WKvIlriIPj81szmmaP2WLq0Sgs0yKiYlSiBV9W7KCE59BBbwMndKB3ZIjdy/bpyGLUA1XQndXYapivA8LgJ+4A==
   dependencies:
     "@solidity-parser/parser" "^0.12.0"
     dir-to-object "^2.0.0"
     emoji-regex "^9.2.1"
     escape-string-regexp "^4.0.0"
     prettier "^2.2.1"
-    semver "^7.3.4"
+    semver "^7.3.5"
     solidity-comments-extractor "^0.0.4"
     string-width "^4.2.0"
 
