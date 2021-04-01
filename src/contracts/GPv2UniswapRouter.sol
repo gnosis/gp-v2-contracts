@@ -67,9 +67,6 @@ contract GPv2UniswapRouter is UniswapV2Library {
                 amounts = getAmountsIn(factory, trade.buyAmount, path);
                 require(limitAmount >= amounts[0], "GPv2: swap in too high");
             }
-            amounts = kind == GPv2Order.SELL
-                ? getAmountsOut(factory, trade.sellAmount, path)
-                : getAmountsIn(factory, trade.buyAmount, path);
         }
 
         GPv2Interaction.Data[][3] memory interactions;
