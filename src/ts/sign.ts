@@ -165,15 +165,23 @@ export async function signOrder(
   owner: Signer,
   scheme: EcdsaSigningScheme,
 ): Promise<EcdsaSignature> {
+  const signature = await ecdsaSignTypedData(
+    scheme,
+    owner,
+    domain,
+    { Order: ORDER_TYPE_FIELDS },
+    normalizeOrder(order),
+  );
+  // Passing the signature over split/join to normalize the `v` byte.
+  // Some wallets do not pad it with `27`, which causes a signature failure
+  // `splitSignature` pads it if needed, and `joinSignature` simply puts it back together
+  const data = ethers.utils.joinSignature(
+    ethers.utils.splitSignature(signature),
+  );
+
   return {
     scheme,
-    data: await ecdsaSignTypedData(
-      scheme,
-      owner,
-      domain,
-      { Order: ORDER_TYPE_FIELDS },
-      normalizeOrder(order),
-    ),
+    data,
   };
 }
 
