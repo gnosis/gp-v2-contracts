@@ -140,7 +140,7 @@ export enum OrderBalance {
    */
   EXTERNAL = "external",
   /**
-   * Use Balancer Vault external balances.
+   * Use Balancer Vault internal balances.
    */
   INTERNAL = "internal",
 }
