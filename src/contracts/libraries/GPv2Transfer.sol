@@ -85,9 +85,6 @@ library GPv2Transfer {
         Data[] calldata transfers,
         address recipient
     ) internal {
-        // NOTE: Pre-allocate an array of vault balance tranfers large enough to
-        // hold all transfers. This allows us to efficiently batch internal
-        // balance transfers into a single Vault call.
         // NOTE: Allocate buffers of Vault balance transfers, one for external
         // transfers and another for internal transfers large enough to hold all
         // GP transfers. This is done to avoid re-allocations (which are gas

@@ -21,7 +21,7 @@ contract GPv2AllowListAuthentication is
     /// in this mapping.
     mapping(address => bool) private solvers;
 
-    /// @dev Event emitted when a solver gets added.
+    /// @dev Event emitted when the manager changes.
     event ManagerChanged(address newManager, address oldManager);
 
     /// @dev Event emitted when a solver gets added.
