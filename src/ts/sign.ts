@@ -121,28 +121,35 @@ export interface PreSignSignature {
   data: string;
 }
 
-function ecdsaSignTypedData(
+async function ecdsaSignTypedData(
   scheme: EcdsaSigningScheme,
   owner: Signer,
   domain: TypedDataDomain,
   types: TypedDataTypes,
   data: Record<string, unknown>,
 ): Promise<string> {
+  let signature: string | null = null;
+
   switch (scheme) {
     case SigningScheme.EIP712:
       if (!isTypedDataSigner(owner)) {
         throw new Error("signer does not support signing typed data");
       }
-      return owner._signTypedData(domain, types, data);
-
+      signature = await owner._signTypedData(domain, types, data);
+      break;
     case SigningScheme.ETHSIGN:
-      return owner.signMessage(
+      signature = await owner.signMessage(
         ethers.utils.arrayify(hashTypedData(domain, types, data)),
       );
-
+      break;
     default:
       throw new Error("invalid signing scheme");
   }
+
+  // Passing the signature through split/join to normalize the `v` byte.
+  // Some wallets do not pad it with `27`, which causes a signature failure
+  // `splitSignature` pads it if needed, and `joinSignature` simply puts it back together
+  return ethers.utils.joinSignature(ethers.utils.splitSignature(signature));
 }
 
 /**
@@ -165,23 +172,15 @@ export async function signOrder(
   owner: Signer,
   scheme: EcdsaSigningScheme,
 ): Promise<EcdsaSignature> {
-  const signature = await ecdsaSignTypedData(
-    scheme,
-    owner,
-    domain,
-    { Order: ORDER_TYPE_FIELDS },
-    normalizeOrder(order),
-  );
-  // Passing the signature over split/join to normalize the `v` byte.
-  // Some wallets do not pad it with `27`, which causes a signature failure
-  // `splitSignature` pads it if needed, and `joinSignature` simply puts it back together
-  const data = ethers.utils.joinSignature(
-    ethers.utils.splitSignature(signature),
-  );
-
   return {
     scheme,
-    data,
+    data: await ecdsaSignTypedData(
+      scheme,
+      owner,
+      domain,
+      { Order: ORDER_TYPE_FIELDS },
+      normalizeOrder(order),
+    ),
   };
 }
 
