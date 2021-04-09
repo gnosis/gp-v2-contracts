@@ -18,30 +18,10 @@ import {
 } from "../src/ts";
 
 import { decodeOrder, encodeOrder } from "./encoding";
-
-function fillBytes(count: number, byte: number): string {
-  return ethers.utils.hexlify([...Array(count)].map(() => byte));
-}
-
-function fillUint(bits: number, byte: number): BigNumber {
-  return BigNumber.from(fillBytes(bits / 8, byte));
-}
+import { fillBytes, fillUint, SAMPLE_ORDER } from "./testHelpers";
 
 describe("GPv2Signing", () => {
   const [deployer, ...traders] = waffle.provider.getWallets();
-
-  const sampleOrder = {
-    sellToken: fillBytes(20, 0x01),
-    buyToken: fillBytes(20, 0x02),
-    receiver: fillBytes(20, 0x03),
-    sellAmount: ethers.utils.parseEther("42"),
-    buyAmount: ethers.utils.parseEther("13.37"),
-    validTo: 0xffffffff,
-    appData: ethers.constants.HashZero,
-    feeAmount: ethers.utils.parseEther("1.0"),
-    kind: OrderKind.SELL,
-    partiallyFillable: false,
-  };
 
   let signing: Contract;
   let testDomain: TypedDataDomain;
@@ -160,7 +140,7 @@ describe("GPv2Signing", () => {
     it("should compute order unique identifier", async () => {
       const encoder = new SettlementEncoder(testDomain);
       await encoder.signEncodeTrade(
-        sampleOrder,
+        SAMPLE_ORDER,
         traders[0],
         SigningScheme.EIP712,
       );
@@ -170,7 +150,7 @@ describe("GPv2Signing", () => {
         encoder.trades[0],
       );
       expect(orderUid).to.equal(
-        computeOrderUid(testDomain, sampleOrder, traders[0].address),
+        computeOrderUid(testDomain, SAMPLE_ORDER, traders[0].address),
       );
     });
 
@@ -181,30 +161,30 @@ describe("GPv2Signing", () => {
 
       const sampleOrderUid = computeOrderUid(
         testDomain,
-        sampleOrder,
+        SAMPLE_ORDER,
         traders[2].address,
       );
       await signing.connect(traders[2]).setPreSignature(sampleOrderUid, true);
 
       const encoder = new SettlementEncoder(testDomain);
       await encoder.signEncodeTrade(
-        sampleOrder,
+        SAMPLE_ORDER,
         traders[0],
         SigningScheme.EIP712,
       );
       await encoder.signEncodeTrade(
-        sampleOrder,
+        SAMPLE_ORDER,
         traders[1],
         SigningScheme.ETHSIGN,
       );
-      encoder.encodeTrade(sampleOrder, {
+      encoder.encodeTrade(SAMPLE_ORDER, {
         scheme: SigningScheme.EIP1271,
         data: {
           verifier: verifier.address,
           signature: "0x",
         },
       });
-      encoder.encodeTrade(sampleOrder, {
+      encoder.encodeTrade(SAMPLE_ORDER, {
         scheme: SigningScheme.PRESIGN,
         data: traders[2].address,
       });
@@ -243,7 +223,7 @@ describe("GPv2Signing", () => {
 
         const encoder = new SettlementEncoder(testDomain);
         await encoder.signEncodeTrade(
-          sampleOrder,
+          SAMPLE_ORDER,
           traders[0],
           SigningScheme.EIP712,
         );
@@ -301,13 +281,13 @@ describe("GPv2Signing", () => {
       ] as const) {
         const { data: signature } = await signOrder(
           testDomain,
-          sampleOrder,
+          SAMPLE_ORDER,
           traders[0],
           scheme,
         );
         expect(
           await signing.recoverOrderSignerTest(
-            encodeOrder(sampleOrder),
+            encodeOrder(SAMPLE_ORDER),
             scheme,
             signature,
           ),
@@ -317,7 +297,7 @@ describe("GPv2Signing", () => {
 
     it("should revert for invalid signing schemes", async () => {
       await expect(
-        signing.recoverOrderSignerTest(encodeOrder(sampleOrder), 42, "0x"),
+        signing.recoverOrderSignerTest(encodeOrder(SAMPLE_ORDER), 42, "0x"),
       ).to.be.reverted;
     });
 
@@ -325,7 +305,7 @@ describe("GPv2Signing", () => {
       for (const scheme of [SigningScheme.EIP712, SigningScheme.ETHSIGN]) {
         await expect(
           signing.recoverOrderSignerTest(
-            encodeOrder(sampleOrder),
+            encodeOrder(SAMPLE_ORDER),
             scheme,
             "0x",
           ),
@@ -336,7 +316,7 @@ describe("GPv2Signing", () => {
     it("should revert for invalid eip-712 order signatures", async () => {
       const { data: signature } = await signOrder(
         testDomain,
-        sampleOrder,
+        SAMPLE_ORDER,
         traders[0],
         SigningScheme.EIP712,
       );
@@ -350,7 +330,7 @@ describe("GPv2Signing", () => {
 
       await expect(
         signing.recoverOrderSignerTest(
-          encodeOrder(sampleOrder),
+          encodeOrder(SAMPLE_ORDER),
           SigningScheme.EIP712,
           invalidSignature,
         ),
@@ -360,7 +340,7 @@ describe("GPv2Signing", () => {
     it("should revert for invalid ethsign order signatures", async () => {
       const { data: signature } = await signOrder(
         testDomain,
-        sampleOrder,
+        SAMPLE_ORDER,
         traders[0],
         SigningScheme.ETHSIGN,
       );
@@ -374,7 +354,7 @@ describe("GPv2Signing", () => {
 
       await expect(
         signing.recoverOrderSignerTest(
-          encodeOrder(sampleOrder),
+          encodeOrder(SAMPLE_ORDER),
           SigningScheme.ETHSIGN,
           invalidSignature,
         ),
@@ -385,7 +365,7 @@ describe("GPv2Signing", () => {
       const artifact = await artifacts.readArtifact("EIP1271Verifier");
       const verifier = await waffle.deployMockContract(deployer, artifact.abi);
 
-      const message = hashOrder(testDomain, sampleOrder);
+      const message = hashOrder(testDomain, SAMPLE_ORDER);
       const eip1271Signature = "0x031337";
       await verifier.mock.isValidSignature
         .withArgs(message, eip1271Signature)
@@ -393,7 +373,7 @@ describe("GPv2Signing", () => {
 
       expect(
         await signing.recoverOrderSignerTest(
-          encodeOrder(sampleOrder),
+          encodeOrder(SAMPLE_ORDER),
           SigningScheme.EIP1271,
           encodeEip1271SignatureData({
             verifier: verifier.address,
@@ -404,7 +384,7 @@ describe("GPv2Signing", () => {
     });
 
     it("should revert on an invalid EIP-1271 signature", async () => {
-      const message = hashOrder(testDomain, sampleOrder);
+      const message = hashOrder(testDomain, SAMPLE_ORDER);
       const eip1271Signature = "0x031337";
 
       const artifact = await artifacts.readArtifact("EIP1271Verifier");
@@ -415,7 +395,7 @@ describe("GPv2Signing", () => {
         .returns("0xbaadc0d3");
       await expect(
         signing.recoverOrderSignerTest(
-          encodeOrder(sampleOrder),
+          encodeOrder(SAMPLE_ORDER),
           SigningScheme.EIP1271,
           encodeEip1271SignatureData({
             verifier: verifier1.address,
@@ -426,7 +406,7 @@ describe("GPv2Signing", () => {
     });
 
     it("should revert with non-standard EIP-1271 verifiers", async () => {
-      const message = hashOrder(testDomain, sampleOrder);
+      const message = hashOrder(testDomain, SAMPLE_ORDER);
       const eip1271Signature = "0x031337";
 
       const NON_STANDARD_EIP1271_VERIFIER = [
@@ -442,7 +422,7 @@ describe("GPv2Signing", () => {
         .returns();
       await expect(
         signing.recoverOrderSignerTest(
-          encodeOrder(sampleOrder),
+          encodeOrder(SAMPLE_ORDER),
           SigningScheme.EIP1271,
           encodeEip1271SignatureData({
             verifier: verifier.address,
@@ -456,7 +436,7 @@ describe("GPv2Signing", () => {
       // Transaction reverted: function call to a non-contract account
       await expect(
         signing.recoverOrderSignerTest(
-          encodeOrder(sampleOrder),
+          encodeOrder(SAMPLE_ORDER),
           SigningScheme.EIP1271,
           encodeEip1271SignatureData({
             verifier: traders[0].address,
@@ -472,7 +452,7 @@ describe("GPv2Signing", () => {
       );
 
       const evilVerifier = await StateChangingEIP1271.deploy();
-      const message = hashOrder(testDomain, sampleOrder);
+      const message = hashOrder(testDomain, SAMPLE_ORDER);
       const eip1271Signature = "0x";
 
       expect(await evilVerifier.state()).to.equal(ethers.constants.Zero);
@@ -488,7 +468,7 @@ describe("GPv2Signing", () => {
       // Transaction reverted and Hardhat couldn't infer the reason.
       await expect(
         signing.recoverOrderSignerTest(
-          encodeOrder(sampleOrder),
+          encodeOrder(SAMPLE_ORDER),
           SigningScheme.EIP1271,
           encodeEip1271SignatureData({
             verifier: evilVerifier.address,
@@ -502,14 +482,14 @@ describe("GPv2Signing", () => {
     it("should verify pre-signed order", async () => {
       const orderUid = computeOrderUid(
         testDomain,
-        sampleOrder,
+        SAMPLE_ORDER,
         traders[0].address,
       );
 
       await signing.connect(traders[0]).setPreSignature(orderUid, true);
       expect(
         await signing.recoverOrderSignerTest(
-          encodeOrder(sampleOrder),
+          encodeOrder(SAMPLE_ORDER),
           SigningScheme.PRESIGN,
           traders[0].address,
         ),
@@ -519,7 +499,7 @@ describe("GPv2Signing", () => {
     it("should revert if order doesn't have pre-signature set", async () => {
       await expect(
         signing.recoverOrderSignerTest(
-          encodeOrder(sampleOrder),
+          encodeOrder(SAMPLE_ORDER),
           SigningScheme.PRESIGN,
           traders[0].address,
         ),
@@ -530,14 +510,14 @@ describe("GPv2Signing", () => {
       await signing
         .connect(traders[0])
         .setPreSignature(
-          computeOrderUid(testDomain, sampleOrder, traders[0].address),
+          computeOrderUid(testDomain, SAMPLE_ORDER, traders[0].address),
           true,
         );
 
       await expect(
         signing.recoverOrderSignerTest(
           encodeOrder({
-            ...sampleOrder,
+            ...SAMPLE_ORDER,
             buyAmount: ethers.constants.Zero,
           }),
           SigningScheme.PRESIGN,
@@ -549,7 +529,7 @@ describe("GPv2Signing", () => {
     it("should revert for malformed pre-sign order UID", async () => {
       await expect(
         signing.recoverOrderSignerTest(
-          encodeOrder(sampleOrder),
+          encodeOrder(SAMPLE_ORDER),
           SigningScheme.PRESIGN,
           "0x",
         ),
