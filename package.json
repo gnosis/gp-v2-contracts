@@ -57,7 +57,7 @@
     "ethers": "^5.1.0",
     "globby": "^11.0.3",
     "hardhat": "^2.1.2",
-    "hardhat-deploy": "^0.7.2",
+    "hardhat-deploy": "^0.7.3",
     "hardhat-gas-reporter": "^1.0.4",
     "prettier": "^2.2.1",
     "prettier-plugin-solidity": "^1.0.0-beta.7",
