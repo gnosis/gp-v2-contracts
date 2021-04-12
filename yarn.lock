@@ -11399,10 +11399,10 @@ prettier-linter-helpers@^1.0.0:
   dependencies:
     fast-diff "^1.1.2"
 
-prettier-plugin-solidity@^1.0.0-beta.7:
-  version "1.0.0-beta.7"
-  resolved "https://registry.yarnpkg.com/prettier-plugin-solidity/-/prettier-plugin-solidity-1.0.0-beta.7.tgz#c9da6bc5fe23c3a470bf357a10970c183b0961ef"
-  integrity sha512-WKvIlriIPj81szmmaP2WLq0Sgs0yKiYlSiBV9W7KCE59BBbwMndKB3ZIjdy/bpyGLUA1XQndXYapivA8LgJ+4A==
+prettier-plugin-solidity@^1.0.0-beta.8:
+  version "1.0.0-beta.8"
+  resolved "https://registry.yarnpkg.com/prettier-plugin-solidity/-/prettier-plugin-solidity-1.0.0-beta.8.tgz#32db9db4e5cdc573dd55215a5e4d422620f17163"
+  integrity sha512-NN4OU+mtqRQQkfMjmXh5c9rnxS4tQulMKv8mqUmhxBA3QDKILthZC54m6+/lky9jHqAAxvBlx5jZwFN6yfP4Kw==
   dependencies:
     "@solidity-parser/parser" "^0.12.0"
     dir-to-object "^2.0.0"
@@ -11410,7 +11410,7 @@ prettier-plugin-solidity@^1.0.0-beta.7:
     escape-string-regexp "^4.0.0"
     prettier "^2.2.1"
     semver "^7.3.5"
-    solidity-comments-extractor "^0.0.4"
+    solidity-comments-extractor "^0.0.6"
     string-width "^4.2.0"
 
 prettier@^1.14.3:
@@ -12821,10 +12821,10 @@ solhint@^3.3.4:
   optionalDependencies:
     prettier "^1.14.3"
 
-solidity-comments-extractor@^0.0.4:
-  version "0.0.4"
-  resolved "https://registry.yarnpkg.com/solidity-comments-extractor/-/solidity-comments-extractor-0.0.4.tgz#ce420aef23641ffd0131c7d80ba85b6e1e42147e"
-  integrity sha512-58glBODwXIKMaQ7rfcJOrWtFQMMOK28tJ0/LcB5Xhu7WtAxk4UX2fpgKPuaL41XjMp/y0gAa1MTLqk018wuSzA==
+solidity-comments-extractor@^0.0.6:
+  version "0.0.6"
+  resolved "https://registry.yarnpkg.com/solidity-comments-extractor/-/solidity-comments-extractor-0.0.6.tgz#8cd0d0394a9c3ff9185fc83d48d75b6cd19dd358"
+  integrity sha512-5GRv062LXC+8sJZS3wlY4ZptKFODf+jTDqxB64DWf/uyAL5ZJEvmr8wW3Kd/V+e5roBShcC15+ThfGMerF2Yxw==
 
 solidity-coverage@^0.7.16:
   version "0.7.16"
