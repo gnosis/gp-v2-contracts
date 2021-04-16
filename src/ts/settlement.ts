@@ -133,24 +133,81 @@ export type EncodedSettlement = [
 ];
 
 /**
+ * An object listing all flag options in order along with their bit offset.
+ */
+export const flagMasks = {
+  kind: {
+    offset: 0,
+    options: [OrderKind.SELL, OrderKind.BUY],
+  },
+  partiallyFillable: {
+    offset: 1,
+    options: [false, true],
+  },
+  signingScheme: {
+    offset: 2,
+    options: [
+      SigningScheme.EIP712,
+      SigningScheme.ETHSIGN,
+      SigningScheme.EIP1271,
+      SigningScheme.PRESIGN,
+    ],
+  },
+} as const;
+
+function encodeFlag<
+  K extends keyof typeof flagMasks,
+  V extends typeof flagMasks[K]["options"][number]
+>(key: K, flag: V): number {
+  const index = flagMasks[key].options.findIndex(
+    (search: unknown) => search === flag,
+  );
+  if (index === undefined) {
+    throw new Error(`Bad key/value pair to encode: ${key}/${flag}`);
+  }
+  return index << flagMasks[key].offset;
+}
+
+// Counts the smallest mask needed to store the input options in the masked
+// bitfield.
+function mask(options: readonly unknown[]): number {
+  const num = options.length;
+  const bitCount = num === 0 ? 0 : (num - 1).toString(2).length;
+  return (1 << bitCount) - 1;
+}
+
+function decodeFlag<
+  K extends keyof typeof flagMasks,
+  V extends typeof flagMasks[K]["options"][number]
+>(key: K, flag: number): V {
+  const { offset, options } = flagMasks[key];
+  const index = (flag >> offset) & mask(options);
+  // This type casting should not be needed
+  const decoded = options[index] as V;
+  if (decoded === undefined || index < 0) {
+    throw new Error(`Invalid input flag for ${key}: 0b${flag.toString(2)}`);
+  }
+  return decoded;
+}
+
+/**
  * Encodes signing scheme as a bitfield.
  *
  * @param scheme The signing scheme to encode.
  * @return The bitfield result.
  */
 export function encodeSigningScheme(scheme: SigningScheme): number {
-  switch (scheme) {
-    case SigningScheme.EIP712:
-      return 0b0000;
-    case SigningScheme.ETHSIGN:
-      return 0b0100;
-    case SigningScheme.EIP1271:
-      return 0b1000;
-    case SigningScheme.PRESIGN:
-      return 0b1100;
-    default:
-      throw new Error("Unsupported signing scheme");
-  }
+  return encodeFlag("signingScheme", scheme);
+}
+
+/**
+ * Decodes signing scheme from a bitfield.
+ *
+ * @param flag The encoded order flag.
+ * @return The decoded signing scheme.
+ */
+export function decodeSigningScheme(flags: number): SigningScheme {
+  return decodeFlag("signingScheme", flags);
 }
 
 /**
@@ -160,20 +217,23 @@ export function encodeSigningScheme(scheme: SigningScheme): number {
  * @return The bitfield result.
  */
 export function encodeOrderFlags(flags: OrderFlags): number {
-  let kind;
-  switch (flags.kind) {
-    case OrderKind.SELL:
-      kind = 0;
-      break;
-    case OrderKind.BUY:
-      kind = 1;
-      break;
-    default:
-      throw new Error(`invalid error kind '${kind}'`);
-  }
-  const partiallyFillable = flags.partiallyFillable ? 0x02 : 0x00;
+  return (
+    encodeFlag("kind", flags.kind) |
+    encodeFlag("partiallyFillable", flags.partiallyFillable)
+  );
+}
 
-  return kind | partiallyFillable;
+/**
+ * Decode order flags from a bitfield.
+ *
+ * @param flags The order flags encoded as a bitfield.
+ * @return The decoded order flags.
+ */
+export function decodeOrderFlags(flags: number): OrderFlags {
+  return {
+    kind: decodeFlag("kind", flags),
+    partiallyFillable: decodeFlag("partiallyFillable", flags),
+  };
 }
 
 /**
@@ -184,6 +244,19 @@ export function encodeOrderFlags(flags: OrderFlags): number {
  */
 export function encodeTradeFlags(flags: TradeFlags): number {
   return encodeOrderFlags(flags) | encodeSigningScheme(flags.signingScheme);
+}
+
+/**
+ * Decode trade flags from a bitfield.
+ *
+ * @param flags The trade flags encoded as a bitfield.
+ * @return The bitfield result.
+ */
+export function decodeTradeFlags(flags: number): TradeFlags {
+  return {
+    ...decodeOrderFlags(flags),
+    signingScheme: decodeSigningScheme(flags),
+  };
 }
 
 function encodeSignatureData(sig: Signature): string {
