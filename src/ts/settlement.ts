@@ -155,10 +155,11 @@ export const FLAG_MASKS = {
   },
 } as const;
 
-function encodeFlag<
-  K extends keyof typeof FLAG_MASKS,
-  V extends typeof FLAG_MASKS[K]["options"][number]
->(key: K, flag: V): number {
+export type FlagKey = keyof typeof FLAG_MASKS;
+export type FlagOptions<K extends FlagKey> = typeof FLAG_MASKS[K]["options"];
+export type FlagValue<K extends FlagKey> = FlagOptions<K>[number];
+
+function encodeFlag<K extends FlagKey>(key: K, flag: FlagValue<K>): number {
   const index = FLAG_MASKS[key].options.findIndex(
     (search: unknown) => search === flag,
   );
@@ -176,14 +177,11 @@ function mask(options: readonly unknown[]): number {
   return (1 << bitCount) - 1;
 }
 
-function decodeFlag<
-  K extends keyof typeof FLAG_MASKS,
-  V extends typeof FLAG_MASKS[K]["options"][number]
->(key: K, flag: number): V {
+function decodeFlag<K extends FlagKey>(key: K, flag: number): FlagValue<K> {
   const { offset, options } = FLAG_MASKS[key];
   const index = (flag >> offset) & mask(options);
   // This type casting should not be needed
-  const decoded = options[index] as V;
+  const decoded = options[index] as FlagValue<K>;
   if (decoded === undefined || index < 0) {
     throw new Error(`Invalid input flag for ${key}: 0b${flag.toString(2)}`);
   }

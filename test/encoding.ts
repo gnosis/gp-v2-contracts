@@ -1,7 +1,14 @@
 import { BigNumber } from "ethers";
 import { ethers } from "hardhat";
 
-import { Order, OrderKind, normalizeOrder, FLAG_MASKS } from "../src/ts";
+import {
+  Order,
+  OrderKind,
+  normalizeOrder,
+  FLAG_MASKS,
+  FlagKey,
+  FlagOptions,
+} from "../src/ts";
 
 export type AbiOrder = [
   string,
@@ -16,9 +23,7 @@ export type AbiOrder = [
   boolean,
 ];
 
-function optionsForKey<K extends keyof typeof FLAG_MASKS>(
-  key: K,
-): typeof FLAG_MASKS[K]["options"] {
+function optionsForKey<K extends FlagKey>(key: K): FlagOptions<K> {
   return FLAG_MASKS[key].options;
 }
 export const allOrderKinds = optionsForKey("kind");
@@ -26,10 +31,10 @@ export const allPartiallyFillable = optionsForKey("partiallyFillable");
 export const allSigningSchemes = optionsForKey("signingScheme");
 
 export function allOptions<
-  K extends keyof typeof FLAG_MASKS,
-  AllOptions extends Record<K, typeof FLAG_MASKS[K]["options"]>
+  K extends FlagKey,
+  AllOptions extends Record<K, FlagOptions<K>>
 >(): AllOptions {
-  const result: Record<string, typeof FLAG_MASKS[K]["options"]> = {};
+  const result: Record<string, FlagOptions<K>> = {};
   Object.entries(FLAG_MASKS).map(
     ([key, value]) => (result[key] = value.options),
   );

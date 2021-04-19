@@ -5,6 +5,7 @@ import {
   decodeTradeFlags,
   FLAG_MASKS,
   TradeFlags,
+  FlagKey,
 } from "../src/ts";
 
 type UnknownArray = unknown[] | readonly unknown[];
@@ -61,14 +62,12 @@ function validEncodedFlags(): number[] {
 }
 
 // Returns an object that assigns to every key all encoded flags for that key.
-function allEncodedFlagOptions<
-  Out extends Record<keyof typeof FLAG_MASKS, number[]>
->(): Out {
+function allEncodedFlagOptions<Out extends Record<FlagKey, number[]>>(): Out {
   const result: Partial<Out> = {};
   Object.entries(FLAG_MASKS).map(([key, { offset, options }]) => {
-    result[
-      key as keyof typeof FLAG_MASKS
-    ] = (options as readonly unknown[]).map((_, index) => index << offset);
+    result[key as FlagKey] = (options as readonly unknown[]).map(
+      (_, index) => index << offset,
+    );
   });
   return result as Out;
 }
