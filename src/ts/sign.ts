@@ -225,3 +225,24 @@ export function encodeEip1271SignatureData({
 }: Eip1271SignatureData): string {
   return ethers.utils.solidityPack(["address", "bytes"], [verifier, signature]);
 }
+
+/**
+ * Decodes a GPv2 EIP-1271-type signature into the actual EIP-1271 signature
+ * and the verifier contract.
+ *
+ * @param signature The EIP-1271 signature data to decode.
+ * @returns decodedSignature The decoded signature object, composed of an
+ * EIP-1271 signature and a verifier.
+ */
+export function decodeEip1271SignatureData(
+  signature: BytesLike,
+): Eip1271SignatureData {
+  const arrayifiedSignature = ethers.utils.arrayify(signature);
+  const verifier = ethers.utils.getAddress(
+    ethers.utils.hexlify(arrayifiedSignature.slice(0, 20)),
+  );
+  return {
+    verifier,
+    signature: arrayifiedSignature.slice(20),
+  };
+}
