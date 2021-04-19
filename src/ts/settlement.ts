@@ -173,7 +173,7 @@ function encodeFlag<K extends FlagKey>(key: K, flag: FlagValue<K>): number {
 // bitfield.
 function mask(options: readonly unknown[]): number {
   const num = options.length;
-  const bitCount = num === 0 ? 0 : (num - 1).toString(2).length;
+  const bitCount = 32 - Math.clz32(num - 1);
   return (1 << bitCount) - 1;
 }
 
