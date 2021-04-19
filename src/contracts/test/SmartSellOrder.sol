@@ -9,6 +9,8 @@ import "../libraries/GPv2SafeERC20.sol";
 import "../libraries/SafeMath.sol";
 import "../GPv2Settlement.sol";
 
+/// @title Proof of Concept Smart Order
+/// @author Gnosis Developers
 contract SmartSellOrder is EIP1271Verifier {
     using GPv2Order for GPv2Order.Data;
     using GPv2SafeERC20 for IERC20;
@@ -91,6 +93,10 @@ contract SmartSellOrder is EIP1271Verifier {
         order.appData = APPDATA;
         order.feeAmount = totalFeeAmount.mul(sellAmount).div(totalSellAmount);
         order.kind = GPv2Order.SELL;
+        // NOTE: We counter-intuitively set `partiallyFillable` to `false`, even
+        // if the smart order as a whole acts like a partially fillable order.
+        // This is done since, once a settlement commits to a specific sell
+        // amount, then it is expected to use it completely and not partially.
         order.partiallyFillable = false;
     }
 
