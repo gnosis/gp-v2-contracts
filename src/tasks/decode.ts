@@ -240,7 +240,7 @@ const setupDecodeTask: () => void = () => {
   task("decode", "Decodes GPv2 settlement calldata.")
     .addOptionalParam(
       "txhash",
-      "The transaction hash of the transaction to decode. Tf this flag is set, stdin is ignored.",
+      "The transaction hash of the transaction to decode. If this flag is set, stdin is ignored.",
     )
     .setAction(
       async ({ txhash }, { artifacts, ethers, deployments, network }) => {
