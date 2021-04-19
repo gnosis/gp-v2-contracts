@@ -92,7 +92,7 @@ function displayTokens(tokens: Token[]) {
   const headers = ["address", "index", "symbol", "price"] as const;
   const formattedTokens = tokens.map(formatToken);
   const columnWidth = displayTokensColumnWidth(formattedTokens);
-  console.log(chalk.bold("=== Decoded tokens ==="));
+  console.log(chalk.bold("=== Tokens ==="));
   console.log(
     headers
       .map((header) => chalk.cyan(cellText(header, columnWidth[header])))
@@ -112,7 +112,7 @@ function displayTokens(tokens: Token[]) {
 }
 
 function displayTrades(trades: Trade[], tokens: Token[]) {
-  console.log(chalk.bold("=== Decoded trades ==="));
+  console.log(chalk.bold("=== Trades ==="));
   console.log(chalk.gray("-".repeat(WIDTH)));
   for (const trade of trades) {
     displayTrade(trade, tokens);
@@ -197,7 +197,7 @@ function displayTrade(trade: Trade, tokens: Token[]) {
 function displayInteractions(
   interactions: [Interaction[], Interaction[], Interaction[]],
 ) {
-  console.log(chalk.bold("=== Decoded interactions ==="));
+  console.log(chalk.bold("=== Interactions ==="));
   console.log(chalk.gray("-".repeat(WIDTH)));
   displayInteractionGroup("Pre-interactions", interactions[0]);
   console.log();
