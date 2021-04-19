@@ -3,7 +3,7 @@ import { expect } from "chai";
 import {
   encodeTradeFlags,
   decodeTradeFlags,
-  flagMasks,
+  FLAG_MASKS,
   TradeFlags,
 } from "../src/ts";
 
@@ -62,20 +62,20 @@ function validEncodedFlags(): number[] {
 
 // Returns an object that assigns to every key all encoded flags for that key.
 function allEncodedFlagOptions<
-  Out extends Record<keyof typeof flagMasks, number[]>
+  Out extends Record<keyof typeof FLAG_MASKS, number[]>
 >(): Out {
   const result: Partial<Out> = {};
-  Object.entries(flagMasks).map(([key, { offset, options }]) => {
-    result[key as keyof typeof flagMasks] = (options as readonly unknown[]).map(
-      (_, index) => index << offset,
-    );
+  Object.entries(FLAG_MASKS).map(([key, { offset, options }]) => {
+    result[
+      key as keyof typeof FLAG_MASKS
+    ] = (options as readonly unknown[]).map((_, index) => index << offset);
   });
   return result as Out;
 }
 
 function validFlags(): TradeFlags[] {
   /* eslint-disable @typescript-eslint/no-explicit-any */
-  const keyedOptions = Object.entries(flagMasks).map(([key, { options }]) =>
+  const keyedOptions = Object.entries(FLAG_MASKS).map(([key, { options }]) =>
     options.map((option: unknown) => [key, option]),
   );
   const combinations = cartesian(...keyedOptions);

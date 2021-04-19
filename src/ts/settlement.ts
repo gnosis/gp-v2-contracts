@@ -135,7 +135,7 @@ export type EncodedSettlement = [
 /**
  * An object listing all flag options in order along with their bit offset.
  */
-export const flagMasks = {
+export const FLAG_MASKS = {
   kind: {
     offset: 0,
     options: [OrderKind.SELL, OrderKind.BUY],
@@ -156,16 +156,16 @@ export const flagMasks = {
 } as const;
 
 function encodeFlag<
-  K extends keyof typeof flagMasks,
-  V extends typeof flagMasks[K]["options"][number]
+  K extends keyof typeof FLAG_MASKS,
+  V extends typeof FLAG_MASKS[K]["options"][number]
 >(key: K, flag: V): number {
-  const index = flagMasks[key].options.findIndex(
+  const index = FLAG_MASKS[key].options.findIndex(
     (search: unknown) => search === flag,
   );
   if (index === undefined) {
     throw new Error(`Bad key/value pair to encode: ${key}/${flag}`);
   }
-  return index << flagMasks[key].offset;
+  return index << FLAG_MASKS[key].offset;
 }
 
 // Counts the smallest mask needed to store the input options in the masked
@@ -177,10 +177,10 @@ function mask(options: readonly unknown[]): number {
 }
 
 function decodeFlag<
-  K extends keyof typeof flagMasks,
-  V extends typeof flagMasks[K]["options"][number]
+  K extends keyof typeof FLAG_MASKS,
+  V extends typeof FLAG_MASKS[K]["options"][number]
 >(key: K, flag: number): V {
-  const { offset, options } = flagMasks[key];
+  const { offset, options } = FLAG_MASKS[key];
   const index = (flag >> offset) & mask(options);
   // This type casting should not be needed
   const decoded = options[index] as V;
