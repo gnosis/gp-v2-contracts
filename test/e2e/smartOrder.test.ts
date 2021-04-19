@@ -25,7 +25,7 @@ describe("E2E: Dumb Smart Order", () => {
 
   let tokens: [Contract, Contract];
 
-  let SmartOrder: ContractFactory;
+  let SmartSellOrder: ContractFactory;
 
   beforeEach(async () => {
     const deployment = await deployTestContracts();
@@ -48,7 +48,7 @@ describe("E2E: Dumb Smart Order", () => {
       await waffle.deployContract(deployer, ERC20, ["T1", 18]),
     ];
 
-    SmartOrder = await ethers.getContractFactory("SmartOrder");
+    SmartSellOrder = await ethers.getContractFactory("SmartSellOrder");
   });
 
   it("permits trader allowance with settlement", async () => {
@@ -75,7 +75,7 @@ describe("E2E: Dumb Smart Order", () => {
       SigningScheme.EIP712,
     );
 
-    const smartOrder = await SmartOrder.connect(traders[1]).deploy(
+    const smartOrder = await SmartSellOrder.connect(traders[1]).deploy(
       settlement.address,
       tokens[1].address,
       tokens[0].address,
@@ -86,8 +86,7 @@ describe("E2E: Dumb Smart Order", () => {
     await tokens[1].mint(traders[1].address, ethers.utils.parseEther("1.1"));
     await tokens[1]
       .connect(traders[1])
-      .approve(smartOrder.address, ethers.constants.MaxUint256);
-    await smartOrder.connect(traders[1]).fund();
+      .transfer(smartOrder.address, ethers.utils.parseEther("1.1"));
 
     const smartOrderSellAmount = ethers.utils.parseEther("0.5");
     const smartOrderTrade = decodeOrder(

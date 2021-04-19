@@ -9,12 +9,12 @@ import "../libraries/GPv2SafeERC20.sol";
 import "../libraries/SafeMath.sol";
 import "../GPv2Settlement.sol";
 
-contract SmartOrder is EIP1271Verifier {
+contract SmartSellOrder is EIP1271Verifier {
     using GPv2Order for GPv2Order.Data;
     using GPv2SafeERC20 for IERC20;
     using SafeMath for uint256;
 
-    bytes32 public constant APPDATA = keccak256("SmartOrder");
+    bytes32 public constant APPDATA = keccak256("SmartSellOrder");
 
     address public immutable owner;
     bytes32 public immutable domainSeparator;
@@ -23,8 +23,6 @@ contract SmartOrder is EIP1271Verifier {
     uint256 public immutable totalSellAmount;
     uint256 public immutable totalFeeAmount;
     uint32 public immutable validTo;
-
-    bool public funded;
 
     constructor(
         GPv2Settlement settlement,
@@ -53,14 +51,8 @@ contract SmartOrder is EIP1271Verifier {
         _;
     }
 
-    function fund() external onlyOwner {
-        require(!funded, "already funded");
-        funded = true;
-        sellToken.safeTransferFrom(
-            owner,
-            address(this),
-            totalSellAmount.add(totalFeeAmount)
-        );
+    function withdraw(uint256 amount) external onlyOwner {
+        sellToken.safeTransfer(owner, amount);
     }
 
     function close() external onlyOwner {
@@ -90,19 +82,11 @@ contract SmartOrder is EIP1271Verifier {
         view
         returns (GPv2Order.Data memory order)
     {
-        uint256 balance = sellToken.balanceOf(address(this));
-        uint256 soldAmount =
-            totalSellAmount.sub(
-                balance.mul(totalSellAmount).div(
-                    totalSellAmount.add(totalFeeAmount)
-                )
-            );
-
         order.sellToken = sellToken;
         order.buyToken = buyToken;
         order.receiver = owner;
         order.sellAmount = sellAmount;
-        order.buyAmount = buyAmountForSellAmount(sellAmount, soldAmount);
+        order.buyAmount = buyAmountForSellAmount(sellAmount);
         order.validTo = validTo;
         order.appData = APPDATA;
         order.feeAmount = totalFeeAmount.mul(sellAmount).div(totalSellAmount);
@@ -110,11 +94,20 @@ contract SmartOrder is EIP1271Verifier {
         order.partiallyFillable = false;
     }
 
-    function buyAmountForSellAmount(uint256 sellAmount, uint256 soldAmount)
+    function buyAmountForSellAmount(uint256 sellAmount)
         private
         view
         returns (uint256 buyAmount)
     {
+        uint256 feeAdjustedBalance =
+            sellToken.balanceOf(address(this)).mul(totalSellAmount).div(
+                totalSellAmount.add(totalFeeAmount)
+            );
+        uint256 soldAmount =
+            totalSellAmount > feeAdjustedBalance
+                ? totalSellAmount - feeAdjustedBalance
+                : 0;
+
         // NOTE: This is currently a silly price strategy where the xrate
         // increases linearly from 1:1 to 1:2 as the smart order gets filled.
         // This can be extended to more complex "price curves".
