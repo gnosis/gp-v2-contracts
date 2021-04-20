@@ -1,11 +1,12 @@
 import "hardhat-deploy";
 import "@nomiclabs/hardhat-ethers";
 
-import { promises as fs } from "fs";
+import readline from "readline";
 
 import chalk from "chalk";
 import { BigNumber, BigNumberish, Contract, utils, constants } from "ethers";
 import { task } from "hardhat/config";
+import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 import {
   decodeTradeFlags,
@@ -236,98 +237,119 @@ function displayInteraction(interaction: Interaction, isLast: boolean) {
   console.log(branch(), label("Calldata"), callData);
 }
 
+async function calldataFromUserInput(
+  txhash: string,
+  hre: HardhatRuntimeEnvironment,
+): Promise<string> {
+  const { ethers, network, deployments } = hre;
+  let calldata = null;
+  if (txhash !== undefined) {
+    const tx = await ethers.provider.getTransaction(txhash.trim());
+    if (tx === null) {
+      throw new Error(`Transaction not found on network ${network.name}`);
+    }
+    const deployment = await deployments
+      .get("GPv2Settlement")
+      .catch(() => null);
+    calldata = tx.data;
+    if (deployment === null || tx.to !== deployment.address) {
+      console.log(
+        `Warning: the input transaction hash does not point to an interaction with the current deployment of GPv2 settlement contract on ${network.name}.`,
+      );
+      console.log(`Deployment: ${deployment?.address}`);
+      console.log(`Target:     ${tx.to}`);
+    }
+  } else {
+    if (process.stdin.isTTY) {
+      console.log("Paste in the calldata to decode");
+    }
+    const rl = readline.createInterface({
+      input: process.stdin,
+    });
+    for await (const line of rl) {
+      const trimmed = line.trim();
+      if (trimmed.length !== 0) {
+        calldata = trimmed;
+        break;
+      }
+    }
+    if (calldata === null) {
+      throw new Error("No input calldata provided");
+    }
+  }
+  if (!/^0x[0-9a-f]*/.exec(calldata)) {
+    throw new Error("Invalid calldata");
+  }
+  return calldata;
+}
+
 const setupDecodeTask: () => void = () => {
   task("decode", "Decodes GPv2 settlement calldata.")
     .addOptionalParam(
       "txhash",
       "The transaction hash of the transaction to decode. If this flag is set, stdin is ignored.",
     )
-    .setAction(
-      async ({ txhash }, { artifacts, ethers, deployments, network }) => {
-        let calldata;
-        if (txhash !== undefined) {
-          const tx = await ethers.provider.getTransaction(txhash.trim());
-          if (tx === null) {
-            throw new Error(`Transaction not found on network ${network.name}`);
-          }
-          const deployment = await deployments
-            .get("GPv2Settlement")
+    .setAction(async ({ txhash }, hre) => {
+      const { artifacts, ethers } = hre;
+      const calldata = await calldataFromUserInput(txhash, hre);
+
+      const GPv2Settlement = await artifacts.readArtifact("GPv2Settlement");
+      const settlementInterface = new utils.Interface(GPv2Settlement.abi);
+      const IERC20 = await artifacts.readArtifact(
+        "src/contracts/interfaces/IERC20.sol:IERC20",
+      );
+
+      const [
+        tokenAddresses,
+        clearingPrices,
+        trades,
+        interactions,
+      ] = settlementInterface.decodeFunctionData(
+        "settle",
+        calldata,
+      ) as EncodedSettlement;
+
+      const tokens = await Promise.all(
+        tokenAddresses.map(async (address: string, index: number) => {
+          const contract = new Contract(address, IERC20.abi, ethers.provider);
+          const symbol = await contract
+            .symbol()
+            .then((s: unknown) => (typeof s !== "string" ? null : s))
             .catch(() => null);
-          calldata = tx.data;
-          if (deployment === null || tx.to !== deployment.address) {
-            console.log(
-              `Warning: the input transaction hash does not point to an interaction with the current deployment of GPv2 settlement contract on ${network.name}.`,
-            );
-            console.log(`Deployment: ${deployment?.address}`);
-            console.log(`Target:     ${tx.to}`);
-          }
-        } else {
-          calldata = (await fs.readFile("/dev/stdin")).toString().trim();
-        }
-        if (!/^0x[0-9a-f]*/.exec(calldata)) {
-          throw new Error("Invalid calldata");
-        }
+          const decimals = await contract
+            .decimals()
+            .then((s: unknown) => BigNumber.from(s))
+            .catch(() => null);
+          return {
+            contract,
+            symbol,
+            decimals,
+            address,
+            index,
+            nativeFlag: BUY_ETH_ADDRESS === address,
+            price: clearingPrices[index] as BigNumber | undefined,
+          };
+        }),
+      );
 
-        const GPv2Settlement = await artifacts.readArtifact("GPv2Settlement");
-        const settlementInterface = new utils.Interface(GPv2Settlement.abi);
-        const IERC20 = await artifacts.readArtifact(
-          "src/contracts/interfaces/IERC20.sol:IERC20",
+      displayTokens(tokens);
+
+      if (clearingPrices.length > tokens.length) {
+        console.log(
+          `Warning: settlement has ${
+            clearingPrices.length - tokens.length
+          } more prices than tokens.`,
         );
-
-        const [
-          tokenAddresses,
-          clearingPrices,
-          trades,
-          interactions,
-        ] = settlementInterface.decodeFunctionData(
-          "settle",
-          calldata,
-        ) as EncodedSettlement;
-
-        const tokens = await Promise.all(
-          tokenAddresses.map(async (address: string, index: number) => {
-            const contract = new Contract(address, IERC20.abi, ethers.provider);
-            const symbol = await contract
-              .symbol()
-              .then((s: unknown) => (typeof s !== "string" ? null : s))
-              .catch(() => null);
-            const decimals = await contract
-              .decimals()
-              .then((s: unknown) => BigNumber.from(s))
-              .catch(() => null);
-            return {
-              contract,
-              symbol,
-              decimals,
-              address,
-              index,
-              nativeFlag: BUY_ETH_ADDRESS === address,
-              price: clearingPrices[index] as BigNumber | undefined,
-            };
-          }),
+        console.log(`Extra prices from index ${tokens.length}:`);
+        console.log(
+          clearingPrices.slice(tokens.length).map((price) => price.toString()),
         );
+      }
 
-        displayTokens(tokens);
+      displayTrades(trades, tokens);
 
-        if (clearingPrices.length > tokens.length) {
-          console.log(
-            `Warning: settlement has ${
-              clearingPrices.length - tokens.length
-            } more prices than tokens.`,
-          );
-          console.log(`Extra prices from index ${tokens.length}:`);
-          console.log(
-            clearingPrices
-              .slice(tokens.length)
-              .map((price) => price.toString()),
-          );
-        }
-
-        displayTrades(trades, tokens);
-
-        displayInteractions(interactions);
-      },
-    );
+      displayInteractions(interactions);
+    });
 };
 
 export { setupDecodeTask };
