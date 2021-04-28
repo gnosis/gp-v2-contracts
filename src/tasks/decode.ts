@@ -5,6 +5,7 @@ import readline from "readline";
 
 import chalk from "chalk";
 import { BigNumber, BigNumberish, Contract, utils, constants } from "ethers";
+import { Deployment } from "hardhat-deploy/types";
 import { task } from "hardhat/config";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
@@ -15,10 +16,16 @@ import {
   BUY_ETH_ADDRESS,
   Interaction,
   SigningScheme,
+  decodeSignatureOwner,
+  TypedDataDomain,
+  domain,
+  computeOrderUid,
+  decodeOrder,
 } from "../ts";
 
 const WIDTH = 120;
 const INVALID_TOKEN = " ! Invalid token ! ";
+const INVALID_OWNER = " ! Invalid owner ! ";
 const NATIVE_TOKEN = " native token ";
 
 interface Token {
@@ -112,11 +119,15 @@ function displayTokens(tokens: Token[]) {
   console.log();
 }
 
-function displayTrades(trades: Trade[], tokens: Token[]) {
+function displayTrades(
+  trades: Trade[],
+  tokens: Token[],
+  domainSeparator: TypedDataDomain | null,
+) {
   console.log(chalk.bold("=== Trades ==="));
   console.log(chalk.gray("-".repeat(WIDTH)));
   for (const trade of trades) {
-    displayTrade(trade, tokens);
+    displayTrade(trade, tokens, domainSeparator);
     console.log();
   }
 }
@@ -136,7 +147,11 @@ function formatSignature(sig: SigningScheme): string {
   }
 }
 
-function displayTrade(trade: Trade, tokens: Token[]) {
+function displayTrade(
+  trade: Trade,
+  tokens: Token[],
+  domainSeparator: TypedDataDomain | null,
+) {
   const prettyToken = (token: MaybeToken, checkNative?: boolean) =>
     `${
       checkNative && token.nativeFlag
@@ -166,6 +181,25 @@ function displayTrade(trade: Trade, tokens: Token[]) {
     signature,
   } = trade;
   const { kind, partiallyFillable, signingScheme } = decodeTradeFlags(flags);
+  let owner = null;
+  let orderUid = null;
+  if (domainSeparator !== null) {
+    try {
+      const order = decodeOrder(
+        trade,
+        tokens.map((token) => token.address),
+      );
+      owner = decodeSignatureOwner(
+        domainSeparator,
+        order,
+        signingScheme,
+        signature,
+      );
+      orderUid = computeOrderUid(domainSeparator, order, owner);
+    } catch {
+      // Nothing to do, `null` variables mark a decoding error.
+    }
+  }
   const sellToken = tokens[sellTokenIndex] ?? { index: sellTokenIndex };
   const buyToken = tokens[buyTokenIndex] ?? { index: buyTokenIndex };
   console.log(
@@ -183,6 +217,9 @@ function displayTrade(trade: Trade, tokens: Token[]) {
       `${prettyAmount(executedAmount, sellToken)}`,
     );
   }
+  if (domainSeparator !== null) {
+    console.log(label("Owner"), owner === null ? INVALID_OWNER : owner);
+  }
   if (receiver !== constants.AddressZero) {
     console.log(label(`Receiver`), receiver);
   }
@@ -193,6 +230,9 @@ function displayTrade(trade: Trade, tokens: Token[]) {
     label(`Signature (${formatSignature(signingScheme)})`),
     signature,
   );
+  if (orderUid !== null) {
+    console.log(label("OrderUid"), orderUid);
+  }
 }
 
 function displayInteractions(
@@ -239,18 +279,16 @@ function displayInteraction(interaction: Interaction, isLast: boolean) {
 
 async function calldataFromUserInput(
   txhash: string,
+  deployment: Deployment | null,
   hre: HardhatRuntimeEnvironment,
 ): Promise<string> {
-  const { ethers, network, deployments } = hre;
+  const { ethers, network } = hre;
   let calldata = null;
   if (txhash !== undefined) {
     const tx = await ethers.provider.getTransaction(txhash.trim());
     if (tx === null) {
       throw new Error(`Transaction not found on network ${network.name}`);
     }
-    const deployment = await deployments
-      .get("GPv2Settlement")
-      .catch(() => null);
     calldata = tx.data;
     if (deployment === null || tx.to !== deployment.address) {
       console.log(
@@ -290,8 +328,14 @@ const setupDecodeTask: () => void = () => {
       "The transaction hash of the transaction to decode. If this flag is set, stdin is ignored.",
     )
     .setAction(async ({ txhash }, hre) => {
-      const { artifacts, ethers } = hre;
-      const calldata = await calldataFromUserInput(txhash, hre);
+      const { artifacts, ethers, deployments } = hre;
+      const deployment = await deployments
+        .get("GPv2Settlement")
+        .catch(() => null);
+      const calldata = await calldataFromUserInput(txhash, deployment, hre);
+      const { chainId } = await ethers.provider.getNetwork();
+      const domainSeparator =
+        deployment === null ? null : domain(chainId, deployment.address);
 
       const GPv2Settlement = await artifacts.readArtifact("GPv2Settlement");
       const settlementInterface = new utils.Interface(GPv2Settlement.abi);
@@ -346,7 +390,7 @@ const setupDecodeTask: () => void = () => {
         );
       }
 
-      displayTrades(trades, tokens);
+      displayTrades(trades, tokens, domainSeparator);
 
       displayInteractions(interactions);
     });
