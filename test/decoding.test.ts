@@ -1,4 +1,6 @@
 import { expect } from "chai";
+import { constants, utils, Wallet } from "ethers";
+import { waffle } from "hardhat";
 
 import {
   encodeTradeFlags,
@@ -6,7 +8,18 @@ import {
   FLAG_MASKS,
   TradeFlags,
   FlagKey,
+  signOrder,
+  SigningScheme,
+  decodeSignatureOwner,
+  EcdsaSigningScheme,
+  encodeEip1271SignatureData,
+  SettlementEncoder,
+  decodeOrder,
+  OrderKind,
+  domain,
 } from "../src/ts";
+
+import { fillDistinctBytes, SAMPLE_ORDER } from "./testHelpers";
 
 type UnknownArray = unknown[] | readonly unknown[];
 // [A, B, C] -> [A, B]
@@ -88,7 +101,7 @@ function validFlags(): TradeFlags[] {
   /* eslint-enable @typescript-eslint/no-explicit-any */
 }
 
-describe("Flag decoding", () => {
+describe("Order flags", () => {
   it("encodeTradeFlags is the right inverse of decodeTradeFlags", () => {
     for (const tradeFlags of validFlags()) {
       expect(decodeTradeFlags(encodeTradeFlags(tradeFlags))).to.deep.equal(
@@ -103,5 +116,83 @@ describe("Flag decoding", () => {
         encodedTradeFlags,
       );
     }
+  });
+});
+
+describe("Signer", () => {
+  const domainSeparator = domain(1337, constants.AddressZero);
+
+  let ecdsaSigner: Wallet;
+
+  beforeEach(async () => {
+    [ecdsaSigner] = await waffle.provider.getWallets();
+  });
+
+  const ecdsaSchemes: EcdsaSigningScheme[] = [
+    SigningScheme.EIP712,
+    SigningScheme.ETHSIGN,
+  ];
+  for (const scheme of ecdsaSchemes) {
+    it(`ecdsa ${scheme}`, async () => {
+      const signature = await utils.joinSignature(
+        (await signOrder(domainSeparator, SAMPLE_ORDER, ecdsaSigner, scheme))
+          .data,
+      );
+      expect(
+        decodeSignatureOwner(domainSeparator, SAMPLE_ORDER, scheme, signature),
+      ).to.deep.equal(ecdsaSigner.address);
+    });
+  }
+
+  it("eip-1271", () => {
+    const verifier = utils.getAddress(fillDistinctBytes(20, 1));
+    const signature = encodeEip1271SignatureData({
+      signature: "0x1337",
+      verifier,
+    });
+    expect(
+      decodeSignatureOwner(
+        domainSeparator,
+        SAMPLE_ORDER,
+        SigningScheme.EIP1271,
+        signature,
+      ),
+    ).to.equal(verifier);
+  });
+
+  it("presign", () => {
+    const signer = utils.getAddress(fillDistinctBytes(20, 1));
+    expect(
+      decodeSignatureOwner(
+        domainSeparator,
+        SAMPLE_ORDER,
+        SigningScheme.PRESIGN,
+        signer,
+      ),
+    ).to.equal(signer);
+  });
+});
+
+describe("Trade", async () => {
+  it("sample order", async () => {
+    const domainSeparator = domain(1337, constants.AddressZero);
+    const [ecdsaSigner] = await waffle.provider.getWallets();
+    const encoder = new SettlementEncoder(domainSeparator);
+    const order = {
+      ...SAMPLE_ORDER,
+      partiallyFillable: true,
+      kind: OrderKind.BUY,
+    };
+    encoder.encodeTrade(
+      order,
+      await signOrder(
+        domainSeparator,
+        order,
+        ecdsaSigner,
+        SigningScheme.ETHSIGN,
+      ),
+      { executedAmount: 42 },
+    );
+    expect(decodeOrder(encoder.trades[0], encoder.tokens)).to.deep.equal(order);
   });
 });

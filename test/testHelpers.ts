@@ -7,6 +7,12 @@ export function fillBytes(count: number, byte: number): string {
   return ethers.utils.hexlify([...Array(count)].map(() => byte));
 }
 
+export function fillDistinctBytes(count: number, start: number): string {
+  return ethers.utils.hexlify(
+    [...Array(count)].map((_, i) => (start + i) % 256),
+  );
+}
+
 export function fillUint(bits: number, byte: number): BigNumber {
   return BigNumber.from(fillBytes(bits / 8, byte));
 }
