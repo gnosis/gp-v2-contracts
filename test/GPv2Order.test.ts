@@ -11,16 +11,7 @@ import {
 } from "../src/ts";
 
 import { encodeOrder } from "./encoding";
-
-function fillBytes(count: number, byte: number): string {
-  return ethers.utils.hexlify([...Array(count)].map(() => byte));
-}
-
-function fillDistinctBytes(count: number, start: number): string {
-  return ethers.utils.hexlify(
-    [...Array(count)].map((_, i) => (start + i) % 256),
-  );
-}
+import { fillBytes, fillDistinctBytes } from "./testHelpers";
 
 describe("GPv2Order", () => {
   let orders: Contract;
