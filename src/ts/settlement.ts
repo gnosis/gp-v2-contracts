@@ -12,6 +12,8 @@ import {
   OrderFlags,
   OrderKind,
   normalizeOrder,
+  hashTypedData,
+  ORDER_TYPE_FIELDS,
 } from "./order";
 import {
   EcdsaSigningScheme,
@@ -19,6 +21,7 @@ import {
   SigningScheme,
   encodeEip1271SignatureData,
   signOrder,
+  decodeEip1271SignatureData,
 } from "./sign";
 import { TypedDataDomain } from "./types/ethers";
 
@@ -266,6 +269,40 @@ function encodeSignatureData(sig: Signature): string {
       return encodeEip1271SignatureData(sig.data);
     case SigningScheme.PRESIGN:
       return ethers.utils.getAddress(sig.data);
+    default:
+      throw new Error("unsupported signing scheme");
+  }
+}
+
+export function decodeSignatureOwner(
+  domain: TypedDataDomain,
+  order: Order,
+  scheme: SigningScheme,
+  sig: BytesLike,
+): string {
+  switch (scheme) {
+    case SigningScheme.EIP712:
+      return ethers.utils.verifyTypedData(
+        domain,
+        { Order: ORDER_TYPE_FIELDS },
+        normalizeOrder(order),
+        sig,
+      );
+    case SigningScheme.ETHSIGN:
+      return ethers.utils.verifyMessage(
+        ethers.utils.arrayify(
+          hashTypedData(
+            domain,
+            { Order: ORDER_TYPE_FIELDS },
+            normalizeOrder(order),
+          ),
+        ),
+        sig,
+      );
+    case SigningScheme.EIP1271:
+      return decodeEip1271SignatureData(sig).verifier;
+    case SigningScheme.PRESIGN:
+      return ethers.utils.getAddress(ethers.utils.hexlify(sig));
     default:
       throw new Error("unsupported signing scheme");
   }
@@ -524,4 +561,28 @@ export class SettlementEncoder {
 
     return tokenIndex;
   }
+}
+
+/**
+ * Decodes an order from a settlement trade.
+ *
+ * @param trade The trade to decode into an order.
+ * @param tokens The list of token addresses as they appear in the settlement.
+ * @returns The decoded order.
+ */
+export function decodeOrder(trade: Trade, tokens: string[]): Order {
+  if (Math.max(trade.sellTokenIndex, trade.buyTokenIndex) >= tokens.length) {
+    throw new Error("Invalid trade");
+  }
+  return {
+    sellToken: tokens[trade.sellTokenIndex],
+    buyToken: tokens[trade.buyTokenIndex],
+    receiver: trade.receiver,
+    sellAmount: trade.sellAmount,
+    buyAmount: trade.buyAmount,
+    validTo: trade.validTo,
+    appData: trade.appData,
+    feeAmount: trade.feeAmount,
+    ...decodeOrderFlags(trade.flags),
+  };
 }
