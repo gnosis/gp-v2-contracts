@@ -302,6 +302,9 @@ async function calldataFromUserInput(
     let output = undefined;
     if (process.stdin.isTTY) {
       console.log("Paste in the calldata to decode");
+      // This line mitigates an issue where the terminal truncates pasted input
+      // calldata to 4096 character. It implicitly enables raw mode for stdin
+      // while keeping most terminal features enabled.
       output = process.stdout;
     }
     const rl = readline.createInterface({
