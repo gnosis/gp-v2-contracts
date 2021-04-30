@@ -1,8 +1,10 @@
 import { Contract } from "ethers";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
+import { ContractName } from "../../ts";
+
 export async function getDeployedContract(
-  name: string,
+  name: ContractName,
   { ethers, deployments }: HardhatRuntimeEnvironment,
 ): Promise<Contract> {
   const deployment = await deployments.get(name);
