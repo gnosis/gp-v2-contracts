@@ -1,3 +1,5 @@
+import "@nomiclabs/hardhat-ethers";
+
 import { BigNumber, Contract } from "ethers";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 

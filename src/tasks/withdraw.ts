@@ -8,7 +8,7 @@ import { BigNumber, utils, constants, Contract } from "ethers";
 import { task, types } from "hardhat/config";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
-import { BUY_ETH_ADDRESS, SettlementEncoder } from "../ts";
+import { SettlementEncoder } from "../ts";
 
 import { getDeployedContract } from "./ts/deployment";
 import { TokenDetails, tokenDetails } from "./ts/erc20";
@@ -155,7 +155,6 @@ async function getAllTradedTokens(settlement: Contract): Promise<string[]> {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     trades.map((trade) => [trade.args!.sellToken, trade.args!.buyToken]).flat(),
   );
-  tokens.delete(BUY_ETH_ADDRESS);
   return Array.from(tokens).sort((lhs, rhs) =>
     lhs.toLowerCase() < rhs.toLowerCase() ? -1 : lhs === rhs ? 0 : 1,
   );
@@ -343,16 +342,17 @@ const setupWithdrawTask: () => void = () =>
           process.exit(0);
         }
 
-        const finalSettlement = SettlementEncoder.encodedSetup(
-          ...withdrawals.map(({ token, balance }) => ({
+        const encoder = new SettlementEncoder({});
+        withdrawals.forEach(({ token, balance }) =>
+          encoder.encodeInteraction({
             target: token.address,
             callData: token.contract.interface.encodeFunctionData("transfer", [
               receiver,
               balance,
             ]),
-          })),
+          }),
         );
-
+        const finalSettlement = [[], [], [], encoder.encodedInteractions, "0x"];
         // TODO: use the address of a solver as the from address in dry run so
         // that the price can always be estimated
         const [gas, gasPrice] = await Promise.all([

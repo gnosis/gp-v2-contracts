@@ -7,6 +7,7 @@ import type { HttpNetworkUserConfig } from "hardhat/types";
 import yargs from "yargs";
 
 import { setupSolversTask } from "./src/tasks/solvers";
+import { setupWithdrawTask } from "./src/tasks/withdraw";
 
 const argv = yargs
   .option("network", {
@@ -39,6 +40,7 @@ if (["rinkeby", "mainnet"].includes(argv.network) && INFURA_KEY === undefined) {
 }
 
 setupSolversTask();
+setupWithdrawTask();
 
 export default {
   paths: {
