@@ -4,6 +4,7 @@ import { Contract, ContractFactory, Wallet } from "ethers";
 import { ethers, waffle } from "hardhat";
 
 import {
+  OrderBalance,
   OrderKind,
   SettlementEncoder,
   SigningScheme,
@@ -20,7 +21,7 @@ describe("E2E: Dumb Smart Order", () => {
   let traders: Wallet[];
 
   let settlement: Contract;
-  let allowanceManager: Contract;
+  let vaultRelayer: Contract;
   let domainSeparator: TypedDataDomain;
 
   let tokens: [Contract, Contract];
@@ -33,7 +34,7 @@ describe("E2E: Dumb Smart Order", () => {
     ({
       deployer,
       settlement,
-      allowanceManager,
+      vaultRelayer,
       wallets: [solver, ...traders],
     } = deployment);
 
@@ -58,7 +59,7 @@ describe("E2E: Dumb Smart Order", () => {
     await tokens[0].mint(traders[0].address, ethers.utils.parseEther("1.01"));
     await tokens[0]
       .connect(traders[0])
-      .approve(allowanceManager.address, ethers.constants.MaxUint256);
+      .approve(vaultRelayer.address, ethers.constants.MaxUint256);
     await encoder.signEncodeTrade(
       {
         kind: OrderKind.BUY,
@@ -103,6 +104,8 @@ describe("E2E: Dumb Smart Order", () => {
       feeAmount: ethers.utils.parseEther("0.05"),
       validTo: 0xffffffff,
       appData: await smartOrder.APPDATA(),
+      sellTokenBalance: OrderBalance.ERC20,
+      buyTokenBalance: OrderBalance.ERC20,
     });
 
     await encoder.encodeTrade(smartOrderTrade, {

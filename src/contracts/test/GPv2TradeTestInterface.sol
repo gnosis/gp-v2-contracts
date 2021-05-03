@@ -19,6 +19,8 @@ contract GPv2TradeTestInterface {
         returns (
             bytes32 kind,
             bool partiallyFillable,
+            bytes32 sellTokenBalance,
+            bytes32 buyTokenBalance,
             GPv2Signing.Scheme signingScheme
         )
     {

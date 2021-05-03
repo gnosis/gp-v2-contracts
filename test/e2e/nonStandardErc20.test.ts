@@ -17,7 +17,7 @@ describe("E2E: Non-Standard ERC20 Tokens", () => {
   let traders: Wallet[];
 
   let settlement: Contract;
-  let allowanceManager: Contract;
+  let vaultRelayer: Contract;
   let domainSeparator: TypedDataDomain;
 
   let tokens: [Contract, Contract];
@@ -27,7 +27,7 @@ describe("E2E: Non-Standard ERC20 Tokens", () => {
 
     ({
       settlement,
-      allowanceManager,
+      vaultRelayer,
       wallets: [solver, ...traders],
     } = deployment);
 
@@ -54,7 +54,7 @@ describe("E2E: Non-Standard ERC20 Tokens", () => {
     await tokens[0].mint(traders[0].address, amount.add(feeAmount));
     await tokens[0]
       .connect(traders[0])
-      .approve(allowanceManager.address, ethers.constants.MaxUint256);
+      .approve(vaultRelayer.address, ethers.constants.MaxUint256);
     await encoder.signEncodeTrade(
       {
         kind: OrderKind.SELL,
@@ -74,7 +74,7 @@ describe("E2E: Non-Standard ERC20 Tokens", () => {
     await tokens[1].mint(traders[1].address, amount.add(feeAmount));
     await tokens[1]
       .connect(traders[1])
-      .approve(allowanceManager.address, ethers.constants.MaxUint256);
+      .approve(vaultRelayer.address, ethers.constants.MaxUint256);
     await encoder.signEncodeTrade(
       {
         kind: OrderKind.BUY,

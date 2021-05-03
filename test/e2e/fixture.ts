@@ -1,14 +1,19 @@
 import { Contract, Wallet } from "ethers";
 import { deployments, network, ethers } from "hardhat";
 
+import AuthorizerArtifact from "./balancer/Authorizer.json";
+import VaultArtifact from "./balancer/Vault.json";
+
 export interface TestDeployment {
   deployer: Wallet;
   owner: Wallet;
   manager: Wallet;
   wallets: Wallet[];
+  vaultAuthorizer: Contract;
+  vault: Contract;
   authenticator: Contract;
   settlement: Contract;
-  allowanceManager: Contract;
+  vaultRelayer: Contract;
   gasToken: Contract;
 }
 
@@ -23,35 +28,50 @@ export const deployTestContracts: () => Promise<TestDeployment> = deployments.cr
     const {
       GPv2AllowListAuthentication,
       GPv2Settlement,
+      VaultAuthorizer,
+      Vault,
     } = await deployments.fixture();
 
     const allWallets = waffle.provider.getWallets();
     const { deployer, owner, manager } = await getNamedAccounts();
     const unnamedAccounts = await getUnnamedAccounts();
+    const deployerWallet = findAccountWallet(allWallets, deployer);
 
     const authenticator = await ethers.getContractAt(
       "GPv2AllowListAuthentication",
       GPv2AllowListAuthentication.address,
     );
+    const vaultAuthorizer = new Contract(
+      VaultAuthorizer.address,
+      AuthorizerArtifact.abi,
+      deployerWallet,
+    );
+    const vault = new Contract(
+      Vault.address,
+      VaultArtifact.abi,
+      deployerWallet,
+    );
     const settlement = await ethers.getContractAt(
       "GPv2Settlement",
       GPv2Settlement.address,
     );
-    const allowanceManager = await ethers.getContractAt(
-      "GPv2AllowanceManager",
-      await settlement.allowanceManager(),
+    const vaultRelayer = await ethers.getContractAt(
+      "GPv2VaultRelayer",
+      await settlement.vaultRelayer(),
     );
 
     return {
-      deployer: findAccountWallet(allWallets, deployer),
+      deployer: deployerWallet,
       owner: findAccountWallet(allWallets, owner),
       manager: findAccountWallet(allWallets, manager),
       wallets: unnamedAccounts.map((account) =>
         findAccountWallet(allWallets, account),
       ),
       authenticator,
+      vaultAuthorizer,
+      vault,
       settlement,
-      allowanceManager,
+      vaultRelayer,
       gasToken: await deployGasToken(allWallets[0]),
     };
   },

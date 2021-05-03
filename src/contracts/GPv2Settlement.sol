@@ -2,13 +2,15 @@
 pragma solidity ^0.7.6;
 pragma abicoder v2;
 
-import "./GPv2AllowanceManager.sol";
+import "./GPv2VaultRelayer.sol";
 import "./interfaces/GPv2Authentication.sol";
 import "./interfaces/IERC20.sol";
+import "./interfaces/IVault.sol";
 import "./libraries/GPv2Interaction.sol";
 import "./libraries/GPv2Order.sol";
 import "./libraries/GPv2Trade.sol";
-import "./libraries/GPv2TradeExecution.sol";
+import "./libraries/GPv2Transfer.sol";
+import "./libraries/SafeCast.sol";
 import "./libraries/SafeMath.sol";
 import "./mixins/GPv2Signing.sol";
 import "./mixins/ReentrancyGuard.sol";
@@ -18,7 +20,9 @@ import "./mixins/StorageAccessible.sol";
 /// @author Gnosis Developers
 contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     using GPv2Order for bytes;
-    using GPv2TradeExecution for GPv2TradeExecution.Data;
+    using GPv2Transfer for IVault;
+    using SafeCast for int256;
+    using SafeCast for uint256;
     using SafeMath for uint256;
 
     /// @dev The authenticator is used to determine who can call the settle function.
@@ -27,9 +31,12 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     /// modifier below.
     GPv2Authentication public immutable authenticator;
 
-    /// @dev The allowance manager which has access to order funds. This
-    /// contract is created during deployment
-    GPv2AllowanceManager public immutable allowanceManager;
+    /// @dev The Balancer Vault the protocol uses for managing user funds.
+    IVault public immutable vault;
+
+    /// @dev The Balancer Vault relayer which can interact on behalf of users.
+    /// This contract is created during deployment
+    GPv2VaultRelayer public immutable vaultRelayer;
 
     /// @dev Map each user order by UID to the amount that has been filled so
     /// far. If this amount is larger than or equal to the amount traded in the
@@ -63,9 +70,10 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     /// @dev Event emitted when an order is invalidated.
     event OrderInvalidated(address indexed owner, bytes orderUid);
 
-    constructor(GPv2Authentication authenticator_) {
+    constructor(GPv2Authentication authenticator_, IVault vault_) {
         authenticator = authenticator_;
-        allowanceManager = new GPv2AllowanceManager();
+        vault = vault_;
+        vaultRelayer = new GPv2VaultRelayer(vault_);
     }
 
     // solhint-disable-next-line no-empty-blocks
@@ -118,17 +126,105 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     ) external nonReentrant onlySolver {
         executeInteractions(interactions[0]);
 
-        GPv2TradeExecution.Data[] memory executedTrades =
-            computeTradeExecutions(tokens, clearingPrices, trades);
+        (
+            GPv2Transfer.Data[] memory inTransfers,
+            GPv2Transfer.Data[] memory outTransfers
+        ) = computeTradeExecutions(tokens, clearingPrices, trades);
 
-        allowanceManager.transferIn(executedTrades);
+        vaultRelayer.transferFromAccounts(inTransfers);
 
         executeInteractions(interactions[1]);
 
-        transferOut(executedTrades);
+        vault.transferToAccounts(outTransfers);
 
         executeInteractions(interactions[2]);
 
+        emit Settlement(msg.sender);
+    }
+
+    /// @dev Settle an order directly against Balancer V2 pools.
+    function swap(
+        IVault.SwapRequest[] calldata swaps,
+        IERC20[] calldata tokens,
+        GPv2Trade.Data calldata trade
+    ) external nonReentrant onlySolver {
+        RecoveredOrder memory recoveredOrder = allocateRecoveredOrder();
+        GPv2Order.Data memory order = recoveredOrder.data;
+        recoverOrderFromTrade(recoveredOrder, tokens, trade);
+
+        IVault.SwapKind kind =
+            order.kind == GPv2Order.KIND_SELL
+                ? IVault.SwapKind.GIVEN_IN
+                : IVault.SwapKind.GIVEN_OUT;
+
+        IVault.FundManagement memory funds;
+        funds.sender = recoveredOrder.owner;
+        funds.fromInternalBalance =
+            order.sellTokenBalance == GPv2Order.BALANCE_INTERNAL;
+        funds.recipient = recoveredOrder.receiver;
+        funds.toInternalBalance =
+            order.buyTokenBalance == GPv2Order.BALANCE_INTERNAL;
+
+        int256[] memory limits = new int256[](tokens.length);
+        // NOTE: Array allocation initializes elements to 0, so we only need to
+        // set the limits we care about. This ensures that the swap will respect
+        // the order's limit price.
+        limits[trade.sellTokenIndex] = order.sellAmount.toInt256();
+        limits[trade.buyTokenIndex] = -order.buyAmount.toInt256();
+
+        GPv2Transfer.Data memory feeTransfer;
+        feeTransfer.account = recoveredOrder.owner;
+        feeTransfer.token = order.sellToken;
+        feeTransfer.amount = order.feeAmount;
+        feeTransfer.balance = order.sellTokenBalance;
+
+        int256[] memory tokenDeltas =
+            vaultRelayer.batchSwapWithFee(
+                kind,
+                swaps,
+                tokens,
+                funds,
+                limits,
+                // NOTE: Specify a deadline to ensure that an expire order
+                // cannot be used to trade.
+                order.validTo,
+                feeTransfer
+            );
+
+        bytes memory orderUid = recoveredOrder.uid;
+        uint256 executedSellAmount =
+            tokenDeltas[trade.sellTokenIndex].toUint256();
+        uint256 executedBuyAmount =
+            (-tokenDeltas[trade.buyTokenIndex]).toUint256();
+
+        // NOTE: Check that the orders were completely filled and update their
+        // filled amounts to avoid replaying them. The limit price and order
+        // validity have already been verified when executing the swap through
+        // the `limit` and `deadline` parameters.
+        require(filledAmount[orderUid] == 0, "GPv2: order filled");
+        if (order.kind == GPv2Order.KIND_SELL) {
+            require(
+                executedSellAmount == order.sellAmount,
+                "GPv2: sell amount not respected"
+            );
+            filledAmount[orderUid] = order.sellAmount;
+        } else {
+            require(
+                executedBuyAmount == order.buyAmount,
+                "GPv2: buy amount not respected"
+            );
+            filledAmount[orderUid] = order.buyAmount;
+        }
+
+        emit Trade(
+            recoveredOrder.owner,
+            order.sellToken,
+            order.buyToken,
+            executedSellAmount,
+            executedBuyAmount,
+            order.feeAmount,
+            orderUid
+        );
         emit Settlement(msg.sender);
     }
 
@@ -178,15 +274,24 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     /// @param tokens An array of ERC20 tokens to be traded in the settlement.
     /// @param clearingPrices An array of token clearing prices.
     /// @param trades Trades for signed orders.
-    /// @return executedTrades Array of executed trades.
+    /// @return inTransfers Array of in transfers of executed sell amounts.
+    /// @return outTransfers Array of out transfers of executed buy amounts.
     function computeTradeExecutions(
         IERC20[] calldata tokens,
         uint256[] calldata clearingPrices,
         GPv2Trade.Data[] calldata trades
-    ) internal returns (GPv2TradeExecution.Data[] memory executedTrades) {
+    )
+        internal
+        returns (
+            GPv2Transfer.Data[] memory inTransfers,
+            GPv2Transfer.Data[] memory outTransfers
+        )
+    {
         RecoveredOrder memory recoveredOrder = allocateRecoveredOrder();
 
-        executedTrades = new GPv2TradeExecution.Data[](trades.length);
+        inTransfers = new GPv2Transfer.Data[](trades.length);
+        outTransfers = new GPv2Transfer.Data[](trades.length);
+
         for (uint256 i = 0; i < trades.length; i++) {
             GPv2Trade.Data calldata trade = trades[i];
 
@@ -196,7 +301,8 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
                 clearingPrices[trade.sellTokenIndex],
                 clearingPrices[trade.buyTokenIndex],
                 trade.executedAmount,
-                executedTrades[i]
+                inTransfers[i],
+                outTransfers[i]
             );
         }
     }
@@ -213,24 +319,23 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     /// @param buyPrice The price of the order's buy token.
     /// @param executedAmount The portion of the order to execute. This will be
     /// ignored for fill-or-kill orders.
-    /// @param executedTrade Memory location for computed executed trade data.
+    /// @param inTransfer Memory location for computed executed sell amount
+    /// transfer.
+    /// @param outTransfer Memory location for computed executed buy amount
+    /// transfer.
     function computeTradeExecution(
         RecoveredOrder memory recoveredOrder,
         uint256 sellPrice,
         uint256 buyPrice,
         uint256 executedAmount,
-        GPv2TradeExecution.Data memory executedTrade
+        GPv2Transfer.Data memory inTransfer,
+        GPv2Transfer.Data memory outTransfer
     ) internal {
         GPv2Order.Data memory order = recoveredOrder.data;
         bytes memory orderUid = recoveredOrder.uid;
 
         // solhint-disable-next-line not-rely-on-time
         require(order.validTo >= block.timestamp, "GPv2: order expired");
-
-        executedTrade.owner = recoveredOrder.owner;
-        executedTrade.receiver = recoveredOrder.receiver;
-        executedTrade.sellToken = order.sellToken;
-        executedTrade.buyToken = order.buyToken;
 
         // NOTE: The following computation is derived from the equation:
         // ```
@@ -259,7 +364,7 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         uint256 executedFeeAmount;
         uint256 currentFilledAmount;
 
-        if (order.kind == GPv2Order.SELL) {
+        if (order.kind == GPv2Order.KIND_SELL) {
             if (order.partiallyFillable) {
                 executedSellAmount = executedAmount;
                 executedFeeAmount = order.feeAmount.mul(executedSellAmount).div(
@@ -299,19 +404,28 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
             );
         }
 
-        executedTrade.sellAmount = executedSellAmount.add(executedFeeAmount);
-        executedTrade.buyAmount = executedBuyAmount;
-
+        executedSellAmount = executedSellAmount.add(executedFeeAmount);
         filledAmount[orderUid] = currentFilledAmount;
+
         emit Trade(
-            executedTrade.owner,
-            executedTrade.sellToken,
-            executedTrade.buyToken,
-            executedTrade.sellAmount,
-            executedTrade.buyAmount,
+            recoveredOrder.owner,
+            order.sellToken,
+            order.buyToken,
+            executedSellAmount,
+            executedBuyAmount,
             executedFeeAmount,
             orderUid
         );
+
+        inTransfer.account = recoveredOrder.owner;
+        inTransfer.token = order.sellToken;
+        inTransfer.amount = executedSellAmount;
+        inTransfer.balance = order.sellTokenBalance;
+
+        outTransfer.account = recoveredOrder.receiver;
+        outTransfer.token = order.buyToken;
+        outTransfer.amount = executedBuyAmount;
+        outTransfer.balance = order.buyTokenBalance;
     }
 
     /// @dev Execute a list of arbitrary contract calls from this contract.
@@ -323,9 +437,9 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
             GPv2Interaction.Data calldata interaction = interactions[i];
 
             // To prevent possible attack on user funds, we explicitly disable
-            // any interactions with AllowanceManager contract.
+            // any interactions with the vault relayer contract.
             require(
-                interaction.target != address(allowanceManager),
+                interaction.target != address(vaultRelayer),
                 "GPv2: forbidden interaction"
             );
             GPv2Interaction.execute(interaction);
@@ -335,18 +449,6 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
                 interaction.value,
                 GPv2Interaction.selector(interaction)
             );
-        }
-    }
-
-    /// @dev Transfers all buy amounts for the executed trades from the
-    /// settlement contract to the order owners. This function reverts if any of
-    /// the ERC20 operations fail.
-    ///
-    /// @param trades The executed trades whose buy amounts need to be
-    /// transferred out.
-    function transferOut(GPv2TradeExecution.Data[] memory trades) internal {
-        for (uint256 i = 0; i < trades.length; i++) {
-            trades[i].transferBuyAmountToOwner();
         }
     }
 

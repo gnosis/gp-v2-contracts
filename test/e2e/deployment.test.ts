@@ -28,8 +28,9 @@ describe("E2E: Deployment", () => {
   let user: Wallet;
 
   let authenticator: Contract;
+  let vault: Contract;
   let settlement: Contract;
-  let allowanceManager: Contract;
+  let vaultRelayer: Contract;
 
   beforeEach(async () => {
     ({
@@ -37,13 +38,14 @@ describe("E2E: Deployment", () => {
       manager,
       wallets: [user],
       authenticator,
+      vault,
       settlement,
-      allowanceManager,
+      vaultRelayer,
     } = await deployTestContracts());
 
     authenticator.connect(user);
     settlement.connect(user);
-    allowanceManager.connect(user);
+    vaultRelayer.connect(user);
   });
 
   describe("same built and deployed bytecode metadata", () => {
@@ -65,11 +67,11 @@ describe("E2E: Deployment", () => {
       ).to.be.true;
     });
 
-    it("allowance manager", async () => {
+    it("vaultRelayer", async () => {
       expect(
         await builtAndDeployedMetadataCoincide(
-          allowanceManager.address,
-          "GPv2AllowanceManager",
+          vaultRelayer.address,
+          "GPv2VaultRelayer",
         ),
       ).to.be.true;
     });
@@ -98,7 +100,11 @@ describe("E2E: Deployment", () => {
 
     it("settlement", async () => {
       expect(
-        await contractAddress("GPv2Settlement", authenticator.address),
+        await contractAddress(
+          "GPv2Settlement",
+          authenticator.address,
+          vault.address,
+        ),
       ).to.equal(settlement.address);
     });
   });

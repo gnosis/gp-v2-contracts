@@ -3,6 +3,7 @@ import { Contract, BigNumber } from "ethers";
 import { ethers, waffle } from "hardhat";
 
 import {
+  OrderBalance,
   OrderKind,
   SettlementEncoder,
   SigningScheme,
@@ -10,7 +11,12 @@ import {
   encodeSigningScheme,
 } from "../src/ts";
 
-import { decodeOrderKind, decodeOrder } from "./encoding";
+import {
+  OrderBalanceId,
+  decodeOrderKind,
+  decodeOrderBalance,
+  decodeOrder,
+} from "./encoding";
 
 function fillBytes(count: number, byte: number): string {
   return ethers.utils.hexlify([...Array(count)].map(() => byte));
@@ -61,6 +67,8 @@ describe("GPv2Trade", () => {
         feeAmount: fillUint(256, 0x08),
         kind: OrderKind.BUY,
         partiallyFillable: true,
+        sellTokenBalance: OrderBalance.EXTERNAL,
+        buyTokenBalance: OrderBalance.INTERNAL,
       };
       const tradeExecution = {
         executedAmount: fillUint(256, 0x09),
@@ -114,20 +122,47 @@ describe("GPv2Trade", () => {
 
   describe("extractFlags", () => {
     it("should extract all supported order flags", async () => {
-      for (const flags of [
-        { kind: OrderKind.SELL, partiallyFillable: false },
-        { kind: OrderKind.BUY, partiallyFillable: false },
-        { kind: OrderKind.SELL, partiallyFillable: true },
-        { kind: OrderKind.BUY, partiallyFillable: true },
-      ]) {
+      const flagVariants = [OrderKind.SELL, OrderKind.BUY].flatMap((kind) =>
+        [false, true].flatMap((partiallyFillable) =>
+          [
+            OrderBalance.ERC20,
+            OrderBalance.EXTERNAL,
+            OrderBalance.INTERNAL,
+          ].flatMap((sellTokenBalance) =>
+            [OrderBalance.ERC20, OrderBalance.INTERNAL].map(
+              (buyTokenBalance) => ({
+                kind,
+                partiallyFillable,
+                sellTokenBalance,
+                buyTokenBalance,
+              }),
+            ),
+          ),
+        ),
+      );
+
+      for (const flags of flagVariants) {
         const {
           kind: encodedKind,
           partiallyFillable,
+          sellTokenBalance: encodedSellTokenBalance,
+          buyTokenBalance: encodedBuyTokenBalance,
         } = await tradeLib.extractFlagsTest(encodeOrderFlags(flags));
         expect({
           kind: decodeOrderKind(encodedKind),
           partiallyFillable,
+          sellTokenBalance: decodeOrderBalance(encodedSellTokenBalance),
+          buyTokenBalance: decodeOrderBalance(encodedBuyTokenBalance),
         }).to.deep.equal(flags);
+      }
+    });
+
+    it("should accept 0b00 and 0b01 for ERC20 sell token balance flag", async () => {
+      for (const encodedFlags of [0b00000, 0b00100]) {
+        const { sellTokenBalance } = await tradeLib.extractFlagsTest(
+          encodedFlags,
+        );
+        expect(sellTokenBalance).to.equal(OrderBalanceId.ERC20);
       }
     });
 
@@ -146,7 +181,7 @@ describe("GPv2Trade", () => {
     });
 
     it("should revert when encoding invalid flags", async () => {
-      await expect(tradeLib.extractFlagsTest(0b10000)).to.be.reverted;
+      await expect(tradeLib.extractFlagsTest(0b10000000)).to.be.reverted;
     });
   });
 });

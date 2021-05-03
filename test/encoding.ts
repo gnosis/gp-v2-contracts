@@ -3,6 +3,7 @@ import { ethers } from "hardhat";
 
 import {
   Order,
+  OrderBalance,
   OrderKind,
   normalizeOrder,
   FLAG_MASKS,
@@ -21,6 +22,8 @@ export type AbiOrder = [
   BigNumber,
   string,
   boolean,
+  string,
+  string,
 ];
 
 function optionsForKey<K extends FlagKey>(key: K): FlagOptions<K> {
@@ -54,16 +57,30 @@ export function encodeOrder(order: Order): AbiOrder {
     BigNumber.from(o.feeAmount),
     ethers.utils.id(o.kind),
     o.partiallyFillable,
+    ethers.utils.id(o.sellTokenBalance),
+    ethers.utils.id(o.buyTokenBalance),
   ];
 }
 
-export function decodeOrderKind(kindHash: string): OrderKind {
-  for (const kind of [OrderKind.SELL, OrderKind.BUY]) {
-    if (kindHash == ethers.utils.id(kind)) {
-      return kind;
+function decodeEnum<T>(hash: string, values: T[]): T {
+  for (const value of values) {
+    if (hash == ethers.utils.id(`${value}`)) {
+      return value;
     }
   }
-  throw new Error(`invalid order kind hash '${kindHash}'`);
+  throw new Error(`invalid enum hash '${hash}'`);
+}
+
+export function decodeOrderKind(kindHash: string): OrderKind {
+  return decodeEnum(kindHash, [OrderKind.SELL, OrderKind.BUY]);
+}
+
+export function decodeOrderBalance(balanceHash: string): OrderBalance {
+  return decodeEnum(balanceHash, [
+    OrderBalance.ERC20,
+    OrderBalance.EXTERNAL,
+    OrderBalance.INTERNAL,
+  ]);
 }
 
 export function decodeOrder(order: AbiOrder): Order {
@@ -78,41 +95,13 @@ export function decodeOrder(order: AbiOrder): Order {
     feeAmount: order[7],
     kind: decodeOrderKind(order[8]),
     partiallyFillable: order[9],
+    sellTokenBalance: decodeOrderBalance(order[10]),
+    buyTokenBalance: decodeOrderBalance(order[11]),
   };
 }
 
-export interface ExecutedTrade {
-  owner: string;
-  receiver: string;
-  sellToken: string;
-  buyToken: string;
-  sellAmount: BigNumber;
-  buyAmount: BigNumber;
-}
-
-export type InTransfer = Pick<
-  ExecutedTrade,
-  "owner" | "sellToken" | "sellAmount"
->;
-
-export function encodeInTransfers(transfers: InTransfer[]): ExecutedTrade[] {
-  return transfers.map((transfer) => ({
-    ...transfer,
-    receiver: ethers.constants.AddressZero,
-    buyToken: ethers.constants.AddressZero,
-    buyAmount: ethers.constants.Zero,
-  }));
-}
-
-export type OutTransfer = Pick<
-  ExecutedTrade,
-  "owner" | "receiver" | "buyToken" | "buyAmount"
->;
-
-export function encodeOutTransfers(transfers: OutTransfer[]): ExecutedTrade[] {
-  return transfers.map((transfer) => ({
-    ...transfer,
-    sellToken: ethers.constants.AddressZero,
-    sellAmount: ethers.constants.Zero,
-  }));
-}
+export const OrderBalanceId = {
+  ERC20: ethers.utils.id(OrderBalance.ERC20),
+  EXTERNAL: ethers.utils.id(OrderBalance.EXTERNAL),
+  INTERNAL: ethers.utils.id(OrderBalance.INTERNAL),
+};

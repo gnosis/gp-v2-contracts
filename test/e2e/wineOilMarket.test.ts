@@ -20,7 +20,7 @@ describe("E2E: RetrETH Red Wine and Olive Oil Market", () => {
   let traders: Wallet[];
 
   let settlement: Contract;
-  let allowanceManager: Contract;
+  let vaultRelayer: Contract;
   let domainSeparator: TypedDataDomain;
 
   beforeEach(async () => {
@@ -29,7 +29,7 @@ describe("E2E: RetrETH Red Wine and Olive Oil Market", () => {
     ({
       deployer,
       settlement,
-      allowanceManager,
+      vaultRelayer,
       wallets: [solver, ...traders],
     } = deployment);
 
@@ -79,7 +79,7 @@ describe("E2E: RetrETH Red Wine and Olive Oil Market", () => {
       await sellToken.mint(trader.address, STARTING_BALANCE);
       await sellToken
         .connect(trader)
-        .approve(allowanceManager.address, ethers.constants.MaxUint256);
+        .approve(vaultRelayer.address, ethers.constants.MaxUint256);
 
       await encoder.signEncodeTrade(order, trader, SigningScheme.EIP712, {
         executedAmount,

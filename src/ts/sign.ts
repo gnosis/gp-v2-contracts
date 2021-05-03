@@ -41,21 +41,21 @@ export enum SigningScheme {
    *
    * <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-712.md#definition-of-domainseparator>
    */
-  EIP712,
+  EIP712 = 0b00,
   /**
    * Message signed using eth_sign RPC call.
    */
-  ETHSIGN,
+  ETHSIGN = 0b01,
   /**
    * Smart contract signatures as defined in EIP-1271.
    *
    * <https://eips.ethereum.org/EIPS/eip-1271>
    */
-  EIP1271,
+  EIP1271 = 0b10,
   /**
    * Pre-signed order.
    */
-  PRESIGN,
+  PRESIGN = 0b11,
 }
 
 export type EcdsaSigningScheme = SigningScheme.EIP712 | SigningScheme.ETHSIGN;
