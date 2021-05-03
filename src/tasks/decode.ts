@@ -277,13 +277,14 @@ function displayInteraction(interaction: Interaction, isLast: boolean) {
 
 async function calldataFromUserInput(
   txhash: string,
-  deployment: Deployment | null,
+  deploymentPromise: Promise<Deployment | null>,
   hre: HardhatRuntimeEnvironment,
 ): Promise<string> {
   const { ethers, network } = hre;
   let calldata = null;
   if (txhash !== undefined) {
     const tx = await ethers.provider.getTransaction(txhash.trim());
+    const deployment = await deploymentPromise;
     if (tx === null) {
       throw new Error(`Transaction not found on network ${network.name}`);
     }
@@ -296,11 +297,17 @@ async function calldataFromUserInput(
       console.log(`Target:     ${tx.to}`);
     }
   } else {
+    let output = undefined;
     if (process.stdin.isTTY) {
       console.log("Paste in the calldata to decode");
+      // This line mitigates an issue where the terminal truncates pasted input
+      // calldata to 4096 character. It implicitly enables raw mode for stdin
+      // while keeping most terminal features enabled.
+      output = process.stdout;
     }
     const rl = readline.createInterface({
       input: process.stdin,
+      output,
     });
     for await (const line of rl) {
       const trimmed = line.trim();
@@ -327,11 +334,16 @@ const setupDecodeTask: () => void = () => {
     )
     .setAction(async ({ txhash }, hre) => {
       const { artifacts, ethers, deployments } = hre;
-      const deployment = await deployments
+      const deploymentPromise = deployments
         .get("GPv2Settlement")
         .catch(() => null);
-      const calldata = await calldataFromUserInput(txhash, deployment, hre);
+      const calldata = await calldataFromUserInput(
+        txhash,
+        deploymentPromise,
+        hre,
+      );
       const { chainId } = await ethers.provider.getNetwork();
+      const deployment = await deploymentPromise;
       const domainSeparator =
         deployment === null ? null : domain(chainId, deployment.address);
 
