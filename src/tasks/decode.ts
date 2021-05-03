@@ -4,7 +4,7 @@ import "@nomiclabs/hardhat-ethers";
 import readline from "readline";
 
 import chalk from "chalk";
-import { BigNumber, BigNumberish, Contract, utils, constants } from "ethers";
+import { BigNumber, BigNumberish, utils, constants } from "ethers";
 import { Deployment } from "hardhat-deploy/types";
 import { task } from "hardhat/config";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
@@ -23,16 +23,14 @@ import {
   decodeOrder,
 } from "../ts";
 
+import { TokenDetails, tokenDetails } from "./ts/erc20";
+
 const WIDTH = 120;
 const INVALID_TOKEN = " ! Invalid token ! ";
 const INVALID_OWNER = " ! Invalid owner ! ";
 const NATIVE_TOKEN = " native token ";
 
-interface Token {
-  contract: Contract;
-  symbol: string | null;
-  decimals: number | null;
-  address: string;
+interface Token extends TokenDetails {
   nativeFlag: boolean;
   price: BigNumber | undefined;
   index: number;
@@ -339,9 +337,6 @@ const setupDecodeTask: () => void = () => {
 
       const GPv2Settlement = await artifacts.readArtifact("GPv2Settlement");
       const settlementInterface = new utils.Interface(GPv2Settlement.abi);
-      const IERC20 = await artifacts.readArtifact(
-        "src/contracts/interfaces/IERC20.sol:IERC20",
-      );
 
       const [
         tokenAddresses,
@@ -354,26 +349,12 @@ const setupDecodeTask: () => void = () => {
       ) as EncodedSettlement;
 
       const tokens = await Promise.all(
-        tokenAddresses.map(async (address: string, index: number) => {
-          const contract = new Contract(address, IERC20.abi, ethers.provider);
-          const symbol = await contract
-            .symbol()
-            .then((s: unknown) => (typeof s !== "string" ? null : s))
-            .catch(() => null);
-          const decimals = await contract
-            .decimals()
-            .then((s: unknown) => BigNumber.from(s))
-            .catch(() => null);
-          return {
-            contract,
-            symbol,
-            decimals,
-            address,
-            index,
-            nativeFlag: BUY_ETH_ADDRESS === address,
-            price: clearingPrices[index] as BigNumber | undefined,
-          };
-        }),
+        tokenAddresses.map(async (address: string, index: number) => ({
+          ...(await tokenDetails(address, hre)),
+          index,
+          nativeFlag: BUY_ETH_ADDRESS === address,
+          price: clearingPrices[index] as BigNumber | undefined,
+        })),
       );
 
       displayTokens(tokens);
