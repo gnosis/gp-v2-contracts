@@ -4,7 +4,7 @@ import "@nomiclabs/hardhat-ethers";
 import readline from "readline";
 
 import chalk from "chalk";
-import { BigNumber, BigNumberish, Contract, utils, constants } from "ethers";
+import { BigNumber, BigNumberish, utils, constants } from "ethers";
 import { Deployment } from "hardhat-deploy/types";
 import { task } from "hardhat/config";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
@@ -23,6 +23,7 @@ import {
   decodeOrder,
 } from "../ts";
 
+import { TokenDetails, tokenDetails } from "./ts/erc20";
 import { Align, displayTable } from "./ts/table";
 
 const WIDTH = 120;
@@ -30,11 +31,7 @@ const INVALID_TOKEN = " ! Invalid token ! ";
 const INVALID_OWNER = " ! Invalid owner ! ";
 const NATIVE_TOKEN = " native token ";
 
-interface Token {
-  contract: Contract;
-  symbol: string | null;
-  decimals: number | null;
-  address: string;
+interface Token extends TokenDetails {
   nativeFlag: boolean;
   price: BigNumber | undefined;
   index: number;
@@ -246,13 +243,14 @@ function displayInteraction(interaction: Interaction, isLast: boolean) {
 
 async function calldataFromUserInput(
   txhash: string,
-  deployment: Deployment | null,
+  deploymentPromise: Promise<Deployment | null>,
   hre: HardhatRuntimeEnvironment,
 ): Promise<string> {
   const { ethers, network } = hre;
   let calldata = null;
   if (txhash !== undefined) {
     const tx = await ethers.provider.getTransaction(txhash.trim());
+    const deployment = await deploymentPromise;
     if (tx === null) {
       throw new Error(`Transaction not found on network ${network.name}`);
     }
@@ -265,11 +263,17 @@ async function calldataFromUserInput(
       console.log(`Target:     ${tx.to}`);
     }
   } else {
+    let output = undefined;
     if (process.stdin.isTTY) {
       console.log("Paste in the calldata to decode");
+      // This line mitigates an issue where the terminal truncates pasted input
+      // calldata to 4096 character. It implicitly enables raw mode for stdin
+      // while keeping most terminal features enabled.
+      output = process.stdout;
     }
     const rl = readline.createInterface({
       input: process.stdin,
+      output,
     });
     for await (const line of rl) {
       const trimmed = line.trim();
@@ -296,19 +300,21 @@ const setupDecodeTask: () => void = () => {
     )
     .setAction(async ({ txhash }, hre) => {
       const { artifacts, ethers, deployments } = hre;
-      const deployment = await deployments
+      const deploymentPromise = deployments
         .get("GPv2Settlement")
         .catch(() => null);
-      const calldata = await calldataFromUserInput(txhash, deployment, hre);
+      const calldata = await calldataFromUserInput(
+        txhash,
+        deploymentPromise,
+        hre,
+      );
       const { chainId } = await ethers.provider.getNetwork();
+      const deployment = await deploymentPromise;
       const domainSeparator =
         deployment === null ? null : domain(chainId, deployment.address);
 
       const GPv2Settlement = await artifacts.readArtifact("GPv2Settlement");
       const settlementInterface = new utils.Interface(GPv2Settlement.abi);
-      const IERC20 = await artifacts.readArtifact(
-        "src/contracts/interfaces/IERC20.sol:IERC20",
-      );
 
       const [
         tokenAddresses,
@@ -321,26 +327,12 @@ const setupDecodeTask: () => void = () => {
       ) as EncodedSettlement;
 
       const tokens = await Promise.all(
-        tokenAddresses.map(async (address: string, index: number) => {
-          const contract = new Contract(address, IERC20.abi, ethers.provider);
-          const symbol = await contract
-            .symbol()
-            .then((s: unknown) => (typeof s !== "string" ? null : s))
-            .catch(() => null);
-          const decimals = await contract
-            .decimals()
-            .then((s: unknown) => BigNumber.from(s))
-            .catch(() => null);
-          return {
-            contract,
-            symbol,
-            decimals,
-            address,
-            index,
-            nativeFlag: BUY_ETH_ADDRESS === address,
-            price: clearingPrices[index] as BigNumber | undefined,
-          };
-        }),
+        tokenAddresses.map(async (address: string, index: number) => ({
+          ...(await tokenDetails(address, hre)),
+          index,
+          nativeFlag: BUY_ETH_ADDRESS === address,
+          price: clearingPrices[index] as BigNumber | undefined,
+        })),
       );
 
       displayTokens(tokens);
