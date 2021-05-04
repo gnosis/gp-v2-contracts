@@ -24,6 +24,7 @@ import {
 } from "../ts";
 
 import { TokenDetails, tokenDetails } from "./ts/erc20";
+import { Align, displayTable } from "./ts/table";
 
 const WIDTH = 120;
 const INVALID_TOKEN = " ! Invalid token ! ";
@@ -61,59 +62,24 @@ function formatToken(token: Token): FormatToken {
   };
 }
 
-function cellText(text: string, size: number): string {
-  const inner =
-    text.length > size - 2
-      ? text.slice(0, size - 5) + "..."
-      : text.padStart(size - 2, " ");
-  return " " + inner + " ";
-}
-
 const mainLabel = (s: string) => chalk.bold(chalk.yellow(s + ":"));
 const label = (s: string) => chalk.cyan(s + ":");
 
-function displayTokensColumnWidth(
-  formattedTokens: FormatToken[],
-): Record<keyof FormatToken, number> {
-  const width = {
-    address: 42,
-    index: 5,
-    symbol: 20,
-    price: 40,
-  };
-
-  const maxWidth = (key: keyof typeof width) =>
-    formattedTokens.reduce((max, token) => Math.max(max, token[key].length), 0);
-  for (const key in width) {
-    const typedKey = key as keyof typeof width;
-    // pad with a space left and right (+2)
-    width[typedKey] =
-      Math.max(Math.min(width[typedKey], maxWidth(typedKey)), typedKey.length) +
-      2;
-  }
-  return width;
-}
-
 function displayTokens(tokens: Token[]) {
-  const headers = ["address", "index", "symbol", "price"] as const;
   const formattedTokens = tokens.map(formatToken);
-  const columnWidth = displayTokensColumnWidth(formattedTokens);
+  const order = ["address", "index", "symbol", "price"];
+  const header = {
+    address: "address",
+    index: "index",
+    symbol: "symbol",
+    price: "price",
+  };
   console.log(chalk.bold("=== Tokens ==="));
-  console.log(
-    headers
-      .map((header) => chalk.cyan(cellText(header, columnWidth[header])))
-      .join(chalk.gray("|")),
-  );
-  console.log(
-    chalk.gray(headers.map((key) => "-".repeat(columnWidth[key])).join("+")),
-  );
-  for (const token of formattedTokens) {
-    console.log(
-      headers
-        .map((key) => cellText(token[key], columnWidth[key]))
-        .join(chalk.gray("|")),
-    );
-  }
+  displayTable(header, formattedTokens, order, {
+    index: { align: Align.Right },
+    symbol: { maxWidth: 20 },
+    price: { align: Align.Right },
+  });
   console.log();
 }
 
