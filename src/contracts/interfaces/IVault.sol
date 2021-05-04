@@ -48,7 +48,7 @@ interface IVault {
      */
     struct UserBalanceOp {
         UserBalanceOpKind kind;
-        IAsset asset;
+        IERC20 asset;
         uint256 amount;
         address sender;
         address payable recipient;
@@ -181,8 +181,8 @@ interface IVault {
     struct SingleSwap {
         bytes32 poolId;
         SwapKind kind;
-        IAsset assetIn;
-        IAsset assetOut;
+        IERC20 assetIn;
+        IERC20 assetOut;
         uint256 amount;
         bytes userData;
     }
@@ -219,7 +219,7 @@ interface IVault {
     function batchSwap(
         SwapKind kind,
         BatchSwapStep[] memory swaps,
-        IAsset[] memory assets,
+        IERC20[] memory assets,
         FundManagement memory funds,
         int256[] memory limits,
         uint256 deadline

@@ -22,6 +22,7 @@ import {
   packOrderUidParams,
 } from "../src/ts";
 
+import { SwapKind, UserBalanceOpKind } from "./balancer";
 import {
   builtAndDeployedMetadataCoincide,
   readVaultRelayerImmutables,
@@ -332,20 +333,20 @@ describe("GPv2Settlement", () => {
       };
 
       const encoder = new SwapEncoder(testDomain);
-      encoder.encodeSwapRequest({
+      encoder.encodeSwapStep({
         poolId: fillBytes(32, 0xff),
         tokenIn: fillBytes(20, 1),
         tokenOut: fillBytes(20, 2),
         amount: ethers.utils.parseEther("42.0"),
       });
-      encoder.encodeSwapRequest({
+      encoder.encodeSwapStep({
         poolId: fillBytes(32, 0xfe),
         tokenIn: fillBytes(20, 2),
         tokenOut: fillBytes(20, 3),
         amount: ethers.utils.parseEther("1337.0"),
         userData: "0x010203",
       });
-      encoder.encodeSwapRequest({
+      encoder.encodeSwapStep({
         poolId: fillBytes(32, 0xfd),
         tokenIn: fillBytes(20, 3),
         tokenOut: fillBytes(20, 4),
@@ -353,8 +354,9 @@ describe("GPv2Settlement", () => {
       });
       await encoder.signEncodeTrade(order, traders[0], SigningScheme.EIP712);
 
-      await vault.mock.batchSwapGivenOut
+      await vault.mock.batchSwap
         .withArgs(
+          SwapKind.GIVEN_OUT,
           encoder.swaps.map(({ amount, ...swap }) => ({
             ...swap,
             amountOut: amount,
@@ -370,9 +372,10 @@ describe("GPv2Settlement", () => {
           order.validTo,
         )
         .returns([order.sellAmount.div(2), 0, 0, order.buyAmount.mul(-1)]);
-      await vault.mock.transferInternalBalance
+      await vault.mock.manageUserBalance
         .withArgs([
           {
+            kind: UserBalanceOpKind.TRANSFER_INTERNAL,
             token: order.sellToken,
             amount: order.feeAmount,
             sender: traders[0].address,
@@ -428,8 +431,9 @@ describe("GPv2Settlement", () => {
             SigningScheme.EIP712,
           );
 
-          await vault.mock.batchSwapGivenIn
+          await vault.mock.batchSwap
             .withArgs(
+              SwapKind.GIVEN_IN,
               [],
               encoder.tokens,
               {
@@ -451,9 +455,10 @@ describe("GPv2Settlement", () => {
                 .returns(true);
               break;
             case OrderBalance.EXTERNAL:
-              await vault.mock.transferToExternalBalance
+              await vault.mock.manageUserBalance
                 .withArgs([
                   {
+                    kind: UserBalanceOpKind.TRANSFER_EXTERNAL,
                     token: sellToken.address,
                     amount: feeAmount,
                     sender: traders[0].address,
@@ -463,9 +468,10 @@ describe("GPv2Settlement", () => {
                 .returns();
               break;
             case OrderBalance.INTERNAL:
-              await vault.mock.transferInternalBalance
+              await vault.mock.manageUserBalance
                 .withArgs([
                   {
+                    kind: UserBalanceOpKind.TRANSFER_INTERNAL,
                     token: sellToken.address,
                     amount: feeAmount,
                     sender: traders[0].address,
@@ -489,16 +495,7 @@ describe("GPv2Settlement", () => {
       const sellAmount = ethers.utils.parseEther("4.2");
       const buyAmount = ethers.utils.parseEther("13.37");
 
-      for (const { kind, swapFunction } of [
-        {
-          kind: OrderKind.SELL,
-          swapFunction: "batchSwapGivenIn",
-        },
-        {
-          kind: OrderKind.BUY,
-          swapFunction: "batchSwapGivenOut",
-        },
-      ]) {
+      for (const kind of [OrderKind.SELL, OrderKind.BUY]) {
         const order = {
           kind,
           sellToken: fillBytes(20, 1),
@@ -522,27 +519,23 @@ describe("GPv2Settlement", () => {
             SigningScheme.ETHSIGN,
           );
 
-        it(`executes ${kind} order against swap given in`, async () => {
-          await vault.mock[swapFunction].returns([
-            sellAmount,
-            buyAmount.mul(-1),
-          ]);
-          await vault.mock.transferInternalBalance.returns();
+        it(`executes ${kind} order against swap`, async () => {
+          const [swaps, tokens, trade] = await encodeSwap();
+
+          await vault.mock.batchSwap.returns([sellAmount, buyAmount.mul(-1)]);
+          await vault.mock.manageUserBalance.returns();
 
           await authenticator.connect(owner).addSolver(solver.address);
-          await expect(settlement.connect(solver).swap(...(await encodeSwap())))
-            .to.not.be.reverted;
+          await expect(settlement.connect(solver).swap(swaps, tokens, trade)).to
+            .not.be.reverted;
         });
 
         it(`updates the filled amount to be the full ${kind} amount`, async () => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const filledAmount = (order as any)[`${kind}Amount`];
 
-          await vault.mock[swapFunction].returns([
-            sellAmount,
-            buyAmount.mul(-1),
-          ]);
-          await vault.mock.transferInternalBalance.returns();
+          await vault.mock.batchSwap.returns([sellAmount, buyAmount.mul(-1)]);
+          await vault.mock.manageUserBalance.returns();
 
           await authenticator.connect(owner).addSolver(solver.address);
           await settlement.connect(solver).swap(...(await encodeSwap()));
@@ -553,8 +546,8 @@ describe("GPv2Settlement", () => {
         });
 
         it(`reverts for cancelled ${kind} orders`, async () => {
-          await vault.mock[swapFunction].returns([0, 0]);
-          await vault.mock.transferInternalBalance.returns();
+          await vault.mock.batchSwap.returns([0, 0]);
+          await vault.mock.manageUserBalance.returns();
 
           await settlement.connect(traders[0]).invalidateOrder(orderUid());
           await authenticator.connect(owner).addSolver(solver.address);
@@ -564,8 +557,8 @@ describe("GPv2Settlement", () => {
         });
 
         it(`reverts for partially filled ${kind} orders`, async () => {
-          await vault.mock[swapFunction].returns([0, 0]);
-          await vault.mock.transferInternalBalance.returns();
+          await vault.mock.batchSwap.returns([0, 0]);
+          await vault.mock.manageUserBalance.returns();
 
           await settlement.setFilledAmount(orderUid(), 1);
           await authenticator.connect(owner).addSolver(solver.address);
@@ -575,11 +568,11 @@ describe("GPv2Settlement", () => {
         });
 
         it(`reverts when not exactly trading ${kind} amount`, async () => {
-          await vault.mock[swapFunction].returns([
+          await vault.mock.batchSwap.returns([
             sellAmount.sub(1),
             buyAmount.add(1).mul(-1),
           ]);
-          await vault.mock.transferInternalBalance.returns();
+          await vault.mock.manageUserBalance.returns();
 
           await authenticator.connect(owner).addSolver(solver.address);
           await expect(
@@ -592,11 +585,11 @@ describe("GPv2Settlement", () => {
             kind == OrderKind.SELL
               ? [order.sellAmount, order.buyAmount.mul(2)]
               : [order.sellAmount.div(2), order.buyAmount];
-          await vault.mock[swapFunction].returns([
+          await vault.mock.batchSwap.returns([
             executedSellAmount,
             executedBuyAmount.mul(-1),
           ]);
-          await vault.mock.transferInternalBalance.returns();
+          await vault.mock.manageUserBalance.returns();
 
           await authenticator.connect(owner).addSolver(solver.address);
           await expect(settlement.connect(solver).swap(...(await encodeSwap())))
@@ -615,8 +608,8 @@ describe("GPv2Settlement", () => {
     });
 
     it("should emit a settlement event", async () => {
-      await vault.mock.batchSwapGivenIn.returns([0, 0]);
-      await vault.mock.transferInternalBalance.returns();
+      await vault.mock.batchSwap.returns([0, 0]);
+      await vault.mock.manageUserBalance.returns();
 
       await authenticator.connect(owner).addSolver(solver.address);
       await expect(settlement.connect(solver).swap(...(await emptySwap())))
@@ -625,8 +618,8 @@ describe("GPv2Settlement", () => {
     });
 
     it("reverts on negative sell amounts", async () => {
-      await vault.mock.batchSwapGivenIn.returns([-1, 0]);
-      await vault.mock.transferInternalBalance.returns();
+      await vault.mock.batchSwap.returns([-1, 0]);
+      await vault.mock.manageUserBalance.returns();
 
       await authenticator.connect(owner).addSolver(solver.address);
       await expect(
@@ -635,8 +628,8 @@ describe("GPv2Settlement", () => {
     });
 
     it("reverts on positive buy amounts", async () => {
-      await vault.mock.batchSwapGivenIn.returns([0, 1]);
-      await vault.mock.transferInternalBalance.returns();
+      await vault.mock.batchSwap.returns([0, 1]);
+      await vault.mock.manageUserBalance.returns();
 
       await authenticator.connect(owner).addSolver(solver.address);
       await expect(
@@ -646,8 +639,8 @@ describe("GPv2Settlement", () => {
 
     it("reverts on unary negation overflow for buy amounts", async () => {
       const INT256_MIN = `-0x80${"00".repeat(31)}`;
-      await vault.mock.batchSwapGivenIn.returns([0, INT256_MIN]);
-      await vault.mock.transferInternalBalance.returns();
+      await vault.mock.batchSwap.returns([0, INT256_MIN]);
+      await vault.mock.manageUserBalance.returns();
 
       await authenticator.connect(owner).addSolver(solver.address);
       await expect(

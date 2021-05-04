@@ -12,6 +12,7 @@ import {
   domain,
   grantRequiredRoles,
 } from "../../src/ts";
+import { UserBalanceOpKind } from "../balancer";
 
 import { deployTestContracts } from "./fixture";
 
@@ -98,8 +99,9 @@ describe("E2E: Should allow trading with Vault internal balances", () => {
     await tokens[1]
       .connect(traders[1])
       .approve(vault.address, ethers.constants.MaxUint256);
-    await vault.connect(traders[1]).depositToInternalBalance([
+    await vault.connect(traders[1]).manageUserBalance([
       {
+        kind: UserBalanceOpKind.DEPOSIT_INTERNAL,
         token: tokens[1].address,
         amount: ethers.utils.parseEther("300.3"),
         sender: traders[1].address,
@@ -151,8 +153,9 @@ describe("E2E: Should allow trading with Vault internal balances", () => {
     await tokens[1]
       .connect(traders[3])
       .approve(vault.address, ethers.constants.MaxUint256);
-    await vault.connect(traders[3]).depositToInternalBalance([
+    await vault.connect(traders[3]).manageUserBalance([
       {
+        kind: UserBalanceOpKind.DEPOSIT_INTERNAL,
         token: tokens[1].address,
         amount: ethers.utils.parseEther("1501.5"),
         sender: traders[3].address,

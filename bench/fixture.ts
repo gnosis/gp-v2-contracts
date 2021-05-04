@@ -5,6 +5,7 @@ import Debug from "debug";
 import { Contract, ContractReceipt, Wallet } from "ethers";
 import { ethers, waffle } from "hardhat";
 
+import MockPool from "../balancer/test/MockPool.json";
 import {
   Order,
   OrderBalance,
@@ -17,7 +18,7 @@ import {
   grantRequiredRoles,
   packOrderUidParams,
 } from "../src/ts";
-import MockPool from "../test/e2e/balancer/MockPool.json";
+import { UserBalanceOpKind } from "../test/balancer";
 import { deployTestContracts, TestDeployment } from "../test/e2e/fixture";
 
 const debug = Debug("bench:fixture");
@@ -71,8 +72,9 @@ export class TokenManager {
       await token.mint(trader.address, LOTS.mul(3));
       await token.connect(trader).approve(vaultRelayer.address, LOTS);
       await token.connect(trader).approve(vault.address, LOTS.mul(2));
-      await vault.connect(trader).depositToInternalBalance([
+      await vault.connect(trader).manageUserBalance([
         {
+          kind: UserBalanceOpKind.DEPOSIT_INTERNAL,
           token: token.address,
           amount: LOTS,
           sender: trader.address,
@@ -457,7 +459,7 @@ export class BenchFixture {
         tokens.instances[index],
         tokens.instances[index + 1],
       ];
-      encoder.encodeSwapRequest({
+      encoder.encodeSwapStep({
         poolId,
         tokenIn: tokenIn.address,
         tokenOut: tokenOut.address,

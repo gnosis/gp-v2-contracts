@@ -1,6 +1,5 @@
 import UniswapV2Pair from "@uniswap/v2-core/build/UniswapV2Pair.json";
 import UniswapV2Router from "@uniswap/v2-periphery/build/UniswapV2Router02.json";
-import WETH from "canonical-weth/build/contracts/WETH9.json";
 import Debug from "debug";
 import { Contract, ContractReceipt } from "ethers";
 import { ethers, waffle } from "hardhat";
@@ -27,11 +26,10 @@ export class UniswapFixture {
   public static async create(): Promise<UniswapFixture> {
     const base = await BenchFixture.create();
     const {
-      deployment: { deployer },
+      deployment: { deployer, weth },
       uniswapFactory,
     } = base;
 
-    const weth = await waffle.deployContract(deployer, WETH);
     const uniswapRouter = await waffle.deployContract(
       deployer,
       UniswapV2Router,

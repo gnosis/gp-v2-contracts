@@ -4,6 +4,7 @@ import Debug from "debug";
 import { BigNumberish, Contract, Wallet } from "ethers";
 import { ethers, waffle } from "hardhat";
 
+import MockPool from "../../balancer/test/MockPool.json";
 import {
   OrderBalance,
   OrderKind,
@@ -13,8 +14,8 @@ import {
   domain,
   grantRequiredRoles,
 } from "../../src/ts";
+import { UserBalanceOpKind } from "../balancer";
 
-import MockPool from "./balancer/MockPool.json";
 import { deployTestContracts } from "./fixture";
 
 const LOTS = ethers.utils.parseEther("10000.0");
@@ -142,8 +143,9 @@ describe("E2E: Direct Balancer swap", () => {
       .connect(trader)
       .approve(vault.address, ethers.constants.MaxUint256);
     if (balance == OrderBalance.INTERNAL) {
-      await vault.connect(trader).depositToInternalBalance([
+      await vault.connect(trader).manageUserBalance([
         {
+          kind: UserBalanceOpKind.DEPOSIT_INTERNAL,
           token: token.address,
           amount,
           sender: trader.address,
@@ -218,7 +220,7 @@ describe("E2E: Direct Balancer swap", () => {
           trader,
           SigningScheme.EIP712,
         );
-        encoder.encodeSwapRequest({
+        encoder.encodeSwapStep({
           poolId: await pool.getPoolId(),
           tokenIn: tokens[0].address,
           tokenOut: tokens[1].address,
@@ -282,7 +284,7 @@ describe("E2E: Direct Balancer swap", () => {
         trader,
         SigningScheme.EIP712,
       );
-      encoder.encodeSwapRequest({
+      encoder.encodeSwapStep({
         poolId: await pool.getPoolId(),
         tokenIn: tokens[0].address,
         tokenOut: tokens[1].address,
@@ -323,7 +325,7 @@ describe("E2E: Direct Balancer swap", () => {
         trader,
         SigningScheme.EIP712,
       );
-      encoder.encodeSwapRequest({
+      encoder.encodeSwapStep({
         poolId: await pool.getPoolId(),
         tokenIn: tokens[0].address,
         tokenOut: tokens[1].address,
@@ -390,7 +392,7 @@ describe("E2E: Direct Balancer swap", () => {
     await poolFor(tokens[0], tokens[1]).setMultiplier(
       ethers.utils.parseEther("1.1"),
     );
-    encoder.encodeSwapRequest({
+    encoder.encodeSwapStep({
       poolId: await poolFor(tokens[0], tokens[1]).getPoolId(),
       tokenIn: tokens[0].address,
       tokenOut: tokens[1].address,
@@ -399,7 +401,7 @@ describe("E2E: Direct Balancer swap", () => {
     await poolFor(tokens[1], tokens[2]).setMultiplier(
       ethers.utils.parseEther("1.2"),
     );
-    encoder.encodeSwapRequest({
+    encoder.encodeSwapStep({
       poolId: await poolFor(tokens[1], tokens[2]).getPoolId(),
       tokenIn: tokens[1].address,
       tokenOut: tokens[2].address,
@@ -411,7 +413,7 @@ describe("E2E: Direct Balancer swap", () => {
     await poolFor(tokens[0], tokens[2]).setMultiplier(
       ethers.utils.parseEther("1.3"),
     );
-    encoder.encodeSwapRequest({
+    encoder.encodeSwapStep({
       poolId: await poolFor(tokens[0], tokens[2]).getPoolId(),
       tokenIn: tokens[0].address,
       tokenOut: tokens[2].address,
@@ -450,7 +452,7 @@ describe("E2E: Direct Balancer swap", () => {
     await poolFor(tokens[2], tokens[1]).setMultiplier(
       ethers.utils.parseEther("4.0"),
     );
-    encoder.encodeSwapRequest({
+    encoder.encodeSwapStep({
       poolId: await poolFor(tokens[2], tokens[1]).getPoolId(),
       tokenOut: tokens[2].address,
       tokenIn: tokens[1].address,
@@ -459,7 +461,7 @@ describe("E2E: Direct Balancer swap", () => {
     await poolFor(tokens[1], tokens[0]).setMultiplier(
       ethers.utils.parseEther("2.0"),
     );
-    encoder.encodeSwapRequest({
+    encoder.encodeSwapStep({
       poolId: await poolFor(tokens[1], tokens[0]).getPoolId(),
       tokenOut: tokens[1].address,
       tokenIn: tokens[0].address,

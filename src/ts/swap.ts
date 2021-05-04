@@ -39,7 +39,7 @@ export interface Swap {
  * An encoded Balancer swap request that can be used as input to the settlement
  * contract.
  */
-export interface SwapRequest {
+export interface BatchSwapStep {
   /**
    * The ID of the pool for the swap.
    */
@@ -70,7 +70,7 @@ export interface SwapRequest {
  */
 export type EncodedSwap = [
   /** Swap requests. */
-  SwapRequest[],
+  BatchSwapStep[],
   /** Tokens. */
   string[],
   /** Encoded trade. */
@@ -78,13 +78,13 @@ export type EncodedSwap = [
 ];
 
 /**
- * Encodes a swap as a {@link SwapRequest} to be used with the settlement
+ * Encodes a swap as a {@link BatchSwapStep} to be used with the settlement
  * contract.
  */
-export function encodeSwapRequest(
+export function encodeSwapStep(
   tokens: TokenRegistry,
   swap: Swap,
-): SwapRequest {
+): BatchSwapStep {
   return {
     poolId: swap.poolId,
     tokenInIndex: tokens.index(swap.tokenIn),
@@ -103,7 +103,7 @@ export function encodeSwapRequest(
  */
 export class SwapEncoder {
   private readonly _tokens = new TokenRegistry();
-  private readonly _swaps: SwapRequest[] = [];
+  private readonly _swaps: BatchSwapStep[] = [];
   private _trade: Trade | undefined = undefined;
 
   /**
@@ -126,7 +126,7 @@ export class SwapEncoder {
   /**
    * Gets the encoded swaps.
    */
-  public get swaps(): SwapRequest[] {
+  public get swaps(): BatchSwapStep[] {
     return this._swaps.slice();
   }
 
@@ -146,9 +146,9 @@ export class SwapEncoder {
    *
    * @param swap The Balancer swap to encode.
    */
-  public encodeSwapRequest(...swaps: Swap[]): void {
+  public encodeSwapStep(...swaps: Swap[]): void {
     this._swaps.push(
-      ...swaps.map((swap) => encodeSwapRequest(this._tokens, swap)),
+      ...swaps.map((swap) => encodeSwapStep(this._tokens, swap)),
     );
   }
 
@@ -223,7 +223,7 @@ export class SwapEncoder {
       args.length === 3 ? [{ name: "unused" }, ...args] : args;
 
     const encoder = new SwapEncoder(domain);
-    encoder.encodeSwapRequest(...swaps);
+    encoder.encodeSwapStep(...swaps);
 
     if (signatureOrSigner.length === 1) {
       const [signature] = signatureOrSigner;

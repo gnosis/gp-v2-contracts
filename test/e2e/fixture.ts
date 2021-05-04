@@ -1,14 +1,16 @@
+import WETHArtifact from "canonical-weth/build/contracts/WETH9.json";
 import { Contract, Wallet } from "ethers";
 import { deployments, network, ethers } from "hardhat";
 
-import AuthorizerArtifact from "./balancer/Authorizer.json";
-import VaultArtifact from "./balancer/Vault.json";
+import AuthorizerArtifact from "../../balancer/Authorizer.json";
+import VaultArtifact from "../../balancer/Vault.json";
 
 export interface TestDeployment {
   deployer: Wallet;
   owner: Wallet;
   manager: Wallet;
   wallets: Wallet[];
+  weth: Contract;
   vaultAuthorizer: Contract;
   vault: Contract;
   authenticator: Contract;
@@ -28,8 +30,9 @@ export const deployTestContracts: () => Promise<TestDeployment> = deployments.cr
     const {
       GPv2AllowListAuthentication,
       GPv2Settlement,
-      VaultAuthorizer,
       Vault,
+      VaultAuthorizer,
+      WETH,
     } = await deployments.fixture();
 
     const allWallets = waffle.provider.getWallets();
@@ -37,10 +40,7 @@ export const deployTestContracts: () => Promise<TestDeployment> = deployments.cr
     const unnamedAccounts = await getUnnamedAccounts();
     const deployerWallet = findAccountWallet(allWallets, deployer);
 
-    const authenticator = await ethers.getContractAt(
-      "GPv2AllowListAuthentication",
-      GPv2AllowListAuthentication.address,
-    );
+    const weth = new Contract(WETH.address, WETHArtifact.abi, deployerWallet);
     const vaultAuthorizer = new Contract(
       VaultAuthorizer.address,
       AuthorizerArtifact.abi,
@@ -50,6 +50,10 @@ export const deployTestContracts: () => Promise<TestDeployment> = deployments.cr
       Vault.address,
       VaultArtifact.abi,
       deployerWallet,
+    );
+    const authenticator = await ethers.getContractAt(
+      "GPv2AllowListAuthentication",
+      GPv2AllowListAuthentication.address,
     );
     const settlement = await ethers.getContractAt(
       "GPv2Settlement",
@@ -67,9 +71,10 @@ export const deployTestContracts: () => Promise<TestDeployment> = deployments.cr
       wallets: unnamedAccounts.map((account) =>
         findAccountWallet(allWallets, account),
       ),
-      authenticator,
+      weth,
       vaultAuthorizer,
       vault,
+      authenticator,
       settlement,
       vaultRelayer,
       gasToken: await deployGasToken(allWallets[0]),
