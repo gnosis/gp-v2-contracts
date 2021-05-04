@@ -16,11 +16,11 @@ export interface Swap {
   /**
    * The swap input token address.
    */
-  tokenIn: string;
+  assetIn: string;
   /**
    * The swap output token address.
    */
-  tokenOut: string;
+  assetOut: string;
   /**
    * The amount to swap. This will ether be a fixed input amount when swapping
    * a sell order, or a fixed output amount when swapping a buy order.
@@ -50,11 +50,11 @@ export interface BatchSwapStep {
    * Settlement swap calls encode tokens as an array, this number represents an
    * index into that array.
    */
-  tokenInIndex: number;
+  assetInIndex: number;
   /**
    * The index of the output token.
    */
-  tokenOutIndex: number;
+  assetOutIndex: number;
   /**
    * The amount to swap.
    */
@@ -87,8 +87,8 @@ export function encodeSwapStep(
 ): BatchSwapStep {
   return {
     poolId: swap.poolId,
-    tokenInIndex: tokens.index(swap.tokenIn),
-    tokenOutIndex: tokens.index(swap.tokenOut),
+    assetInIndex: tokens.index(swap.assetIn),
+    assetOutIndex: tokens.index(swap.assetOut),
     amount: swap.amount,
     userData: swap.userData || "0x",
   };

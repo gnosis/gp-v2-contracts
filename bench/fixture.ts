@@ -75,7 +75,7 @@ export class TokenManager {
       await vault.connect(trader).manageUserBalance([
         {
           kind: UserBalanceOpKind.DEPOSIT_INTERNAL,
-          token: token.address,
+          asset: token.address,
           amount: LOTS,
           sender: trader.address,
           recipient: trader.address,
@@ -91,24 +91,28 @@ export class TokenManager {
     await token.connect(pooler).approve(vault.address, LOTS);
     const existingTokens = this.instances.map(({ address }) => address);
     const zeros = this.instances.map(() => 0);
-    await vault.connect(pooler).joinPool(
-      await balancerPool.getPoolId(),
-      pooler.address,
-      pooler.address,
-      [...existingTokens, token.address],
-      [...zeros, LOTS],
-      false,
-      // NOTE: The mock pool uses this for encoding the pool share amounts
-      // that a user (here `pooler`) gets when joining the pool (first value)
-      // as well as the pool fees (second value).
-      ethers.utils.defaultAbiCoder.encode(
-        ["uint256[]", "uint256[]"],
-        [
-          [...zeros, LOTS],
-          [...zeros, 0],
-        ],
-      ),
-    );
+    await vault
+      .connect(pooler)
+      .joinPool(
+        await balancerPool.getPoolId(),
+        pooler.address,
+        pooler.address,
+        {
+          assets: [...existingTokens, token.address],
+          maxAmountsIn: [...zeros, LOTS],
+          // NOTE: The mock pool uses this for encoding the pool share amounts
+          // that a user (here `pooler`) gets when joining the pool (first value)
+          // as well as the pool fees (second value).
+          userData: ethers.utils.defaultAbiCoder.encode(
+            ["uint256[]", "uint256[]"],
+            [
+              [...zeros, LOTS],
+              [...zeros, 0],
+            ],
+          ),
+          fromInternalBalance: false,
+        },
+      );
 
     this.instances.push(token);
     return token;
@@ -170,7 +174,7 @@ export class BenchFixture {
     );
     await vault
       .connect(traders[0])
-      .changeRelayerAllowance(vaultRelayer.address, true);
+      .setRelayerApproval(traders[0].address, vaultRelayer.address, true);
     await authenticator.connect(manager).addSolver(solver.address);
 
     const balancerPool = await waffle.deployContract(deployer, MockPool, [
@@ -455,14 +459,14 @@ export class BenchFixture {
     const poolId = await balancerPool.getPoolId();
     for (let i = 0; i < hops; i++) {
       const index = orderFlags.kind == OrderKind.SELL ? i : hops - 1 - i;
-      const [tokenIn, tokenOut] = [
+      const [assetIn, assetOut] = [
         tokens.instances[index],
         tokens.instances[index + 1],
       ];
       encoder.encodeSwapStep({
         poolId,
-        tokenIn: tokenIn.address,
-        tokenOut: tokenOut.address,
+        assetIn: assetIn.address,
+        assetOut: assetOut.address,
         // NOTE: Use the swap amount for the first swap, and then 0 for the
         // other swaps to indicate a "multi-hop" which uses the computed in/out
         // amount from the previous swap.

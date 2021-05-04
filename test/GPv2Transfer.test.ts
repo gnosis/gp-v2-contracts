@@ -58,7 +58,7 @@ describe("GPv2Transfer", () => {
         .withArgs([
           {
             kind: UserBalanceOpKind.TRANSFER_EXTERNAL,
-            token: token.address,
+            asset: token.address,
             amount,
             sender: traders[0].address,
             recipient: recipient.address,
@@ -84,7 +84,7 @@ describe("GPv2Transfer", () => {
         .withArgs([
           {
             kind: UserBalanceOpKind.TRANSFER_INTERNAL,
-            token: token.address,
+            asset: token.address,
             amount,
             sender: traders[0].address,
             recipient: recipient.address,
@@ -150,7 +150,7 @@ describe("GPv2Transfer", () => {
         .withArgs([
           {
             kind: UserBalanceOpKind.TRANSFER_EXTERNAL,
-            token: token.address,
+            asset: token.address,
             amount,
             sender: traders[0].address,
             recipient: recipient.address,
@@ -177,7 +177,7 @@ describe("GPv2Transfer", () => {
         .withArgs([
           {
             kind: UserBalanceOpKind.TRANSFER_INTERNAL,
-            token: token.address,
+            asset: token.address,
             amount,
             sender: traders[0].address,
             recipient: recipient.address,
@@ -226,7 +226,7 @@ describe("GPv2Transfer", () => {
         .withArgs([
           {
             kind: UserBalanceOpKind.TRANSFER_EXTERNAL,
-            token: token.address,
+            asset: token.address,
             amount,
             sender: traders[0].address,
             recipient: recipient.address,
@@ -254,7 +254,7 @@ describe("GPv2Transfer", () => {
         .withArgs([
           {
             kind: UserBalanceOpKind.WITHDRAW_INTERNAL,
-            token: token.address,
+            asset: token.address,
             amount,
             sender: traders[0].address,
             recipient: recipient.address,
@@ -290,37 +290,33 @@ describe("GPv2Transfer", () => {
             : OrderBalanceId.INTERNAL,
       }));
 
-      const {
-        erc20Transfers,
-        externalTransfers,
-        internalTransfers,
-      } = transfers.reduce((result, transfer) => {
-        let group;
-        switch (transfer.balance) {
-          case OrderBalanceId.ERC20:
-            group = "erc20Transfers";
-            break;
-          case OrderBalanceId.EXTERNAL:
-            group = "externalTransfers";
-            break;
-          case OrderBalanceId.INTERNAL:
-            group = "internalTransfers";
-            break;
-          default:
-            throw new Error(
-              `invalid balance configuration ${transfer.balance}`,
-            );
-        }
-        (result[group] = result[group] || []).push(transfer);
-        return result;
-      }, {} as Record<string, typeof transfers>);
+      const { erc20Transfers, balanceOps } = transfers.reduce(
+        (result, transfer) => {
+          let group;
+          switch (transfer.balance) {
+            case OrderBalanceId.ERC20:
+              group = "erc20Transfers";
+              break;
+            case OrderBalanceId.EXTERNAL:
+            case OrderBalanceId.INTERNAL:
+              group = "balanceOps";
+              break;
+            default:
+              throw new Error(
+                `invalid balance configuration ${transfer.balance}`,
+              );
+          }
+          (result[group] = result[group] || []).push(transfer);
+          return result;
+        },
+        {} as Record<string, typeof transfers>,
+      );
 
       // NOTE: Make sure we have at least 2 of each flavour of transfer, this
       // avoids this test not achieving what it expects because of reasonable
       // changes elsewhere in the file (like only having 3 traders for example).
       expect(erc20Transfers).to.have.length.above(1);
-      expect(externalTransfers).to.have.length.above(1);
-      expect(internalTransfers).to.have.length.above(1);
+      expect(balanceOps).to.have.length.above(1);
 
       for (const { account } of erc20Transfers) {
         await token.mock.transferFrom
@@ -329,20 +325,12 @@ describe("GPv2Transfer", () => {
       }
       await vault.mock.manageUserBalance
         .withArgs(
-          externalTransfers.map(({ account }) => ({
-            kind: UserBalanceOpKind.TRANSFER_EXTERNAL,
-            token: token.address,
-            amount,
-            sender: account,
-            recipient: recipient.address,
-          })),
-        )
-        .returns();
-      await vault.mock.manageUserBalance
-        .withArgs(
-          internalTransfers.map(({ account }) => ({
-            kind: UserBalanceOpKind.WITHDRAW_INTERNAL,
-            token: token.address,
+          balanceOps.map(({ account, balance }) => ({
+            kind:
+              balance === OrderBalanceId.EXTERNAL
+                ? UserBalanceOpKind.TRANSFER_EXTERNAL
+                : UserBalanceOpKind.WITHDRAW_INTERNAL,
+            asset: token.address,
             amount,
             sender: account,
             recipient: recipient.address,
@@ -408,7 +396,7 @@ describe("GPv2Transfer", () => {
         .withArgs([
           {
             kind: UserBalanceOpKind.TRANSFER_EXTERNAL,
-            token: token.address,
+            asset: token.address,
             amount,
             sender: traders[0].address,
             recipient: recipient.address,
@@ -437,7 +425,7 @@ describe("GPv2Transfer", () => {
         .withArgs([
           {
             kind: UserBalanceOpKind.WITHDRAW_INTERNAL,
-            token: token.address,
+            asset: token.address,
             amount,
             sender: traders[0].address,
             recipient: recipient.address,
@@ -484,7 +472,7 @@ describe("GPv2Transfer", () => {
         .withArgs([
           {
             kind: UserBalanceOpKind.DEPOSIT_INTERNAL,
-            token: token.address,
+            asset: token.address,
             amount,
             sender: transfer.address,
             recipient: traders[0].address,
@@ -568,7 +556,7 @@ describe("GPv2Transfer", () => {
         .withArgs(
           internalTransfers.map(({ account }) => ({
             kind: UserBalanceOpKind.DEPOSIT_INTERNAL,
-            token: token.address,
+            asset: token.address,
             amount,
             sender: transfer.address,
             recipient: account,
@@ -621,7 +609,7 @@ describe("GPv2Transfer", () => {
         .withArgs([
           {
             kind: UserBalanceOpKind.DEPOSIT_INTERNAL,
-            token: token.address,
+            asset: token.address,
             amount,
             sender: transfer.address,
             recipient: traders[0].address,

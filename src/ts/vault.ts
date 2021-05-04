@@ -30,7 +30,7 @@ export async function grantRequiredRoles(
   for (const name in VAULT_INTERFACE.functions) {
     await authorizer.grantRole(
       ethers.utils.solidityKeccak256(
-        ["address", "bytes4"],
+        ["uint256", "bytes4"],
         [vaultAddress, VAULT_INTERFACE.getSighash(name)],
       ),
       vaultRelayerAddress,

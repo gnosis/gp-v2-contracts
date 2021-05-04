@@ -53,18 +53,14 @@ describe("GPv2VaultRelayer", () => {
         .withArgs([
           {
             kind: UserBalanceOpKind.TRANSFER_EXTERNAL,
-            token: tokens[1].address,
+            asset: tokens[1].address,
             amount,
             sender: traders[1].address,
             recipient: creator.address,
           },
-        ])
-        .returns();
-      await vault.mock.manageUserBalance
-        .withArgs([
           {
             kind: UserBalanceOpKind.WITHDRAW_INTERNAL,
-            token: tokens[2].address,
+            asset: tokens[2].address,
             amount,
             sender: traders[2].address,
             recipient: creator.address,
@@ -124,7 +120,7 @@ describe("GPv2VaultRelayer", () => {
         .withArgs([
           {
             kind: UserBalanceOpKind.TRANSFER_EXTERNAL,
-            token: token.address,
+            asset: token.address,
             amount,
             sender: traders[0].address,
             recipient: creator.address,
@@ -152,7 +148,7 @@ describe("GPv2VaultRelayer", () => {
         .withArgs([
           {
             kind: UserBalanceOpKind.WITHDRAW_INTERNAL,
-            token: token.address,
+            asset: token.address,
             amount,
             sender: traders[0].address,
             recipient: creator.address,
@@ -232,15 +228,15 @@ describe("GPv2VaultRelayer", () => {
           const swaps = [
             {
               poolId: `0x${"01".repeat(32)}`,
-              tokenInIndex: 0,
-              tokenOutIndex: 1,
+              assetInIndex: 0,
+              assetOutIndex: 1,
               amount: ethers.utils.parseEther("42.0"),
               userData: "0x010203",
             },
             {
               poolId: `0x${"02".repeat(32)}`,
-              tokenInIndex: 1,
-              tokenOutIndex: 2,
+              assetInIndex: 1,
+              assetOutIndex: 2,
               amount: ethers.utils.parseEther("1337.0"),
               userData: "0xabcd",
             },
@@ -272,10 +268,7 @@ describe("GPv2VaultRelayer", () => {
           await vault.mock.batchSwap
             .withArgs(
               kind,
-              swaps.map(({ amount, ...swap }) => ({
-                ...swap,
-                [`amount${name}`]: amount,
-              })),
+              swaps,
               tokens.map(({ address }) => address),
               funds,
               limits,
@@ -369,8 +362,8 @@ describe("GPv2VaultRelayer", () => {
         await vault.mock.manageUserBalance
           .withArgs([
             {
-            kind: UserBalanceOpKind.TRANSFER_EXTERNAL,
-              token: token.address,
+              kind: UserBalanceOpKind.TRANSFER_EXTERNAL,
+              asset: token.address,
               amount,
               sender: traders[0].address,
               recipient: creator.address,
@@ -401,7 +394,7 @@ describe("GPv2VaultRelayer", () => {
           .withArgs([
             {
               kind: UserBalanceOpKind.TRANSFER_INTERNAL,
-              token: token.address,
+              asset: token.address,
               amount,
               sender: traders[0].address,
               recipient: creator.address,
@@ -454,8 +447,8 @@ describe("GPv2VaultRelayer", () => {
         await vault.mock.manageUserBalance
           .withArgs([
             {
-            kind: UserBalanceOpKind.TRANSFER_EXTERNAL,
-              token: token.address,
+              kind: UserBalanceOpKind.TRANSFER_EXTERNAL,
+              asset: token.address,
               amount,
               sender: traders[0].address,
               recipient: creator.address,
@@ -486,7 +479,7 @@ describe("GPv2VaultRelayer", () => {
           .withArgs([
             {
               kind: UserBalanceOpKind.TRANSFER_INTERNAL,
-              token: token.address,
+              asset: token.address,
               amount,
               sender: traders[0].address,
               recipient: creator.address,

@@ -14,7 +14,7 @@ import {
   domain,
   grantRequiredRoles,
 } from "../../src/ts";
-import { UserBalanceOpKind } from "../balancer";
+import { UserBalanceOpKind, BalancerErrors } from "../balancer";
 
 import { deployTestContracts } from "./fixture";
 
@@ -89,24 +89,23 @@ describe("E2E: Direct Balancer swap", () => {
           .connect(pooler)
           .approve(vault.address, ethers.constants.MaxUint256);
       }
-      await vault.connect(pooler).joinPool(
-        await pool.getPoolId(),
-        pooler.address,
-        pooler.address,
-        [tokenA.address, tokenB.address],
-        [LOTS, LOTS],
-        false,
-        // NOTE: The mock pool uses this for encoding the pool share amounts
-        // that a user (here `pooler`) gets when joining the pool (first value)
-        // as well as the pool fees (second value).
-        ethers.utils.defaultAbiCoder.encode(
-          ["uint256[]", "uint256[]"],
-          [
-            [LOTS, LOTS],
-            [0, 0],
-          ],
-        ),
-      );
+      await vault
+        .connect(pooler)
+        .joinPool(await pool.getPoolId(), pooler.address, pooler.address, {
+          assets: [tokenA.address, tokenB.address],
+          maxAmountsIn: [LOTS, LOTS],
+          // NOTE: The mock pool uses this for encoding the pool share amounts
+          // that a user (here `pooler`) gets when joining the pool (first value)
+          // as well as the pool fees (second value).
+          userData: ethers.utils.defaultAbiCoder.encode(
+            ["uint256[]", "uint256[]"],
+            [
+              [LOTS, LOTS],
+              [0, 0],
+            ],
+          ),
+          fromInternalBalance: false,
+        });
 
       pools[`${tokenA.address}-${tokenB.address}`] = pool;
       pools[`${tokenB.address}-${tokenA.address}`] = pool;
@@ -146,7 +145,7 @@ describe("E2E: Direct Balancer swap", () => {
       await vault.connect(trader).manageUserBalance([
         {
           kind: UserBalanceOpKind.DEPOSIT_INTERNAL,
-          token: token.address,
+          asset: token.address,
           amount,
           sender: trader.address,
           recipient: trader.address,
@@ -155,7 +154,7 @@ describe("E2E: Direct Balancer swap", () => {
     }
     await vault
       .connect(trader)
-      .changeRelayerAllowance(vaultRelayer.address, true);
+      .setRelayerApproval(trader.address, vaultRelayer.address, true);
   };
 
   const balanceOf = async (
@@ -222,8 +221,8 @@ describe("E2E: Direct Balancer swap", () => {
         );
         encoder.encodeSwapStep({
           poolId: await pool.getPoolId(),
-          tokenIn: tokens[0].address,
-          tokenOut: tokens[1].address,
+          assetIn: tokens[0].address,
+          assetOut: tokens[1].address,
           amount:
             kind == OrderKind.SELL
               ? ethers.utils.parseEther("100.0")
@@ -286,8 +285,8 @@ describe("E2E: Direct Balancer swap", () => {
       );
       encoder.encodeSwapStep({
         poolId: await pool.getPoolId(),
-        tokenIn: tokens[0].address,
-        tokenOut: tokens[1].address,
+        assetIn: tokens[0].address,
+        assetOut: tokens[1].address,
         // NOTE: Set "better" amouts, where we pay less and get more. These,
         // however, should still cause a revert as they aren't the exact amounts
         // that were requested in the orders.
@@ -327,8 +326,8 @@ describe("E2E: Direct Balancer swap", () => {
       );
       encoder.encodeSwapStep({
         poolId: await pool.getPoolId(),
-        tokenIn: tokens[0].address,
-        tokenOut: tokens[1].address,
+        assetIn: tokens[0].address,
+        assetOut: tokens[1].address,
         amount:
           kind == OrderKind.SELL
             ? ethers.utils.parseEther("100.0")
@@ -337,7 +336,7 @@ describe("E2E: Direct Balancer swap", () => {
 
       await expect(
         settlement.connect(solver).swap(...encoder.encodedSwap()),
-      ).to.be.revertedWith("SWAP_LIMIT");
+      ).to.be.revertedWith(BalancerErrors.SWAP_LIMIT);
     });
   }
 
@@ -365,7 +364,7 @@ describe("E2E: Direct Balancer swap", () => {
 
     await expect(
       settlement.connect(solver).swap(...encoder.encodedSwap()),
-    ).to.be.revertedWith("SWAP_DEADLINE");
+    ).to.be.revertedWith(BalancerErrors.SWAP_DEADLINE);
   });
 
   it("allows using liquidity from multiple pools", async () => {
@@ -394,8 +393,8 @@ describe("E2E: Direct Balancer swap", () => {
     );
     encoder.encodeSwapStep({
       poolId: await poolFor(tokens[0], tokens[1]).getPoolId(),
-      tokenIn: tokens[0].address,
-      tokenOut: tokens[1].address,
+      assetIn: tokens[0].address,
+      assetOut: tokens[1].address,
       amount: ethers.utils.parseEther("70.0"),
     });
     await poolFor(tokens[1], tokens[2]).setMultiplier(
@@ -403,8 +402,8 @@ describe("E2E: Direct Balancer swap", () => {
     );
     encoder.encodeSwapStep({
       poolId: await poolFor(tokens[1], tokens[2]).getPoolId(),
-      tokenIn: tokens[1].address,
-      tokenOut: tokens[2].address,
+      assetIn: tokens[1].address,
+      assetOut: tokens[2].address,
       // NOTE: Setting amount to zero indicates a "multi-hop" swap and uses the
       // computed `amountOut` of the previous swap.
       amount: ethers.constants.Zero,
@@ -415,8 +414,8 @@ describe("E2E: Direct Balancer swap", () => {
     );
     encoder.encodeSwapStep({
       poolId: await poolFor(tokens[0], tokens[2]).getPoolId(),
-      tokenIn: tokens[0].address,
-      tokenOut: tokens[2].address,
+      assetIn: tokens[0].address,
+      assetOut: tokens[2].address,
       amount: ethers.utils.parseEther("30.0"),
     });
 
@@ -454,8 +453,8 @@ describe("E2E: Direct Balancer swap", () => {
     );
     encoder.encodeSwapStep({
       poolId: await poolFor(tokens[2], tokens[1]).getPoolId(),
-      tokenOut: tokens[2].address,
-      tokenIn: tokens[1].address,
+      assetOut: tokens[2].address,
+      assetIn: tokens[1].address,
       amount: ethers.utils.parseEther("100.0"),
     });
     await poolFor(tokens[1], tokens[0]).setMultiplier(
@@ -463,8 +462,8 @@ describe("E2E: Direct Balancer swap", () => {
     );
     encoder.encodeSwapStep({
       poolId: await poolFor(tokens[1], tokens[0]).getPoolId(),
-      tokenOut: tokens[1].address,
-      tokenIn: tokens[0].address,
+      assetOut: tokens[1].address,
+      assetIn: tokens[0].address,
       // NOTE: Setting amount to zero indicates a "multi-hop" swap and uses the
       // computed `amountIn` of the previous swap.
       amount: ethers.constants.Zero,

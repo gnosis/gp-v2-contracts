@@ -335,21 +335,21 @@ describe("GPv2Settlement", () => {
       const encoder = new SwapEncoder(testDomain);
       encoder.encodeSwapStep({
         poolId: fillBytes(32, 0xff),
-        tokenIn: fillBytes(20, 1),
-        tokenOut: fillBytes(20, 2),
+        assetIn: fillBytes(20, 1),
+        assetOut: fillBytes(20, 2),
         amount: ethers.utils.parseEther("42.0"),
       });
       encoder.encodeSwapStep({
         poolId: fillBytes(32, 0xfe),
-        tokenIn: fillBytes(20, 2),
-        tokenOut: fillBytes(20, 3),
+        assetIn: fillBytes(20, 2),
+        assetOut: fillBytes(20, 3),
         amount: ethers.utils.parseEther("1337.0"),
         userData: "0x010203",
       });
       encoder.encodeSwapStep({
         poolId: fillBytes(32, 0xfd),
-        tokenIn: fillBytes(20, 3),
-        tokenOut: fillBytes(20, 4),
+        assetIn: fillBytes(20, 3),
+        assetOut: fillBytes(20, 4),
         amount: ethers.utils.parseEther("6.0"),
       });
       await encoder.signEncodeTrade(order, traders[0], SigningScheme.EIP712);
@@ -357,10 +357,7 @@ describe("GPv2Settlement", () => {
       await vault.mock.batchSwap
         .withArgs(
           SwapKind.GIVEN_OUT,
-          encoder.swaps.map(({ amount, ...swap }) => ({
-            ...swap,
-            amountOut: amount,
-          })),
+          encoder.swaps,
           encoder.tokens,
           {
             sender: traders[0].address,
@@ -376,7 +373,7 @@ describe("GPv2Settlement", () => {
         .withArgs([
           {
             kind: UserBalanceOpKind.TRANSFER_INTERNAL,
-            token: order.sellToken,
+            asset: order.sellToken,
             amount: order.feeAmount,
             sender: traders[0].address,
             recipient: settlement.address,
@@ -459,7 +456,7 @@ describe("GPv2Settlement", () => {
                 .withArgs([
                   {
                     kind: UserBalanceOpKind.TRANSFER_EXTERNAL,
-                    token: sellToken.address,
+                    asset: sellToken.address,
                     amount: feeAmount,
                     sender: traders[0].address,
                     recipient: settlement.address,
@@ -472,7 +469,7 @@ describe("GPv2Settlement", () => {
                 .withArgs([
                   {
                     kind: UserBalanceOpKind.TRANSFER_INTERNAL,
-                    token: sellToken.address,
+                    asset: sellToken.address,
                     amount: feeAmount,
                     sender: traders[0].address,
                     recipient: settlement.address,
