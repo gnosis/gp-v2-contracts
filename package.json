@@ -44,6 +44,7 @@
     "@typescript-eslint/parser": "^4.22.0",
     "@uniswap/v2-core": "^1.0.1",
     "@uniswap/v2-periphery": "^1.1.0-beta.0",
+    "axios": "^0.21.1",
     "canonical-weth": "^1.4.0",
     "chai": "^4.3.4",
     "chalk": "^4.1.1",
