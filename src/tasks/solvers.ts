@@ -1,9 +1,11 @@
 import "hardhat-deploy";
 import "@nomiclabs/hardhat-ethers";
 
-import { Contract, Signer } from "ethers";
+import { Signer } from "ethers";
 import { subtask, task } from "hardhat/config";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
+
+import { getDeployedContract } from "./ts/deployment";
 
 const solversTaskList = ["add", "check", "remove"] as const;
 type SolversTasks = typeof solversTaskList[number];
@@ -24,28 +26,15 @@ async function getOwnerSigner({
   return signer;
 }
 
-async function getAuthenticator({
-  ethers,
-  deployments,
-}: HardhatRuntimeEnvironment): Promise<Contract> {
-  const authenticatorDeployment = await deployments.get(
-    "GPv2AllowListAuthentication",
-  );
-
-  const authenticator = new Contract(
-    authenticatorDeployment.address,
-    authenticatorDeployment.abi,
-  ).connect(ethers.provider);
-
-  return authenticator;
-}
-
 async function addSolver(
   solver: string,
   hardhatRuntime: HardhatRuntimeEnvironment,
 ) {
   const owner = await getOwnerSigner(hardhatRuntime);
-  const authenticator = await getAuthenticator(hardhatRuntime);
+  const authenticator = await getDeployedContract(
+    "GPv2AllowListAuthentication",
+    hardhatRuntime,
+  );
 
   const tx = await authenticator.connect(owner).addSolver(solver);
   await tx.wait();
@@ -57,7 +46,10 @@ const removeSolver = async (
   hardhatRuntime: HardhatRuntimeEnvironment,
 ) => {
   const owner = await getOwnerSigner(hardhatRuntime);
-  const authenticator = await getAuthenticator(hardhatRuntime);
+  const authenticator = await getDeployedContract(
+    "GPv2AllowListAuthentication",
+    hardhatRuntime,
+  );
 
   const tx = await authenticator.connect(owner).removeSolver(solver);
   await tx.wait();
@@ -68,7 +60,10 @@ const isSolver = async (
   solver: string,
   hardhatRuntime: HardhatRuntimeEnvironment,
 ) => {
-  const authenticator = await getAuthenticator(hardhatRuntime);
+  const authenticator = await getDeployedContract(
+    "GPv2AllowListAuthentication",
+    hardhatRuntime,
+  );
 
   console.log(
     `${solver} is ${
@@ -125,7 +120,7 @@ const setupSolversTask: () => void = () => {
 
   subtask(
     "solvers-check",
-    "Checks that an address is registered as a solver in GPv2.",
+    "Checks that an address is registered as a solver of GPv2.",
   ).setAction(async ({ args }, hardhatRuntime) => {
     if (!args || args.length !== 1) {
       throw new Error(
