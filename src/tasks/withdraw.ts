@@ -35,9 +35,10 @@ interface DisplayWithdrawal {
 }
 
 interface PricedToken extends TokenDetails {
-  // The number of wei needed to form a unit of this token (10**decimals)
-  oneInWei: BigNumber;
-  // Amount of DAI wei equivalent to one unit of this token
+  // Overrides existing field in TokenDetails. The number of decimals must be
+  // known to estimate the price
+  decimals: number;
+  // Amount of DAI wei equivalent to one unit of this token (10**decimals)
   usdValue: BigNumber;
 }
 
@@ -163,9 +164,13 @@ async function appraise(
   token: TokenDetails,
   network: string,
 ): Promise<PricedToken> {
-  const oneInWei = BigNumber.from(10).pow(token.decimals ?? DAI_DECIMALS);
-  const usdValue = await oneinchUsdValue(token, oneInWei, network);
-  return { ...token, oneInWei, usdValue };
+  const decimals = token.decimals ?? DAI_DECIMALS;
+  const usdValue = await oneinchUsdValue(
+    token,
+    BigNumber.from(10).pow(decimals),
+    network,
+  );
+  return { ...token, usdValue, decimals };
 }
 
 async function getAllTradedTokens(settlement: Contract): Promise<string[]> {
@@ -212,14 +217,14 @@ async function getWithdrawals(
     const pricedToken = await appraise(token, hre.network.name);
     const balanceUsd = pricedToken.usdValue
       .mul(balance)
-      .div(pricedToken.oneInWei);
+      .div(BigNumber.from(10).pow(pricedToken.decimals));
     clearLine();
     if (
       balanceUsd.lt(minValueWei.add(leftoverWei)) ||
       (balanceUsd.isZero() && !(minValueWei.isZero() && leftoverWei.isZero()))
     ) {
       console.warn(
-        `Ignored ${utils.formatUnits(balance, token.decimals ?? 0)} units of ${
+        `Ignored ${utils.formatUnits(balance, pricedToken.decimals)} units of ${
           token.symbol ?? "unknown token"
         } (${token.address}) with value ${formatUsdValue(balanceUsd)} USD`,
       );
@@ -270,12 +275,15 @@ function formatUsdValue(amount: BigNumber): string {
 }
 
 function formatWithdrawal(withdrawal: Withdrawal): DisplayWithdrawal {
-  const tokenDecimals = withdrawal.token.decimals ?? DAI_DECIMALS;
   return {
     address: withdrawal.token.address,
     value: formatUsdValue(withdrawal.balanceUsd),
-    balance: formatTokenValue(withdrawal.balance, tokenDecimals, 18),
-    amount: formatTokenValue(withdrawal.amount, tokenDecimals, 18),
+    balance: formatTokenValue(
+      withdrawal.balance,
+      withdrawal.token.decimals,
+      18,
+    ),
+    amount: formatTokenValue(withdrawal.amount, withdrawal.token.decimals, 18),
     symbol: withdrawal.token.symbol ?? "unknown token",
   };
 }
