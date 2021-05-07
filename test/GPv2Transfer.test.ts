@@ -6,6 +6,7 @@ import { artifacts, ethers, waffle } from "hardhat";
 
 import { BUY_ETH_ADDRESS } from "../src/ts";
 
+import { UserBalanceOpKind } from "./balancer";
 import { OrderBalanceId } from "./encoding";
 
 describe("GPv2Transfer", () => {
@@ -53,10 +54,11 @@ describe("GPv2Transfer", () => {
     });
 
     it("should transfer external amount to recipient", async () => {
-      await vault.mock.transferToExternalBalance
+      await vault.mock.manageUserBalance
         .withArgs([
           {
-            token: token.address,
+            kind: UserBalanceOpKind.TRANSFER_EXTERNAL,
+            asset: token.address,
             amount,
             sender: traders[0].address,
             recipient: recipient.address,
@@ -78,10 +80,11 @@ describe("GPv2Transfer", () => {
     });
 
     it("should transfer internal amount to recipient", async () => {
-      await vault.mock.transferInternalBalance
+      await vault.mock.manageUserBalance
         .withArgs([
           {
-            token: token.address,
+            kind: UserBalanceOpKind.TRANSFER_INTERNAL,
+            asset: token.address,
             amount,
             sender: traders[0].address,
             recipient: recipient.address,
@@ -143,10 +146,11 @@ describe("GPv2Transfer", () => {
     });
 
     it("should revert on failed Vault external transfer", async () => {
-      await vault.mock.transferToExternalBalance
+      await vault.mock.manageUserBalance
         .withArgs([
           {
-            token: token.address,
+            kind: UserBalanceOpKind.TRANSFER_EXTERNAL,
+            asset: token.address,
             amount,
             sender: traders[0].address,
             recipient: recipient.address,
@@ -169,10 +173,11 @@ describe("GPv2Transfer", () => {
     });
 
     it("should revert on failed Vault internal transfer", async () => {
-      await vault.mock.transferInternalBalance
+      await vault.mock.manageUserBalance
         .withArgs([
           {
-            token: token.address,
+            kind: UserBalanceOpKind.TRANSFER_INTERNAL,
+            asset: token.address,
             amount,
             sender: traders[0].address,
             recipient: recipient.address,
@@ -217,10 +222,11 @@ describe("GPv2Transfer", () => {
     });
 
     it("should transfer external amount to recipient", async () => {
-      await vault.mock.transferToExternalBalance
+      await vault.mock.manageUserBalance
         .withArgs([
           {
-            token: token.address,
+            kind: UserBalanceOpKind.TRANSFER_EXTERNAL,
+            asset: token.address,
             amount,
             sender: traders[0].address,
             recipient: recipient.address,
@@ -244,10 +250,11 @@ describe("GPv2Transfer", () => {
     });
 
     it("should transfer internal amount to recipient", async () => {
-      await vault.mock.withdrawFromInternalBalance
+      await vault.mock.manageUserBalance
         .withArgs([
           {
-            token: token.address,
+            kind: UserBalanceOpKind.WITHDRAW_INTERNAL,
+            asset: token.address,
             amount,
             sender: traders[0].address,
             recipient: recipient.address,
@@ -283,57 +290,47 @@ describe("GPv2Transfer", () => {
             : OrderBalanceId.INTERNAL,
       }));
 
-      const {
-        erc20Transfers,
-        externalTransfers,
-        internalTransfers,
-      } = transfers.reduce((result, transfer) => {
-        let group;
-        switch (transfer.balance) {
-          case OrderBalanceId.ERC20:
-            group = "erc20Transfers";
-            break;
-          case OrderBalanceId.EXTERNAL:
-            group = "externalTransfers";
-            break;
-          case OrderBalanceId.INTERNAL:
-            group = "internalTransfers";
-            break;
-          default:
-            throw new Error(
-              `invalid balance configuration ${transfer.balance}`,
-            );
-        }
-        (result[group] = result[group] || []).push(transfer);
-        return result;
-      }, {} as Record<string, typeof transfers>);
+      const { erc20Transfers, balanceOps } = transfers.reduce(
+        (result, transfer) => {
+          let group;
+          switch (transfer.balance) {
+            case OrderBalanceId.ERC20:
+              group = "erc20Transfers";
+              break;
+            case OrderBalanceId.EXTERNAL:
+            case OrderBalanceId.INTERNAL:
+              group = "balanceOps";
+              break;
+            default:
+              throw new Error(
+                `invalid balance configuration ${transfer.balance}`,
+              );
+          }
+          (result[group] = result[group] || []).push(transfer);
+          return result;
+        },
+        {} as Record<string, typeof transfers>,
+      );
 
       // NOTE: Make sure we have at least 2 of each flavour of transfer, this
       // avoids this test not achieving what it expects because of reasonable
       // changes elsewhere in the file (like only having 3 traders for example).
       expect(erc20Transfers).to.have.length.above(1);
-      expect(externalTransfers).to.have.length.above(1);
-      expect(internalTransfers).to.have.length.above(1);
+      expect(balanceOps).to.have.length.above(1);
 
       for (const { account } of erc20Transfers) {
         await token.mock.transferFrom
           .withArgs(account, recipient.address, amount)
           .returns(true);
       }
-      await vault.mock.transferToExternalBalance
+      await vault.mock.manageUserBalance
         .withArgs(
-          externalTransfers.map(({ account }) => ({
-            token: token.address,
-            amount,
-            sender: account,
-            recipient: recipient.address,
-          })),
-        )
-        .returns();
-      await vault.mock.withdrawFromInternalBalance
-        .withArgs(
-          internalTransfers.map(({ account }) => ({
-            token: token.address,
+          balanceOps.map(({ account, balance }) => ({
+            kind:
+              balance === OrderBalanceId.EXTERNAL
+                ? UserBalanceOpKind.TRANSFER_EXTERNAL
+                : UserBalanceOpKind.WITHDRAW_INTERNAL,
+            asset: token.address,
             amount,
             sender: account,
             recipient: recipient.address,
@@ -395,10 +392,11 @@ describe("GPv2Transfer", () => {
     });
 
     it("should revert on failed Vault transfer", async () => {
-      await vault.mock.transferToExternalBalance
+      await vault.mock.manageUserBalance
         .withArgs([
           {
-            token: token.address,
+            kind: UserBalanceOpKind.TRANSFER_EXTERNAL,
+            asset: token.address,
             amount,
             sender: traders[0].address,
             recipient: recipient.address,
@@ -423,10 +421,11 @@ describe("GPv2Transfer", () => {
     });
 
     it("should revert on failed Vault withdrawal", async () => {
-      await vault.mock.withdrawFromInternalBalance
+      await vault.mock.manageUserBalance
         .withArgs([
           {
-            token: token.address,
+            kind: UserBalanceOpKind.WITHDRAW_INTERNAL,
+            asset: token.address,
             amount,
             sender: traders[0].address,
             recipient: recipient.address,
@@ -469,10 +468,11 @@ describe("GPv2Transfer", () => {
     });
 
     it("should transfer internal amount to account", async () => {
-      await vault.mock.depositToInternalBalance
+      await vault.mock.manageUserBalance
         .withArgs([
           {
-            token: token.address,
+            kind: UserBalanceOpKind.DEPOSIT_INTERNAL,
+            asset: token.address,
             amount,
             sender: transfer.address,
             recipient: traders[0].address,
@@ -552,10 +552,11 @@ describe("GPv2Transfer", () => {
       for (const { account } of externalTransfers) {
         await token.mock.transfer.withArgs(account, amount).returns(true);
       }
-      await vault.mock.depositToInternalBalance
+      await vault.mock.manageUserBalance
         .withArgs(
           internalTransfers.map(({ account }) => ({
-            token: token.address,
+            kind: UserBalanceOpKind.DEPOSIT_INTERNAL,
+            asset: token.address,
             amount,
             sender: transfer.address,
             recipient: account,
@@ -604,10 +605,11 @@ describe("GPv2Transfer", () => {
     });
 
     it("should revert on failed Vault deposit", async () => {
-      await vault.mock.depositToInternalBalance
+      await vault.mock.manageUserBalance
         .withArgs([
           {
-            token: token.address,
+            kind: UserBalanceOpKind.DEPOSIT_INTERNAL,
+            asset: token.address,
             amount,
             sender: transfer.address,
             recipient: traders[0].address,

@@ -4,12 +4,10 @@ import { MockContract } from "ethereum-waffle";
 import { BigNumberish, Contract } from "ethers";
 import { artifacts, ethers, waffle } from "hardhat";
 
-import { SwapRequest } from "../src/ts";
+import { BatchSwapStep } from "../src/ts";
 
+import { SwapKind, UserBalanceOpKind } from "./balancer";
 import { OrderBalanceId } from "./encoding";
-
-const GIVEN_IN = 0;
-const GIVEN_OUT = 1;
 
 describe("GPv2VaultRelayer", () => {
   const [
@@ -51,20 +49,18 @@ describe("GPv2VaultRelayer", () => {
       await tokens[0].mock.transferFrom
         .withArgs(traders[0].address, creator.address, amount)
         .returns(true);
-      await vault.mock.transferToExternalBalance
+      await vault.mock.manageUserBalance
         .withArgs([
           {
-            token: tokens[1].address,
+            kind: UserBalanceOpKind.TRANSFER_EXTERNAL,
+            asset: tokens[1].address,
             amount,
             sender: traders[1].address,
             recipient: creator.address,
           },
-        ])
-        .returns();
-      await vault.mock.withdrawFromInternalBalance
-        .withArgs([
           {
-            token: tokens[2].address,
+            kind: UserBalanceOpKind.WITHDRAW_INTERNAL,
+            asset: tokens[2].address,
             amount,
             sender: traders[2].address,
             recipient: creator.address,
@@ -120,10 +116,11 @@ describe("GPv2VaultRelayer", () => {
       const token = await waffle.deployMockContract(deployer, IERC20.abi);
 
       const amount = ethers.utils.parseEther("4.2");
-      await vault.mock.transferToExternalBalance
+      await vault.mock.manageUserBalance
         .withArgs([
           {
-            token: token.address,
+            kind: UserBalanceOpKind.TRANSFER_EXTERNAL,
+            asset: token.address,
             amount,
             sender: traders[0].address,
             recipient: creator.address,
@@ -147,10 +144,11 @@ describe("GPv2VaultRelayer", () => {
       const token = await waffle.deployMockContract(deployer, IERC20.abi);
 
       const amount = ethers.utils.parseEther("4.2");
-      await vault.mock.withdrawFromInternalBalance
+      await vault.mock.manageUserBalance
         .withArgs([
           {
-            token: token.address,
+            kind: UserBalanceOpKind.WITHDRAW_INTERNAL,
+            asset: token.address,
             amount,
             sender: traders[0].address,
             recipient: creator.address,
@@ -173,8 +171,8 @@ describe("GPv2VaultRelayer", () => {
 
   describe("batchSwapWithFee", () => {
     interface BatchSwapWithFee {
-      kind: typeof GIVEN_IN | typeof GIVEN_OUT;
-      swaps: SwapRequest[];
+      kind: SwapKind;
+      swaps: BatchSwapStep[];
       tokens: string[];
       funds: {
         sender: string;
@@ -194,7 +192,7 @@ describe("GPv2VaultRelayer", () => {
 
     const encodeSwapParams = (p: Partial<BatchSwapWithFee>) => {
       return [
-        p.kind ?? GIVEN_IN,
+        p.kind ?? SwapKind.GIVEN_IN,
         p.swaps ?? [],
         p.tokens ?? [],
         p.funds ?? {
@@ -222,23 +220,23 @@ describe("GPv2VaultRelayer", () => {
     });
 
     for (const [name, kind] of Object.entries({
-      In: GIVEN_IN,
-      Out: GIVEN_OUT,
+      In: SwapKind.GIVEN_IN,
+      Out: SwapKind.GIVEN_OUT,
     } as const)) {
       describe(`Swap Given ${name}`, () => {
         it(`performs swaps given ${name.toLowerCase()}`, async () => {
           const swaps = [
             {
               poolId: `0x${"01".repeat(32)}`,
-              tokenInIndex: 0,
-              tokenOutIndex: 1,
+              assetInIndex: 0,
+              assetOutIndex: 1,
               amount: ethers.utils.parseEther("42.0"),
               userData: "0x010203",
             },
             {
               poolId: `0x${"02".repeat(32)}`,
-              tokenInIndex: 1,
-              tokenOutIndex: 2,
+              assetInIndex: 1,
+              assetOutIndex: 2,
               amount: ethers.utils.parseEther("1337.0"),
               userData: "0xabcd",
             },
@@ -267,12 +265,10 @@ describe("GPv2VaultRelayer", () => {
             balance: OrderBalanceId.ERC20,
           };
 
-          await vault.mock[`batchSwapGiven${name}`]
+          await vault.mock.batchSwap
             .withArgs(
-              swaps.map(({ amount, ...swap }) => ({
-                ...swap,
-                [`amount${name}`]: amount,
-              })),
+              kind,
+              swaps,
               tokens.map(({ address }) => address),
               funds,
               limits,
@@ -293,53 +289,53 @@ describe("GPv2VaultRelayer", () => {
             ),
           ).to.not.be.reverted;
         });
-
-        it("returns the Vault swap token deltas", async () => {
-          const deltas = [
-            ethers.utils.parseEther("42.0"),
-            ethers.constants.Zero,
-            ethers.utils.parseEther("1337.0").mul(-1),
-          ];
-
-          const token = await waffle.deployMockContract(deployer, IERC20.abi);
-          const feeTransfer = {
-            account: traders[0].address,
-            token: token.address,
-            amount: ethers.utils.parseEther("1.0"),
-            balance: OrderBalanceId.ERC20,
-          };
-
-          await vault.mock[`batchSwapGiven${name}`].returns(deltas);
-          await token.mock.transferFrom.returns(true);
-
-          expect(
-            await vaultRelayer.callStatic.batchSwapWithFee(
-              ...encodeSwapParams({
-                kind,
-                feeTransfer,
-              }),
-            ),
-          ).to.deep.equal(deltas);
-        });
-
-        it("reverts on failed Vault swap", async () => {
-          await vault.mock[`batchSwapGiven${name}`].revertsWithReason(
-            "test error",
-          );
-
-          await expect(
-            vaultRelayer.batchSwapWithFee(...encodeSwapParams({ kind })),
-          ).to.be.revertedWith("test error");
-        });
       });
     }
+
+    it("returns the Vault swap token deltas", async () => {
+      const deltas = [
+        ethers.utils.parseEther("42.0"),
+        ethers.constants.Zero,
+        ethers.utils.parseEther("1337.0").mul(-1),
+      ];
+
+      const token = await waffle.deployMockContract(deployer, IERC20.abi);
+      const feeTransfer = {
+        account: traders[0].address,
+        token: token.address,
+        amount: ethers.utils.parseEther("1.0"),
+        balance: OrderBalanceId.ERC20,
+      };
+
+      await vault.mock.batchSwap.returns(deltas);
+      await token.mock.transferFrom.returns(true);
+
+      expect(
+        await vaultRelayer.callStatic.batchSwapWithFee(
+          ...encodeSwapParams({
+            kind: SwapKind.GIVEN_IN,
+            feeTransfer,
+          }),
+        ),
+      ).to.deep.equal(deltas);
+    });
+
+    it("reverts on failed Vault swap", async () => {
+      await vault.mock.batchSwap.revertsWithReason("test error");
+
+      await expect(
+        vaultRelayer.batchSwapWithFee(
+          ...encodeSwapParams({ kind: SwapKind.GIVEN_OUT }),
+        ),
+      ).to.be.revertedWith("test error");
+    });
 
     describe("Fee Transfer", () => {
       it("should perform ERC20 transfer when not using direct ERC20 balance", async () => {
         const token = await waffle.deployMockContract(deployer, IERC20.abi);
         const amount = ethers.utils.parseEther("4.2");
 
-        await vault.mock.batchSwapGivenIn.returns([]);
+        await vault.mock.batchSwap.returns([]);
         await token.mock.transferFrom
           .withArgs(traders[0].address, creator.address, amount)
           .returns(true);
@@ -362,11 +358,12 @@ describe("GPv2VaultRelayer", () => {
         const token = await waffle.deployMockContract(deployer, IERC20.abi);
         const amount = ethers.utils.parseEther("4.2");
 
-        await vault.mock.batchSwapGivenIn.returns([]);
-        await vault.mock.transferToExternalBalance
+        await vault.mock.batchSwap.returns([]);
+        await vault.mock.manageUserBalance
           .withArgs([
             {
-              token: token.address,
+              kind: UserBalanceOpKind.TRANSFER_EXTERNAL,
+              asset: token.address,
               amount,
               sender: traders[0].address,
               recipient: creator.address,
@@ -392,11 +389,12 @@ describe("GPv2VaultRelayer", () => {
         const token = await waffle.deployMockContract(deployer, IERC20.abi);
         const amount = ethers.utils.parseEther("4.2");
 
-        await vault.mock.batchSwapGivenIn.returns([]);
-        await vault.mock.transferInternalBalance
+        await vault.mock.batchSwap.returns([]);
+        await vault.mock.manageUserBalance
           .withArgs([
             {
-              token: token.address,
+              kind: UserBalanceOpKind.TRANSFER_INTERNAL,
+              asset: token.address,
               amount,
               sender: traders[0].address,
               recipient: creator.address,
@@ -422,7 +420,7 @@ describe("GPv2VaultRelayer", () => {
         const token = await waffle.deployMockContract(deployer, IERC20.abi);
         const amount = ethers.utils.parseEther("4.2");
 
-        await vault.mock.batchSwapGivenIn.returns([]);
+        await vault.mock.batchSwap.returns([]);
         await token.mock.transferFrom
           .withArgs(traders[0].address, creator.address, amount)
           .revertsWithReason("test error");
@@ -445,11 +443,12 @@ describe("GPv2VaultRelayer", () => {
         const token = await waffle.deployMockContract(deployer, IERC20.abi);
         const amount = ethers.utils.parseEther("4.2");
 
-        await vault.mock.batchSwapGivenIn.returns([]);
-        await vault.mock.transferToExternalBalance
+        await vault.mock.batchSwap.returns([]);
+        await vault.mock.manageUserBalance
           .withArgs([
             {
-              token: token.address,
+              kind: UserBalanceOpKind.TRANSFER_EXTERNAL,
+              asset: token.address,
               amount,
               sender: traders[0].address,
               recipient: creator.address,
@@ -475,11 +474,12 @@ describe("GPv2VaultRelayer", () => {
         const token = await waffle.deployMockContract(deployer, IERC20.abi);
         const amount = ethers.utils.parseEther("4.2");
 
-        await vault.mock.batchSwapGivenIn.returns([]);
-        await vault.mock.transferInternalBalance
+        await vault.mock.batchSwap.returns([]);
+        await vault.mock.manageUserBalance
           .withArgs([
             {
-              token: token.address,
+              kind: UserBalanceOpKind.TRANSFER_INTERNAL,
+              asset: token.address,
               amount,
               sender: traders[0].address,
               recipient: creator.address,

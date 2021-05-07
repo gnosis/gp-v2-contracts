@@ -1,8 +1,9 @@
+import WETH from "canonical-weth/build/contracts/WETH9.json";
 import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
-import Authorizer from "../../test/e2e/balancer/Authorizer.json";
-import Vault from "../../test/e2e/balancer/Vault.json";
+import Authorizer from "../../balancer/Authorizer.json";
+import Vault from "../../balancer/Vault.json";
 import { CONTRACT_NAMES, SALT } from "../ts/deploy";
 
 const deploySettlement: DeployFunction = async function ({
@@ -25,11 +26,16 @@ const deploySettlement: DeployFunction = async function ({
       gasLimit: 3e6,
       args: [manager],
     });
+    const { address: wethAddress } = await deploy("WETH", {
+      from: deployer,
+      contract: WETH,
+      gasLimit: 3e6,
+    });
     ({ address: vaultAddress } = await deploy("Vault", {
       from: deployer,
       contract: Vault,
       gasLimit: 8e6,
-      args: [authorizerAddress],
+      args: [authorizerAddress, wethAddress, 0, 0],
     }));
   } else {
     // TODO(nlordell): Once the Vault is deployed, we need to get the address

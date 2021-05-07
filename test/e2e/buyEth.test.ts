@@ -1,5 +1,4 @@
 import ERC20 from "@openzeppelin/contracts/build/contracts/ERC20PresetMinterPauser.json";
-import WETH from "canonical-weth/build/contracts/WETH9.json";
 import { expect } from "chai";
 import { Contract, Wallet } from "ethers";
 import { ethers, waffle } from "hardhat";
@@ -32,6 +31,7 @@ describe("E2E: Buy Ether", () => {
 
     ({
       deployer,
+      weth,
       settlement,
       vaultRelayer,
       wallets: [solver, ...traders],
@@ -43,7 +43,6 @@ describe("E2E: Buy Ether", () => {
     const { chainId } = await ethers.provider.getNetwork();
     domainSeparator = domain(chainId, settlement.address);
 
-    weth = await waffle.deployContract(deployer, WETH);
     usdt = await waffle.deployContract(deployer, ERC20, ["USDT", 6]);
   });
 

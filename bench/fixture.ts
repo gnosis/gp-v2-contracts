@@ -5,6 +5,7 @@ import Debug from "debug";
 import { Contract, ContractReceipt, Wallet } from "ethers";
 import { ethers, waffle } from "hardhat";
 
+import MockPool from "../balancer/test/MockPool.json";
 import {
   Order,
   OrderBalance,
@@ -17,7 +18,7 @@ import {
   grantRequiredRoles,
   packOrderUidParams,
 } from "../src/ts";
-import MockPool from "../test/e2e/balancer/MockPool.json";
+import { UserBalanceOpKind } from "../test/balancer";
 import { deployTestContracts, TestDeployment } from "../test/e2e/fixture";
 
 const debug = Debug("bench:fixture");
@@ -71,9 +72,10 @@ export class TokenManager {
       await token.mint(trader.address, LOTS.mul(3));
       await token.connect(trader).approve(vaultRelayer.address, LOTS);
       await token.connect(trader).approve(vault.address, LOTS.mul(2));
-      await vault.connect(trader).depositToInternalBalance([
+      await vault.connect(trader).manageUserBalance([
         {
-          token: token.address,
+          kind: UserBalanceOpKind.DEPOSIT_INTERNAL,
+          asset: token.address,
           amount: LOTS,
           sender: trader.address,
           recipient: trader.address,
@@ -89,24 +91,28 @@ export class TokenManager {
     await token.connect(pooler).approve(vault.address, LOTS);
     const existingTokens = this.instances.map(({ address }) => address);
     const zeros = this.instances.map(() => 0);
-    await vault.connect(pooler).joinPool(
-      await balancerPool.getPoolId(),
-      pooler.address,
-      pooler.address,
-      [...existingTokens, token.address],
-      [...zeros, LOTS],
-      false,
-      // NOTE: The mock pool uses this for encoding the pool share amounts
-      // that a user (here `pooler`) gets when joining the pool (first value)
-      // as well as the pool fees (second value).
-      ethers.utils.defaultAbiCoder.encode(
-        ["uint256[]", "uint256[]"],
-        [
-          [...zeros, LOTS],
-          [...zeros, 0],
-        ],
-      ),
-    );
+    await vault
+      .connect(pooler)
+      .joinPool(
+        await balancerPool.getPoolId(),
+        pooler.address,
+        pooler.address,
+        {
+          assets: [...existingTokens, token.address],
+          maxAmountsIn: [...zeros, LOTS],
+          // NOTE: The mock pool uses this for encoding the pool share amounts
+          // that a user (here `pooler`) gets when joining the pool (first value)
+          // as well as the pool fees (second value).
+          userData: ethers.utils.defaultAbiCoder.encode(
+            ["uint256[]", "uint256[]"],
+            [
+              [...zeros, LOTS],
+              [...zeros, 0],
+            ],
+          ),
+          fromInternalBalance: false,
+        },
+      );
 
     this.instances.push(token);
     return token;
@@ -168,7 +174,7 @@ export class BenchFixture {
     );
     await vault
       .connect(traders[0])
-      .changeRelayerAllowance(vaultRelayer.address, true);
+      .setRelayerApproval(traders[0].address, vaultRelayer.address, true);
     await authenticator.connect(manager).addSolver(solver.address);
 
     const balancerPool = await waffle.deployContract(deployer, MockPool, [
@@ -453,14 +459,14 @@ export class BenchFixture {
     const poolId = await balancerPool.getPoolId();
     for (let i = 0; i < hops; i++) {
       const index = orderFlags.kind == OrderKind.SELL ? i : hops - 1 - i;
-      const [tokenIn, tokenOut] = [
+      const [assetIn, assetOut] = [
         tokens.instances[index],
         tokens.instances[index + 1],
       ];
-      encoder.encodeSwapRequest({
+      encoder.encodeSwapStep({
         poolId,
-        tokenIn: tokenIn.address,
-        tokenOut: tokenOut.address,
+        assetIn: assetIn.address,
+        assetOut: assetOut.address,
         // NOTE: Use the swap amount for the first swap, and then 0 for the
         // other swaps to indicate a "multi-hop" which uses the computed in/out
         // amount from the previous swap.
