@@ -19,16 +19,27 @@ const ONEINCH_ETH_FLAG = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 const DAI_DECIMALS = 18;
 
 interface Withdrawal {
-  token: TokenDetails;
+  token: PricedToken;
+  amount: BigNumber;
+  amountUsd: BigNumber;
   balance: BigNumber;
-  usdValue: BigNumber;
+  balanceUsd: BigNumber;
 }
 
 interface DisplayWithdrawal {
   symbol: string;
   balance: string;
+  amount: string;
   value: string;
   address: string;
+}
+
+interface PricedToken extends TokenDetails {
+  // Overrides existing field in TokenDetails. The number of decimals must be
+  // known to estimate the price
+  decimals: number;
+  // Amount of DAI wei equivalent to one unit of this token (10**decimals)
+  usdValue: BigNumber;
 }
 
 // https://api.1inch.exchange/swagger/ethereum/#/Tokens/TokensController_getTokens
@@ -149,6 +160,19 @@ const oneinchUsdValue = async function (
   }
 };
 
+async function appraise(
+  token: TokenDetails,
+  network: string,
+): Promise<PricedToken> {
+  const decimals = token.decimals ?? DAI_DECIMALS;
+  const usdValue = await oneinchUsdValue(
+    token,
+    BigNumber.from(10).pow(decimals),
+    network,
+  );
+  return { ...token, usdValue, decimals };
+}
+
 async function getAllTradedTokens(settlement: Contract): Promise<string[]> {
   const trades = await settlement.queryFilter(settlement.filters.Trade());
   const tokens = new Set(
@@ -175,9 +199,12 @@ async function getWithdrawals(
   tokens: string[],
   settlement: Contract,
   minValue: string,
+  leftover: string,
   hre: HardhatRuntimeEnvironment,
 ): Promise<Withdrawal[]> {
   const withdrawals = [];
+  const minValueWei = utils.parseUnits(minValue, DAI_DECIMALS);
+  const leftoverWei = utils.parseUnits(leftover, DAI_DECIMALS);
   for (let i = 0; i < tokens.length; i++) {
     const address = tokens[i];
     clearLine();
@@ -187,17 +214,43 @@ async function getWithdrawals(
     if (balance.eq(0)) {
       continue;
     }
-    const usdValue = await oneinchUsdValue(token, balance, hre.network.name);
+    const pricedToken = await appraise(token, hre.network.name);
+    const balanceUsd = pricedToken.usdValue
+      .mul(balance)
+      .div(BigNumber.from(10).pow(pricedToken.decimals));
     clearLine();
-    if (usdValue.gte(utils.parseUnits(minValue, DAI_DECIMALS))) {
-      withdrawals.push({ token, balance, usdValue });
-    } else {
+    // Note: if balanceUsd is zero, then setting either minValue or leftoverWei
+    // to a nonzero value means that nothing should be withdrawn. If neither
+    // flag is set, then whether to withdraw does not depend on the USD value.
+    if (
+      balanceUsd.lt(minValueWei.add(leftoverWei)) ||
+      (balanceUsd.isZero() && !(minValueWei.isZero() && leftoverWei.isZero()))
+    ) {
       console.warn(
-        `Ignored ${utils.formatUnits(balance, token.decimals ?? 0)} units of ${
+        `Ignored ${utils.formatUnits(balance, pricedToken.decimals)} units of ${
           token.symbol ?? "unknown token"
-        } (${token.address}) with value ${formatUsdValue(usdValue)} USD`,
+        } (${token.address}) with value ${formatUsdValue(balanceUsd)} USD`,
       );
+      continue;
     }
+    let amount;
+    let amountUsd;
+    if (balanceUsd.isZero()) {
+      // Note: minValueWei and leftoverWei are zero. Everything should be
+      // withdrawn.
+      amount = balance;
+      amountUsd = balanceUsd;
+    } else {
+      amount = balance.mul(balanceUsd.sub(leftoverWei)).div(balanceUsd);
+      amountUsd = balanceUsd.sub(leftoverWei);
+    }
+    withdrawals.push({
+      token: pricedToken,
+      amount,
+      amountUsd,
+      balance,
+      balanceUsd,
+    });
   }
   clearLine();
   return withdrawals;
@@ -227,29 +280,32 @@ function formatUsdValue(amount: BigNumber): string {
 function formatWithdrawal(withdrawal: Withdrawal): DisplayWithdrawal {
   return {
     address: withdrawal.token.address,
-    value: formatUsdValue(withdrawal.usdValue),
+    value: formatUsdValue(withdrawal.balanceUsd),
     balance: formatTokenValue(
       withdrawal.balance,
-      withdrawal.token.decimals ?? DAI_DECIMALS,
+      withdrawal.token.decimals,
       18,
     ),
+    amount: formatTokenValue(withdrawal.amount, withdrawal.token.decimals, 18),
     symbol: withdrawal.token.symbol ?? "unknown token",
   };
 }
 
 function displayWithdrawals(withdrawals: Withdrawal[]) {
   const formattedWithdtrawals = withdrawals.map(formatWithdrawal);
-  const order = ["address", "value", "balance", "symbol"] as const;
+  const order = ["address", "value", "balance", "amount", "symbol"] as const;
   const header = {
     address: "address",
-    value: "value (usd)",
+    value: "balance (usd)",
     balance: "balance",
+    amount: "withdrawn amount",
     symbol: "symbol",
   };
   console.log(chalk.bold("Amounts to withdraw:"));
   displayTable(header, formattedWithdtrawals, order, {
     value: { align: Align.Right },
     balance: { align: Align.Right, maxWidth: 30 },
+    amount: { align: Align.Right, maxWidth: 30 },
     symbol: { maxWidth: 20 },
   });
   console.log();
@@ -294,6 +350,12 @@ const setupWithdrawTask: () => void = () =>
       "0",
       types.string,
     )
+    .addOptionalParam(
+      "leftover",
+      "If specified, withdrawing leaves an amount of each token of USD value specified with this flag.",
+      "0",
+      types.string,
+    )
     .addParam("receiver", "The address receiving the withdrawn tokens.")
     .addFlag(
       "dryRun",
@@ -301,7 +363,7 @@ const setupWithdrawTask: () => void = () =>
     )
     .setAction(
       async (
-        { minValue, dryRun, receiver: inputReceiver },
+        { minValue, dryRun, leftover, receiver: inputReceiver },
         hre: HardhatRuntimeEnvironment,
       ) => {
         const receiver = utils.getAddress(inputReceiver);
@@ -329,10 +391,11 @@ const setupWithdrawTask: () => void = () =>
           tokens,
           settlement,
           minValue,
+          leftover,
           hre,
         );
         withdrawals.sort((lhs, rhs) => {
-          const diff = lhs.usdValue.sub(rhs.usdValue);
+          const diff = lhs.balanceUsd.sub(rhs.balanceUsd);
           return diff.isZero() ? 0 : diff.isNegative() ? -1 : 1;
         });
 
@@ -344,11 +407,11 @@ const setupWithdrawTask: () => void = () =>
         }
 
         const finalSettlement = SettlementEncoder.encodedSetup(
-          ...withdrawals.map(({ token, balance }) => ({
+          ...withdrawals.map(({ token, amount }) => ({
             target: token.address,
             callData: token.contract.interface.encodeFunctionData("transfer", [
               receiver,
-              balance,
+              amount,
             ]),
           })),
         );
@@ -361,7 +424,7 @@ const setupWithdrawTask: () => void = () =>
         ]);
         const amount = gas.mul(gasPrice);
         const totalValue = withdrawals.reduce(
-          (sum, { usdValue }) => sum.add(usdValue),
+          (sum, { amountUsd }) => sum.add(amountUsd),
           constants.Zero,
         );
         console.log(
