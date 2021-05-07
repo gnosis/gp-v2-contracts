@@ -219,6 +219,9 @@ async function getWithdrawals(
       .mul(balance)
       .div(BigNumber.from(10).pow(pricedToken.decimals));
     clearLine();
+    // Note: if balanceUsd is zero, then setting either minValue or leftoverWei
+    // to a nonzero value means that nothing should be withdrawn. If neither
+    // flag is set, then whether to withdraw does not depend on the USD value.
     if (
       balanceUsd.lt(minValueWei.add(leftoverWei)) ||
       (balanceUsd.isZero() && !(minValueWei.isZero() && leftoverWei.isZero()))
