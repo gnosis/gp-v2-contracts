@@ -117,7 +117,7 @@ describe("E2E: Direct Balancer swap", () => {
   beforeEach(async () => {
     // NOTE: Use EVM snapshots to speed up test execution, as the setup time is
     // quite high (around 1s **per test**). Oddly, snapshots need to be
-    // re-created everytime they are reverted.
+    // re-created every time they are reverted.
     await ethers.provider.send("evm_revert", [snapshot]);
     snapshot = await ethers.provider.send("evm_snapshot", []);
   });
@@ -287,7 +287,7 @@ describe("E2E: Direct Balancer swap", () => {
         poolId: await pool.getPoolId(),
         assetIn: tokens[0].address,
         assetOut: tokens[1].address,
-        // NOTE: Set "better" amouts, where we pay less and get more. These,
+        // NOTE: Set "better" amounts, where we pay less and get more. These,
         // however, should still cause a revert as they aren't the exact amounts
         // that were requested in the orders.
         amount:
