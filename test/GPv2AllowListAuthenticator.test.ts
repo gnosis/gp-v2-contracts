@@ -12,7 +12,7 @@ describe("GPv2AllowListAuthentication", () => {
     solver,
   ] = waffle.provider.getWallets();
   let authenticator: Contract;
-  let initilization: Promise<unknown>;
+  let initialization: Promise<unknown>;
 
   beforeEach(async () => {
     const GPv2AllowListAuthentication = await ethers.getContractFactory(
@@ -23,8 +23,8 @@ describe("GPv2AllowListAuthentication", () => {
     // NOTE: This deploys the test interface contract which emulates being
     // proxied by an EIP-1967 compatible proxy for unit testing purposes.
     authenticator = await GPv2AllowListAuthentication.deploy(owner.address);
-    initilization = authenticator.initializeManager(manager.address);
-    await initilization;
+    initialization = authenticator.initializeManager(manager.address);
+    await initialization;
   });
 
   describe("initializeManager", () => {
@@ -52,7 +52,7 @@ describe("GPv2AllowListAuthentication", () => {
     });
 
     it("should emit a ManagerChanged event", async () => {
-      await expect(initilization)
+      await expect(initialization)
         .to.emit(authenticator, "ManagerChanged")
         .withArgs(manager.address, ethers.constants.AddressZero);
     });
