@@ -8,7 +8,7 @@ describe("SettlementStorageReader", () => {
   const [deployer, owner, ...traders] = waffle.provider.getWallets();
   let settlement: Contract;
   let reader: Contract;
-  let settlmentReader: SettlementReader;
+  let settlementReader: SettlementReader;
 
   beforeEach(async () => {
     const GPv2AllowListAuthentication = await ethers.getContractFactory(
@@ -36,7 +36,7 @@ describe("SettlementStorageReader", () => {
     );
     reader = await SettlementStorageReader.deploy();
 
-    settlmentReader = new SettlementReader(settlement, reader);
+    settlementReader = new SettlementReader(settlement, reader);
   });
 
   describe("filledAmountsForOrders(bytes[] calldata orderUids)", () => {
@@ -54,7 +54,7 @@ describe("SettlementStorageReader", () => {
       await settlement.connect(traders[1]).invalidateOrder(orderUids[1]);
 
       expect(
-        await settlmentReader.filledAmountsForOrders(orderUids),
+        await settlementReader.filledAmountsForOrders(orderUids),
       ).to.deep.equal([
         ethers.constants.MaxUint256,
         ethers.constants.MaxUint256,
