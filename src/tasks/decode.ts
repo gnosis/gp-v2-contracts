@@ -164,13 +164,19 @@ function displayTrade(
       // Nothing to do, `null` variables mark a decoding error.
     }
   }
-  const sellToken = tokens[sellTokenIndex] ?? { index: sellTokenIndex };
-  const buyToken = tokens[buyTokenIndex] ?? { index: buyTokenIndex };
+  const sellToken = tokens[BigNumber.from(sellTokenIndex).toNumber()] ?? {
+    index: sellTokenIndex,
+  };
+  const buyToken = tokens[BigNumber.from(buyTokenIndex).toNumber()] ?? {
+    index: buyTokenIndex,
+  };
   console.log(
     mainLabel("Order"),
     `${kind.toString().toUpperCase()} ${
       partiallyFillable ? "partially fillable " : ""
-    }order, valid until ${new Date(validTo * 1000).toISOString()} (${validTo})`,
+    }order, valid until ${new Date(
+      BigNumber.from(validTo).toNumber() * 1000,
+    ).toISOString()} (${validTo.toString()})`,
   );
   console.log(label(`Trade`), `sell ${prettyAmount(sellAmount, sellToken)}`);
   console.log("      ", ` buy ${prettyAmount(buyAmount, buyToken, true)}`);
