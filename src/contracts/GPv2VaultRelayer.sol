@@ -66,69 +66,21 @@ contract GPv2VaultRelayer {
     /// @return tokenDeltas The executed swap amounts.
     function batchSwapWithFee(
         IVault.SwapKind kind,
-        IVault.SwapRequest[] calldata swaps,
+        IVault.BatchSwapStep[] calldata swaps,
         IERC20[] memory tokens,
         IVault.FundManagement memory funds,
         int256[] memory limits,
         uint256 deadline,
         GPv2Transfer.Data calldata feeTransfer
     ) external onlyCreator returns (int256[] memory tokenDeltas) {
-        if (kind == IVault.SwapKind.GIVEN_IN) {
-            tokenDeltas = vault.batchSwapGivenIn(
-                swapRequestToIn(swaps),
-                tokens,
-                funds,
-                limits,
-                deadline
-            );
-        } else {
-            tokenDeltas = vault.batchSwapGivenOut(
-                swapRequestToOut(swaps),
-                tokens,
-                funds,
-                limits,
-                deadline
-            );
-        }
-
+        tokenDeltas = vault.batchSwap(
+            kind,
+            swaps,
+            tokens,
+            funds,
+            limits,
+            deadline
+        );
         vault.transferFromAccount(feeTransfer, msg.sender);
-    }
-
-    /// @dev Converts an array of Vault `SwapRequest`s into `SwapIn`s.
-    ///
-    /// This method leverages the fact that both structs have identical memory
-    /// representations. For more information, consult conversion methods from:
-    /// <https://github.com/balancer-labs/balancer-core-v2/blob/master/contracts/vault/Swaps.sol>
-    ///
-    /// @param swaps The swap requests.
-    /// @return swapIns The swap ins.
-    function swapRequestToIn(IVault.SwapRequest[] calldata swaps)
-        private
-        pure
-        returns (IVault.SwapIn[] calldata swapIns)
-    {
-        // NOTE: Use assembly to cast the swap requests.
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            swapIns.offset := swaps.offset
-            swapIns.length := swaps.length
-        }
-    }
-
-    /// @dev Converts an array of Vault `SwapRequest`s into `SwapOut`s.
-    ///
-    /// @param swaps The swap requests.
-    /// @return swapOuts The swap outs.
-    function swapRequestToOut(IVault.SwapRequest[] calldata swaps)
-        private
-        pure
-        returns (IVault.SwapOut[] calldata swapOuts)
-    {
-        // NOTE: Use assembly to cast the swap requests.
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            swapOuts.offset := swaps.offset
-            swapOuts.length := swaps.length
-        }
     }
 }

@@ -23,7 +23,7 @@ describe("GPv2SafeERC20.sol", () => {
   });
 
   describe("transfer", () => {
-    it("succeeds when the internal call succeds", async () => {
+    it("succeeds when the internal call succeeds", async () => {
       const amount = ethers.utils.parseEther("13.37");
 
       const sellToken = await waffle.deployMockContract(deployer, IERC20.abi);
@@ -121,7 +121,7 @@ describe("GPv2SafeERC20.sol", () => {
   });
 
   describe("transferFrom", () => {
-    it("succeeds when the internal call succeds", async () => {
+    it("succeeds when the internal call succeeds", async () => {
       const amount = ethers.utils.parseEther("13.37");
 
       const sellToken = await waffle.deployMockContract(deployer, IERC20.abi);

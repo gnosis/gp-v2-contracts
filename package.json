@@ -1,6 +1,6 @@
 {
   "name": "@gnosis.pm/gp-v2-contracts",
-  "version": "0.0.1-alpha.17",
+  "version": "0.1.0",
   "license": "LGPL-3.0-or-later",
   "scripts": {
     "deploy": "hardhat deploy",
@@ -36,7 +36,7 @@
     "@nomiclabs/hardhat-waffle": "^2.0.1",
     "@openzeppelin/contracts": "=3.4.0-solc-0.7",
     "@tenderly/hardhat-tenderly": "^1.0.12",
-    "@types/chai": "^4.2.17",
+    "@types/chai": "^4.2.18",
     "@types/debug": "^4.1.5",
     "@types/mocha": "^8.2.2",
     "@types/yargs": "^16.0.1",
@@ -49,7 +49,7 @@
     "chai": "^4.3.4",
     "chalk": "^4.1.1",
     "debug": "^4.3.1",
-    "dotenv": "^8.2.0",
+    "dotenv": "^9.0.1",
     "eslint": "^7.25.0",
     "eslint-config-prettier": "^8.3.0",
     "eslint-plugin-import": "^2.22.1",

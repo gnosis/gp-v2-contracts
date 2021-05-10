@@ -7,11 +7,8 @@ import { ethers, Contract } from "ethers";
  * relayer. It is copied here to avoid relying on build artifacts.
  */
 export const VAULT_INTERFACE = new ethers.utils.Interface([
-  "function transferToExternalBalance((address, uint256, address, address)[])",
-  "function transferInternalBalance((address, uint256, address, address)[])",
-  "function withdrawFromInternalBalance((address, uint256, address, address)[])",
-  "function batchSwapGivenIn((bytes32, uint256, uint256, uint256, bytes)[], address[], (address, bool, address, bool), int256[], uint256)",
-  "function batchSwapGivenOut((bytes32, uint256, uint256, uint256, bytes)[], address[], (address, bool, address, bool), int256[], uint256)",
+  "function manageUserBalance((uint8, address, uint256, address, address)[])",
+  "function batchSwap(uint8, (bytes32, uint256, uint256, uint256, bytes)[], address[], (address, bool, address, bool), int256[], uint256)",
 ]);
 
 /**
@@ -33,7 +30,7 @@ export async function grantRequiredRoles(
   for (const name in VAULT_INTERFACE.functions) {
     await authorizer.grantRole(
       ethers.utils.solidityKeccak256(
-        ["address", "bytes4"],
+        ["uint256", "bytes4"],
         [vaultAddress, VAULT_INTERFACE.getSighash(name)],
       ),
       vaultRelayerAddress,

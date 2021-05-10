@@ -16,7 +16,7 @@ import { SAMPLE_ORDER } from "./testHelpers";
 const patchedSignMessageBuilder = (key: SigningKey) => async (
   message: string,
 ): Promise<string> => {
-  // Reproducing `@ethersproject/wallet/src.ts/index.ts` sign message bahaviour
+  // Reproducing `@ethersproject/wallet/src.ts/index.ts` sign message behavior
   const sig = joinSignature(key.signDigest(hashMessage(message)));
 
   // Unpack the signature

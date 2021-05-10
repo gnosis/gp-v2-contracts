@@ -12,6 +12,7 @@ import {
   domain,
   grantRequiredRoles,
 } from "../../src/ts";
+import { UserBalanceOpKind } from "../balancer";
 
 import { deployTestContracts } from "./fixture";
 
@@ -76,7 +77,7 @@ describe("E2E: Should allow trading with Vault internal balances", () => {
       .approve(vault.address, ethers.constants.MaxUint256);
     await vault
       .connect(traders[0])
-      .changeRelayerAllowance(vaultRelayer.address, true);
+      .setRelayerApproval(traders[0].address, vaultRelayer.address, true);
     await encoder.signEncodeTrade(
       {
         kind: OrderKind.SELL,
@@ -98,9 +99,10 @@ describe("E2E: Should allow trading with Vault internal balances", () => {
     await tokens[1]
       .connect(traders[1])
       .approve(vault.address, ethers.constants.MaxUint256);
-    await vault.connect(traders[1]).depositToInternalBalance([
+    await vault.connect(traders[1]).manageUserBalance([
       {
-        token: tokens[1].address,
+        kind: UserBalanceOpKind.DEPOSIT_INTERNAL,
+        asset: tokens[1].address,
         amount: ethers.utils.parseEther("300.3"),
         sender: traders[1].address,
         recipient: traders[1].address,
@@ -108,7 +110,7 @@ describe("E2E: Should allow trading with Vault internal balances", () => {
     ]);
     await vault
       .connect(traders[1])
-      .changeRelayerAllowance(vaultRelayer.address, true);
+      .setRelayerApproval(traders[1].address, vaultRelayer.address, true);
     await encoder.signEncodeTrade(
       {
         kind: OrderKind.BUY,
@@ -151,9 +153,10 @@ describe("E2E: Should allow trading with Vault internal balances", () => {
     await tokens[1]
       .connect(traders[3])
       .approve(vault.address, ethers.constants.MaxUint256);
-    await vault.connect(traders[3]).depositToInternalBalance([
+    await vault.connect(traders[3]).manageUserBalance([
       {
-        token: tokens[1].address,
+        kind: UserBalanceOpKind.DEPOSIT_INTERNAL,
+        asset: tokens[1].address,
         amount: ethers.utils.parseEther("1501.5"),
         sender: traders[3].address,
         recipient: traders[3].address,
@@ -161,7 +164,7 @@ describe("E2E: Should allow trading with Vault internal balances", () => {
     ]);
     await vault
       .connect(traders[3])
-      .changeRelayerAllowance(vaultRelayer.address, true);
+      .setRelayerApproval(traders[3].address, vaultRelayer.address, true);
     await encoder.signEncodeTrade(
       {
         kind: OrderKind.BUY,

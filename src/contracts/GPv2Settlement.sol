@@ -144,7 +144,7 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
 
     /// @dev Settle an order directly against Balancer V2 pools.
     function swap(
-        IVault.SwapRequest[] calldata swaps,
+        IVault.BatchSwapStep[] calldata swaps,
         IERC20[] calldata tokens,
         GPv2Trade.Data calldata trade
     ) external nonReentrant onlySolver {
@@ -161,7 +161,7 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         funds.sender = recoveredOrder.owner;
         funds.fromInternalBalance =
             order.sellTokenBalance == GPv2Order.BALANCE_INTERNAL;
-        funds.recipient = recoveredOrder.receiver;
+        funds.recipient = payable(recoveredOrder.receiver);
         funds.toInternalBalance =
             order.buyTokenBalance == GPv2Order.BALANCE_INTERNAL;
 
