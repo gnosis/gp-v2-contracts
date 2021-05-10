@@ -58,7 +58,7 @@ export function decodeGasTrace(
   );
   const transactionGas = baseGas + calldataGas;
 
-  const { gasRefund } = (trace as unknown) as GasExtension;
+  const { gasRefund } = trace as unknown as GasExtension;
 
   return node({
     name: callName(trace),
@@ -166,7 +166,7 @@ function computeGasTrace(
 ): GasTrace[] {
   const nodes = [];
 
-  const { gasLeft: initialGasLeft } = (steps[0] as unknown) as GasExtension;
+  const { gasLeft: initialGasLeft } = steps[0] as unknown as GasExtension;
   const gasLimit = num(initialGasLeft).add(transactionGas);
 
   for (const [i, step] of steps.entries()) {
@@ -182,12 +182,12 @@ function computeGasTrace(
       throw new Error("expected EVM step after sub trace");
     }
 
-    const { gasLeft: gasLeftAfterCall } = (nextStep as unknown) as GasExtension;
+    const { gasLeft: gasLeftAfterCall } = nextStep as unknown as GasExtension;
     const cumulativeGas = gasLimit.sub(num(gasLeftAfterCall));
     const { gasUsed } = step;
 
     if (isCallTrace(step)) {
-      const { gasRefund } = (step as unknown) as GasExtension;
+      const { gasRefund } = step as unknown as GasExtension;
       nodes.push(
         node({
           name: callName(step),

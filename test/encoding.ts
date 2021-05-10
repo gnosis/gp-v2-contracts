@@ -35,7 +35,7 @@ export const allSigningSchemes = optionsForKey("signingScheme");
 
 export function allOptions<
   K extends FlagKey,
-  AllOptions extends Record<K, FlagOptions<K>>
+  AllOptions extends Record<K, FlagOptions<K>>,
 >(): AllOptions {
   const result: Record<string, FlagOptions<K>> = {};
   Object.entries(FLAG_MASKS).map(

@@ -10,12 +10,8 @@ import { UserBalanceOpKind } from "./balancer";
 import { OrderBalanceId } from "./encoding";
 
 describe("GPv2Transfer", () => {
-  const [
-    deployer,
-    recipient,
-    funder,
-    ...traders
-  ] = waffle.provider.getWallets();
+  const [deployer, recipient, funder, ...traders] =
+    waffle.provider.getWallets();
 
   let transfer: Contract;
   let vault: MockContract;

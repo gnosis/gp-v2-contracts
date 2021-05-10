@@ -5,9 +5,10 @@ import "@tenderly/hardhat-tenderly";
 import { Deployment } from "hardhat-deploy/types";
 import { task } from "hardhat/config";
 
-function separateProxiedContracts(
-  allDeployments: Record<string, Deployment>,
-): { proxied: string[]; unproxied: string[] } {
+function separateProxiedContracts(allDeployments: Record<string, Deployment>): {
+  proxied: string[];
+  unproxied: string[];
+} {
   const proxied = Object.entries(allDeployments)
     .filter(([, deployment]) => deployment.implementation !== undefined)
     .map(([name]) => name);

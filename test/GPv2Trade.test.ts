@@ -173,9 +173,8 @@ describe("GPv2Trade", () => {
         SigningScheme.EIP1271,
         SigningScheme.PRESIGN,
       ]) {
-        const {
-          signingScheme: extractedScheme,
-        } = await tradeLib.extractFlagsTest(encodeSigningScheme(scheme));
+        const { signingScheme: extractedScheme } =
+          await tradeLib.extractFlagsTest(encodeSigningScheme(scheme));
         expect(extractedScheme).to.deep.equal(scheme);
       }
     });

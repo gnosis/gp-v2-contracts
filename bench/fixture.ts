@@ -341,12 +341,10 @@ export class BenchFixture {
       const [tokenIn, tokenOut] = [i % 2, (i + 1) % 2];
       encoder.encodeInteraction({
         target: uniswapTokens[tokenIn].address,
-        callData: uniswapTokens[
-          tokenIn
-        ].interface.encodeFunctionData("transfer", [
-          uniswapPair.address,
-          ethers.utils.parseEther("1.0"),
-        ]),
+        callData: uniswapTokens[tokenIn].interface.encodeFunctionData(
+          "transfer",
+          [uniswapPair.address, ethers.utils.parseEther("1.0")],
+        ),
       });
 
       debug(`encoding Uniswap T00${tokenIn} -> T00${tokenOut} token swap`);
