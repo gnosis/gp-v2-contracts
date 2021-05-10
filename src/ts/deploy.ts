@@ -30,13 +30,12 @@ export type ContractName = typeof CONTRACT_NAMES[keyof typeof CONTRACT_NAMES];
 /**
  * The deployment args for a contract.
  */
-export type DeploymentArguments<
-  T
-> = T extends typeof CONTRACT_NAMES.authenticator
-  ? never
-  : T extends typeof CONTRACT_NAMES.settlement
-  ? [string, string]
-  : unknown[];
+export type DeploymentArguments<T> =
+  T extends typeof CONTRACT_NAMES.authenticator
+    ? never
+    : T extends typeof CONTRACT_NAMES.settlement
+    ? [string, string]
+    : unknown[];
 
 /**
  * Allowed ABI definition types by Ethers.js.

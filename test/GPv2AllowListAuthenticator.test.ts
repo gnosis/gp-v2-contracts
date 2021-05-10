@@ -3,14 +3,8 @@ import { Contract } from "ethers";
 import { ethers, waffle } from "hardhat";
 
 describe("GPv2AllowListAuthentication", () => {
-  const [
-    deployer,
-    owner,
-    manager,
-    newManager,
-    nobody,
-    solver,
-  ] = waffle.provider.getWallets();
+  const [deployer, owner, manager, newManager, nobody, solver] =
+    waffle.provider.getWallets();
   let authenticator: Contract;
   let initialization: Promise<unknown>;
 

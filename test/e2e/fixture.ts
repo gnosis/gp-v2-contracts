@@ -19,68 +19,69 @@ export interface TestDeployment {
   gasToken: Contract;
 }
 
-export const deployTestContracts: () => Promise<TestDeployment> = deployments.createFixture(
-  async ({
-    deployments,
-    ethers,
-    getNamedAccounts,
-    getUnnamedAccounts,
-    waffle,
-  }) => {
-    const {
-      GPv2AllowListAuthentication,
-      GPv2Settlement,
-      Vault,
-      VaultAuthorizer,
-      WETH,
-    } = await deployments.fixture();
+export const deployTestContracts: () => Promise<TestDeployment> =
+  deployments.createFixture(
+    async ({
+      deployments,
+      ethers,
+      getNamedAccounts,
+      getUnnamedAccounts,
+      waffle,
+    }) => {
+      const {
+        GPv2AllowListAuthentication,
+        GPv2Settlement,
+        Vault,
+        VaultAuthorizer,
+        WETH,
+      } = await deployments.fixture();
 
-    const allWallets = waffle.provider.getWallets();
-    const { deployer, owner, manager } = await getNamedAccounts();
-    const unnamedAccounts = await getUnnamedAccounts();
-    const deployerWallet = findAccountWallet(allWallets, deployer);
+      const allWallets = waffle.provider.getWallets();
+      const { deployer, owner, manager } = await getNamedAccounts();
+      const unnamedAccounts = await getUnnamedAccounts();
+      const deployerWallet = findAccountWallet(allWallets, deployer);
 
-    const weth = new Contract(WETH.address, WETHArtifact.abi, deployerWallet);
-    const vaultAuthorizer = new Contract(
-      VaultAuthorizer.address,
-      AuthorizerArtifact.abi,
-      deployerWallet,
-    );
-    const vault = new Contract(
-      Vault.address,
-      VaultArtifact.abi,
-      deployerWallet,
-    );
-    const authenticator = await ethers.getContractAt(
-      "GPv2AllowListAuthentication",
-      GPv2AllowListAuthentication.address,
-    );
-    const settlement = await ethers.getContractAt(
-      "GPv2Settlement",
-      GPv2Settlement.address,
-    );
-    const vaultRelayer = await ethers.getContractAt(
-      "GPv2VaultRelayer",
-      await settlement.vaultRelayer(),
-    );
+      const weth = new Contract(WETH.address, WETHArtifact.abi, deployerWallet);
+      const vaultAuthorizer = new Contract(
+        VaultAuthorizer.address,
+        AuthorizerArtifact.abi,
+        deployerWallet,
+      );
+      const vault = new Contract(
+        Vault.address,
+        VaultArtifact.abi,
+        deployerWallet,
+      );
+      const authenticator = await ethers.getContractAt(
+        "GPv2AllowListAuthentication",
+        GPv2AllowListAuthentication.address,
+      );
+      const settlement = await ethers.getContractAt(
+        "GPv2Settlement",
+        GPv2Settlement.address,
+      );
+      const vaultRelayer = await ethers.getContractAt(
+        "GPv2VaultRelayer",
+        await settlement.vaultRelayer(),
+      );
 
-    return {
-      deployer: deployerWallet,
-      owner: findAccountWallet(allWallets, owner),
-      manager: findAccountWallet(allWallets, manager),
-      wallets: unnamedAccounts.map((account) =>
-        findAccountWallet(allWallets, account),
-      ),
-      weth,
-      vaultAuthorizer,
-      vault,
-      authenticator,
-      settlement,
-      vaultRelayer,
-      gasToken: await deployGasToken(allWallets[0]),
-    };
-  },
-);
+      return {
+        deployer: deployerWallet,
+        owner: findAccountWallet(allWallets, owner),
+        manager: findAccountWallet(allWallets, manager),
+        wallets: unnamedAccounts.map((account) =>
+          findAccountWallet(allWallets, account),
+        ),
+        weth,
+        vaultAuthorizer,
+        vault,
+        authenticator,
+        settlement,
+        vaultRelayer,
+        gasToken: await deployGasToken(allWallets[0]),
+      };
+    },
+  );
 
 const CHI_TOKEN_DEPLOYER = "0x7E1E3334130355799F833ffec2D731BCa3E68aF6";
 

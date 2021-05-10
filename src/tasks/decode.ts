@@ -322,15 +322,11 @@ const setupDecodeTask: () => void = () => {
       const GPv2Settlement = await artifacts.readArtifact("GPv2Settlement");
       const settlementInterface = new utils.Interface(GPv2Settlement.abi);
 
-      const [
-        tokenAddresses,
-        clearingPrices,
-        trades,
-        interactions,
-      ] = settlementInterface.decodeFunctionData(
-        "settle",
-        calldata,
-      ) as EncodedSettlement;
+      const [tokenAddresses, clearingPrices, trades, interactions] =
+        settlementInterface.decodeFunctionData(
+          "settle",
+          calldata,
+        ) as EncodedSettlement;
 
       const tokens = await Promise.all(
         tokenAddresses.map(async (address: string, index: number) => ({

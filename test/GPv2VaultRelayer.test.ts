@@ -10,12 +10,8 @@ import { SwapKind, UserBalanceOpKind } from "./balancer";
 import { OrderBalanceId } from "./encoding";
 
 describe("GPv2VaultRelayer", () => {
-  const [
-    deployer,
-    creator,
-    nonCreator,
-    ...traders
-  ] = waffle.provider.getWallets();
+  const [deployer, creator, nonCreator, ...traders] =
+    waffle.provider.getWallets();
 
   let vault: MockContract;
   let vaultRelayer: Contract;

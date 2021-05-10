@@ -65,13 +65,12 @@ function cartesian<T extends UnknownMatrix>(...arrays: T): Transpose<T> {
 }
 
 function validEncodedFlags(): number[] {
-  return cartesian(
-    ...Object.values(allEncodedFlagOptions()),
-  ).map((flagOptions) =>
-    flagOptions.reduce(
-      (cumulative: number, flagOption: number) => cumulative | flagOption,
-      0,
-    ),
+  return cartesian(...Object.values(allEncodedFlagOptions())).map(
+    (flagOptions) =>
+      flagOptions.reduce(
+        (cumulative: number, flagOption: number) => cumulative | flagOption,
+        0,
+      ),
   );
 }
 
@@ -103,7 +102,7 @@ function validFlags(): TradeFlags[] {
     transposedKeyedOptions.forEach(
       ([key, option]: any) => (tradeFlags[key] = option),
     );
-    return (tradeFlags as unknown) as TradeFlags;
+    return tradeFlags as unknown as TradeFlags;
   });
   /* eslint-enable @typescript-eslint/no-explicit-any */
 }
@@ -142,8 +141,9 @@ describe("Signer", () => {
   for (const scheme of ecdsaSchemes) {
     it(`ecdsa ${scheme}`, async () => {
       const signature = await utils.joinSignature(
-        (await signOrder(domainSeparator, SAMPLE_ORDER, ecdsaSigner, scheme))
-          .data,
+        (
+          await signOrder(domainSeparator, SAMPLE_ORDER, ecdsaSigner, scheme)
+        ).data,
       );
       expect(
         decodeSignatureOwner(domainSeparator, SAMPLE_ORDER, scheme, signature),
