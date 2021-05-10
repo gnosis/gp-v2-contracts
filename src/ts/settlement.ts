@@ -1,4 +1,4 @@
-import { BigNumberish, BytesLike, Signer, ethers } from "ethers";
+import { BigNumberish, BytesLike, Signer, ethers, BigNumber } from "ethers";
 
 import {
   Interaction,
@@ -82,15 +82,15 @@ export type Trade = TradeExecution &
     /**
      * The index of the sell token in the settlement.
      */
-    sellTokenIndex: number;
+    sellTokenIndex: BigNumberish;
     /**
      * The index of the buy token in the settlement.
      */
-    buyTokenIndex: number;
+    buyTokenIndex: BigNumberish;
     /**
      * Encoded order flags.
      */
-    flags: number;
+    flags: BigNumberish;
     /**
      * Signature data.
      */
@@ -203,13 +203,19 @@ function mask(options: readonly unknown[]): number {
   return (1 << bitCount) - 1;
 }
 
-function decodeFlag<K extends FlagKey>(key: K, flag: number): FlagValue<K> {
+function decodeFlag<K extends FlagKey>(
+  key: K,
+  flag: BigNumberish,
+): FlagValue<K> {
   const { offset, options } = FLAG_MASKS[key];
-  const index = (flag >> offset) & mask(options);
+  const numberFlags = BigNumber.from(flag).toNumber();
+  const index = (numberFlags >> offset) & mask(options);
   // This type casting should not be needed
   const decoded = options[index] as FlagValue<K>;
   if (decoded === undefined || index < 0) {
-    throw new Error(`Invalid input flag for ${key}: 0b${flag.toString(2)}`);
+    throw new Error(
+      `Invalid input flag for ${key}: 0b${numberFlags.toString(2)}`,
+    );
   }
   return decoded;
 }
@@ -230,7 +236,7 @@ export function encodeSigningScheme(scheme: SigningScheme): number {
  * @param flag The encoded order flag.
  * @return The decoded signing scheme.
  */
-export function decodeSigningScheme(flags: number): SigningScheme {
+export function decodeSigningScheme(flags: BigNumberish): SigningScheme {
   return decodeFlag("signingScheme", flags);
 }
 
@@ -261,7 +267,7 @@ export function encodeOrderFlags(flags: OrderFlags): number {
  * @param flags The order flags encoded as a bitfield.
  * @return The decoded order flags.
  */
-export function decodeOrderFlags(flags: number): OrderFlags {
+export function decodeOrderFlags(flags: BigNumberish): OrderFlags {
   return {
     kind: decodeFlag("kind", flags),
     partiallyFillable: decodeFlag("partiallyFillable", flags),
@@ -286,7 +292,7 @@ export function encodeTradeFlags(flags: TradeFlags): number {
  * @param flags The trade flags encoded as a bitfield.
  * @return The bitfield result.
  */
-export function decodeTradeFlags(flags: number): TradeFlags {
+export function decodeTradeFlags(flags: BigNumberish): TradeFlags {
   return {
     ...decodeOrderFlags(flags),
     signingScheme: decodeSigningScheme(flags),
@@ -655,16 +661,18 @@ export class SettlementEncoder {
  * @returns The decoded order.
  */
 export function decodeOrder(trade: Trade, tokens: string[]): Order {
-  if (Math.max(trade.sellTokenIndex, trade.buyTokenIndex) >= tokens.length) {
+  const sellTokenIndex = BigNumber.from(trade.sellTokenIndex).toNumber();
+  const buyTokenIndex = BigNumber.from(trade.buyTokenIndex).toNumber();
+  if (Math.max(sellTokenIndex, buyTokenIndex) >= tokens.length) {
     throw new Error("Invalid trade");
   }
   return {
-    sellToken: tokens[trade.sellTokenIndex],
-    buyToken: tokens[trade.buyTokenIndex],
+    sellToken: tokens[sellTokenIndex],
+    buyToken: tokens[buyTokenIndex],
     receiver: trade.receiver,
     sellAmount: trade.sellAmount,
     buyAmount: trade.buyAmount,
-    validTo: trade.validTo,
+    validTo: BigNumber.from(trade.validTo).toNumber(),
     appData: trade.appData,
     feeAmount: trade.feeAmount,
     ...decodeOrderFlags(trade.flags),
