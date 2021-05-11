@@ -361,7 +361,7 @@ const setupWithdrawTask: () => void = () =>
       "dryRun",
       "Just simulate the settlement instead of executing the transaction on the blockchain.",
     )
-    .addVariadicPositionalParam(
+    .addOptionalVariadicPositionalParam(
       "tokens",
       "An optional subset of tokens to consider for withdraw (otherwise all traded tokens will be queried).",
     )
@@ -387,7 +387,7 @@ const setupWithdrawTask: () => void = () =>
           }
         }
 
-        if (tokens.length === 0) {
+        if (tokens === undefined) {
           tokens = await getAllTradedTokens(settlement);
         }
 
