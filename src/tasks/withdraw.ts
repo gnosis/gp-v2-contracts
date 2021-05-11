@@ -361,9 +361,13 @@ const setupWithdrawTask: () => void = () =>
       "dryRun",
       "Just simulate the settlement instead of executing the transaction on the blockchain.",
     )
+    .addOptionalVariadicPositionalParam(
+      "tokens",
+      "An optional subset of tokens to consider for withdraw (otherwise all traded tokens will be queried).",
+    )
     .setAction(
       async (
-        { minValue, dryRun, leftover, receiver: inputReceiver },
+        { minValue, dryRun, leftover, receiver: inputReceiver, tokens },
         hre: HardhatRuntimeEnvironment,
       ) => {
         const receiver = utils.getAddress(inputReceiver);
@@ -383,7 +387,9 @@ const setupWithdrawTask: () => void = () =>
           }
         }
 
-        const tokens = await getAllTradedTokens(settlement);
+        if (tokens === undefined) {
+          tokens = await getAllTradedTokens(settlement);
+        }
 
         // TODO: add eth withdrawal
         // TODO: split large transaction in batches

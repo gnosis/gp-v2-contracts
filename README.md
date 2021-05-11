@@ -138,3 +138,14 @@ For example, adding the address `0x0000000000000000000000000000000000000042` to 
 export PK=<private key>
 yarn solvers add 0x0000000000000000000000000000000000000042
 ```
+
+### Fee Withdrawls
+
+Script to withdraw all balances of the Settlement contract. Allows to specify what minimum value the contract must have for a token to be considered (breadcrumbs might not be worth the gas costs) and how much remaining value should be left in the contract (e.g. to feed token buffers).
+
+If no token list is passed in all traded token balances will be fetched from chain (can take a long time...)
+
+```sh
+export PK=<private key>
+yarn hardhat withdraw --receiver 0x6C2999B6B1fAD608ECEA71B926D68Ee6c62BeEf8 --min-value 10000 --leftover 500 0x038a68ff68c393373ec894015816e33ad41bd564 0x913d8adf7ce6986a8cbfee5a54725d9eea4f0729
+```
