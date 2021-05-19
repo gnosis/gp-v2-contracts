@@ -81,6 +81,6 @@ contract GPv2VaultRelayer {
             limits,
             deadline
         );
-        vault.transferFromAccount(feeTransfer, msg.sender);
+        vault.fastTransferFromAccount(feeTransfer, msg.sender);
     }
 }

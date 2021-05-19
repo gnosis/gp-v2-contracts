@@ -5,12 +5,12 @@ pragma abicoder v2;
 import "../libraries/GPv2Transfer.sol";
 
 contract GPv2TransferTestInterface {
-    function transferFromAccountTest(
+    function fastTransferFromAccountTest(
         IVault vault,
         GPv2Transfer.Data calldata transfer,
         address recipient
     ) external {
-        GPv2Transfer.transferFromAccount(vault, transfer, recipient);
+        GPv2Transfer.fastTransferFromAccount(vault, transfer, recipient);
     }
 
     function transferFromAccountsTest(
