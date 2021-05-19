@@ -3,7 +3,7 @@
 // Vendored from OpenZeppelin contracts with minor modifications:
 // - Modified Solidity version
 // - Formatted code
-// - Shortned multiplication overflow revert messages
+// - Shortened some revert messages
 // - Removed unused methods
 // - Added `ceilDiv` method
 // <https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v3.4.0/contracts/math/SafeMath.sol>
