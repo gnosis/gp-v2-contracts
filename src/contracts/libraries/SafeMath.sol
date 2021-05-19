@@ -101,6 +101,6 @@ library SafeMath {
      */
     function ceilDiv(uint256 a, uint256 b) internal pure returns (uint256) {
         require(b > 0, "SafeMath: ceiling division by 0");
-        return add(a, b - 1) / b;
+        return a / b + (a % b == 0 ? 0 : 1);
     }
 }
