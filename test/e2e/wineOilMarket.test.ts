@@ -11,6 +11,7 @@ import {
   TypedDataDomain,
   domain,
 } from "../../src/ts";
+import { ceilDiv } from "../testHelpers";
 
 import { deployTestContracts } from "./fixture";
 
@@ -152,7 +153,7 @@ describe("E2E: RetrETH Red Wine and Olive Oil Market", () => {
       ),
     );
     expect(await oil.balanceOf(traders[0].address)).to.deep.equal(
-      ethers.utils.parseEther("12.0").mul(14).div(13),
+      ceilDiv(ethers.utils.parseEther("12.0").mul(14), 13),
     );
 
     expect(await oil.balanceOf(traders[1].address)).to.deep.equal(

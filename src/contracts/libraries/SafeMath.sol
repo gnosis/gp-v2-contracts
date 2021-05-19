@@ -3,8 +3,9 @@
 // Vendored from OpenZeppelin contracts with minor modifications:
 // - Modified Solidity version
 // - Formatted code
-// - Shortned multiplication overflow revert messages
+// - Shortened some revert messages
 // - Removed unused methods
+// - Added `ceilDiv` method
 // <https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v3.4.0/contracts/math/SafeMath.sol>
 
 pragma solidity ^0.7.6;
@@ -84,7 +85,22 @@ library SafeMath {
      * - The divisor cannot be zero.
      */
     function div(uint256 a, uint256 b) internal pure returns (uint256) {
-        require(b > 0, "SafeMath: division by zero");
+        require(b > 0, "SafeMath: division by 0");
         return a / b;
+    }
+
+    /**
+     * @dev Returns the ceiling integer division of two unsigned integers,
+     * reverting on division by zero. The result is rounded towards up the
+     * nearest integer, instead of truncating the fractional part.
+     *
+     * Requirements:
+     *
+     * - The divisor cannot be zero.
+     * - The sum of the dividend and divisor cannot overflow.
+     */
+    function ceilDiv(uint256 a, uint256 b) internal pure returns (uint256) {
+        require(b > 0, "SafeMath: ceiling division by 0");
+        return a / b + (a % b == 0 ? 0 : 1);
     }
 }
