@@ -1,12 +1,19 @@
 import IERC20 from "@openzeppelin/contracts/build/contracts/IERC20.json";
 import { expect } from "chai";
 import { MockContract } from "ethereum-waffle";
-import { BigNumber, Contract, ContractReceipt, Event } from "ethers";
+import {
+  BigNumber,
+  BigNumberish,
+  Contract,
+  ContractReceipt,
+  Event,
+} from "ethers";
 import { artifacts, ethers, waffle } from "hardhat";
 
 import {
   Interaction,
   InteractionStage,
+  Order,
   OrderBalance,
   OrderFlags,
   OrderKind,
@@ -27,6 +34,7 @@ import {
   builtAndDeployedMetadataCoincide,
   readVaultRelayerImmutables,
 } from "./bytecode";
+import { ceilDiv } from "./testHelpers";
 
 function fillBytes(count: number, byte: number): string {
   return ethers.utils.hexlify([...Array(count)].map(() => byte));
@@ -828,20 +836,26 @@ describe("GPv2Settlement", () => {
     describe("Order Executed Amounts", () => {
       const { sellAmount, buyAmount } = partialOrder;
       const executedAmount = ethers.utils.parseEther("10.0");
-      const computeSettlementForOrderVariant = async ({
-        kind,
-        partiallyFillable,
-      }: OrderFlags) => {
+      const computeSettlementForOrderVariant = async (
+        {
+          kind,
+          partiallyFillable,
+          ...orderOverrides
+        }: OrderFlags & Partial<Order>,
+        execution: TradeExecution = { executedAmount },
+        clearingPrices: Record<string, BigNumberish> = prices,
+      ) => {
         const encoder = new SettlementEncoder(testDomain);
         await encoder.signEncodeTrade(
           {
             ...partialOrder,
             kind,
             partiallyFillable,
+            ...orderOverrides,
           },
           traders[0],
           SigningScheme.EIP712,
-          { executedAmount },
+          execution,
         );
 
         const {
@@ -849,13 +863,13 @@ describe("GPv2Settlement", () => {
           outTransfers: [{ amount: executedBuyAmount }],
         } = await settlement.callStatic.computeTradeExecutionsTest(
           encoder.tokens,
-          encoder.clearingPrices(prices),
+          encoder.clearingPrices(clearingPrices),
           encoder.trades,
         );
 
         const [sellPrice, buyPrice] = [
-          prices[partialOrder.sellToken],
-          prices[partialOrder.buyToken],
+          clearingPrices[sellToken],
+          clearingPrices[buyToken],
         ];
 
         return { executedSellAmount, sellPrice, executedBuyAmount, buyPrice };
@@ -914,7 +928,7 @@ describe("GPv2Settlement", () => {
 
         expect(executedSellAmount).to.deep.equal(executedAmount);
         expect(executedBuyAmount).to.deep.equal(
-          executedAmount.mul(sellPrice).div(buyPrice),
+          ceilDiv(executedAmount.mul(sellPrice), buyPrice),
         );
       });
 
@@ -957,6 +971,47 @@ describe("GPv2Settlement", () => {
             .mul(sellAmount)
             .gt(executedSellAmount.mul(buyAmount)),
         ).to.be.true;
+      });
+
+      it("should round executed buy amount in favour of trader for partial fill sell orders", async () => {
+        const { executedBuyAmount } = await computeSettlementForOrderVariant(
+          {
+            kind: OrderKind.SELL,
+            partiallyFillable: true,
+            sellAmount: ethers.utils.parseEther("100.0"),
+            buyAmount: ethers.utils.parseEther("1.0"),
+          },
+          { executedAmount: 1 },
+          {
+            [sellToken]: 1,
+            [buyToken]: 100,
+          },
+        );
+
+        // NOTE: Buy token is 100x more valuable than the sell token, however,
+        // selling just 1 atom of the less valuable token will still give the
+        // trader 1 atom of the much more valuable buy token.
+        expect(executedBuyAmount).to.deep.equal(ethers.constants.One);
+      });
+
+      it("should round executed sell amount in favour of trader for partial fill buy orders", async () => {
+        const { executedSellAmount } = await computeSettlementForOrderVariant(
+          {
+            kind: OrderKind.BUY,
+            partiallyFillable: true,
+            sellAmount: ethers.utils.parseEther("1.0"),
+            buyAmount: ethers.utils.parseEther("100.0"),
+          },
+          { executedAmount: 1 },
+          {
+            [sellToken]: 100,
+            [buyToken]: 1,
+          },
+        );
+
+        // NOTE: Sell token is 100x more valuable than the buy token. Buying
+        // just 1 atom of the less valuable buy token is free for the trader.
+        expect(executedSellAmount).to.deep.equal(ethers.constants.Zero);
       });
 
       describe("should revert if order is executed for a too large amount", () => {
