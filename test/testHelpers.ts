@@ -1,4 +1,4 @@
-import { BigNumber } from "ethers";
+import { BigNumber, BigNumberish } from "ethers";
 import { ethers } from "hardhat";
 
 import { OrderKind } from "../src/ts";
@@ -29,3 +29,7 @@ export const SAMPLE_ORDER = {
   kind: OrderKind.SELL,
   partiallyFillable: false,
 };
+
+export function ceilDiv(p: BigNumberish, q: BigNumberish): BigNumber {
+  return BigNumber.from(p).add(q).sub(1).div(q);
+}
