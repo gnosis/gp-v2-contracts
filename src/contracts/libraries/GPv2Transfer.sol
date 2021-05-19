@@ -32,7 +32,7 @@ library GPv2Transfer {
     /// This method is used for transferring fees to the settlement contract
     /// when settling a single order directly with Balancer.
     ///
-    /// Note that this method is subtly different that `transferFromAccounts`
+    /// Note that this method is subtly different from `transferFromAccounts`
     /// with a single transfer with respect to how it deals with internal
     /// balances. Specifically, this method will perform an **internal balance
     /// transfer instead of an intenal balance withdrawal** for trades that
