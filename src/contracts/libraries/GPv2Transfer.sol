@@ -32,10 +32,18 @@ library GPv2Transfer {
     /// This method is used for transferring fees to the settlement contract
     /// when settling a single order directly with Balancer.
     ///
+    /// Note that this method is subtly different from `transferFromAccounts`
+    /// with a single transfer with respect to how it deals with internal
+    /// balances. Specifically, this method will perform an **internal balance
+    /// transfer to the settlement contract instead of a withdrawal to the
+    /// external balance of the settlement contract** for trades that specify
+    /// trading with internal balances. This is done as a gas optimization in
+    /// the single order "fast-path".
+    ///
     /// @param vault The Balancer vault to use.
     /// @param transfer The transfer to perform specifying the sender account.
     /// @param recipient The recipient for the transfer.
-    function transferFromAccount(
+    function fastTransferFromAccount(
         IVault vault,
         Data calldata transfer,
         address recipient

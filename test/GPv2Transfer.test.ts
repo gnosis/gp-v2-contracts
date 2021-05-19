@@ -36,7 +36,7 @@ describe("GPv2Transfer", () => {
         .withArgs(traders[0].address, recipient.address, amount)
         .returns(true);
       await expect(
-        transfer.transferFromAccountTest(
+        transfer.fastTransferFromAccountTest(
           vault.address,
           {
             account: traders[0].address,
@@ -62,7 +62,7 @@ describe("GPv2Transfer", () => {
         ])
         .returns();
       await expect(
-        transfer.transferFromAccountTest(
+        transfer.fastTransferFromAccountTest(
           vault.address,
           {
             account: traders[0].address,
@@ -88,7 +88,7 @@ describe("GPv2Transfer", () => {
         ])
         .returns();
       await expect(
-        transfer.transferFromAccountTest(
+        transfer.fastTransferFromAccountTest(
           vault.address,
           {
             account: traders[0].address,
@@ -108,7 +108,7 @@ describe("GPv2Transfer", () => {
         OrderBalanceId.INTERNAL,
       ]) {
         await expect(
-          transfer.transferFromAccountTest(
+          transfer.fastTransferFromAccountTest(
             vault.address,
             {
               account: traders[0].address,
@@ -128,7 +128,7 @@ describe("GPv2Transfer", () => {
         .revertsWithReason("test error");
 
       await expect(
-        transfer.transferFromAccountTest(
+        transfer.fastTransferFromAccountTest(
           vault.address,
           {
             account: traders[0].address,
@@ -155,7 +155,7 @@ describe("GPv2Transfer", () => {
         .revertsWithReason("test error");
 
       await expect(
-        transfer.transferFromAccountTest(
+        transfer.fastTransferFromAccountTest(
           vault.address,
           {
             account: traders[0].address,
@@ -182,7 +182,7 @@ describe("GPv2Transfer", () => {
         .revertsWithReason("test error");
 
       await expect(
-        transfer.transferFromAccountTest(
+        transfer.fastTransferFromAccountTest(
           vault.address,
           {
             account: traders[0].address,
