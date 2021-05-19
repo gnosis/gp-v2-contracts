@@ -35,7 +35,7 @@ library GPv2Transfer {
     /// Note that this method is subtly different from `transferFromAccounts`
     /// with a single transfer with respect to how it deals with internal
     /// balances. Specifically, this method will perform an **internal balance
-    /// transfer instead of an intenal balance withdrawal** for trades that
+    /// transfer to the settlement contract instead of a withdrawal to the external balance of the settlement contract** for trades that
     /// specify trading with internal balances. This is done as a gas
     /// optimization in the single order "fast-path".
     ///
