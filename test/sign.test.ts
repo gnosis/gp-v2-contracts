@@ -33,6 +33,7 @@ const patchedSignMessageBuilder = (key: SigningKey) => async (
 type SpyProvider = JsonRpcProvider & {
   called: number;
   method: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   params: any[];
 };
 
@@ -42,6 +43,7 @@ type SpyProvider = JsonRpcProvider & {
 const patchProvider = (p: SpyProvider) => {
   p.called = 0;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   p.send = async (method: string, params: any[]): Promise<string> => {
     p.method = method;
     p.params = params;
