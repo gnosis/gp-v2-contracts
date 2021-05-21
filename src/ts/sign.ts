@@ -1,3 +1,5 @@
+import { _TypedDataEncoder } from "@ethersproject/hash";
+import type { JsonRpcProvider } from "@ethersproject/providers";
 import { BytesLike, ethers, Signer } from "ethers";
 
 import {
@@ -121,12 +123,62 @@ export interface PreSignSignature {
   data: string;
 }
 
+export type SigningOptions = {
+  signTypedDataVersion?: "v4" | "v3";
+};
+
+/**
+ * Sign message using `eth_signTypedData_v3`
+ *
+ * Code adapted from https://github.com/ethers-io/ethers.js/blob/master/packages/providers/src.ts/json-rpc-provider.ts#L232-L244
+ * Main difference is the use of `eth_signTypedData_v3` instead of `eth_signTypedData_v4`
+ */
+async function signTypedDataV3(
+  signer: Signer,
+  domain: TypedDataDomain,
+  types: TypedDataTypes,
+  data: Record<string, unknown>,
+): Promise<string> {
+  if (!signer.provider) {
+    // Likely set at this point, but throwing when empty just in case
+    throw new Error("Signer does not have a provider set");
+  }
+
+  // Casting it to JsonRpcProvider, which contains the `send` method
+  const provider = signer.provider as JsonRpcProvider;
+
+  const populated = await _TypedDataEncoder.resolveNames(
+    domain,
+    types,
+    data,
+    (name: string) => {
+      return provider.resolveName(name);
+    },
+  );
+
+  const payload = _TypedDataEncoder.getPayload(
+    populated.domain,
+    types,
+    populated.value,
+  );
+  const msg = JSON.stringify(payload);
+
+  const address = await signer.getAddress();
+
+  // Actual signing
+  return (await provider.send("eth_signTypedData_v3", [
+    address.toLowerCase(),
+    msg,
+  ])) as string;
+}
+
 async function ecdsaSignTypedData(
   scheme: EcdsaSigningScheme,
   owner: Signer,
   domain: TypedDataDomain,
   types: TypedDataTypes,
   data: Record<string, unknown>,
+  options?: SigningOptions,
 ): Promise<string> {
   let signature: string | null = null;
 
@@ -135,7 +187,13 @@ async function ecdsaSignTypedData(
       if (!isTypedDataSigner(owner)) {
         throw new Error("signer does not support signing typed data");
       }
-      signature = await owner._signTypedData(domain, types, data);
+      if (options?.signTypedDataVersion === "v3") {
+        // v3
+        signature = await signTypedDataV3(owner, domain, types, data);
+      } else {
+        // v4
+        signature = await owner._signTypedData(domain, types, data);
+      }
       break;
     case SigningScheme.ETHSIGN:
       signature = await owner.signMessage(
@@ -164,6 +222,10 @@ async function ecdsaSignTypedData(
  * @param owner The owner for the order used to sign.
  * @param scheme The signing scheme to use. See {@link SigningScheme} for more
  * details.
+ * @param options Object with optional parameters to tweak the behaviour of some signing methods
+ *  - signTypedDataVersion: For `SigningScheme.EIP712`, allows to force the use of a specific `signTypedData` version.
+ *                          Option are: `v4` and `v3`.
+ *                          Defaults to `v4`.
  * @return Encoded signature including signing scheme for the order.
  */
 export async function signOrder(
@@ -171,6 +233,7 @@ export async function signOrder(
   order: Order,
   owner: Signer,
   scheme: EcdsaSigningScheme,
+  options?: SigningOptions,
 ): Promise<EcdsaSignature> {
   return {
     scheme,
@@ -180,6 +243,7 @@ export async function signOrder(
       domain,
       { Order: ORDER_TYPE_FIELDS },
       normalizeOrder(order),
+      options,
     ),
   };
 }
@@ -193,6 +257,10 @@ export async function signOrder(
  * @param owner The owner for the order used to sign.
  * @param scheme The signing scheme to use. See {@link SigningScheme} for more
  * details.
+ * @param options Object with optional parameters to tweak the behaviour of some signing methods
+ *  - signTypedDataVersion: For `SigningScheme.EIP712`, allows to force the use of a specific `signTypedData` version.
+ *                          Option are: `v4` and `v3`.
+ *                          Defaults to `v4`.
  * @return Encoded signature including signing scheme for the cancellation.
  */
 export async function signOrderCancellation(
@@ -200,6 +268,7 @@ export async function signOrderCancellation(
   orderUid: BytesLike,
   owner: Signer,
   scheme: EcdsaSigningScheme,
+  options?: SigningOptions,
 ): Promise<EcdsaSignature> {
   return {
     scheme,
@@ -209,6 +278,7 @@ export async function signOrderCancellation(
       domain,
       { OrderCancellation: CANCELLATION_TYPE_FIELDS },
       { orderUid },
+      options,
     ),
   };
 }
