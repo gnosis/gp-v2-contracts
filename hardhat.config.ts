@@ -5,12 +5,11 @@ import "solidity-coverage";
 import "@tenderly/hardhat-tenderly";
 
 import dotenv from "dotenv";
+import type { HttpNetworkUserConfig } from "hardhat/types";
+import type { MochaOptions } from "mocha";
 import yargs from "yargs";
 
 import { setupTasks } from "./src/tasks";
-
-import type { HttpNetworkUserConfig } from "hardhat/types";
-import type { MochaOptions } from "mocha";
 
 const argv = yargs
   .option("network", {
