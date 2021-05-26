@@ -3,6 +3,7 @@ import type { JsonRpcProvider } from "@ethersproject/providers";
 import { ethers, Signer } from "ethers";
 
 import {
+  isJsonRpcProvider,
   TypedDataDomain,
   TypedDataSigner,
   TypedDataTypes,
@@ -17,12 +18,20 @@ import {
  */
 export class TypedDataV3Signer implements TypedDataSigner {
   signer: Signer;
-  provider?: JsonRpcProvider | undefined;
+  provider: JsonRpcProvider;
   _isSigner = true;
 
   constructor(signer: Signer) {
     this.signer = signer;
-    this.provider = signer.provider as JsonRpcProvider;
+
+    if (!signer.provider) {
+      throw new Error("Signer does not have a provider set");
+    }
+    if (!isJsonRpcProvider(signer.provider)) {
+      throw new Error("Provider must be of type JsonRpcProvider");
+    }
+
+    this.provider = signer.provider;
   }
 
   async _signTypedData(
@@ -30,19 +39,12 @@ export class TypedDataV3Signer implements TypedDataSigner {
     types: TypedDataTypes,
     data: Record<string, unknown>,
   ): Promise<string> {
-    if (!this.provider) {
-      // Likely set at this point, but throwing when empty just in case
-      throw new Error("Signer does not have a provider set");
-    }
-
-    const provider = this.provider;
-
     const populated = await _TypedDataEncoder.resolveNames(
       domain,
       types,
       data,
       (name: string) => {
-        return provider.resolveName(name);
+        return this.provider.resolveName(name);
       },
     );
 
@@ -56,7 +58,7 @@ export class TypedDataV3Signer implements TypedDataSigner {
     const address = await this.getAddress();
 
     // Actual signing
-    return (await provider.send("eth_signTypedData_v3", [
+    return (await this.provider.send("eth_signTypedData_v3", [
       address.toLowerCase(),
       msg,
     ])) as string;
