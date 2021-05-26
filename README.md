@@ -156,7 +156,7 @@ This project exposes some handy scripts for parsing settlement calldata into hum
 
 The `decode` script can be used in two ways:
 
-1. By specifying the transaction hash with of an existing settlement transaction `--txhash 0x...`
+1. By specifying the transaction hash of an existing settlement transaction `--txhash 0x...`
 
 ```sh
 npx hardhat decode --txhash 0xc12e5bc2ef9c116932301495738d555ea1d658977dacd6c7989a6d77125a17d2 --network mainnet
