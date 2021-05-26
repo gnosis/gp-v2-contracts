@@ -25,5 +25,6 @@ export * from "./settlement";
 export * from "./reader";
 export * from "./deploy";
 export * from "./sign";
+export * from "./signers";
 export * from "./proxy";
 export * from "./types/ethers";
