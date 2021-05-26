@@ -139,7 +139,7 @@ export PK=<private key>
 yarn solvers add 0x0000000000000000000000000000000000000042
 ```
 
-### Fee Withdrawls
+### Fee Withdrawals
 
 Script to withdraw all balances of the Settlement contract. Allows to specify what minimum value the contract must have for a token to be considered (breadcrumbs might not be worth the gas costs) and how much remaining value should be left in the contract (e.g. to feed token buffers).
 
@@ -149,3 +149,24 @@ If no token list is passed in all traded token balances will be fetched from cha
 export PK=<private key>
 yarn hardhat withdraw --receiver 0x6C2999B6B1fAD608ECEA71B926D68Ee6c62BeEf8 --min-value 10000 --leftover 500 0x038a68ff68c393373ec894015816e33ad41bd564 0x913d8adf7ce6986a8cbfee5a54725d9eea4f0729
 ```
+
+### Decoding Settlement CallData
+
+This project exposes some handy scripts for parsing settlement calldata into human readable format.
+
+The `decode` script can be used in two ways:
+
+1. By specifying the transaction hash of an existing settlement transaction `--txhash 0x...`
+
+```sh
+npx hardhat decode --txhash 0xc12e5bc2ef9c116932301495738d555ea1d658977dacd6c7989a6d77125a17d2 --network mainnet
+```
+
+2. When no `txhash` is specified, by reading the calldata from stdin (`< calldata.txt`). If stdin is a terminal, the user is prompted to paste the calldata into the terminal.
+
+```sh
+> npx hardhat decode --network mainnet
+# Paste in the calldata to decode
+```
+
+Note that you will be expected to have your `INFURA_KEY` exported to your environment variables.
