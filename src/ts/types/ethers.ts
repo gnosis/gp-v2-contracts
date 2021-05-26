@@ -1,3 +1,4 @@
+import type { JsonRpcProvider, Provider } from "@ethersproject/providers";
 import type { ethers, Signer } from "ethers";
 
 /**
@@ -35,4 +36,13 @@ export interface TypedDataSigner extends Signer {
  */
 export function isTypedDataSigner(signer: Signer): signer is TypedDataSigner {
   return "_signTypedData" in signer;
+}
+
+/**
+ * Checks whether the specified provider is a JSON RPC provider.
+ */
+export function isJsonRpcProvider(
+  provider: Provider,
+): provider is JsonRpcProvider {
+  return "send" in provider;
 }
