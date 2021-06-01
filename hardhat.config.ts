@@ -83,10 +83,6 @@ export default {
         },
       },
       {
-        // Compiler for the Gnosis Safe, used for testing.
-        version: "0.5.17",
-      },
-      {
         // Compiler for the Gas Token v1
         version: "0.4.11",
       },

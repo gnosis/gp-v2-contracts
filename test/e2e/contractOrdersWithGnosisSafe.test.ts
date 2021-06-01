@@ -1,8 +1,9 @@
-import GnosisSafe from "@gnosis.pm/safe-contracts/build/contracts/GnosisSafe.json";
-import GnosisSafeProxyFactory from "@gnosis.pm/safe-contracts/build/contracts/GnosisSafeProxyFactory.json";
+import GnosisSafe from "@gnosis.pm/safe-contracts/build/artifacts/contracts/GnosisSafe.sol/GnosisSafe.json";
+import CompatibilityFallbackHandler from "@gnosis.pm/safe-contracts/build/artifacts/contracts/handler/CompatibilityFallbackHandler.sol/CompatibilityFallbackHandler.json";
+import GnosisSafeProxyFactory from "@gnosis.pm/safe-contracts/build/artifacts/contracts/proxies/GnosisSafeProxyFactory.sol/GnosisSafeProxyFactory.json";
 import ERC20 from "@openzeppelin/contracts/build/contracts/ERC20PresetMinterPauser.json";
 import { expect } from "chai";
-import { BytesLike, ContractFactory, Signer, Contract, Wallet } from "ethers";
+import { BytesLike, Signer, Contract, Wallet } from "ethers";
 import { ethers, waffle } from "hardhat";
 
 import {
@@ -26,6 +27,7 @@ class GnosisSafeManager {
   constructor(
     readonly deployer: Signer,
     readonly masterCopy: Contract,
+    readonly signingFallback: Contract,
     readonly proxyFactory: Contract,
   ) {}
 
@@ -35,7 +37,16 @@ class GnosisSafeManager {
       deployer,
       GnosisSafeProxyFactory,
     );
-    return new GnosisSafeManager(deployer, masterCopy, proxyFactory);
+    const signingFallback = await waffle.deployContract(
+      deployer,
+      CompatibilityFallbackHandler,
+    );
+    return new GnosisSafeManager(
+      deployer,
+      masterCopy,
+      signingFallback,
+      proxyFactory,
+    );
   }
 
   async newSafe(
@@ -126,11 +137,11 @@ async function execSafeTransaction(
 }
 
 async function fallbackSign(
-  safe: Contract,
+  safeAsFallback: Contract,
   message: BytesLike,
   signers: Signer[],
 ): Promise<BytesLike> {
-  const safeMessage = await safe.getMessageHash(
+  const safeMessage = await safeAsFallback.getMessageHash(
     ethers.utils.defaultAbiCoder.encode(["bytes32"], [message]),
   );
   return gnosisSafeSign(safeMessage, signers);
@@ -147,7 +158,6 @@ describe("E2E: Order From A Gnosis Safe", () => {
   let safe: Contract;
   let domainSeparator: TypedDataDomain;
   let gnosisSafeManager: GnosisSafeManager;
-  let GnosisSafeEIP1271Fallback: ContractFactory;
 
   beforeEach(async () => {
     const deployment = await deployTestContracts();
@@ -165,16 +175,11 @@ describe("E2E: Order From A Gnosis Safe", () => {
     const { chainId } = await ethers.provider.getNetwork();
     domainSeparator = domain(chainId, settlement.address);
 
-    GnosisSafeEIP1271Fallback = await ethers.getContractFactory(
-      "GnosisSafeEIP1271Fallback",
-    );
-    const fallback = await GnosisSafeEIP1271Fallback.deploy();
-
     gnosisSafeManager = await GnosisSafeManager.init(deployer);
     safe = await gnosisSafeManager.newSafe(
       safeOwners.map((wallet) => wallet.address),
       2,
-      fallback.address,
+      gnosisSafeManager.signingFallback.address,
     );
   });
 
@@ -246,15 +251,20 @@ describe("E2E: Order From A Gnosis Safe", () => {
       feeAmount: SAFE_FEE,
     };
     const gpv2Message = hashOrder(domainSeparator, order);
+    const safeAsFallback = gnosisSafeManager.signingFallback.attach(
+      safe.address,
+    );
     // Note: threshold is 2, any two owners should suffice.
-    const signature = await fallbackSign(safe, gpv2Message, [
+    const signature = await fallbackSign(safeAsFallback, gpv2Message, [
       safeOwners[4],
       safeOwners[2],
     ]);
-
-    const safeAsVerifier = GnosisSafeEIP1271Fallback.attach(safe.address);
+    // Note: the fallback handler provides two versions of `isValidSignature`
+    // for compatibility reasons. The following is the signature of the most
+    // recent EIP1271-compatible verification function.
+    const isValidSignature = "isValidSignature(bytes32,bytes)";
     expect(
-      await safeAsVerifier.callStatic.isValidSignature(gpv2Message, signature),
+      await safeAsFallback.callStatic[isValidSignature](gpv2Message, signature),
     ).to.equal(EIP1271_MAGICVALUE);
 
     encoder.encodeTrade(order, {
