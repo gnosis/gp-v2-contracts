@@ -143,6 +143,13 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
     }
 
     /// @dev Settle an order directly against Balancer V2 pools.
+    ///
+    /// @param swaps The Balancer V2 swap steps to use for trading.
+    /// @param tokens An array of ERC20 tokens to be traded in the settlement.
+    /// Swaps and the trade encode tokens as indices into this array.
+    /// @param trade The trade to match directly against Balancer liquidity. The
+    /// order will always be fully executed, so the trade's `executedAmount`
+    /// field is used to represent a swap limit amount.
     function swap(
         IVault.BatchSwapStep[] calldata swaps,
         IERC20[] calldata tokens,
@@ -166,11 +173,19 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
             order.buyTokenBalance == GPv2Order.BALANCE_INTERNAL;
 
         int256[] memory limits = new int256[](tokens.length);
+        uint256 limitAmount = trade.executedAmount;
         // NOTE: Array allocation initializes elements to 0, so we only need to
         // set the limits we care about. This ensures that the swap will respect
         // the order's limit price.
-        limits[trade.sellTokenIndex] = order.sellAmount.toInt256();
-        limits[trade.buyTokenIndex] = -order.buyAmount.toInt256();
+        if (order.kind == GPv2Order.KIND_SELL) {
+            require(limitAmount >= order.buyAmount, "GPv2: limit too low");
+            limits[trade.sellTokenIndex] = order.sellAmount.toInt256();
+            limits[trade.buyTokenIndex] = -limitAmount.toInt256();
+        } else {
+            require(limitAmount <= order.sellAmount, "GPv2: limit too high");
+            limits[trade.sellTokenIndex] = limitAmount.toInt256();
+            limits[trade.buyTokenIndex] = -order.buyAmount.toInt256();
+        }
 
         GPv2Transfer.Data memory feeTransfer;
         feeTransfer.account = recoveredOrder.owner;

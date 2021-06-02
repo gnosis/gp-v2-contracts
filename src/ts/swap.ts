@@ -1,6 +1,6 @@
 import { BigNumberish, BytesLike, Signer } from "ethers";
 
-import { Order } from "./order";
+import { Order, OrderKind } from "./order";
 import { TokenRegistry, Trade, encodeTrade } from "./settlement";
 import { EcdsaSigningScheme, Signature, signOrder } from "./sign";
 import { TypedDataDomain } from "./types/ethers";
@@ -63,6 +63,19 @@ export interface BatchSwapStep {
    * Additional pool user data required for the swap.
    */
   userData: BytesLike;
+}
+
+/**
+ * Swap execution parameters.
+ */
+export interface SwapExecution {
+  /**
+   * The limit amount for the swap.
+   *
+   * This allows settlement submission to define a tighter slippage than what
+   * was specified by the order in order to reduce MEV opportunity.
+   */
+  limitAmount: BigNumberish;
 }
 
 /**
@@ -161,9 +174,19 @@ export class SwapEncoder {
    * @param order The order of the trade to encode.
    * @param signature The signature for the order data.
    */
-  public encodeTrade(order: Order, signature: Signature): void {
+  public encodeTrade(
+    order: Order,
+    signature: Signature,
+    swapExecution?: Partial<SwapExecution>,
+  ): void {
+    const { limitAmount } = {
+      limitAmount:
+        order.kind == OrderKind.SELL ? order.buyAmount : order.sellAmount,
+      ...swapExecution,
+    };
+
     this._trade = encodeTrade(this._tokens, order, signature, {
-      executedAmount: 0,
+      executedAmount: limitAmount,
     });
   }
 
@@ -179,9 +202,10 @@ export class SwapEncoder {
     order: Order,
     owner: Signer,
     scheme: EcdsaSigningScheme,
+    swapExecution?: Partial<SwapExecution>,
   ): Promise<void> {
     const signature = await signOrder(this.domain, order, owner, scheme);
-    this.encodeTrade(order, signature);
+    this.encodeTrade(order, signature, swapExecution);
   }
 
   /**
@@ -198,6 +222,12 @@ export class SwapEncoder {
     order: Order,
     signature: Signature,
   ): EncodedSwap;
+  public static encodeSwap(
+    swaps: Swap[],
+    order: Order,
+    signature: Signature,
+    swapExecution: Partial<SwapExecution> | undefined,
+  ): EncodedSwap;
 
   public static encodeSwap(
     domain: TypedDataDomain,
@@ -205,6 +235,14 @@ export class SwapEncoder {
     order: Order,
     owner: Signer,
     scheme: EcdsaSigningScheme,
+  ): Promise<EncodedSwap>;
+  public static encodeSwap(
+    domain: TypedDataDomain,
+    swaps: Swap[],
+    order: Order,
+    owner: Signer,
+    scheme: EcdsaSigningScheme,
+    swapExecution: Partial<SwapExecution> | undefined,
   ): Promise<EncodedSwap>;
 
   /**
@@ -217,22 +255,44 @@ export class SwapEncoder {
   public static encodeSwap(
     ...args:
       | [Swap[], Order, Signature]
+      | [Swap[], Order, Signature, Partial<SwapExecution> | undefined]
       | [TypedDataDomain, Swap[], Order, Signer, EcdsaSigningScheme]
+      | [
+          TypedDataDomain,
+          Swap[],
+          Order,
+          Signer,
+          EcdsaSigningScheme,
+          Partial<SwapExecution> | undefined,
+        ]
   ): EncodedSwap | Promise<EncodedSwap> {
-    const [domain, swaps, order, ...signatureOrSigner] =
-      args.length === 3 ? [{ name: "unused" }, ...args] : args;
+    if (args.length < 5) {
+      const [swaps, order, signature, swapExecution] = args as unknown as [
+        Swap[],
+        Order,
+        Signature,
+        Partial<SwapExecution> | undefined,
+      ];
 
-    const encoder = new SwapEncoder(domain);
-    encoder.encodeSwapStep(...swaps);
-
-    if (signatureOrSigner.length === 1) {
-      const [signature] = signatureOrSigner;
-      encoder.encodeTrade(order, signature);
+      const encoder = new SwapEncoder({});
+      encoder.encodeSwapStep(...swaps);
+      encoder.encodeTrade(order, signature, swapExecution);
       return encoder.encodedSwap();
     } else {
-      const [owner, scheme] = signatureOrSigner;
+      const [domain, swaps, order, owner, scheme, swapExecution] =
+        args as unknown as [
+          TypedDataDomain,
+          Swap[],
+          Order,
+          Signer,
+          EcdsaSigningScheme,
+          Partial<SwapExecution> | undefined,
+        ];
+
+      const encoder = new SwapEncoder(domain);
+      encoder.encodeSwapStep(...swaps);
       return encoder
-        .signEncodeTrade(order, owner, scheme)
+        .signEncodeTrade(order, owner, scheme, swapExecution)
         .then(() => encoder.encodedSwap());
     }
   }
