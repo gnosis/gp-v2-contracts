@@ -589,7 +589,7 @@ describe("GPv2Settlement", () => {
 
         it(`reverts when specified limit amount does not satisfy ${kind} price`, async () => {
           const [swaps, tokens, trade] = await encodeSwap({
-            // Specify a swap limit about that is slightly worse than the
+            // Specify a swap limit amount that is slightly worse than the
             // order's limit price.
             limitAmount:
               kind == OrderKind.SELL
