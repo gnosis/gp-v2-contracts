@@ -174,7 +174,6 @@ library GPv2Transfer {
                         gas: 5700
                     }(hex"");
                 // solhint-enable avoid-low-level-calls
-
                 require(success, "GPv2: ether transfer failed");
             } else if (transfer.balance == GPv2Order.BALANCE_ERC20) {
                 transfer.token.safeTransfer(transfer.account, transfer.amount);
