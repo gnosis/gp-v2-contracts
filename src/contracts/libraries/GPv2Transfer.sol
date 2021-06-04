@@ -155,7 +155,23 @@ library GPv2Transfer {
                     transfer.balance != GPv2Order.BALANCE_INTERNAL,
                     "GPv2: unsupported internal ETH"
                 );
-                payable(transfer.account).transfer(transfer.amount);
+
+                // NOTE: We transfer with a slightly higher stipend than the
+                // Solidity default of 2300 because of the recent Berlin hard
+                // fork. This is not strictly needed, as access lists would also
+                // allow sending Ether to SC wallets, but increasing the stipend
+                // seemed like an appropriate solution. The value of 15000 was
+                // chosen so that no storage can be written nor a new contract
+                // created.
+                // solhint-disable avoid-low-level-calls
+                (bool success, ) =
+                    payable(transfer.account).call{
+                        value: transfer.amount,
+                        gas: 15000
+                    }(hex"");
+                // solhint-enable avoid-low-level-calls
+
+                require(success, "GPv2: transfer failed");
             } else if (transfer.balance == GPv2Order.BALANCE_ERC20) {
                 transfer.token.safeTransfer(transfer.account, transfer.amount);
             } else {

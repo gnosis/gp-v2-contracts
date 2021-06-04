@@ -1,7 +1,7 @@
 import IERC20 from "@openzeppelin/contracts/build/contracts/IERC20.json";
 import { expect } from "chai";
 import { MockContract } from "ethereum-waffle";
-import { BigNumber, Contract } from "ethers";
+import { BigNumber, Contract, ContractFactory } from "ethers";
 import { artifacts, ethers, waffle } from "hardhat";
 
 import { BUY_ETH_ADDRESS } from "../src/ts";
@@ -17,6 +17,9 @@ describe("GPv2Transfer", () => {
   let vault: MockContract;
   let token: MockContract;
 
+  let NonPayable: ContractFactory;
+  let EtherReceiver: ContractFactory;
+
   beforeEach(async () => {
     const GPv2Transfer = await ethers.getContractFactory(
       "GPv2TransferTestInterface",
@@ -26,6 +29,9 @@ describe("GPv2Transfer", () => {
     const IVault = await artifacts.readArtifact("IVault");
     vault = await waffle.deployMockContract(deployer, IVault.abi);
     token = await waffle.deployMockContract(deployer, IERC20.abi);
+
+    NonPayable = await ethers.getContractFactory("NonPayable");
+    EtherReceiver = await ethers.getContractFactory("EtherReceiver");
   });
 
   const amount = ethers.utils.parseEther("0.1337");
@@ -506,6 +512,49 @@ describe("GPv2Transfer", () => {
       expect(await traders[0].getBalance()).to.deep.equal(
         initialBalance.add(amount),
       );
+    });
+
+    it("should transfer Ether to contract", async () => {
+      await funder.sendTransaction({
+        to: transfer.address,
+        value: amount,
+      });
+
+      const smartWallet = await EtherReceiver.deploy();
+      const initialBalance = await ethers.provider.getBalance(
+        smartWallet.address,
+      );
+      await transfer.transferToAccountsTest(vault.address, [
+        {
+          account: smartWallet.address,
+          token: BUY_ETH_ADDRESS,
+          amount,
+          balance: OrderBalanceId.ERC20,
+        },
+      ]);
+
+      expect(
+        await ethers.provider.getBalance(smartWallet.address),
+      ).to.deep.equal(initialBalance.add(amount));
+    });
+
+    it("should revert when transfering Ether to contract that reverts", async () => {
+      await funder.sendTransaction({
+        to: transfer.address,
+        value: amount,
+      });
+
+      const smartWallet = await NonPayable.deploy();
+      await expect(
+        transfer.transferToAccountsTest(vault.address, [
+          {
+            account: smartWallet.address,
+            token: BUY_ETH_ADDRESS,
+            amount,
+            balance: OrderBalanceId.ERC20,
+          },
+        ]),
+      ).to.be.reverted;
     });
 
     it("should transfer many external and internal amounts to recipient", async () => {
