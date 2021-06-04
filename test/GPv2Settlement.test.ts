@@ -21,6 +21,7 @@ import {
   SettlementEncoder,
   SigningScheme,
   SwapEncoder,
+  SwapExecution,
   TradeExecution,
   TypedDataDomain,
   computeOrderUid,
@@ -515,13 +516,14 @@ describe("GPv2Settlement", () => {
         };
         const orderUid = () =>
           computeOrderUid(testDomain, order, traders[0].address);
-        const encodeSwap = () =>
+        const encodeSwap = (swapExecution?: Partial<SwapExecution>) =>
           SwapEncoder.encodeSwap(
             testDomain,
             [],
             order,
             traders[0],
             SigningScheme.ETHSIGN,
+            swapExecution,
           );
 
         it(`executes ${kind} order against swap`, async () => {
@@ -583,6 +585,27 @@ describe("GPv2Settlement", () => {
           await expect(
             settlement.connect(solver).swap(...(await encodeSwap())),
           ).to.be.revertedWith(`${kind} amount not respected`);
+        });
+
+        it(`reverts when specified limit amount does not satisfy ${kind} price`, async () => {
+          const [swaps, tokens, trade] = await encodeSwap({
+            // Specify a swap limit amount that is slightly worse than the
+            // order's limit price.
+            limitAmount:
+              kind == OrderKind.SELL
+                ? order.buyAmount.sub(1) // receive slightly less buy token
+                : order.sellAmount.add(1), // pay slightly more sell token
+          });
+
+          await vault.mock.batchSwap.returns([sellAmount, buyAmount.mul(-1)]);
+          await vault.mock.manageUserBalance.returns();
+
+          await authenticator.connect(owner).addSolver(solver.address);
+          await expect(
+            settlement.connect(solver).swap(swaps, tokens, trade),
+          ).to.be.revertedWith(
+            kind == OrderKind.SELL ? "limit too low" : "limit too high",
+          );
         });
 
         it(`emits a ${kind} trade event`, async () => {

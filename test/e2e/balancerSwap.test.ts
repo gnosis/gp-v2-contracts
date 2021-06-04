@@ -305,8 +305,9 @@ describe("E2E: Direct Balancer swap", () => {
       await mintAndApprove(trader, tokens[0], ethers.utils.parseEther("100.1"));
 
       const pool = poolFor(tokens[0], tokens[1]);
-      // NOTE: Set a multiplier that does not satisfy the order's limit price.
-      await pool.setMultiplier(ethers.utils.parseEther("0.5"));
+      // NOTE: Set a multiplier that satisfies the order's limit price but not
+      // the specified limit amount.
+      await pool.setMultiplier(ethers.utils.parseEther("1.1"));
 
       const encoder = new SwapEncoder(domainSeparator);
       await encoder.signEncodeTrade(
@@ -323,15 +324,18 @@ describe("E2E: Direct Balancer swap", () => {
         },
         trader,
         SigningScheme.EIP712,
+        {
+          limitAmount:
+            kind == OrderKind.SELL
+              ? ethers.utils.parseEther("120.0")
+              : ethers.utils.parseEther("80.0"),
+        },
       );
       encoder.encodeSwapStep({
         poolId: await pool.getPoolId(),
         assetIn: tokens[0].address,
         assetOut: tokens[1].address,
-        amount:
-          kind == OrderKind.SELL
-            ? ethers.utils.parseEther("100.0")
-            : ethers.utils.parseEther("100.0"),
+        amount: ethers.utils.parseEther("100.0"),
       });
 
       await expect(
