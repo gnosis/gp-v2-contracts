@@ -8,6 +8,7 @@ import { BUY_ETH_ADDRESS } from "../src/ts";
 
 import { UserBalanceOpKind } from "./balancer";
 import { OrderBalanceId } from "./encoding";
+import { GnosisSafeManager } from "./safe";
 
 describe("GPv2Transfer", () => {
   const [deployer, recipient, funder, ...traders] =
@@ -18,7 +19,6 @@ describe("GPv2Transfer", () => {
   let token: MockContract;
 
   let NonPayable: ContractFactory;
-  let EtherReceiver: ContractFactory;
 
   beforeEach(async () => {
     const GPv2Transfer = await ethers.getContractFactory(
@@ -31,7 +31,6 @@ describe("GPv2Transfer", () => {
     token = await waffle.deployMockContract(deployer, IERC20.abi);
 
     NonPayable = await ethers.getContractFactory("NonPayable");
-    EtherReceiver = await ethers.getContractFactory("EtherReceiver");
   });
 
   const amount = ethers.utils.parseEther("0.1337");
@@ -514,28 +513,27 @@ describe("GPv2Transfer", () => {
       );
     });
 
-    it("should transfer Ether to contract", async () => {
+    it("should transfer Ether to a Smart Contract wallet", async () => {
       await funder.sendTransaction({
         to: transfer.address,
         value: amount,
       });
 
-      const smartWallet = await EtherReceiver.deploy();
-      const initialBalance = await ethers.provider.getBalance(
-        smartWallet.address,
-      );
+      const safeManager = await GnosisSafeManager.init(deployer);
+      const safe = await safeManager.newSafe([traders[0].address], 1);
+
       await transfer.transferToAccountsTest(vault.address, [
         {
-          account: smartWallet.address,
+          account: safe.address,
           token: BUY_ETH_ADDRESS,
           amount,
           balance: OrderBalanceId.ERC20,
         },
       ]);
 
-      expect(
-        await ethers.provider.getBalance(smartWallet.address),
-      ).to.deep.equal(initialBalance.add(amount));
+      expect(await ethers.provider.getBalance(safe.address)).to.deep.equal(
+        amount,
+      );
     });
 
     it("should revert when transfering Ether to contract that reverts", async () => {

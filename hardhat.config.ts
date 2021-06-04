@@ -90,6 +90,7 @@ export default {
   },
   networks: {
     hardhat: {
+      hardfork: "berlin",
       blockGasLimit: 12.5e6,
     },
     mainnet: {

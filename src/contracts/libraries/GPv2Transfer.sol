@@ -160,18 +160,22 @@ library GPv2Transfer {
                 // Solidity default of 2300 because of the recent Berlin hard
                 // fork. This is not strictly needed, as access lists would also
                 // allow sending Ether to SC wallets, but increasing the stipend
-                // seemed like an appropriate solution. The value of 15000 was
-                // chosen so that no storage can be written nor a new contract
-                // created.
+                // seemed like an appropriate solution. The value of 5700 was
+                // chosen because:
+                // - it is small enough that no meaningful work can be done (no
+                //   storage writing for example)
+                // - it is enough for a cold storage read (2100), cold delegate
+                //   call (2600), and a little more for doing things (1000)
+                // - it is enough to transfer to a Gnosis Safe :)
                 // solhint-disable avoid-low-level-calls
                 (bool success, ) =
                     payable(transfer.account).call{
                         value: transfer.amount,
-                        gas: 15000
+                        gas: 5700
                     }(hex"");
                 // solhint-enable avoid-low-level-calls
 
-                require(success, "GPv2: transfer failed");
+                require(success, "GPv2: ether transfer failed");
             } else if (transfer.balance == GPv2Order.BALANCE_ERC20) {
                 transfer.token.safeTransfer(transfer.account, transfer.amount);
             } else {

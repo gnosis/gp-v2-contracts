@@ -1,6 +1,3 @@
-import GnosisSafe from "@gnosis.pm/safe-contracts/build/artifacts/contracts/GnosisSafe.sol/GnosisSafe.json";
-import CompatibilityFallbackHandler from "@gnosis.pm/safe-contracts/build/artifacts/contracts/handler/CompatibilityFallbackHandler.sol/CompatibilityFallbackHandler.json";
-import GnosisSafeProxyFactory from "@gnosis.pm/safe-contracts/build/artifacts/contracts/proxies/GnosisSafeProxyFactory.sol/GnosisSafeProxyFactory.json";
 import ERC20 from "@openzeppelin/contracts/build/contracts/ERC20PresetMinterPauser.json";
 import { expect } from "chai";
 import { BytesLike, Signer, Contract, Wallet } from "ethers";
@@ -15,63 +12,13 @@ import {
   domain,
   hashOrder,
 } from "../../src/ts";
+import { GnosisSafeManager } from "../safe";
 
 import { deployTestContracts } from "./fixture";
 
 interface SafeTransaction {
   to: string;
   data: BytesLike;
-}
-
-class GnosisSafeManager {
-  constructor(
-    readonly deployer: Signer,
-    readonly masterCopy: Contract,
-    readonly signingFallback: Contract,
-    readonly proxyFactory: Contract,
-  ) {}
-
-  static async init(deployer: Signer): Promise<GnosisSafeManager> {
-    const masterCopy = await waffle.deployContract(deployer, GnosisSafe);
-    const proxyFactory = await waffle.deployContract(
-      deployer,
-      GnosisSafeProxyFactory,
-    );
-    const signingFallback = await waffle.deployContract(
-      deployer,
-      CompatibilityFallbackHandler,
-    );
-    return new GnosisSafeManager(
-      deployer,
-      masterCopy,
-      signingFallback,
-      proxyFactory,
-    );
-  }
-
-  async newSafe(
-    owners: string[],
-    threshold: number,
-    fallback = ethers.constants.AddressZero,
-  ): Promise<Contract> {
-    const proxyAddress = await this.proxyFactory.callStatic.createProxy(
-      this.masterCopy.address,
-      "0x",
-    );
-    await this.proxyFactory.createProxy(this.masterCopy.address, "0x");
-    const safe = await ethers.getContractAt(GnosisSafe.abi, proxyAddress);
-    await safe.setup(
-      owners,
-      threshold,
-      ethers.constants.AddressZero,
-      "0x",
-      fallback,
-      ethers.constants.AddressZero,
-      0,
-      ethers.constants.AddressZero,
-    );
-    return safe;
-  }
 }
 
 async function gnosisSafeSign(
