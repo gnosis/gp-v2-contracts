@@ -19,6 +19,7 @@ describe("GPv2Transfer", () => {
   let token: MockContract;
 
   let NonPayable: ContractFactory;
+  let FallbackWriteStorage: ContractFactory;
 
   beforeEach(async () => {
     const GPv2Transfer = await ethers.getContractFactory(
@@ -31,6 +32,9 @@ describe("GPv2Transfer", () => {
     token = await waffle.deployMockContract(deployer, IERC20.abi);
 
     NonPayable = await ethers.getContractFactory("NonPayable");
+    FallbackWriteStorage = await ethers.getContractFactory(
+      "FallbackWriteStorage",
+    );
   });
 
   const amount = ethers.utils.parseEther("0.1337");
@@ -553,6 +557,35 @@ describe("GPv2Transfer", () => {
           },
         ]),
       ).to.be.reverted;
+    });
+
+    it("should revert when transfering Ether to contract writes storage", async () => {
+      await funder.sendTransaction({
+        to: transfer.address,
+        value: amount,
+      });
+
+      const smartWallet = await FallbackWriteStorage.deploy();
+
+      await expect(
+        funder.sendTransaction({
+          to: smartWallet.address,
+          value: 1,
+        }),
+      ).to.not.be.reverted;
+      expect(await smartWallet.receiveCount()).to.equal(1);
+
+      await expect(
+        transfer.transferToAccountsTest(vault.address, [
+          {
+            account: smartWallet.address,
+            token: BUY_ETH_ADDRESS,
+            amount,
+            balance: OrderBalanceId.ERC20,
+          },
+        ]),
+      ).to.be.reverted;
+      expect(await smartWallet.receiveCount()).to.not.equal(2);
     });
 
     it("should transfer many external and internal amounts to recipient", async () => {
