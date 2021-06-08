@@ -4,6 +4,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 import Authorizer from "../../balancer/Authorizer.json";
 import Vault from "../../balancer/Vault.json";
+import BALANCER_NETWORKS from "../../balancer/networks.json";
 import { CONTRACT_NAMES, SALT } from "../ts/deploy";
 
 const deploySettlement: DeployFunction = async function ({
@@ -38,9 +39,17 @@ const deploySettlement: DeployFunction = async function ({
       args: [authorizerAddress, wethAddress, 0, 0],
     }));
   } else {
-    // TODO(nlordell): Once the Vault is deployed, we need to get the address
-    // based on the network.
-    vaultAddress = ethers.constants.AddressZero;
+    const { chainId } = await ethers.provider.getNetwork();
+    const vaultNetworks = BALANCER_NETWORKS["Vault"] as Record<
+      number,
+      { address: string } | undefined
+    >;
+    const vaultDeployment = vaultNetworks[chainId];
+    if (vaultDeployment === undefined) {
+      throw new Error(`Vault not deployed on chain ${chainId}`);
+    }
+
+    vaultAddress = vaultDeployment.address;
   }
 
   await deploy(settlement, {
