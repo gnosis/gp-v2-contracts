@@ -7,6 +7,10 @@
     "4": {
       "address": "0xA331D84eC860Bf466b4CdCcFb4aC09a1B43F3aE6",
       "transactionHash": "0xc66455d8a3acaf7d5b57bb8acbbc9466928221a69eab081da996b8774ced34a4"
+    },
+    "100": {
+      "address": "0xA331D84eC860Bf466b4CdCcFb4aC09a1B43F3aE6",
+      "transactionHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
     }
   },
   "Vault": {
@@ -17,6 +21,10 @@
     "4": {
       "address": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
       "transactionHash": "0x5fe65a242760f7f32b582dc402a081791d57ea561474617fcd0e763c995cfec7"
+    },
+    "100": {
+      "address": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+      "transactionHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
     }
   }
 }
