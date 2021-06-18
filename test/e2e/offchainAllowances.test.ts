@@ -54,7 +54,7 @@ describe("E2E: Off-chain Allowances", () => {
 
   describe("EIP-2612 Permit", () => {
     it("permits trader allowance with settlement", async () => {
-      // Settle a trivial where all € stable coins trade 1:1.
+      // Settle a trivial trade where all € stable coins trade 1:1.
 
       const encoder = new SettlementEncoder(domainSeparator);
 
