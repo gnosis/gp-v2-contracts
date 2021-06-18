@@ -55,7 +55,7 @@
     "eslint-plugin-import": "^2.23.4",
     "eslint-plugin-no-only-tests": "^2.6.0",
     "eslint-plugin-prettier": "^3.4.0",
-    "ethereum-waffle": "^3.3.0",
+    "ethereum-waffle": "^3.4.0",
     "ethers": "^5.3.1",
     "globby": "^11.0.4",
     "hardhat": "^2.3.3",
