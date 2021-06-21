@@ -173,11 +173,52 @@ async function appraise(
   return { ...token, usdValue, decimals };
 }
 
-async function getAllTradedTokens(settlement: Contract): Promise<string[]> {
-  const trades = await settlement.queryFilter(settlement.filters.Trade());
+function isErrorTooManyEvents(error: Error): boolean {
+  return /query returned more than \d* results/.test(error.message);
+}
+
+// List all traded tokens. Block range bounds are both inclusive.
+async function getAllTradedTokens(
+  settlement: Contract,
+  fromBlock: number,
+  toBlock: number,
+  hre: HardhatRuntimeEnvironment,
+): Promise<string[]> {
+  let trades;
+  try {
+    trades = await hre.ethers.provider.getLogs({
+      topics: [settlement.interface.getEventTopic("Trade")],
+      fromBlock,
+      toBlock,
+    });
+  } catch (error) {
+    if (isErrorTooManyEvents(error)) {
+      if (fromBlock === toBlock) {
+        throw new Error("Too many events in the same block");
+      }
+      const mid = Math.floor((toBlock + fromBlock) / 2);
+      return (
+        await Promise.all([
+          getAllTradedTokens(settlement, fromBlock, mid, hre),
+          getAllTradedTokens(settlement, mid + 1, toBlock, hre), // note: mid+1 is not larger than toBlock thanks to flooring
+        ])
+      ).flat();
+    } else {
+      throw error;
+    }
+  }
+
   const tokens = new Set(
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    trades.map((trade) => [trade.args!.sellToken, trade.args!.buyToken]).flat(),
+    trades
+      .map((trade) => {
+        const decodedTrade = settlement.interface.decodeEventLog(
+          "Trade",
+          trade.data,
+          trade.topics,
+        );
+        return [decodedTrade.sellToken, decodedTrade.buyToken];
+      })
+      .flat(),
   );
   tokens.delete(BUY_ETH_ADDRESS);
   return Array.from(tokens).sort((lhs, rhs) =>
@@ -371,11 +412,22 @@ const setupWithdrawTask: () => void = () =>
         hre: HardhatRuntimeEnvironment,
       ) => {
         const receiver = utils.getAddress(inputReceiver);
-        const [authenticator, settlement, [solver]] = await Promise.all([
+        const [
+          authenticator,
+          settlementDeployment,
+          [solver],
+          latestBlock,
+        ] = await Promise.all([
           getDeployedContract("GPv2AllowListAuthentication", hre),
-          getDeployedContract("GPv2Settlement", hre),
+          hre.deployments.get("GPv2Settlement"),
           hre.ethers.getSigners(),
+          hre.ethers.provider.getBlockNumber(),
         ]);
+        const settlement = new Contract(
+          settlementDeployment.address,
+          settlementDeployment.abi,
+        ).connect(hre.ethers.provider);
+        const deploymentBlock = settlementDeployment.receipt?.blockNumber;
 
         if (!(await authenticator.isSolver(solver.address))) {
           const message =
@@ -388,7 +440,13 @@ const setupWithdrawTask: () => void = () =>
         }
 
         if (tokens === undefined) {
-          tokens = await getAllTradedTokens(settlement);
+          console.log("Recovering list of traded tokens...");
+          tokens = await getAllTradedTokens(
+            settlement,
+            deploymentBlock ?? 0,
+            latestBlock,
+            hre,
+          );
         }
 
         // TODO: add eth withdrawal
