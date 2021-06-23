@@ -230,14 +230,14 @@ async function getAllTradedTokens(
   );
 }
 
+const LINE_CLEARING_ENABLED =
+  process.stdout.isTTY &&
+  process.stdout.clearLine !== undefined &&
+  process.stdout.cursorTo !== undefined;
+
 function clearLine() {
-  if (
-    process.stdout.clearLine !== undefined &&
-    process.stdout.cursorTo !== undefined
-  ) {
-    process.stdout.clearLine(0);
-    process.stdout.cursorTo(0);
-  }
+  process.stdout.clearLine(0);
+  process.stdout.cursorTo(0);
 }
 
 async function getWithdrawals(
@@ -269,13 +269,15 @@ async function getWithdrawals(
       balanceUsd.lt(minValueWei.add(leftoverWei)) ||
       (balanceUsd.isZero() && !(minValueWei.isZero() && leftoverWei.isZero()))
     ) {
-      clearLine();
+      if (LINE_CLEARING_ENABLED) {
+        clearLine();
+      }
       console.warn(
         `Ignored ${utils.formatUnits(balance, pricedToken.decimals)} units of ${
           token.symbol ?? "unknown token"
         } (${token.address}) with value ${formatUsdValue(balanceUsd)} USD`,
       );
-      if (process.stdin.isTTY) {
+      if (LINE_CLEARING_ENABLED) {
         process.stdout.write(vanishingProgressMessage);
       }
       return;
@@ -315,8 +317,8 @@ async function getWithdrawals(
     } to ${step * RATE_LIMIT_MAX_PARALLEL_WITHDRAWALS + tokensInBatch} of ${
       tokens.length
     } tokens...`;
-    clearLine();
-    if (process.stdin.isTTY) {
+    if (LINE_CLEARING_ENABLED) {
+      clearLine();
       process.stdout.write(vanishingProgressMessage);
     }
     await Promise.all(
@@ -327,7 +329,9 @@ async function getWithdrawals(
         ),
     );
   }
-  clearLine();
+  if (LINE_CLEARING_ENABLED) {
+    clearLine();
+  }
   return withdrawals;
 }
 
