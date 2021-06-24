@@ -13,8 +13,13 @@ import { BUY_ETH_ADDRESS, SettlementEncoder } from "../ts";
 import { getDeployedContract } from "./ts/deployment";
 import { TokenDetails, tokenDetails } from "./ts/erc20";
 import { Align, displayTable } from "./ts/table";
+import {
+  usdValue,
+  formatUsdValue,
+  formatTokenValue,
+  appraise,
+} from "./withdraw/value";
 
-const MAINNET_DAI = "0x6b175474e89094c44da98b954eedeac495271d0f";
 const ONEINCH_ETH_FLAG = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 const DAI_DECIMALS = 18;
 const RATE_LIMIT_MAX_PARALLEL_WITHDRAWALS = 20;
@@ -72,106 +77,6 @@ async function fastTokenDetails(
     return { ...oneinchTokens[address.toLowerCase()], contract };
   }
   return tokenDetails(address, hre);
-}
-
-// Recovers mainnet address from token symbol. Useful to get prices out of xdai
-// and rinkeby tokens.
-async function addressFromSymbol(
-  symbol: string,
-  network: string,
-): Promise<string | null> {
-  const oneinchTokens = await ONEINCH_TOKENS;
-  const tokensFromSymbol = Object.entries(oneinchTokens).filter(
-    ([, token]) => token.symbol.toLowerCase() === symbol.toLowerCase(),
-  );
-  let result = tokensFromSymbol.length == 0 ? null : tokensFromSymbol[0][0];
-  if (tokensFromSymbol.length > 1) {
-    // More than one token available. Using the most valued token to be safe.
-    const tokenValues = await Promise.all(
-      tokensFromSymbol.map(([, token]) =>
-        oneinchUsdValue(token, BigNumber.from(10).pow(15), network),
-      ),
-    );
-    const mostValued = tokenValues.reduce(
-      (max, value, i) => (value.gt(tokenValues[max]) ? i : max),
-      0,
-    );
-    result = tokensFromSymbol[mostValued][0];
-  }
-  return result;
-}
-
-// https://api.1inch.exchange/swagger/ethereum/#/Swap/SwapController_getQuote
-const oneinchUsdValue = async function (
-  token: Pick<TokenDetails, "symbol" | "address">,
-  amount: BigNumber,
-  network: string,
-): Promise<BigNumber> {
-  let fromTokenAddress: string;
-  if (Object.keys(await ONEINCH_TOKENS).includes(token.address.toLowerCase())) {
-    // Assumption: if a mainnet token has value, it's supported by 1inch.
-    // If it's not on mainnet, then either it was deployed to the same address
-    // on mainnet (and is the same token, i.e., same value), or its address is
-    // overwhelmingly likely not to be in the 1inch list.
-    fromTokenAddress = token.address;
-  } else if (network === "mainnet" || token.symbol === null) {
-    // Assumption: a token with no name has no value.
-    return constants.Zero;
-  } else {
-    // Assumption: if the token has value on xdai, then a token with the same
-    // name and approximately the same value exists on mainnet. WXDAI is the
-    // only exception.
-    // There will be false positives, but on Rinkeby and xdai the low gas prices
-    // make it an acceptable loss.
-    const symbol =
-      token.symbol.toLowerCase() === "wxdai" ? "DAI" : token.symbol;
-    const address = await addressFromSymbol(symbol, network);
-    if (address === null) {
-      return constants.Zero;
-    }
-    fromTokenAddress = address;
-  }
-
-  const toTokenAddress = MAINNET_DAI;
-  // Note: 1inch API calls fail if from and to addresses are the same
-  if (fromTokenAddress === toTokenAddress) {
-    return amount;
-  }
-
-  try {
-    const response = await axios.get(
-      "https://api.1inch.exchange/v3.0/1/quote",
-      {
-        params: {
-          fromTokenAddress,
-          toTokenAddress,
-          amount: amount.toString(),
-        },
-      },
-    );
-    // Note: in principle 1inch could use less than the provided input amount.
-    // In this case, we assume that the token has no more value that what is
-    // available from the available liquidity.
-    return BigNumber.from(response.data.toTokenAmount);
-  } catch (e) {
-    console.warn(
-      `Warning: 1inch price retrieval failed for token ${token.symbol} (${token.address}). Token will be ignored.`,
-    );
-    return constants.Zero;
-  }
-};
-
-async function appraise(
-  token: TokenDetails,
-  network: string,
-): Promise<PricedToken> {
-  const decimals = token.decimals ?? DAI_DECIMALS;
-  const usdValue = await oneinchUsdValue(
-    token,
-    BigNumber.from(10).pow(decimals),
-    network,
-  );
-  return { ...token, usdValue, decimals };
 }
 
 function isErrorTooManyEvents(error: Error): boolean {
@@ -235,11 +140,6 @@ const LINE_CLEARING_ENABLED =
   process.stdout.clearLine !== undefined &&
   process.stdout.cursorTo !== undefined;
 
-function clearLine() {
-  process.stdout.clearLine(0);
-  process.stdout.cursorTo(0);
-}
-
 async function getWithdrawals(
   tokens: string[],
   settlement: Contract,
@@ -270,15 +170,19 @@ async function getWithdrawals(
       (balanceUsd.isZero() && !(minValueWei.isZero() && leftoverWei.isZero()))
     ) {
       if (LINE_CLEARING_ENABLED) {
-        clearLine();
+        process.stdout.clearLine(0);
       }
       console.warn(
         `Ignored ${utils.formatUnits(balance, pricedToken.decimals)} units of ${
           token.symbol ?? "unknown token"
-        } (${token.address}) with value ${formatUsdValue(balanceUsd)} USD`,
+        } (${token.address}) with value ${formatUsdValue(
+          balanceUsd,
+          hre.network.name,
+        )} USD`,
       );
       if (LINE_CLEARING_ENABLED) {
         process.stdout.write(vanishingProgressMessage);
+        process.stdout.cursorTo(0);
       }
       return;
     }
@@ -318,8 +222,8 @@ async function getWithdrawals(
       tokens.length
     } tokens...`;
     if (LINE_CLEARING_ENABLED) {
-      clearLine();
       process.stdout.write(vanishingProgressMessage);
+      process.stdout.cursorTo(0);
     }
     await Promise.all(
       Array(tokensInBatch)
@@ -330,36 +234,18 @@ async function getWithdrawals(
     );
   }
   if (LINE_CLEARING_ENABLED) {
-    clearLine();
+    process.stdout.clearLine(0);
   }
   return withdrawals;
 }
 
-// Format amount so that it has exactly a fixed amount of decimals.
-function formatTokenValue(
-  amount: BigNumber,
-  actualDecimals: number,
-  targetDecimals: number,
-): string {
-  const normalized =
-    targetDecimals <= actualDecimals
-      ? amount.div(BigNumber.from(10).pow(actualDecimals - targetDecimals))
-      : amount.mul(BigNumber.from(10).pow(-actualDecimals + targetDecimals));
-  const powDecimals = BigNumber.from(10).pow(targetDecimals);
-  return `${normalized.div(powDecimals).toString()}.${normalized
-    .mod(powDecimals)
-    .toString()
-    .padStart(targetDecimals, "0")}`;
-}
-
-function formatUsdValue(amount: BigNumber): string {
-  return formatTokenValue(amount, DAI_DECIMALS, 2);
-}
-
-function formatWithdrawal(withdrawal: Withdrawal): DisplayWithdrawal {
+function formatWithdrawal(
+  withdrawal: Withdrawal,
+  network: string,
+): DisplayWithdrawal {
   return {
     address: withdrawal.token.address,
-    value: formatUsdValue(withdrawal.balanceUsd),
+    value: formatUsdValue(withdrawal.balanceUsd, network),
     balance: formatTokenValue(
       withdrawal.balance,
       withdrawal.token.decimals,
@@ -370,8 +256,10 @@ function formatWithdrawal(withdrawal: Withdrawal): DisplayWithdrawal {
   };
 }
 
-function displayWithdrawals(withdrawals: Withdrawal[]) {
-  const formattedWithdtrawals = withdrawals.map(formatWithdrawal);
+function displayWithdrawals(withdrawals: Withdrawal[], network: string) {
+  const formattedWithdtrawals = withdrawals.map((w) =>
+    formatWithdrawal(w, network),
+  );
   const order = ["address", "value", "balance", "amount", "symbol"] as const;
   const header = {
     address: "address",
@@ -396,12 +284,15 @@ async function formatGasCost(
 ): Promise<string> {
   switch (network) {
     case "mainnet": {
-      const value = await oneinchUsdValue(
+      const value = await usdValue(
         { symbol: "ETH", address: ONEINCH_ETH_FLAG },
         amount,
         "mainnet",
       );
-      return `${utils.formatEther(amount)} ETH (${formatUsdValue(value)} USD)`;
+      return `${utils.formatEther(amount)} ETH (${formatUsdValue(
+        value,
+        network,
+      )} USD)`;
     }
     case "xdai":
       return `${utils.formatEther(amount)} XDAI`;
@@ -501,7 +392,7 @@ const setupWithdrawTask: () => void = () =>
           return diff.isZero() ? 0 : diff.isNegative() ? -1 : 1;
         });
 
-        displayWithdrawals(withdrawals);
+        displayWithdrawals(withdrawals, hre.network.name);
 
         if (withdrawals.length === 0) {
           console.log("No tokens to withdraw.");
@@ -539,6 +430,7 @@ const setupWithdrawTask: () => void = () =>
             withdrawals.length
           } tokens for an estimated total value of ${formatUsdValue(
             totalValue,
+            hre.network.name,
           )} USD. All withdrawn funds will be sent to ${receiver}.`,
         );
 
