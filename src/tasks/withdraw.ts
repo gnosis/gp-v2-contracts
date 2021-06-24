@@ -16,6 +16,7 @@ import { prompt } from "./ts/tui";
 const MAINNET_DAI = "0x6b175474e89094c44da98b954eedeac495271d0f";
 const ONEINCH_ETH_FLAG = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 const DAI_DECIMALS = 18;
+const RATE_LIMIT_MAX_PARALLEL_WITHDRAWALS = 20;
 
 interface Withdrawal {
   token: PricedToken;
@@ -228,14 +229,14 @@ async function getAllTradedTokens(
   );
 }
 
+const LINE_CLEARING_ENABLED =
+  process.stdout.isTTY &&
+  process.stdout.clearLine !== undefined &&
+  process.stdout.cursorTo !== undefined;
+
 function clearLine() {
-  if (
-    process.stdout.clearLine !== undefined &&
-    process.stdout.cursorTo !== undefined
-  ) {
-    process.stdout.clearLine(0);
-    process.stdout.cursorTo(0);
-  }
+  process.stdout.clearLine(0);
+  process.stdout.cursorTo(0);
 }
 
 async function getWithdrawals(
@@ -245,23 +246,21 @@ async function getWithdrawals(
   leftover: string,
   hre: HardhatRuntimeEnvironment,
 ): Promise<Withdrawal[]> {
-  const withdrawals = [];
+  const withdrawals: Withdrawal[] = [];
   const minValueWei = utils.parseUnits(minValue, DAI_DECIMALS);
   const leftoverWei = utils.parseUnits(leftover, DAI_DECIMALS);
-  for (let i = 0; i < tokens.length; i++) {
+  let vanishingProgressMessage = "";
+  const addWithdrawal = async (i: number) => {
     const address = tokens[i];
-    clearLine();
-    process.stdout.write(`Processing token ${i + 1}/${tokens.length}...`);
     const token = await fastTokenDetails(address, hre);
     const balance = await token.contract.balanceOf(settlement.address);
     if (balance.eq(0)) {
-      continue;
+      return;
     }
     const pricedToken = await appraise(token, hre.network.name);
     const balanceUsd = pricedToken.usdValue
       .mul(balance)
       .div(BigNumber.from(10).pow(pricedToken.decimals));
-    clearLine();
     // Note: if balanceUsd is zero, then setting either minValue or leftoverWei
     // to a nonzero value means that nothing should be withdrawn. If neither
     // flag is set, then whether to withdraw does not depend on the USD value.
@@ -269,12 +268,18 @@ async function getWithdrawals(
       balanceUsd.lt(minValueWei.add(leftoverWei)) ||
       (balanceUsd.isZero() && !(minValueWei.isZero() && leftoverWei.isZero()))
     ) {
+      if (LINE_CLEARING_ENABLED) {
+        clearLine();
+      }
       console.warn(
         `Ignored ${utils.formatUnits(balance, pricedToken.decimals)} units of ${
           token.symbol ?? "unknown token"
         } (${token.address}) with value ${formatUsdValue(balanceUsd)} USD`,
       );
-      continue;
+      if (LINE_CLEARING_ENABLED) {
+        process.stdout.write(vanishingProgressMessage);
+      }
+      return;
     }
     let amount;
     let amountUsd;
@@ -294,8 +299,38 @@ async function getWithdrawals(
       balance,
       balanceUsd,
     });
+  };
+  for (
+    let step = 0;
+    step < tokens.length / RATE_LIMIT_MAX_PARALLEL_WITHDRAWALS;
+    step++
+  ) {
+    const remainingTokens =
+      tokens.length - RATE_LIMIT_MAX_PARALLEL_WITHDRAWALS * step;
+    const tokensInBatch =
+      remainingTokens >= RATE_LIMIT_MAX_PARALLEL_WITHDRAWALS
+        ? RATE_LIMIT_MAX_PARALLEL_WITHDRAWALS
+        : remainingTokens;
+    vanishingProgressMessage = `Processing tokens ${
+      step * RATE_LIMIT_MAX_PARALLEL_WITHDRAWALS + 1
+    } to ${step * RATE_LIMIT_MAX_PARALLEL_WITHDRAWALS + tokensInBatch} of ${
+      tokens.length
+    } tokens...`;
+    if (LINE_CLEARING_ENABLED) {
+      clearLine();
+      process.stdout.write(vanishingProgressMessage);
+    }
+    await Promise.all(
+      Array(tokensInBatch)
+        .fill(undefined)
+        .map((_, i) =>
+          addWithdrawal(step * RATE_LIMIT_MAX_PARALLEL_WITHDRAWALS + i),
+        ),
+    );
   }
-  clearLine();
+  if (LINE_CLEARING_ENABLED) {
+    clearLine();
+  }
   return withdrawals;
 }
 
