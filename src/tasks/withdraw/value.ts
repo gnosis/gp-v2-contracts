@@ -72,6 +72,17 @@ export const usdValue = async function (
         network,
       }),
     );
+    // The services return the quote token used for the price. The quote token
+    // is checked to make sure that the returned price meets our expectations.
+    if (
+      response.data.token.toLowerCase() !==
+      REFERENCE_TOKEN[network].address.toLowerCase()
+    ) {
+      console.warn(
+        `Warning: price returned for base token ${token.symbol} (${token.address}) uses an incorrect quote token (${response.data.token} instead of ${REFERENCE_TOKEN[network].address}); price is set to zero`,
+      );
+      return constants.Zero;
+    }
     return BigNumber.from(response.data.amount);
   } catch (e) {
     const errorData = e.response?.data ?? {
