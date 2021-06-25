@@ -74,8 +74,12 @@ export const usdValue = async function (
     );
     return BigNumber.from(response.data.amount);
   } catch (e) {
+    const errorData = e.response?.data ?? {
+      errorType: "UnknownError",
+      description: "no error from server",
+    };
     console.warn(
-      `Warning: price retrieval failed for token ${token.symbol} (${token.address}).`,
+      `Warning: price retrieval failed for token ${token.symbol} (${token.address}): ${errorData.errorType} (${errorData.description})`,
     );
     return constants.Zero;
   }
