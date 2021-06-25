@@ -94,6 +94,7 @@ async function getAllTradedTokens(
   try {
     trades = await hre.ethers.provider.getLogs({
       topics: [settlement.interface.getEventTopic("Trade")],
+      address: settlement.address,
       fromBlock,
       toBlock,
     });
