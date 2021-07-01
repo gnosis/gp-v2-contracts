@@ -396,7 +396,9 @@ const setupDecodeTask: () => void = () => {
             await Promise.all(
               interactionGroup.map(async (i) => ({
                 ...i,
-                decoded: await decodeInteraction(i),
+                decoded: await decodeInteraction(i, hre, {
+                  settlementContractAddress: deployment?.address,
+                }),
               })),
             ),
         ),
