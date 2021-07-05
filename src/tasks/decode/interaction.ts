@@ -3,6 +3,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { Interaction } from "../../ts";
 import { TokenDetails } from "../ts/erc20";
 
+import { Erc20Decoder } from "./interaction/erc20";
 import { InteractionDecoder } from "./interaction/template";
 import { UniswapLikeDecoder } from "./interaction/uniswap_like";
 
@@ -34,7 +35,10 @@ export async function decode(
   hre: HardhatRuntimeEnvironment,
   decodingTools: DecodingTools = {},
 ): Promise<DecodedInteraction | null> {
-  const decoders: InteractionDecoder[] = [new UniswapLikeDecoder(hre)];
+  const decoders: InteractionDecoder[] = [
+    new UniswapLikeDecoder(hre),
+    new Erc20Decoder(hre),
+  ];
 
   try {
     // TODO: use Promise.any when better supported by our tooling
