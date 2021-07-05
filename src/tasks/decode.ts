@@ -23,6 +23,10 @@ import {
   decodeOrder,
 } from "../ts";
 
+import {
+  decode as decodeInteraction,
+  DecodedInteraction,
+} from "./decode/interaction";
 import { TokenDetails, tokenDetails } from "./ts/erc20";
 import { Align, displayTable } from "./ts/table";
 
@@ -35,6 +39,10 @@ interface Token extends TokenDetails {
   nativeFlag: boolean;
   price: BigNumber | undefined;
   index: number;
+}
+
+export interface DetailedInteraction extends Interaction {
+  decoded: DecodedInteraction;
 }
 
 type MaybeToken =
@@ -206,7 +214,11 @@ function displayTrade(
 }
 
 function displayInteractions(
-  interactions: [Interaction[], Interaction[], Interaction[]],
+  interactions: [
+    DetailedInteraction[],
+    DetailedInteraction[],
+    DetailedInteraction[],
+  ],
 ) {
   console.log(chalk.bold("=== Interactions ==="));
   console.log(chalk.gray("-".repeat(WIDTH)));
@@ -218,7 +230,10 @@ function displayInteractions(
   console.log();
 }
 
-function displayInteractionGroup(name: string, interactions: Interaction[]) {
+function displayInteractionGroup(
+  name: string,
+  interactions: DetailedInteraction[],
+) {
   const nonEmpty = interactions.length !== 0;
   console.log(` ${nonEmpty ? "┌" : " "}--- ${name} ---`);
   for (const interaction of interactions.slice(undefined, -1)) {
@@ -229,7 +244,7 @@ function displayInteractionGroup(name: string, interactions: Interaction[]) {
   }
 }
 
-function displayInteraction(interaction: Interaction, isLast: boolean) {
+function displayInteraction(interaction: DetailedInteraction, isLast: boolean) {
   let newInteraction = true;
   const branch = () => {
     if (newInteraction) {
@@ -239,12 +254,36 @@ function displayInteraction(interaction: Interaction, isLast: boolean) {
       return isLast ? "      " : " │    ";
     }
   };
-  const { target, value, callData } = interaction;
-  console.log(branch(), mainLabel("Interaction"), `target address ${target}`);
+  const branchedLog = (...args: unknown[]) => console.log(branch(), ...args);
+  const { target, value, callData, decoded } = interaction;
+  branchedLog(
+    mainLabel("Interaction"),
+    `target address ${target}` +
+      ((decoded?.targetName ?? null) !== null
+        ? ` (${decoded.targetName})`
+        : ""),
+  );
   if (!BigNumber.from(value).isZero()) {
-    console.log(branch(), label("Value"), utils.formatEther(value));
+    branchedLog(label("Value"), utils.formatEther(value));
   }
-  console.log(branch(), label("Calldata"), callData);
+  if ((decoded?.call ?? null) !== null) {
+    // `decoded?.call` is defined and not null by the if check
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const { functionName, args } = decoded.call!;
+    if (args === null) {
+      branchedLog(
+        label("function"),
+        functionName,
+        chalk.red("(input decoding failed)"),
+      );
+    } else {
+      branchedLog(label("function"), functionName);
+      for (const [name, value] of args) {
+        branchedLog(label(` - ${name}`), value);
+      }
+    }
+  }
+  branchedLog(label("calldata"), callData);
 }
 
 async function calldataFromUserInput(
@@ -353,7 +392,22 @@ const setupDecodeTask: () => void = () => {
 
       displayTrades(trades, tokens, domainSeparator);
 
-      displayInteractions(interactions);
+      const detailedInteractions = (await Promise.all(
+        interactions.map(
+          async (interactionGroup) =>
+            await Promise.all(
+              interactionGroup.map(async (i) => ({
+                ...i,
+                decoded: await decodeInteraction(i),
+              })),
+            ),
+        ),
+      )) as [
+        DetailedInteraction[],
+        DetailedInteraction[],
+        DetailedInteraction[],
+      ];
+      displayInteractions(detailedInteractions);
     });
 };
 
