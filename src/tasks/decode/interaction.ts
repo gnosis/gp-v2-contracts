@@ -1,6 +1,10 @@
+import { HardhatRuntimeEnvironment } from "hardhat/types";
+
 import { Interaction } from "../../ts";
+import { TokenDetails } from "../ts/erc20";
 
 import { InteractionDecoder } from "./interaction/template";
+import { UniswapLikeDecoder } from "./interaction/uniswap_like";
 
 // For reference, here is a list of contracts supported by the backend:
 // https://github.com/gnosis/gp-v2-services/blob/a472d0dca02c0df30c22e17c959d37e2c828fed2/contracts/build.rs
@@ -21,16 +25,16 @@ export interface DecodedInteraction {
 
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface DecodingTools {
-  // Used to pass in objects needed for decoding
+  tokenRegistry?: Record<string, TokenDetails>;
+  settlementContractAddress?: string;
 }
 
 export async function decode(
   interaction: Interaction,
+  hre: HardhatRuntimeEnvironment,
   decodingTools: DecodingTools = {},
 ): Promise<DecodedInteraction | null> {
-  const decoders: InteractionDecoder[] = [
-    /* new decoders should be added here */
-  ];
+  const decoders: InteractionDecoder[] = [new UniswapLikeDecoder(hre)];
 
   try {
     // TODO: use Promise.any when better supported by our tooling
