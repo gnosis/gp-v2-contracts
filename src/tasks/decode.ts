@@ -390,6 +390,10 @@ const setupDecodeTask: () => void = () => {
 
       displayTrades(trades, tokens, domainSeparator);
 
+      const tokenRegistry: Record<string, Token> = {};
+      tokens.forEach((token) => {
+        tokenRegistry[token.address] = token;
+      });
       const detailedInteractions = (await Promise.all(
         interactions.map(
           async (interactionGroup) =>
@@ -397,6 +401,7 @@ const setupDecodeTask: () => void = () => {
               interactionGroup.map(async (i) => ({
                 ...i,
                 decoded: await decodeInteraction(i, hre, {
+                  tokenRegistry,
                   settlementContractAddress: deployment?.address,
                 }),
               })),
