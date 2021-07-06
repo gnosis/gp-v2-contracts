@@ -1,18 +1,10 @@
-import axios from "axios";
 import WethNetworks from "canonical-weth/networks.json";
 import { BigNumber, constants } from "ethers";
 
+import { ApiError, estimateTradeAmount } from "../../services/api";
 import { OrderKind } from "../../ts";
 import { SupportedNetwork } from "../ts/deployment";
 import { TokenDetails } from "../ts/erc20";
-
-interface ApiTradeQuery {
-  network: string;
-  baseToken: string;
-  quoteToken: string;
-  kind: OrderKind;
-  amount: BigNumber;
-}
 
 interface PricedToken extends TokenDetails {
   // Overrides existing field in TokenDetails. The number of decimals must be
@@ -57,17 +49,6 @@ const REFERENCE_TOKEN: Record<
   },
 } as const;
 
-function apiPriceUrl({
-  network,
-  baseToken,
-  quoteToken,
-  kind,
-  amount,
-}: ApiTradeQuery) {
-  // Using dev endpoint to avoid stressing the prod server with too many queries
-  return `https://protocol-${network}.dev.gnosisdev.com/api/v1/markets/${baseToken}-${quoteToken}/${kind}/${amount.toString()}`;
-}
-
 export const usdValue = async function (
   token: Pick<TokenDetails, "symbol" | "address"> | "native token",
   amount: BigNumber,
@@ -82,31 +63,17 @@ export const usdValue = async function (
     };
   }
   try {
-    const response = await axios.get(
-      apiPriceUrl({
-        baseToken: token.address,
-        quoteToken: REFERENCE_TOKEN[network].address,
-        kind: OrderKind.SELL,
-        amount,
-        network,
-      }),
-    );
-    // The services return the quote token used for the price. The quote token
-    // is checked to make sure that the returned price meets our expectations.
-    if (
-      response.data.token.toLowerCase() !==
-      REFERENCE_TOKEN[network].address.toLowerCase()
-    ) {
-      console.warn(
-        `Warning: price returned for base token ${token.symbol} (${token.address}) uses an incorrect quote token (${response.data.token} instead of ${REFERENCE_TOKEN[network].address}); price is set to zero`,
-      );
-      return constants.Zero;
-    }
-    return BigNumber.from(response.data.amount);
+    return await estimateTradeAmount({
+      sellToken: token.address,
+      buyToken: REFERENCE_TOKEN[network].address,
+      amount,
+      kind: OrderKind.SELL,
+      network,
+    });
   } catch (e) {
-    const errorData = e.response?.data ?? {
-      errorType: "UnknownError",
-      description: "no error from server",
+    const errorData: ApiError = e.apiError ?? {
+      errorType: "script internal error",
+      description: e?.message ?? "no details",
     };
     console.warn(
       `Warning: price retrieval failed for token ${token.symbol} (${token.address}): ${errorData.errorType} (${errorData.description})`,

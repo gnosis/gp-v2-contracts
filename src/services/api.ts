@@ -39,6 +39,13 @@ interface EstimateAmountResponse {
   amount: string;
   token: string;
 }
+export interface ApiError {
+  errorType: string;
+  description: string;
+}
+interface CallError extends Error {
+  apiError?: ApiError;
+}
 
 async function call<T>(
   route: string,
@@ -49,9 +56,17 @@ async function call<T>(
   const response = await fetch(url, init);
   const body = await response.text();
   if (!response.ok) {
-    throw `Calling "${url} ${JSON.stringify(init)} failed with ${
-      response.status
-    }: ${body}`;
+    const error: CallError = new Error(
+      `Calling "${url} ${JSON.stringify(init)} failed with ${
+        response.status
+      }: ${body}`,
+    );
+    try {
+      error.apiError = JSON.parse(body);
+    } catch {
+      // no api error
+    }
+    throw error;
   }
   return JSON.parse(body);
 }
@@ -81,6 +96,13 @@ export async function estimateTradeAmount({
     `markets/${sellToken}-${buyToken}/${kind}/${amount}`,
     network,
   );
+  // The services return the quote token used for the price. The quote token
+  // is checked to make sure that the returned price meets our expectations.
+  if (response.token.toLowerCase() !== buyToken.toLowerCase()) {
+    throw new Error(
+      `Price returned for sell token ${sellToken} uses an incorrect quote token (${response.token.toLowerCase()} instead of ${buyToken.toLowerCase()})`,
+    );
+  }
   return BigNumber.from(response.amount);
 }
 
