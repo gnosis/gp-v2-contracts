@@ -1,8 +1,7 @@
-import { Order, OrderKind } from "@gnosis.pm/gp-v2-contracts";
 import { BigNumber } from "ethers";
 import fetch, { RequestInit } from "node-fetch";
 
-import { Signature } from "./utils";
+import { Order, OrderKind, Signature } from "../ts";
 
 export class Api {
   network: string;
@@ -27,10 +26,10 @@ export class Api {
     selToken: string,
     buyToken: string,
     amount: BigNumber,
-    kind: OrderKind
+    kind: OrderKind,
   ): Promise<BigNumber> {
     const response: GetFeeResponse = await this.call(
-      `fee?sellToken=${selToken}&buyToken=${buyToken}&amount=${amount}&kind=${kind}`
+      `fee?sellToken=${selToken}&buyToken=${buyToken}&amount=${amount}&kind=${kind}`,
     );
     return BigNumber.from(response.amount);
   }
@@ -39,10 +38,10 @@ export class Api {
     selToken: string,
     buyToken: string,
     amount: BigNumber,
-    kind: OrderKind
+    kind: OrderKind,
   ): Promise<BigNumber> {
     const response: EstimateAmountResponse = await this.call(
-      `markets/${selToken}-${buyToken}/${kind}/${amount}`
+      `markets/${selToken}-${buyToken}/${kind}/${amount}`,
     );
     return BigNumber.from(response.amount);
   }
@@ -60,8 +59,8 @@ export class Api {
         feeAmount: order.feeAmount.toString(),
         kind: order.kind,
         partiallyFillable: order.partiallyFillable,
-        signature: signature.signature,
-        signingScheme: signature.signatureScheme,
+        signature: signature.data,
+        signingScheme: signature.scheme,
         receiver: order.receiver,
       }),
       headers: { "Content-Type": "application/json" },
