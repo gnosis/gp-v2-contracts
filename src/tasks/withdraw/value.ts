@@ -1,14 +1,10 @@
 import axios from "axios";
+import WethNetworks from "canonical-weth/networks.json";
 import { BigNumber, constants } from "ethers";
 
 import { OrderKind } from "../../ts";
 import { SupportedNetwork } from "../ts/deployment";
 import { TokenDetails } from "../ts/erc20";
-
-// canonical-weth is not typed
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const wrappedNativeTokenByNetworkId = require("canonical-weth")
-  .networks as Record<string, { address: string }>;
 
 interface ApiTradeQuery {
   network: string;
@@ -33,8 +29,8 @@ const NATIVE_TOKEN_SYMBOL: Record<SupportedNetwork, string> = {
 };
 
 const WRAPPED_NATIVE_TOKEN_ADDRESS: Record<SupportedNetwork, string> = {
-  mainnet: wrappedNativeTokenByNetworkId[1].address,
-  rinkeby: wrappedNativeTokenByNetworkId[4].address,
+  mainnet: WethNetworks.WETH9[1].address,
+  rinkeby: WethNetworks.WETH9[4].address,
   xdai: "0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d",
 };
 
