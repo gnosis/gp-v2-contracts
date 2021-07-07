@@ -3,6 +3,14 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 import { ContractName } from "../../ts";
 
+const supportedNetworks = ["rinkeby", "xdai", "mainnet"] as const;
+export type SupportedNetwork = typeof supportedNetworks[number];
+export function isSupportedNetwork(
+  network: string,
+): network is SupportedNetwork {
+  return (supportedNetworks as readonly string[]).includes(network);
+}
+
 export async function getDeployedContract(
   name: ContractName,
   { ethers, deployments }: HardhatRuntimeEnvironment,
