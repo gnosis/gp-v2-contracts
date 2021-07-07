@@ -1,7 +1,9 @@
 import axios from "axios";
+import WethNetworks from "canonical-weth/networks.json";
 import { BigNumber, constants } from "ethers";
 
 import { OrderKind } from "../../ts";
+import { SupportedNetwork } from "../ts/deployment";
 import { TokenDetails } from "../ts/erc20";
 
 interface ApiTradeQuery {
@@ -20,8 +22,20 @@ interface PricedToken extends TokenDetails {
   usdValue: BigNumber;
 }
 
+const NATIVE_TOKEN_SYMBOL: Record<SupportedNetwork, string> = {
+  mainnet: "ETH",
+  rinkeby: "ETH",
+  xdai: "xDAI",
+};
+
+const WRAPPED_NATIVE_TOKEN_ADDRESS: Record<SupportedNetwork, string> = {
+  mainnet: WethNetworks.WETH9[1].address,
+  rinkeby: WethNetworks.WETH9[4].address,
+  xdai: "0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d",
+};
+
 const REFERENCE_TOKEN: Record<
-  string,
+  SupportedNetwork,
   { symbol: string; decimals: number; address: string }
 > = {
   rinkeby: {
@@ -39,7 +53,7 @@ const REFERENCE_TOKEN: Record<
     // by the services.
     symbol: "WXDAI",
     decimals: 18,
-    address: "0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d",
+    address: WRAPPED_NATIVE_TOKEN_ADDRESS.xdai,
   },
 } as const;
 
@@ -55,12 +69,17 @@ function apiPriceUrl({
 }
 
 export const usdValue = async function (
-  token: Pick<TokenDetails, "symbol" | "address">,
+  token: Pick<TokenDetails, "symbol" | "address"> | "native token",
   amount: BigNumber,
-  network: string,
+  network: SupportedNetwork,
 ): Promise<BigNumber> {
-  if (!(network in REFERENCE_TOKEN)) {
-    throw new Error("Unsupported network for computing USD value");
+  if (token === "native token") {
+    // Note: using wrapped token since the API does not support sell orders in
+    // native tokens.
+    token = {
+      symbol: NATIVE_TOKEN_SYMBOL[network],
+      address: WRAPPED_NATIVE_TOKEN_ADDRESS[network],
+    };
   }
   try {
     const response = await axios.get(
@@ -113,16 +132,16 @@ export function formatTokenValue(
     .padStart(targetDecimals, "0")}`;
 }
 
-export function formatUsdValue(amount: BigNumber, network: string): string {
-  if (!(network in REFERENCE_TOKEN)) {
-    throw new Error("Network not supported");
-  }
+export function formatUsdValue(
+  amount: BigNumber,
+  network: SupportedNetwork,
+): string {
   return formatTokenValue(amount, REFERENCE_TOKEN[network].decimals, 2);
 }
 
 export async function appraise(
   token: TokenDetails,
-  network: string,
+  network: SupportedNetwork,
 ): Promise<PricedToken> {
   const decimals = token.decimals ?? 18;
   const usd = await usdValue(token, BigNumber.from(10).pow(decimals), network);
