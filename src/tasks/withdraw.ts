@@ -8,7 +8,11 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 import { BUY_ETH_ADDRESS, SettlementEncoder } from "../ts";
 
-import { getDeployedContract } from "./ts/deployment";
+import {
+  getDeployedContract,
+  isSupportedNetwork,
+  SupportedNetwork,
+} from "./ts/deployment";
 import { TokenDetails, tokenDetails } from "./ts/erc20";
 import { Align, displayTable } from "./ts/table";
 import { prompt } from "./ts/tui";
@@ -19,7 +23,6 @@ import {
   appraise,
 } from "./withdraw/value";
 
-const ONEINCH_ETH_FLAG = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 const DAI_DECIMALS = 18;
 const RATE_LIMIT_MAX_PARALLEL_WITHDRAWALS = 20;
 
@@ -93,6 +96,7 @@ async function getAllTradedTokens(
   try {
     trades = await hre.ethers.provider.getLogs({
       topics: [settlement.interface.getEventTopic("Trade")],
+      address: settlement.address,
       fromBlock,
       toBlock,
     });
@@ -145,6 +149,7 @@ async function getWithdrawals(
   minValue: string,
   leftover: string,
   hre: HardhatRuntimeEnvironment,
+  network: SupportedNetwork,
 ): Promise<Withdrawal[]> {
   const withdrawals: Withdrawal[] = [];
   const minValueWei = utils.parseUnits(minValue, DAI_DECIMALS);
@@ -157,7 +162,7 @@ async function getWithdrawals(
     if (balance.eq(0)) {
       return;
     }
-    const pricedToken = await appraise(token, hre.network.name);
+    const pricedToken = await appraise(token, network);
     const balanceUsd = pricedToken.usdValue
       .mul(balance)
       .div(BigNumber.from(10).pow(pricedToken.decimals));
@@ -176,7 +181,7 @@ async function getWithdrawals(
           token.symbol ?? "unknown token"
         } (${token.address}) with value ${formatUsdValue(
           balanceUsd,
-          hre.network.name,
+          network,
         )} USD`,
       );
       if (LINE_CLEARING_ENABLED) {
@@ -240,7 +245,7 @@ async function getWithdrawals(
 
 function formatWithdrawal(
   withdrawal: Withdrawal,
-  network: string,
+  network: SupportedNetwork,
 ): DisplayWithdrawal {
   return {
     address: withdrawal.token.address,
@@ -255,7 +260,10 @@ function formatWithdrawal(
   };
 }
 
-function displayWithdrawals(withdrawals: Withdrawal[], network: string) {
+function displayWithdrawals(
+  withdrawals: Withdrawal[],
+  network: SupportedNetwork,
+) {
   const formattedWithdtrawals = withdrawals.map((w) =>
     formatWithdrawal(w, network),
   );
@@ -279,15 +287,11 @@ function displayWithdrawals(withdrawals: Withdrawal[], network: string) {
 
 async function formatGasCost(
   amount: BigNumber,
-  network: string,
+  network: SupportedNetwork,
 ): Promise<string> {
   switch (network) {
     case "mainnet": {
-      const value = await usdValue(
-        { symbol: "ETH", address: ONEINCH_ETH_FLAG },
-        amount,
-        "mainnet",
-      );
+      const value = await usdValue("native token", amount, "mainnet");
       return `${utils.formatEther(amount)} ETH (${formatUsdValue(
         value,
         network,
@@ -329,6 +333,10 @@ const setupWithdrawTask: () => void = () =>
         hre: HardhatRuntimeEnvironment,
       ) => {
         const receiver = utils.getAddress(inputReceiver);
+        if (!isSupportedNetwork(hre.network.name)) {
+          throw new Error(`Unsupported network ${hre.network.name}`);
+        }
+        const network = hre.network.name;
         const [
           authenticator,
           settlementDeployment,
@@ -374,13 +382,14 @@ const setupWithdrawTask: () => void = () =>
           minValue,
           leftover,
           hre,
+          network,
         );
         withdrawals.sort((lhs, rhs) => {
           const diff = lhs.balanceUsd.sub(rhs.balanceUsd);
           return diff.isZero() ? 0 : diff.isNegative() ? -1 : 1;
         });
 
-        displayWithdrawals(withdrawals, hre.network.name);
+        displayWithdrawals(withdrawals, network);
 
         if (withdrawals.length === 0) {
           console.log("No tokens to withdraw.");
