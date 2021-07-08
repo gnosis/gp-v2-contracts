@@ -1,7 +1,14 @@
-import { BigNumber } from "ethers";
+import { BigNumber, utils } from "ethers";
 import fetch, { RequestInit } from "node-fetch";
 
-import { Order, OrderKind, Signature } from "../ts";
+import {
+  normalizeOrder,
+  Order,
+  OrderKind,
+  Signature,
+  SigningScheme,
+  encodeSignatureData,
+} from "../ts";
 
 interface ApiCall {
   network: string;
@@ -45,6 +52,21 @@ export interface ApiError {
 }
 interface CallError extends Error {
   apiError?: ApiError;
+}
+
+function apiSigningScheme(scheme: SigningScheme): string {
+  switch (scheme) {
+    case SigningScheme.EIP712:
+      return "eip712";
+    case SigningScheme.ETHSIGN:
+      return "ethsign";
+    case SigningScheme.EIP1271:
+      return "eip1271";
+    case SigningScheme.PRESIGN:
+      return "presign";
+    default:
+      throw new Error(`Unsupported signing scheme ${scheme}`);
+  }
 }
 
 async function call<T>(
@@ -111,21 +133,26 @@ export async function placeOrder({
   signature,
   network,
 }: PlaceOrderQuery & ApiCall): Promise<string> {
+  const normalizedOrder = normalizeOrder(order);
+  // the api expects appData to always have length 32 bytes
+  const appData = utils.hexlify(
+    utils.hexZeroPad(utils.arrayify(normalizedOrder.appData), 32),
+  );
   return await call("orders", network, {
     method: "post",
     body: JSON.stringify({
-      sellToken: order.sellToken,
-      buyToken: order.buyToken,
-      sellAmount: order.sellAmount.toString(),
-      buyAmount: order.buyAmount.toString(),
-      validTo: order.validTo,
-      appData: order.appData,
-      feeAmount: order.feeAmount.toString(),
-      kind: order.kind,
-      partiallyFillable: order.partiallyFillable,
-      signature: signature.data,
-      signingScheme: signature.scheme,
-      receiver: order.receiver,
+      sellToken: normalizedOrder.sellToken,
+      buyToken: normalizedOrder.buyToken,
+      sellAmount: BigNumber.from(normalizedOrder.sellAmount).toString(),
+      buyAmount: BigNumber.from(normalizedOrder.buyAmount).toString(),
+      validTo: normalizedOrder.validTo,
+      appData,
+      feeAmount: BigNumber.from(normalizedOrder.feeAmount).toString(),
+      kind: normalizedOrder.kind,
+      partiallyFillable: normalizedOrder.partiallyFillable,
+      signature: encodeSignatureData(signature),
+      signingScheme: apiSigningScheme(signature.scheme),
+      receiver: normalizedOrder.receiver,
     }),
     headers: { "Content-Type": "application/json" },
   });
