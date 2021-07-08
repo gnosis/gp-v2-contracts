@@ -54,6 +54,17 @@ interface CallError extends Error {
   apiError?: ApiError;
 }
 
+function apiKind(kind: OrderKind): string {
+  switch (kind) {
+    case OrderKind.SELL:
+      return "sell";
+    case OrderKind.BUY:
+      return "buy";
+    default:
+      throw new Error(`Unsupported kind ${kind}`);
+  }
+}
+
 function apiSigningScheme(scheme: SigningScheme): string {
   switch (scheme) {
     case SigningScheme.EIP712:
@@ -101,7 +112,9 @@ export async function getFee({
   network,
 }: GetFeeQuery & ApiCall): Promise<BigNumber> {
   const response: GetFeeResponse = await call(
-    `fee?sellToken=${sellToken}&buyToken=${buyToken}&amount=${amount}&kind=${kind}`,
+    `fee?sellToken=${sellToken}&buyToken=${buyToken}&amount=${amount}&kind=${apiKind(
+      kind,
+    )}`,
     network,
   );
   return BigNumber.from(response.amount);
@@ -115,7 +128,7 @@ export async function estimateTradeAmount({
   amount,
 }: EstimateTradeAmountQuery & ApiCall): Promise<BigNumber> {
   const response: EstimateAmountResponse = await call(
-    `markets/${sellToken}-${buyToken}/${kind}/${amount}`,
+    `markets/${sellToken}-${buyToken}/${apiKind(kind)}/${amount}`,
     network,
   );
   // The services return the quote token used for the price. The quote token
@@ -148,7 +161,7 @@ export async function placeOrder({
       validTo: normalizedOrder.validTo,
       appData,
       feeAmount: BigNumber.from(normalizedOrder.feeAmount).toString(),
-      kind: normalizedOrder.kind,
+      kind: apiKind(order.kind),
       partiallyFillable: normalizedOrder.partiallyFillable,
       signature: encodeSignatureData(signature),
       signingScheme: apiSigningScheme(signature.scheme),
