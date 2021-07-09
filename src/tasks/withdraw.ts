@@ -15,12 +15,12 @@ import {
   isSupportedNetwork,
   SupportedNetwork,
 } from "./ts/deployment";
-import { TokenDetails, tokenDetails } from "./ts/erc20";
 import {
   DisappearingLogFunctions,
   promiseAllWithRateLimit,
 } from "./ts/rate_limits";
 import { Align, displayTable } from "./ts/table";
+import { TokenDetails, tokenDetails } from "./ts/tokens";
 import {
   usdValue,
   formatUsdValue,

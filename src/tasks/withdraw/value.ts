@@ -1,10 +1,13 @@
 import axios from "axios";
-import WethNetworks from "canonical-weth/networks.json";
 import { BigNumber, constants } from "ethers";
 
 import { OrderKind } from "../../ts";
 import { SupportedNetwork } from "../ts/deployment";
-import { TokenDetails } from "../ts/erc20";
+import {
+  NATIVE_TOKEN_SYMBOL,
+  TokenDetails,
+  WRAPPED_NATIVE_TOKEN_ADDRESS,
+} from "../ts/tokens";
 
 interface ApiTradeQuery {
   network: string;
@@ -21,18 +24,6 @@ interface PricedToken extends TokenDetails {
   // Amount of DAI wei equivalent to one unit of this token (10**decimals)
   usdValue: BigNumber;
 }
-
-const NATIVE_TOKEN_SYMBOL: Record<SupportedNetwork, string> = {
-  mainnet: "ETH",
-  rinkeby: "ETH",
-  xdai: "xDAI",
-};
-
-const WRAPPED_NATIVE_TOKEN_ADDRESS: Record<SupportedNetwork, string> = {
-  mainnet: WethNetworks.WETH9[1].address,
-  rinkeby: WethNetworks.WETH9[4].address,
-  xdai: "0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d",
-};
 
 const REFERENCE_TOKEN: Record<
   SupportedNetwork,

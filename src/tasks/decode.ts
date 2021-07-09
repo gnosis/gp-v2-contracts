@@ -27,8 +27,8 @@ import {
   decode as decodeInteraction,
   DecodedInteraction,
 } from "./decode/interaction";
-import { TokenDetails, tokenDetails } from "./ts/erc20";
 import { Align, displayTable } from "./ts/table";
+import { TokenDetails, tokenDetails } from "./ts/tokens";
 
 const WIDTH = 120;
 const INVALID_TOKEN = " ! Invalid token ! ";

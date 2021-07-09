@@ -3,7 +3,7 @@ import { utils, BytesLike } from "ethers";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 import { Interaction } from "../../../ts";
-import { tokenDetails } from "../../ts/erc20";
+import { tokenDetails } from "../../ts/tokens";
 import {
   DecodedInteraction,
   DecodedInteractionCall,

@@ -1,7 +1,7 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 import { Interaction } from "../../ts";
-import { TokenDetails } from "../ts/erc20";
+import { TokenDetails } from "../ts/tokens";
 
 import { Erc20Decoder } from "./interaction/erc20";
 import { InteractionDecoder } from "./interaction/template";
