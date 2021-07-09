@@ -26,7 +26,7 @@ import {
   formatUsdValue,
   formatTokenValue,
   appraise,
-} from "./withdraw/value";
+} from "./ts/value";
 
 const DAI_DECIMALS = 18;
 
