@@ -16,6 +16,10 @@ import {
   SupportedNetwork,
 } from "./ts/deployment";
 import { TokenDetails, tokenDetails } from "./ts/erc20";
+import {
+  DisappearingLogFunctions,
+  promiseAllWithRateLimit,
+} from "./ts/rate_limits";
 import { Align, displayTable } from "./ts/table";
 import {
   usdValue,
@@ -25,7 +29,6 @@ import {
 } from "./withdraw/value";
 
 const DAI_DECIMALS = 18;
-const RATE_LIMIT_MAX_PARALLEL_WITHDRAWALS = 20;
 
 interface Withdrawal {
   token: PricedToken;
@@ -139,11 +142,6 @@ async function getAllTradedTokens(
   );
 }
 
-const LINE_CLEARING_ENABLED =
-  process.stdout.isTTY &&
-  process.stdout.clearLine !== undefined &&
-  process.stdout.cursorTo !== undefined;
-
 async function getWithdrawals(
   tokens: string[],
   settlement: Contract,
@@ -152,96 +150,63 @@ async function getWithdrawals(
   hre: HardhatRuntimeEnvironment,
   network: SupportedNetwork,
 ): Promise<Withdrawal[]> {
-  const withdrawals: Withdrawal[] = [];
   const minValueWei = utils.parseUnits(minValue, DAI_DECIMALS);
   const leftoverWei = utils.parseUnits(leftover, DAI_DECIMALS);
-  let vanishingProgressMessage = "";
-  const addWithdrawal = async (i: number) => {
-    const address = tokens[i];
-    const token = await fastTokenDetails(address, hre);
-    const balance = await token.contract.balanceOf(settlement.address);
-    if (balance.eq(0)) {
-      return;
-    }
-    const pricedToken = await appraise(token, network);
-    const balanceUsd = pricedToken.usdValue
-      .mul(balance)
-      .div(BigNumber.from(10).pow(pricedToken.decimals));
-    // Note: if balanceUsd is zero, then setting either minValue or leftoverWei
-    // to a nonzero value means that nothing should be withdrawn. If neither
-    // flag is set, then whether to withdraw does not depend on the USD value.
-    if (
-      balanceUsd.lt(minValueWei.add(leftoverWei)) ||
-      (balanceUsd.isZero() && !(minValueWei.isZero() && leftoverWei.isZero()))
-    ) {
-      if (LINE_CLEARING_ENABLED) {
-        process.stdout.clearLine(0);
+  const computeWithdrawalInstructions = tokens.map(
+    (tokenAddress) => async ({ consoleWarn }: DisappearingLogFunctions) => {
+      const token = await fastTokenDetails(tokenAddress, hre);
+      const balance = await token.contract.balanceOf(settlement.address);
+      if (balance.eq(0)) {
+        return null;
       }
-      console.warn(
-        `Ignored ${utils.formatUnits(balance, pricedToken.decimals)} units of ${
-          token.symbol ?? "unknown token"
-        } (${token.address}) with value ${formatUsdValue(
-          balanceUsd,
-          network,
-        )} USD`,
-      );
-      if (LINE_CLEARING_ENABLED) {
-        process.stdout.write(vanishingProgressMessage);
-        process.stdout.cursorTo(0);
+      const pricedToken = await appraise(token, network);
+      const balanceUsd = pricedToken.usdValue
+        .mul(balance)
+        .div(BigNumber.from(10).pow(pricedToken.decimals));
+      // Note: if balanceUsd is zero, then setting either minValue or leftoverWei
+      // to a nonzero value means that nothing should be withdrawn. If neither
+      // flag is set, then whether to withdraw does not depend on the USD value.
+      if (
+        balanceUsd.lt(minValueWei.add(leftoverWei)) ||
+        (balanceUsd.isZero() && !(minValueWei.isZero() && leftoverWei.isZero()))
+      ) {
+        consoleWarn(
+          `Ignored ${utils.formatUnits(
+            balance,
+            pricedToken.decimals,
+          )} units of ${token.symbol ?? "unknown token"} (${
+            token.address
+          }) with value ${formatUsdValue(balanceUsd, network)} USD`,
+        );
+        return null;
       }
-      return;
-    }
-    let amount;
-    let amountUsd;
-    if (balanceUsd.isZero()) {
-      // Note: minValueWei and leftoverWei are zero. Everything should be
-      // withdrawn.
-      amount = balance;
-      amountUsd = balanceUsd;
-    } else {
-      amount = balance.mul(balanceUsd.sub(leftoverWei)).div(balanceUsd);
-      amountUsd = balanceUsd.sub(leftoverWei);
-    }
-    withdrawals.push({
-      token: pricedToken,
-      amount,
-      amountUsd,
-      balance,
-      balanceUsd,
-    });
-  };
-  for (
-    let step = 0;
-    step < tokens.length / RATE_LIMIT_MAX_PARALLEL_WITHDRAWALS;
-    step++
-  ) {
-    const remainingTokens =
-      tokens.length - RATE_LIMIT_MAX_PARALLEL_WITHDRAWALS * step;
-    const tokensInBatch =
-      remainingTokens >= RATE_LIMIT_MAX_PARALLEL_WITHDRAWALS
-        ? RATE_LIMIT_MAX_PARALLEL_WITHDRAWALS
-        : remainingTokens;
-    vanishingProgressMessage = `Processing tokens ${
-      step * RATE_LIMIT_MAX_PARALLEL_WITHDRAWALS + 1
-    } to ${step * RATE_LIMIT_MAX_PARALLEL_WITHDRAWALS + tokensInBatch} of ${
-      tokens.length
-    } tokens...`;
-    if (LINE_CLEARING_ENABLED) {
-      process.stdout.write(vanishingProgressMessage);
-      process.stdout.cursorTo(0);
-    }
-    await Promise.all(
-      Array(tokensInBatch)
-        .fill(undefined)
-        .map((_, i) =>
-          addWithdrawal(step * RATE_LIMIT_MAX_PARALLEL_WITHDRAWALS + i),
-        ),
-    );
-  }
-  if (LINE_CLEARING_ENABLED) {
-    process.stdout.clearLine(0);
-  }
-  return withdrawals;
+      let amount;
+      let amountUsd;
+      if (balanceUsd.isZero()) {
+        // Note: minValueWei and leftoverWei are zero. Everything should be
+        // withdrawn.
+        amount = balance;
+        amountUsd = balanceUsd;
+      } else {
+        amount = balance.mul(balanceUsd.sub(leftoverWei)).div(balanceUsd);
+        amountUsd = balanceUsd.sub(leftoverWei);
+      }
+      return {
+        token: pricedToken,
+        amount,
+        amountUsd,
+        balance,
+        balanceUsd,
+      };
+    },
+  );
+  const processedWithdrawals: (Withdrawal | null)[] = await promiseAllWithRateLimit(
+    computeWithdrawalInstructions,
+    { message: "computing withdrawals" },
+  );
+  return processedWithdrawals.filter(
+    (withdrawal) => withdrawal !== null,
+  ) as Withdrawal[];
 }
 
 function formatWithdrawal(
