@@ -1,4 +1,4 @@
-import { BigNumber, utils } from "ethers";
+import { BigNumber } from "ethers";
 import fetch, { RequestInit } from "node-fetch";
 
 import {
@@ -147,10 +147,6 @@ export async function placeOrder({
   network,
 }: PlaceOrderQuery & ApiCall): Promise<string> {
   const normalizedOrder = normalizeOrder(order);
-  // the api expects appData to always have length 32 bytes
-  const appData = utils.hexlify(
-    utils.hexZeroPad(utils.arrayify(normalizedOrder.appData), 32),
-  );
   return await call("orders", network, {
     method: "post",
     body: JSON.stringify({
@@ -159,7 +155,7 @@ export async function placeOrder({
       sellAmount: BigNumber.from(normalizedOrder.sellAmount).toString(),
       buyAmount: BigNumber.from(normalizedOrder.buyAmount).toString(),
       validTo: normalizedOrder.validTo,
-      appData,
+      appData: normalizedOrder.appData,
       feeAmount: BigNumber.from(normalizedOrder.feeAmount).toString(),
       kind: apiKind(order.kind),
       partiallyFillable: normalizedOrder.partiallyFillable,
