@@ -100,7 +100,7 @@ export function nativeToken({
 export async function erc20Token(
   address: string,
   hre: HardhatRuntimeEnvironment,
-): Promise<Erc20Token> {
+): Promise<Erc20Token | null> {
   const IERC20 = await hre.artifacts.readArtifact(
     "src/contracts/interfaces/IERC20.sol:IERC20",
   );
@@ -115,6 +115,12 @@ export async function erc20Token(
       .then((s: unknown) => BigNumber.from(s))
       .catch(() => null),
   ]);
+  if (symbol === null || decimals === null) {
+    const code = await hre.ethers.provider.getCode(address);
+    if (code === "0x") {
+      return null;
+    }
+  }
   return {
     contract,
     symbol,
