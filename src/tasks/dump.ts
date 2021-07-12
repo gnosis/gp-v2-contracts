@@ -104,7 +104,6 @@ async function getDumpInstructions({
     );
   }
 
-  const dumpedTokens = Array.from(new Set(inputDumpedTokens));
   let toToken: Erc20Token | NativeToken;
   if (toTokenAddress === undefined || toTokenAddress === BUY_ETH_ADDRESS) {
     toToken = nativeToken(hre);
@@ -119,17 +118,17 @@ async function getDumpInstructions({
   }
 
   let transferToReceiver: TransferToReceiver | undefined = undefined;
-  const sameTokenIndex = dumpedTokens.findIndex(
-    (token) => token === (toTokenAddress ?? BUY_ETH_ADDRESS),
+  const dumpedTokens = Array.from(new Set(inputDumpedTokens)).filter(
+    (token) => token !== (toTokenAddress ?? BUY_ETH_ADDRESS),
   );
-  if (sameTokenIndex !== -1) {
-    dumpedTokens.splice(sameTokenIndex, 1);
-    if (hasCustomReceiver) {
-      transferToReceiver = {
-        token: toToken,
-        amount: await balanceOf(toToken, user),
-      };
-    }
+  if (
+    hasCustomReceiver &&
+    inputDumpedTokens.includes(toTokenAddress ?? BUY_ETH_ADDRESS)
+  ) {
+    transferToReceiver = {
+      token: toToken,
+      amount: await balanceOf(toToken, user),
+    };
   }
 
   const computedInstructions: (DumpInstruction | null)[] = (
