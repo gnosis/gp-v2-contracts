@@ -177,14 +177,11 @@ export type NormalizedOrder = Omit<Order, "validTo" | "appData" | "kind"> & {
  */
 export function normalizeOrder(order: Order): NormalizedOrder {
   const normalizedOrder = {
-    receiver: ethers.constants.AddressZero,
     ...order,
+    receiver: order.receiver ?? ethers.constants.AddressZero,
     validTo: timestamp(order.validTo),
     appData: hashify(order.appData),
   };
-  if (normalizedOrder.receiver === undefined) {
-    normalizedOrder.receiver = ethers.constants.AddressZero;
-  }
   return normalizedOrder;
 }
 
