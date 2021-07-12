@@ -45,6 +45,9 @@ import { formatTokenValue } from "./ts/value";
 const MAX_LATEST_BLOCK_DELAY_SECONDS = 2 * 60;
 const MAX_ORDER_VALIDITY_SECONDS = 24 * 3600;
 
+const keccak = utils.id;
+const APP_DATA = keccak("GPv2 dump script");
+
 interface DumpInstruction {
   token: Erc20Token;
   amount: BigNumber;
@@ -368,7 +371,7 @@ async function createOrders(
       buyAmount: inst.receivedAmount,
       feeAmount: inst.fee,
       kind: OrderKind.SELL,
-      appData: "0x",
+      appData: APP_DATA,
       // todo: switch to true when partially fillable orders will be
       // supported by the services
       partiallyFillable: false,
