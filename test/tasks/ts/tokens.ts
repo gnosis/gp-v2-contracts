@@ -6,9 +6,9 @@ import {
   transfer,
   balanceOf,
   nativeToken,
-  tokenDetails,
+  erc20Token,
   isNativeToken,
-  TokenDetails,
+  Erc20Token,
   NativeToken,
 } from "../../../src/tasks/ts/tokens";
 
@@ -17,7 +17,7 @@ describe("token tools", () => {
   const receiver = "0x" + "42".repeat(20);
 
   let token: Contract;
-  let erc20: TokenDetails;
+  let erc20: Erc20Token;
   let native: NativeToken;
 
   beforeEach(async () => {
@@ -27,15 +27,15 @@ describe("token tools", () => {
 
     token = await waffle.deployMockContract(deployer, IERC20.abi);
 
-    erc20 = await tokenDetails(token.address, hre);
+    erc20 = await erc20Token(token.address, hre);
     native = await nativeToken(hre);
   });
 
-  it("tokenDetails", async () => {
+  it("erc20Token", async () => {
     await token.mock.symbol.withArgs().returns("SYM");
     await token.mock.decimals.withArgs().returns(18);
 
-    erc20 = await tokenDetails(token.address, hre);
+    erc20 = await erc20Token(token.address, hre);
 
     expect(erc20.address).to.equal(token.address);
     expect(erc20.symbol).to.equal("SYM");

@@ -5,7 +5,7 @@ import { OrderKind } from "../../ts";
 import { SupportedNetwork } from "../ts/deployment";
 import {
   NATIVE_TOKEN_SYMBOL,
-  TokenDetails,
+  Erc20Token,
   WRAPPED_NATIVE_TOKEN_ADDRESS,
 } from "../ts/tokens";
 
@@ -17,7 +17,7 @@ interface ApiTradeQuery {
   amount: BigNumber;
 }
 
-interface PricedToken extends TokenDetails {
+interface PricedToken extends Erc20Token {
   // Overrides existing field in TokenDetails. The number of decimals must be
   // known to estimate the price
   decimals: number;
@@ -60,7 +60,7 @@ function apiPriceUrl({
 }
 
 export const usdValue = async function (
-  token: Pick<TokenDetails, "symbol" | "address"> | "native token",
+  token: Pick<Erc20Token, "symbol" | "address"> | "native token",
   amount: BigNumber,
   network: SupportedNetwork,
 ): Promise<BigNumber> {
@@ -131,7 +131,7 @@ export function formatUsdValue(
 }
 
 export async function appraise(
-  token: TokenDetails,
+  token: Erc20Token,
   network: SupportedNetwork,
 ): Promise<PricedToken> {
   const decimals = token.decimals ?? 18;

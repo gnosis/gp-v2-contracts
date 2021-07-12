@@ -11,7 +11,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 import { SupportedNetwork, isSupportedNetwork } from "./deployment";
 
-export interface TokenDetails {
+export interface Erc20Token {
   contract: Contract;
   symbol: string | null;
   decimals: number | null;
@@ -41,12 +41,12 @@ export const WRAPPED_NATIVE_TOKEN_ADDRESS: Record<SupportedNetwork, string> = {
 };
 
 export function isNativeToken(
-  token: TokenDetails | NativeToken,
+  token: Erc20Token | NativeToken,
 ): token is NativeToken {
-  return (token as TokenDetails).contract === undefined;
+  return (token as Erc20Token).contract === undefined;
 }
 
-export function displayName(token: TokenDetails | NativeToken): string {
+export function displayName(token: Erc20Token | NativeToken): string {
   if (isNativeToken(token)) {
     return token.symbol;
   } else {
@@ -55,7 +55,7 @@ export function displayName(token: TokenDetails | NativeToken): string {
 }
 
 export async function balanceOf(
-  token: TokenDetails | NativeToken,
+  token: Erc20Token | NativeToken,
   user: string,
 ): Promise<BigNumber> {
   const balanceFunction = isNativeToken(token)
@@ -65,7 +65,7 @@ export async function balanceOf(
 }
 
 export async function transfer(
-  token: TokenDetails | NativeToken,
+  token: Erc20Token | NativeToken,
   from: Signer,
   to: string,
   amount: BigNumberish,
@@ -97,10 +97,10 @@ export function nativeToken({
   };
 }
 
-export async function tokenDetails(
+export async function erc20Token(
   address: string,
   hre: HardhatRuntimeEnvironment,
-): Promise<TokenDetails> {
+): Promise<Erc20Token> {
   const IERC20 = await hre.artifacts.readArtifact(
     "src/contracts/interfaces/IERC20.sol:IERC20",
   );

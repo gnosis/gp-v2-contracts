@@ -20,7 +20,7 @@ import {
   promiseAllWithRateLimit,
 } from "./ts/rate_limits";
 import { Align, displayTable } from "./ts/table";
-import { TokenDetails, tokenDetails } from "./ts/tokens";
+import { Erc20Token, erc20Token } from "./ts/tokens";
 import {
   usdValue,
   formatUsdValue,
@@ -46,7 +46,7 @@ interface DisplayWithdrawal {
   address: string;
 }
 
-interface PricedToken extends TokenDetails {
+interface PricedToken extends Erc20Token {
   // Overrides existing field in TokenDetails. The number of decimals must be
   // known to estimate the price
   decimals: number;
@@ -70,7 +70,7 @@ const ONEINCH_TOKENS: Promise<OneinchTokenList> = axios
 async function fastTokenDetails(
   address: string,
   hre: HardhatRuntimeEnvironment,
-): Promise<TokenDetails> {
+): Promise<Erc20Token> {
   const oneinchTokens = await ONEINCH_TOKENS;
   if (
     hre.network.name === "mainnet" &&
@@ -82,7 +82,7 @@ async function fastTokenDetails(
     const contract = new Contract(address, IERC20.abi, hre.ethers.provider);
     return { ...oneinchTokens[address.toLowerCase()], contract };
   }
-  return tokenDetails(address, hre);
+  return erc20Token(address, hre);
 }
 
 function isErrorTooManyEvents(error: Error): boolean {
