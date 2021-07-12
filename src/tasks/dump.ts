@@ -87,6 +87,24 @@ interface GetDumpInstructionInput {
   hre: HardhatRuntimeEnvironment;
   network: SupportedNetwork;
 }
+/**
+ * This function recovers all information needed to dump the input list of
+ * tokens into toToken with GPv2. It returns structured information on all
+ * operations to execute, sorted so that the last operation is the one
+ * recovering the largest amount of toToken.
+ *
+ * Information on operations to perform include that needed for creating orders,
+ * setting allowances and, if needed, transfering tokens.
+ *
+ * Note that this function is not supposed to execute any state-changing
+ * operation (either onchain or in the backend).
+ *
+ * Care is taken in handling the following logic:
+ * - handling the case where the receiver is not the signer address
+ * - handling ETH buy addresses (especially with a custom receiver)
+ * - rejecting dump requests for tokens for which the fee to pay is larger than
+ *   a given threshold
+ */
 async function getDumpInstructions({
   dumpedTokens: inputDumpedTokens,
   toTokenAddress,
