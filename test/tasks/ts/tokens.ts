@@ -27,19 +27,32 @@ describe("token tools", () => {
 
     token = await waffle.deployMockContract(deployer, IERC20.abi);
 
-    erc20 = await erc20Token(token.address, hre);
+    const recoveredErc20 = await erc20Token(token.address, hre);
+    if (recoveredErc20 === null) {
+      throw new Error("Erc20 token not decoded");
+    }
+    erc20 = recoveredErc20;
     native = await nativeToken(hre);
   });
 
-  it("erc20Token", async () => {
-    await token.mock.symbol.withArgs().returns("SYM");
-    await token.mock.decimals.withArgs().returns(18);
+  describe("erc20Token", () => {
+    it("recovers token info", async () => {
+      await token.mock.symbol.withArgs().returns("SYM");
+      await token.mock.decimals.withArgs().returns(18);
 
-    erc20 = await erc20Token(token.address, hre);
+      const recoveredErc20 = await erc20Token(token.address, hre);
+      expect(recoveredErc20).not.to.be.null;
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      erc20 = recoveredErc20!;
 
-    expect(erc20.address).to.equal(token.address);
-    expect(erc20.symbol).to.equal("SYM");
-    expect(erc20.decimals).to.equal(18);
+      expect(erc20.address).to.equal(token.address);
+      expect(erc20.symbol).to.equal("SYM");
+      expect(erc20.decimals).to.equal(18);
+    });
+
+    it("returns null for addresses with no code", async () => {
+      expect(await erc20Token(constants.AddressZero, hre)).to.be.null;
+    });
   });
 
   it("isNativeToken", async () => {

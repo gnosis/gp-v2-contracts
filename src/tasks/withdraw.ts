@@ -70,7 +70,7 @@ const ONEINCH_TOKENS: Promise<OneinchTokenList> = axios
 async function fastTokenDetails(
   address: string,
   hre: HardhatRuntimeEnvironment,
-): Promise<Erc20Token> {
+): Promise<Erc20Token | null> {
   const oneinchTokens = await ONEINCH_TOKENS;
   if (
     hre.network.name === "mainnet" &&
@@ -155,6 +155,11 @@ async function getWithdrawals(
   const computeWithdrawalInstructions = tokens.map(
     (tokenAddress) => async ({ consoleWarn }: DisappearingLogFunctions) => {
       const token = await fastTokenDetails(tokenAddress, hre);
+      if (token === null) {
+        throw new Error(
+          `There is no valid ERC20 token at address ${tokenAddress}`,
+        );
+      }
       const balance = await token.contract.balanceOf(settlement.address);
       if (balance.eq(0)) {
         return null;

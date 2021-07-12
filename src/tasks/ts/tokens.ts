@@ -13,8 +13,8 @@ import { SupportedNetwork, isSupportedNetwork } from "./deployment";
 
 export interface Erc20Token {
   contract: Contract;
-  symbol: string | null;
-  decimals: number | null;
+  symbol?: string;
+  decimals?: number;
   address: string;
 }
 
