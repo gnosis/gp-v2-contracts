@@ -1,4 +1,4 @@
-import { BigNumber } from "ethers";
+import { BigNumber, BigNumberish } from "ethers";
 import fetch, { RequestInit } from "node-fetch";
 
 import {
@@ -14,35 +14,35 @@ interface ApiCall {
   network: string;
 }
 
-interface GetFeeQuery {
+export interface GetFeeQuery {
   sellToken: string;
   buyToken: string;
   kind: OrderKind;
-  amount: BigNumber;
+  amount: BigNumberish;
 }
-interface EstimateTradeAmountQuery {
+export interface EstimateTradeAmountQuery {
   sellToken: string;
   buyToken: string;
   kind: OrderKind;
-  amount: BigNumber;
+  amount: BigNumberish;
 }
-interface PlaceOrderQuery {
+export interface PlaceOrderQuery {
   order: Order;
   signature: Signature;
 }
-interface GetExecutedSellAmountQuery {
+export interface GetExecutedSellAmountQuery {
   uid: string;
 }
 
-interface OrderDetailResponse {
+export interface OrderDetailResponse {
   // Other fields are omitted until needed
   executedSellAmount: string;
 }
-interface GetFeeResponse {
+export interface GetFeeResponse {
   amount: string;
   expirationDate: Date;
 }
-interface EstimateAmountResponse {
+export interface EstimateAmountResponse {
   amount: string;
   token: string;
 }
@@ -50,7 +50,7 @@ export interface ApiError {
   errorType: string;
   description: string;
 }
-interface CallError extends Error {
+export interface CallError extends Error {
   apiError?: ApiError;
 }
 
@@ -112,9 +112,9 @@ export async function getFee({
   network,
 }: GetFeeQuery & ApiCall): Promise<BigNumber> {
   const response: GetFeeResponse = await call(
-    `fee?sellToken=${sellToken}&buyToken=${buyToken}&amount=${amount}&kind=${apiKind(
-      kind,
-    )}`,
+    `fee?sellToken=${sellToken}&buyToken=${buyToken}&amount=${BigNumber.from(
+      amount,
+    ).toString()}&kind=${apiKind(kind)}`,
     network,
   );
   return BigNumber.from(response.amount);
@@ -128,7 +128,9 @@ export async function estimateTradeAmount({
   amount,
 }: EstimateTradeAmountQuery & ApiCall): Promise<BigNumber> {
   const response: EstimateAmountResponse = await call(
-    `markets/${sellToken}-${buyToken}/${apiKind(kind)}/${amount}`,
+    `markets/${sellToken}-${buyToken}/${apiKind(kind)}/${BigNumber.from(
+      amount,
+    ).toString()}`,
     network,
   );
   // The services return the quote token used for the price. The quote token
