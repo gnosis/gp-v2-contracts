@@ -306,7 +306,7 @@ export function decodeTradeFlags(flags: BigNumberish): TradeFlags {
   };
 }
 
-function encodeSignatureData(sig: Signature): string {
+export function encodeSignatureData(sig: Signature): string {
   switch (sig.scheme) {
     case SigningScheme.EIP712:
     case SigningScheme.ETHSIGN:
