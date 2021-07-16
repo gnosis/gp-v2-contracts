@@ -80,7 +80,7 @@ interface DumpInstructions {
   transferToReceiver?: TransferToReceiver;
 }
 
-interface GetDumpInstructionInput {
+export interface GetDumpInstructionInput {
   dumpedTokens: string[];
   toTokenAddress: string | undefined; // undefined defaults to native token (e.g., ETH)
   user: string;
@@ -109,7 +109,7 @@ interface GetDumpInstructionInput {
  * - rejecting dump requests for tokens for which the fee to pay is larger than
  *   a given threshold
  */
-async function getDumpInstructions({
+export async function getDumpInstructions({
   dumpedTokens: inputDumpedTokens,
   toTokenAddress,
   user,
