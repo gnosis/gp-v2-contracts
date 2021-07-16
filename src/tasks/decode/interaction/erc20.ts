@@ -3,7 +3,7 @@ import { utils, BytesLike } from "ethers";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 import { Interaction } from "../../../ts";
-import { tokenDetails } from "../../ts/erc20";
+import { erc20Token } from "../../ts/tokens";
 import {
   DecodedInteraction,
   DecodedInteractionCall,
@@ -122,14 +122,12 @@ export class Erc20Decoder extends InteractionDecoder {
     decodingTools: DecodingTools = {},
   ): Promise<DecodedInteraction | null> {
     const { settlementContractAddress } = decodingTools;
-    const { symbol, decimals } = await tokenDetails(
-      interaction.target,
-      this.hre,
-    );
+    const { symbol, decimals } =
+      (await erc20Token(interaction.target, this.hre)) ?? {};
     // Assumption: it's a token if and only if it has both a symbol and
     // decimals. In theory there could be false positives and negatives, in
     // practice all meaningful tokens have both.
-    if (symbol === null || decimals === null) {
+    if (symbol === undefined || decimals === undefined) {
       return null;
     }
 
