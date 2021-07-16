@@ -176,12 +176,13 @@ export type NormalizedOrder = Omit<Order, "validTo" | "appData" | "kind"> & {
  * @returns A 32-byte hash encoded as a hex-string.
  */
 export function normalizeOrder(order: Order): NormalizedOrder {
-  return {
-    receiver: ethers.constants.AddressZero,
+  const normalizedOrder = {
     ...order,
+    receiver: order.receiver ?? ethers.constants.AddressZero,
     validTo: timestamp(order.validTo),
     appData: hashify(order.appData),
   };
+  return normalizedOrder;
 }
 
 /**
