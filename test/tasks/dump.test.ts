@@ -171,7 +171,9 @@ describe("getDumpInstructions", () => {
   });
 
   for (const to of [undefined, BUY_ETH_ADDRESS]) {
-    it(`dumps token for eth (${to})`, async () => {
+    it(`dumps token for eth (${
+      to === undefined ? "leaving the toToken parameter undefined" : to
+    })`, async () => {
       const dumped = await mockErc20(deployer);
       await dumped.mock.symbol.returns("DUMPEDTOKEN");
       await dumped.mock.decimals.returns(0xd);
