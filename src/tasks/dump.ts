@@ -11,7 +11,7 @@ import {
 import { task, types } from "hardhat/config";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
-import { estimateTradeAmount, getFee, placeOrder } from "../services/api";
+import { Api, Environment } from "../services/api";
 import {
   BUY_ETH_ADDRESS,
   domain,
@@ -89,6 +89,7 @@ interface GetDumpInstructionInput {
   hasCustomReceiver: boolean;
   hre: HardhatRuntimeEnvironment;
   network: SupportedNetwork;
+  api: Api;
 }
 /**
  * This function recovers all information needed to dump the input list of
@@ -117,6 +118,7 @@ async function getDumpInstructions({
   hasCustomReceiver,
   hre,
   network,
+  api,
 }: GetDumpInstructionInput): Promise<DumpInstructions> {
   // todo: support dumping ETH by wrapping them
   if (inputDumpedTokens.includes(BUY_ETH_ADDRESS)) {
@@ -182,12 +184,11 @@ async function getDumpInstructions({
           ? WRAPPED_NATIVE_TOKEN_ADDRESS[network] // todo: replace WETH address with BUY_ETH_ADDRESS when services support ETH estimates
           : toToken.address;
         const kind = OrderKind.SELL;
-        const fee = await getFee({
+        const fee = await api.getFee({
           sellToken,
           buyToken,
           kind,
           amount: balance,
-          network,
         });
         const amount = balance.sub(fee);
         if (amount.lte(constants.Zero)) {
@@ -211,12 +212,11 @@ async function getDumpInstructions({
           );
           return null;
         }
-        const receivedAmount = await estimateTradeAmount({
+        const receivedAmount = await api.estimateTradeAmount({
           sellToken,
           buyToken,
           amount,
           kind,
-          network,
         });
         return {
           token,
@@ -354,6 +354,7 @@ async function createOrders(
   validity: number,
   network: SupportedNetwork,
   ethers: HardhatRuntimeEnvironment["ethers"],
+  api: Api,
 ) {
   const blockTimestamp = (await ethers.provider.getBlock("latest")).timestamp;
   // Check that the local time is consistent with that of the blockchain
@@ -388,10 +389,9 @@ async function createOrders(
     console.log(
       `Creating order selling ${inst.token.symbol ?? inst.token.address}...`,
     );
-    await placeOrder({
+    await api.placeOrder({
       order,
       signature,
-      network,
     });
   }
 }
@@ -470,6 +470,7 @@ const setupDumpTask: () => void = () =>
           throw new Error("Order validity too large");
         }
 
+        const api = new Api(network, Environment.Dev);
         const [signers, settlement, chainId] = await Promise.all([
           ethers.getSigners(),
           getDeployedContract("GPv2Settlement", hre),
@@ -515,6 +516,7 @@ const setupDumpTask: () => void = () =>
           hasCustomReceiver,
           hre,
           network,
+          api,
         });
         if (instructions.length === 0) {
           console.log("No token can be sold");
@@ -579,6 +581,7 @@ const setupDumpTask: () => void = () =>
             validity,
             network,
             ethers,
+            api,
           );
 
           if (transferToReceiver !== undefined) {
