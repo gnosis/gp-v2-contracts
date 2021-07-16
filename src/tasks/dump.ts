@@ -51,10 +51,10 @@ const APP_DATA = keccak("GPv2 dump script");
 interface DumpInstruction {
   token: Erc20Token;
   amountWithoutFee: BigNumber;
-  approvedAmount: BigNumber;
   receivedAmount: BigNumber;
   balance: BigNumber;
   fee: BigNumber;
+  needsAllowance: boolean;
 }
 
 interface DisplayDumpInstruction {
@@ -171,6 +171,7 @@ async function getDumpInstructions({
           token.contract.balanceOf(user).then(BigNumber.from),
           token.contract.allowance(user, allowanceManager).then(BigNumber.from),
         ]);
+        const needsAllowance = approvedAmount.lt(balance);
         if (balance.isZero()) {
           consoleWarn(
             `Dump request skipped for token ${displayName(
@@ -222,9 +223,9 @@ async function getDumpInstructions({
           token,
           balance,
           amountWithoutFee,
-          approvedAmount,
           receivedAmount,
           fee,
+          needsAllowance,
         };
       }),
       { rateLimit: 10 },
@@ -247,16 +248,16 @@ function formatInstruction(
   {
     token: fromToken,
     balance,
-    approvedAmount,
     receivedAmount,
     fee,
+    needsAllowance: inputNeedsAllowance,
   }: DumpInstruction,
   toToken: Erc20Token | NativeToken,
 ): DisplayDumpInstruction {
   const fromSymbol = fromToken.symbol ?? "! unknown symbol !";
   const fromAddress = fromToken.address;
   const fromDecimals = fromToken.decimals ?? 0;
-  const needsAllowance = approvedAmount.lt(balance) ? "yes" : "";
+  const needsAllowance = inputNeedsAllowance ? "yes" : "";
   const feePercent = fee.mul(10000).div(balance).lt(1)
     ? "<0.01"
     : utils.formatUnits(fee.mul(10000).div(balance), 2);
@@ -273,7 +274,6 @@ function formatInstruction(
 function displayOperations(
   instructions: DumpInstruction[],
   toToken: Erc20Token | NativeToken,
-  needsAnyAllowance: boolean,
 ) {
   const formattedInstructions = instructions.map((inst) =>
     formatInstruction(inst, toToken),
@@ -285,7 +285,7 @@ function displayOperations(
     "balance",
     "feePercent",
   ] as const;
-  const order = needsAnyAllowance
+  const order = instructions.some(({ needsAllowance }) => needsAllowance)
     ? ([
         ...orderWithoutAllowances.slice(0, 2),
         "needsAllowance",
@@ -522,17 +522,15 @@ const setupDumpTask: () => void = () =>
           return;
         }
 
-        const needAllowances = instructions
-          .map(({ approvedAmount, amountWithoutFee, token, fee }) =>
-            approvedAmount.lt(amountWithoutFee.add(fee)) ? token : null,
-          )
-          .filter((address) => address !== null) as Erc20Token[];
-        displayOperations(instructions, toToken, needAllowances.length !== 0);
+        displayOperations(instructions, toToken);
 
         let sumReceived = instructions.reduce(
           (sum, inst) => sum.add(inst.receivedAmount),
           constants.Zero,
         );
+        const needAllowances = instructions
+          .filter(({ needsAllowance }) => needsAllowance)
+          .map(({ token }) => token);
         if (needAllowances.length !== 0) {
           console.log(
             `Before creating the orders, a total of ${needAllowances.length} allowances will be granted to the allowance manager.`,
