@@ -50,7 +50,7 @@ const APP_DATA = keccak("GPv2 dump script");
 
 interface DumpInstruction {
   token: Erc20Token;
-  amount: BigNumber;
+  amountWithoutFee: BigNumber;
   approvedAmount: BigNumber;
   receivedAmount: BigNumber;
   balance: BigNumber;
@@ -190,8 +190,8 @@ async function getDumpInstructions({
           kind,
           amount: balance,
         });
-        const amount = balance.sub(fee);
-        if (amount.lte(constants.Zero)) {
+        const amountWithoutFee = balance.sub(fee);
+        if (amountWithoutFee.lte(constants.Zero)) {
           consoleWarn(
             `Dump request skipped for token ${displayName(
               token,
@@ -215,13 +215,13 @@ async function getDumpInstructions({
         const receivedAmount = await api.estimateTradeAmount({
           sellToken,
           buyToken,
-          amount,
+          amount: amountWithoutFee,
           kind,
         });
         return {
           token,
           balance,
-          amount,
+          amountWithoutFee,
           approvedAmount,
           receivedAmount,
           fee,
@@ -368,7 +368,7 @@ async function createOrders(
     const order: Order = {
       sellToken: inst.token.address,
       buyToken: isNativeToken(toToken) ? BUY_ETH_ADDRESS : toToken.address,
-      sellAmount: inst.amount,
+      sellAmount: inst.amountWithoutFee,
       buyAmount: inst.receivedAmount,
       feeAmount: inst.fee,
       kind: OrderKind.SELL,
@@ -524,8 +524,8 @@ const setupDumpTask: () => void = () =>
         }
 
         const needAllowances = instructions
-          .map(({ approvedAmount, amount, token }) =>
-            approvedAmount.lt(amount) ? token : null,
+          .map(({ approvedAmount, amountWithoutFee, token, fee }) =>
+            approvedAmount.lt(amountWithoutFee.add(fee)) ? token : null,
           )
           .filter((address) => address !== null) as Erc20Token[];
         displayOperations(instructions, toToken, needAllowances.length !== 0);
