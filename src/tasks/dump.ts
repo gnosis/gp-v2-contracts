@@ -352,7 +352,6 @@ async function createOrders(
   hasCustomReceiver: boolean,
   domainSeparator: TypedDataDomain,
   validity: number,
-  network: SupportedNetwork,
   ethers: HardhatRuntimeEnvironment["ethers"],
   api: Api,
 ) {
@@ -579,7 +578,6 @@ const setupDumpTask: () => void = () =>
             hasCustomReceiver,
             domainSeparator,
             validity,
-            network,
             ethers,
             api,
           );
