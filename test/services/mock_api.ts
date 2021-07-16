@@ -170,7 +170,7 @@ class BaseMockApi {
 
 // Programmatically extend BaseMockApi to include all mocked methods. Each
 // method call verifies any mock expectation and returns the expected value.
-type MockApi = BaseMockApi & Api;
+export type MockApi = BaseMockApi & Api;
 export const MockApi = class MockApi extends BaseMockApi {} as new (
   ...args: ConstructorParameters<typeof BaseMockApi>
 ) => MockApi;
