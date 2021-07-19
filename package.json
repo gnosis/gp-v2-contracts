@@ -50,7 +50,7 @@
     "chalk": "^4.1.1",
     "debug": "^4.3.2",
     "dotenv": "^10.0.0",
-    "eslint": "^7.30.0",
+    "eslint": "^7.31.0",
     "eslint-config-prettier": "^8.3.0",
     "eslint-plugin-import": "^2.23.4",
     "eslint-plugin-no-only-tests": "^2.6.0",
