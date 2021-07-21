@@ -10,8 +10,14 @@ import {
   encodeSignatureData,
 } from "../ts";
 
+export enum Endpoint {
+  Dev,
+  Prod,
+}
+
 interface ApiCall {
   network: string;
+  endpoint: Endpoint;
 }
 
 interface GetFeeQuery {
@@ -83,9 +89,19 @@ function apiSigningScheme(scheme: SigningScheme): string {
 async function call<T>(
   route: string,
   network: string,
+  endpoint: Endpoint,
   init?: RequestInit,
 ): Promise<T> {
-  const url = `https://protocol-${network}.dev.gnosisdev.com/api/v1/${route}`;
+  let baseUrl: string;
+  switch (endpoint) {
+    case Endpoint.Dev:
+      baseUrl = `https://protocol-${network}.dev.gnosisdev.com`;
+      break;
+    case Endpoint.Prod:
+      baseUrl = `https://protocol-${network}.gnosis.io`;
+      break;
+  }
+  const url = `${baseUrl}/api/v1/${route}`;
   const response = await fetch(url, init);
   const body = await response.text();
   if (!response.ok) {
@@ -110,12 +126,14 @@ export async function getFee({
   kind,
   amount,
   network,
+  endpoint,
 }: GetFeeQuery & ApiCall): Promise<BigNumber> {
   const response: GetFeeResponse = await call(
     `fee?sellToken=${sellToken}&buyToken=${buyToken}&amount=${amount}&kind=${apiKind(
       kind,
     )}`,
     network,
+    endpoint,
   );
   return BigNumber.from(response.amount);
 }
@@ -126,10 +144,12 @@ export async function estimateTradeAmount({
   buyToken,
   kind,
   amount,
+  endpoint,
 }: EstimateTradeAmountQuery & ApiCall): Promise<BigNumber> {
   const response: EstimateAmountResponse = await call(
     `markets/${sellToken}-${buyToken}/${apiKind(kind)}/${amount}`,
     network,
+    endpoint,
   );
   // The services return the quote token used for the price. The quote token
   // is checked to make sure that the returned price meets our expectations.
@@ -145,9 +165,10 @@ export async function placeOrder({
   order,
   signature,
   network,
+  endpoint,
 }: PlaceOrderQuery & ApiCall): Promise<string> {
   const normalizedOrder = normalizeOrder(order);
-  return await call("orders", network, {
+  return await call("orders", network, endpoint, {
     method: "post",
     body: JSON.stringify({
       sellToken: normalizedOrder.sellToken,
@@ -170,32 +191,43 @@ export async function placeOrder({
 export async function getExecutedSellAmount({
   uid,
   network,
+  endpoint,
 }: GetExecutedSellAmountQuery & ApiCall): Promise<BigNumber> {
-  const response: OrderDetailResponse = await call(`orders/${uid}`, network);
+  const response: OrderDetailResponse = await call(
+    `orders/${uid}`,
+    network,
+    endpoint,
+  );
   return BigNumber.from(response.executedSellAmount);
 }
 
 export class Api {
   network: string;
+  endpoint: Endpoint;
 
-  constructor(network: string) {
+  constructor(network: string, endpoint: Endpoint) {
     this.network = network;
+    this.endpoint = endpoint;
+  }
+
+  private apiCallParams() {
+    return { network: this.network, endpoint: this.endpoint };
   }
 
   async getFee(query: GetFeeQuery): Promise<BigNumber> {
-    return getFee({ ...query, network: this.network });
+    return getFee({ ...this.apiCallParams(), ...query });
   }
   async estimateTradeAmount(
     query: EstimateTradeAmountQuery,
   ): Promise<BigNumber> {
-    return estimateTradeAmount({ ...query, network: this.network });
+    return estimateTradeAmount({ ...this.apiCallParams(), ...query });
   }
   async placeOrder(query: PlaceOrderQuery): Promise<string> {
-    return placeOrder({ ...query, network: this.network });
+    return placeOrder({ ...this.apiCallParams(), ...query });
   }
   async getExecutedSellAmount(
     query: GetExecutedSellAmountQuery,
   ): Promise<BigNumber> {
-    return getExecutedSellAmount({ ...query, network: this.network });
+    return getExecutedSellAmount({ ...this.apiCallParams(), ...query });
   }
 }
