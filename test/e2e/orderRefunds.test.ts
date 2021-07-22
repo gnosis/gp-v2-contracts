@@ -1,7 +1,7 @@
 import ERC20 from "@openzeppelin/contracts/build/contracts/ERC20PresetMinterPauser.json";
 import { expect } from "chai";
 import Debug from "debug";
-import { Contract, Wallet } from "ethers";
+import { BigNumber, Contract, Wallet } from "ethers";
 import { ethers, waffle } from "hardhat";
 
 import {
@@ -167,6 +167,6 @@ describe("E2E: Expired Order Gas Refunds", () => {
       );
     debug(`Gas savings per refund: ${gasSavingsPerRefund}`);
 
-    expect(gasSavingsPerRefund.gt(4000)).to.be.true;
+    expect(gasSavingsPerRefund.lt(BigNumber.from(-5000))).to.be.true;
   });
 });

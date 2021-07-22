@@ -90,6 +90,8 @@ export default {
   },
   networks: {
     hardhat: {
+      hardfork: "london",
+      gasPrice: "auto",
       blockGasLimit: 12.5e6,
     },
     mainnet: {
