@@ -10,7 +10,9 @@ import {
   Wallet,
 } from "ethers";
 import hre, { waffle } from "hardhat";
+import sinon, { SinonMock } from "sinon";
 
+import { Api, Environment } from "../../src/services/api";
 import {
   GetDumpInstructionInput,
   getDumpInstructions,
@@ -18,7 +20,6 @@ import {
 import { SupportedNetwork } from "../../src/tasks/ts/deployment";
 import { Erc20Token, isNativeToken } from "../../src/tasks/ts/tokens";
 import { BUY_ETH_ADDRESS, OrderKind } from "../../src/ts";
-import { MockApi } from "../services/mock_api";
 
 chai.use(chaiAsPromised);
 
@@ -30,7 +31,7 @@ async function mockErc20(deployer: Wallet) {
 }
 
 interface MockApiCallsInput {
-  api: MockApi;
+  apiMock: SinonMock;
   toToken: string;
   dumpedToken: string;
   balance: BigNumberish;
@@ -38,29 +39,33 @@ interface MockApiCallsInput {
   boughtAmount: BigNumberish;
 }
 function mockApiCalls({
-  api,
+  apiMock,
   toToken,
   dumpedToken,
   balance,
   fee,
   boughtAmount,
 }: MockApiCallsInput): void {
-  api.mock.getFee
+  apiMock
+    .expects("getFee")
     .withArgs({
       sellToken: dumpedToken,
       buyToken: toToken,
       kind: OrderKind.SELL,
       amount: BigNumber.from(balance),
     })
-    .returns(BigNumber.from(fee));
-  api.mock.estimateTradeAmount
+    .once()
+    .returns(Promise.resolve(BigNumber.from(fee)));
+  apiMock
+    .expects("estimateTradeAmount")
     .withArgs({
       sellToken: dumpedToken,
       buyToken: toToken,
       kind: OrderKind.SELL,
       amount: BigNumber.from(balance).sub(fee),
     })
-    .returns(BigNumber.from(boughtAmount));
+    .once()
+    .returns(Promise.resolve(BigNumber.from(boughtAmount)));
 }
 
 describe("getDumpInstructions", () => {
@@ -75,22 +80,38 @@ describe("getDumpInstructions", () => {
   // quotes.
   const network = (undefined as unknown) as SupportedNetwork;
   const wrappedNativeToken = (undefined as unknown) as string;
+  let rejectedPromise: Promise<never>;
 
   let deployer: Wallet;
   let user: Wallet;
-  let api = new MockApi();
+  let apiMock: SinonMock;
+  let api: Api;
 
   let defaultDumpInstructions: Omit<
     GetDumpInstructionInput,
     "dumpedTokens" | "toTokenAddress"
   >;
 
+  before(async () => {
+    // Suppress a warning "Promise rejection was handled asynchronously".
+    // Otherwise, `rejectedPromise` can always be replaced with Promise.reject()
+    // https://github.com/domenic/chai-as-promised/issues/173
+    rejectedPromise = Promise.reject();
+    await rejectedPromise.catch(() => {
+      /* ignored */
+    });
+  });
+
   beforeEach(async () => {
     consoleWarn = console.warn;
     console.warn = (...args: unknown[]) => (consoleWarnOutput = args[0]);
 
     [deployer, user] = await waffle.provider.getWallets();
-    api = new MockApi();
+    // environment parameter is unused in mock
+    const environment = ("unset environment" as unknown) as Environment;
+    api = new Api("mock", environment);
+    apiMock = sinon.mock(api);
+
     defaultDumpInstructions = {
       user: user.address,
       allowanceManager,
@@ -102,8 +123,10 @@ describe("getDumpInstructions", () => {
     };
   });
 
-  afterEach(() => {
-    api.mock.assertAllExpectationsUsed();
+  afterEach(function () {
+    if (this.currentTest?.isPassed()) {
+      apiMock.verify();
+    }
     console.warn = consoleWarn;
     consoleWarnOutput = undefined;
   });
@@ -126,7 +149,7 @@ describe("getDumpInstructions", () => {
       .withArgs(user.address, allowanceManager)
       .returns(allowance);
     mockApiCalls({
-      api,
+      apiMock,
       toToken: to.address,
       dumpedToken: dumped.address,
       balance,
@@ -188,7 +211,7 @@ describe("getDumpInstructions", () => {
         .withArgs(user.address, allowanceManager)
         .returns(allowance);
       mockApiCalls({
-        api,
+        apiMock,
         toToken: wrappedNativeToken,
         dumpedToken: dumped.address,
         balance,
@@ -246,7 +269,7 @@ describe("getDumpInstructions", () => {
       .withArgs(user.address, allowanceManager)
       .returns(allowance);
     mockApiCalls({
-      api,
+      apiMock,
       toToken: to.address,
       dumpedToken: dumped.address,
       balance,
@@ -348,14 +371,16 @@ describe("getDumpInstructions", () => {
       await dumped.mock.allowance
         .withArgs(user.address, allowanceManager)
         .returns(allowance);
-      api.mock.getFee
+      apiMock
+        .expects("getFee")
         .withArgs({
           sellToken: dumped.address,
           buyToken: to.address,
           kind: OrderKind.SELL,
           amount: balance,
         })
-        .throwsWith({ errorType: "MockError", description: "mock error" });
+        .once()
+        .returns(rejectedPromise);
 
       await expect(
         getDumpInstructions({
@@ -378,22 +403,26 @@ describe("getDumpInstructions", () => {
       await dumped.mock.allowance
         .withArgs(user.address, allowanceManager)
         .returns(allowance);
-      api.mock.getFee
+      apiMock
+        .expects("getFee")
         .withArgs({
           sellToken: dumped.address,
           buyToken: to.address,
           kind: OrderKind.SELL,
           amount: balance,
         })
-        .returns(fee);
-      api.mock.estimateTradeAmount
+        .once()
+        .returns(Promise.resolve(fee));
+      apiMock
+        .expects("estimateTradeAmount")
         .withArgs({
           sellToken: dumped.address,
           buyToken: to.address,
           kind: OrderKind.SELL,
           amount: BigNumber.from(balance).sub(fee),
         })
-        .throws();
+        .once()
+        .returns(rejectedPromise);
 
       await expect(
         getDumpInstructions({
@@ -417,14 +446,16 @@ describe("getDumpInstructions", () => {
     await dumped.mock.allowance
       .withArgs(user.address, allowanceManager)
       .returns(allowance);
-    api.mock.getFee
+    apiMock
+      .expects("getFee")
       .withArgs({
         sellToken: dumped.address,
         buyToken: to.address,
         kind: OrderKind.SELL,
         amount: balance,
       })
-      .returns(BigNumber.from(fee));
+      .once()
+      .returns(Promise.resolve(fee));
 
     const { transferToReceiver, instructions } = await getDumpInstructions({
       ...defaultDumpInstructions,
@@ -455,14 +486,16 @@ describe("getDumpInstructions", () => {
     await dumped.mock.allowance
       .withArgs(user.address, allowanceManager)
       .returns(allowance);
-    api.mock.getFee
+    apiMock
+      .expects("getFee")
       .withArgs({
         sellToken: dumped.address,
         buyToken: to.address,
         kind: OrderKind.SELL,
         amount: balance,
       })
-      .returns(BigNumber.from(fee));
+      .once()
+      .returns(Promise.resolve(fee));
 
     const { transferToReceiver, instructions } = await getDumpInstructions({
       ...defaultDumpInstructions,
@@ -521,7 +554,6 @@ describe("getDumpInstructions", () => {
     });
     expect(pseudorandomTokenConfigs).to.have.length(32);
 
-    api.mock.ignoreExpectationOrder();
     const dumpedTokens: MockContract[] = [];
     for (const {
       balance,
@@ -539,23 +571,27 @@ describe("getDumpInstructions", () => {
       await dumped.mock.allowance
         .withArgs(user.address, allowanceManager)
         .returns(allowance);
-      api.mock.getFee
+      apiMock
+        .expects("getFee")
         .withArgs({
           sellToken: dumped.address,
           buyToken: to.address,
           kind: OrderKind.SELL,
           amount: balance,
         })
-        .returns(BigNumber.from(fee));
+        .once()
+        .returns(Promise.resolve(fee));
       if (!isIndexWithTooLargeFee(index)) {
-        api.mock.estimateTradeAmount
+        apiMock
+          .expects("estimateTradeAmount")
           .withArgs({
             sellToken: dumped.address,
             buyToken: to.address,
             kind: OrderKind.SELL,
             amount: BigNumber.from(balance).sub(fee),
           })
-          .returns(BigNumber.from(boughtAmount));
+          .once()
+          .returns(Promise.resolve(boughtAmount));
       }
       dumpedTokens.push(dumped);
     }
