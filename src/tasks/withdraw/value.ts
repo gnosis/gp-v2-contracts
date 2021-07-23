@@ -1,7 +1,7 @@
 import WethNetworks from "canonical-weth/networks.json";
 import { BigNumber, constants } from "ethers";
 
-import { ApiError, Endpoint, estimateTradeAmount } from "../../services/api";
+import { ApiError, Environment, estimateTradeAmount } from "../../services/api";
 import { OrderKind } from "../../ts";
 import { SupportedNetwork } from "../ts/deployment";
 import { TokenDetails } from "../ts/erc20";
@@ -69,7 +69,7 @@ export const usdValue = async function (
       amount,
       kind: OrderKind.SELL,
       network,
-      endpoint: Endpoint.Dev,
+      environment: Environment.Dev,
     });
   } catch (e) {
     const errorData: ApiError = e.apiError ?? {
