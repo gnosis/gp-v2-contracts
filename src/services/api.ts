@@ -10,8 +10,14 @@ import {
   encodeSignatureData,
 } from "../ts";
 
+export enum Environment {
+  Dev,
+  Prod,
+}
+
 interface ApiCall {
   network: string;
+  environment: Environment;
 }
 
 interface GetFeeQuery {
@@ -83,9 +89,19 @@ function apiSigningScheme(scheme: SigningScheme): string {
 async function call<T>(
   route: string,
   network: string,
+  environment: Environment,
   init?: RequestInit,
 ): Promise<T> {
-  const url = `https://protocol-${network}.dev.gnosisdev.com/api/v1/${route}`;
+  let baseUrl: string;
+  switch (environment) {
+    case Environment.Dev:
+      baseUrl = `https://protocol-${network}.dev.gnosisdev.com`;
+      break;
+    case Environment.Prod:
+      baseUrl = `https://protocol-${network}.gnosis.io`;
+      break;
+  }
+  const url = `${baseUrl}/api/v1/${route}`;
   const response = await fetch(url, init);
   const body = await response.text();
   if (!response.ok) {
@@ -110,12 +126,14 @@ export async function getFee({
   kind,
   amount,
   network,
+  environment,
 }: GetFeeQuery & ApiCall): Promise<BigNumber> {
   const response: GetFeeResponse = await call(
     `fee?sellToken=${sellToken}&buyToken=${buyToken}&amount=${amount}&kind=${apiKind(
       kind,
     )}`,
     network,
+    environment,
   );
   return BigNumber.from(response.amount);
 }
@@ -126,10 +144,12 @@ export async function estimateTradeAmount({
   buyToken,
   kind,
   amount,
+  environment,
 }: EstimateTradeAmountQuery & ApiCall): Promise<BigNumber> {
   const response: EstimateAmountResponse = await call(
     `markets/${sellToken}-${buyToken}/${apiKind(kind)}/${amount}`,
     network,
+    environment,
   );
   // The services return the quote token used for the price. The quote token
   // is checked to make sure that the returned price meets our expectations.
@@ -145,9 +165,10 @@ export async function placeOrder({
   order,
   signature,
   network,
+  environment,
 }: PlaceOrderQuery & ApiCall): Promise<string> {
   const normalizedOrder = normalizeOrder(order);
-  return await call("orders", network, {
+  return await call("orders", network, environment, {
     method: "post",
     body: JSON.stringify({
       sellToken: normalizedOrder.sellToken,
@@ -170,32 +191,43 @@ export async function placeOrder({
 export async function getExecutedSellAmount({
   uid,
   network,
+  environment,
 }: GetExecutedSellAmountQuery & ApiCall): Promise<BigNumber> {
-  const response: OrderDetailResponse = await call(`orders/${uid}`, network);
+  const response: OrderDetailResponse = await call(
+    `orders/${uid}`,
+    network,
+    environment,
+  );
   return BigNumber.from(response.executedSellAmount);
 }
 
 export class Api {
   network: string;
+  environment: Environment;
 
-  constructor(network: string) {
+  constructor(network: string, environment: Environment) {
     this.network = network;
+    this.environment = environment;
+  }
+
+  private apiCallParams() {
+    return { network: this.network, environment: this.environment };
   }
 
   async getFee(query: GetFeeQuery): Promise<BigNumber> {
-    return getFee({ ...query, network: this.network });
+    return getFee({ ...this.apiCallParams(), ...query });
   }
   async estimateTradeAmount(
     query: EstimateTradeAmountQuery,
   ): Promise<BigNumber> {
-    return estimateTradeAmount({ ...query, network: this.network });
+    return estimateTradeAmount({ ...this.apiCallParams(), ...query });
   }
   async placeOrder(query: PlaceOrderQuery): Promise<string> {
-    return placeOrder({ ...query, network: this.network });
+    return placeOrder({ ...this.apiCallParams(), ...query });
   }
   async getExecutedSellAmount(
     query: GetExecutedSellAmountQuery,
   ): Promise<BigNumber> {
-    return getExecutedSellAmount({ ...query, network: this.network });
+    return getExecutedSellAmount({ ...this.apiCallParams(), ...query });
   }
 }
