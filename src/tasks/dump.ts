@@ -469,7 +469,7 @@ const setupDumpTask: () => void = () =>
           throw new Error("Order validity too large");
         }
 
-        const api = new Api(network, Environment.Dev);
+        const api = new Api(network, Environment.Prod);
         const [signers, settlement, chainId] = await Promise.all([
           ethers.getSigners(),
           getDeployedContract("GPv2Settlement", hre),
