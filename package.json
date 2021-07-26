@@ -37,7 +37,7 @@
     "@openzeppelin/contracts": "=3.4.0-solc-0.7",
     "@tenderly/hardhat-tenderly": "^1.0.12",
     "@types/chai": "^4.2.21",
-    "@types/debug": "^4.1.6",
+    "@types/debug": "^4.1.7",
     "@types/mocha": "^9.0.0",
     "@types/yargs": "^17.0.2",
     "@typescript-eslint/eslint-plugin": "^4.28.4",
