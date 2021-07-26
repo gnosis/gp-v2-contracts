@@ -27,15 +27,16 @@ import {
   decode as decodeInteraction,
   DecodedInteraction,
 } from "./decode/interaction";
-import { TokenDetails, tokenDetails } from "./ts/erc20";
 import { Align, displayTable } from "./ts/table";
+import { Erc20Token, erc20Token } from "./ts/tokens";
 
 const WIDTH = 120;
 const INVALID_TOKEN = " ! Invalid token ! ";
 const INVALID_OWNER = " ! Invalid owner ! ";
 const NATIVE_TOKEN = " native token ";
 
-interface Token extends TokenDetails {
+interface Token extends Partial<Erc20Token> {
+  address: string;
   nativeFlag: boolean;
   price: BigNumber | undefined;
   index: number;
@@ -366,12 +367,16 @@ const setupDecodeTask: () => void = () => {
       ) as EncodedSettlement;
 
       const tokens = await Promise.all(
-        tokenAddresses.map(async (address: string, index: number) => ({
-          ...(await tokenDetails(address, hre)),
-          index,
-          nativeFlag: BUY_ETH_ADDRESS === address,
-          price: clearingPrices[index] as BigNumber | undefined,
-        })),
+        tokenAddresses.map(async (address: string, index: number) => {
+          const erc20 = await erc20Token(address, hre);
+          return {
+            ...(erc20 ?? {}),
+            address,
+            index,
+            nativeFlag: BUY_ETH_ADDRESS === address,
+            price: clearingPrices[index] as BigNumber | undefined,
+          };
+        }),
       );
 
       displayTokens(tokens);
@@ -390,10 +395,21 @@ const setupDecodeTask: () => void = () => {
 
       displayTrades(trades, tokens, domainSeparator);
 
-      const tokenRegistry: Record<string, Token> = {};
-      tokens.forEach((token) => {
-        tokenRegistry[token.address] = token;
-      });
+      const tokenRegistry: Record<string, Erc20Token> = {};
+      tokens
+        .filter(
+          (token) => token.contract !== undefined && token.contract !== null,
+        )
+        .forEach((token) => {
+          tokenRegistry[token.address] = {
+            address: token.address,
+            // Contract is defined because of the previous filter
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            contract: token.contract!,
+            symbol: token.symbol,
+            decimals: token.decimals,
+          };
+        });
       const detailedInteractions = (await Promise.all(
         interactions.map(
           async (interactionGroup) =>
