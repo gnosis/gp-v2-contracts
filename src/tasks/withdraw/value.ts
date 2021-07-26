@@ -1,30 +1,21 @@
-import WethNetworks from "canonical-weth/networks.json";
 import { BigNumber, constants } from "ethers";
 
 import { ApiError, Environment, estimateTradeAmount } from "../../services/api";
 import { OrderKind } from "../../ts";
 import { SupportedNetwork } from "../ts/deployment";
-import { TokenDetails } from "../ts/erc20";
+import {
+  NATIVE_TOKEN_SYMBOL,
+  Erc20Token,
+  WRAPPED_NATIVE_TOKEN_ADDRESS,
+} from "../ts/tokens";
 
-interface PricedToken extends TokenDetails {
+interface PricedToken extends Erc20Token {
   // Overrides existing field in TokenDetails. The number of decimals must be
   // known to estimate the price
   decimals: number;
   // Amount of DAI wei equivalent to one unit of this token (10**decimals)
   usdValue: BigNumber;
 }
-
-const NATIVE_TOKEN_SYMBOL: Record<SupportedNetwork, string> = {
-  mainnet: "ETH",
-  rinkeby: "ETH",
-  xdai: "xDAI",
-};
-
-const WRAPPED_NATIVE_TOKEN_ADDRESS: Record<SupportedNetwork, string> = {
-  mainnet: WethNetworks.WETH9[1].address,
-  rinkeby: WethNetworks.WETH9[4].address,
-  xdai: "0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d",
-};
 
 const REFERENCE_TOKEN: Record<
   SupportedNetwork,
@@ -50,7 +41,7 @@ const REFERENCE_TOKEN: Record<
 } as const;
 
 export const usdValue = async function (
-  token: Pick<TokenDetails, "symbol" | "address"> | "native token",
+  token: Pick<Erc20Token, "symbol" | "address"> | "native token",
   amount: BigNumber,
   network: SupportedNetwork,
 ): Promise<BigNumber> {
@@ -108,7 +99,7 @@ export function formatUsdValue(
 }
 
 export async function appraise(
-  token: TokenDetails,
+  token: Erc20Token,
   network: SupportedNetwork,
 ): Promise<PricedToken> {
   const decimals = token.decimals ?? 18;

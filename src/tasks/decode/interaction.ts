@@ -1,7 +1,7 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 import { Interaction } from "../../ts";
-import { TokenDetails } from "../ts/erc20";
+import { Erc20Token } from "../ts/tokens";
 
 import { Erc20Decoder } from "./interaction/erc20";
 import { InteractionDecoder } from "./interaction/template";
@@ -26,7 +26,7 @@ export interface DecodedInteraction {
 
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface DecodingTools {
-  tokenRegistry?: Record<string, TokenDetails>;
+  tokenRegistry?: Record<string, Erc20Token>;
   settlementContractAddress?: string;
 }
 
