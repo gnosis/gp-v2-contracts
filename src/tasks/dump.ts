@@ -11,7 +11,7 @@ import {
 import { task, types } from "hardhat/config";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
-import { Api, Environment } from "../services/api";
+import { Api, CallError, Environment } from "../services/api";
 import {
   BUY_ETH_ADDRESS,
   domain,
@@ -184,22 +184,31 @@ export async function getDumpInstructions({
         const buyToken = isNativeToken(toToken)
           ? WRAPPED_NATIVE_TOKEN_ADDRESS[network] // todo: replace WETH address with BUY_ETH_ADDRESS when services support ETH estimates
           : toToken.address;
-        const kind = OrderKind.SELL;
-        const fee = await api.getFee({
-          sellToken,
-          buyToken,
-          kind,
-          amount: balance,
-        });
-        const amountWithoutFee = balance.sub(fee);
-        if (amountWithoutFee.lte(constants.Zero)) {
-          consoleWarn(
-            `Dump request skipped for token ${displayName(
-              token,
-            )}. The trading fee is larger than the dumped amount.`,
-          );
-          return null;
+        let fee, buyAmountAfterFee;
+        try {
+          const feeAndQuote = await api.getFeeAndQuoteSell({
+            sellToken,
+            buyToken,
+            sellAmountBeforeFee: balance,
+          });
+          fee = feeAndQuote.feeAmount;
+          buyAmountAfterFee = feeAndQuote.buyAmountAfterFee;
+        } catch (e) {
+          if (
+            (e as CallError)?.apiError?.errorType ===
+            "SellAmountDoesNotCoverFee"
+          ) {
+            consoleWarn(
+              `Dump request skipped for token ${displayName(
+                token,
+              )}. The trading fee is larger than the dumped amount.`,
+            );
+            return null;
+          } else {
+            throw e;
+          }
         }
+        const amountWithoutFee = balance.sub(fee);
         const approxBalance = Number(balance.toString());
         const approxFee = Number(fee.toString());
         const feePercent = (100 * approxFee) / approxBalance;
@@ -213,17 +222,11 @@ export async function getDumpInstructions({
           );
           return null;
         }
-        const receivedAmount = await api.estimateTradeAmount({
-          sellToken,
-          buyToken,
-          amount: amountWithoutFee,
-          kind,
-        });
         return {
           token,
           balance,
           amountWithoutFee,
-          receivedAmount,
+          receivedAmount: buyAmountAfterFee,
           fee,
           needsAllowance,
         };
