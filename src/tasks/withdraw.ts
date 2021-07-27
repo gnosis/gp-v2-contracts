@@ -15,12 +15,12 @@ import {
   isSupportedNetwork,
   SupportedNetwork,
 } from "./ts/deployment";
-import { TokenDetails, tokenDetails } from "./ts/erc20";
 import {
   DisappearingLogFunctions,
   promiseAllWithRateLimit,
 } from "./ts/rate_limits";
 import { Align, displayTable } from "./ts/table";
+import { Erc20Token, erc20Token } from "./ts/tokens";
 import {
   usdValue,
   formatUsdValue,
@@ -46,7 +46,7 @@ interface DisplayWithdrawal {
   address: string;
 }
 
-interface PricedToken extends TokenDetails {
+interface PricedToken extends Erc20Token {
   // Overrides existing field in TokenDetails. The number of decimals must be
   // known to estimate the price
   decimals: number;
@@ -70,7 +70,7 @@ const ONEINCH_TOKENS: Promise<OneinchTokenList> = axios
 async function fastTokenDetails(
   address: string,
   hre: HardhatRuntimeEnvironment,
-): Promise<TokenDetails> {
+): Promise<Erc20Token | null> {
   const oneinchTokens = await ONEINCH_TOKENS;
   if (
     hre.network.name === "mainnet" &&
@@ -82,7 +82,7 @@ async function fastTokenDetails(
     const contract = new Contract(address, IERC20.abi, hre.ethers.provider);
     return { ...oneinchTokens[address.toLowerCase()], contract };
   }
-  return tokenDetails(address, hre);
+  return erc20Token(address, hre);
 }
 
 function isErrorTooManyEvents(error: Error): boolean {
@@ -155,6 +155,11 @@ async function getWithdrawals(
   const computeWithdrawalInstructions = tokens.map(
     (tokenAddress) => async ({ consoleWarn }: DisappearingLogFunctions) => {
       const token = await fastTokenDetails(tokenAddress, hre);
+      if (token === null) {
+        throw new Error(
+          `There is no valid ERC20 token at address ${tokenAddress}`,
+        );
+      }
       const balance = await token.contract.balanceOf(settlement.address);
       if (balance.eq(0)) {
         return null;
