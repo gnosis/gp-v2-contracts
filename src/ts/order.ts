@@ -246,14 +246,15 @@ export function normalizeOrder(order: Order): NormalizedOrder {
     throw new Error("receiver cannot be address(0)");
   }
 
-  return {
-    receiver: ethers.constants.AddressZero,
-    sellTokenBalance: OrderBalance.ERC20,
+  const normalizedOrder = {
     ...order,
+    sellTokenBalance: order.sellTokenBalance ?? OrderBalance.ERC20,
+    receiver: order.receiver ?? ethers.constants.AddressZero,
     validTo: timestamp(order.validTo),
     appData: hashify(order.appData),
     buyTokenBalance: normalizeBuyTokenBalance(order.buyTokenBalance),
   };
+  return normalizedOrder;
 }
 
 /**
