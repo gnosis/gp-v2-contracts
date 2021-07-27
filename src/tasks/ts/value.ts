@@ -1,6 +1,6 @@
 import { BigNumber, constants } from "ethers";
 
-import { ApiError, Environment, estimateTradeAmount } from "../../services/api";
+import { Api, ApiError, Environment } from "../../services/api";
 import { OrderKind } from "../../ts";
 import { SupportedNetwork } from "../ts/deployment";
 import {
@@ -54,13 +54,11 @@ export const usdValue = async function (
     };
   }
   try {
-    return await estimateTradeAmount({
+    return await new Api(network, Environment.Prod).estimateTradeAmount({
       sellToken: token.address,
       buyToken: REFERENCE_TOKEN[network].address,
       amount,
       kind: OrderKind.SELL,
-      network,
-      environment: Environment.Dev,
     });
   } catch (e) {
     const errorData: ApiError = e.apiError ?? {
