@@ -84,7 +84,7 @@ export interface ApiError {
   errorType: string;
   description: string;
 }
-interface CallError extends Error {
+export interface CallError extends Error {
   apiError?: ApiError;
 }
 
