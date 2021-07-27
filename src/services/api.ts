@@ -1,4 +1,4 @@
-import { BigNumber } from "ethers";
+import { BigNumber, BigNumberish } from "ethers";
 import fetch, { RequestInit } from "node-fetch";
 
 import {
@@ -24,13 +24,13 @@ interface GetFeeQuery {
   sellToken: string;
   buyToken: string;
   kind: OrderKind;
-  amount: BigNumber;
+  amount: BigNumberish;
 }
 interface EstimateTradeAmountQuery {
   sellToken: string;
   buyToken: string;
   kind: OrderKind;
-  amount: BigNumber;
+  amount: BigNumberish;
 }
 interface PlaceOrderQuery {
   order: Order;
@@ -38,6 +38,16 @@ interface PlaceOrderQuery {
 }
 interface GetExecutedSellAmountQuery {
   uid: string;
+}
+interface GetFeeAndQuoteSellQuery {
+  sellToken: string;
+  buyToken: string;
+  sellAmountBeforeFee: BigNumberish;
+}
+interface GetFeeAndQuoteBuyQuery {
+  sellToken: string;
+  buyToken: string;
+  buyAmountAfterFee: BigNumberish;
 }
 
 interface OrderDetailResponse {
@@ -52,6 +62,24 @@ interface EstimateAmountResponse {
   amount: string;
   token: string;
 }
+interface GetFeeAndQuoteSellResponse {
+  fee: GetFeeResponse;
+  buyAmountAfterFee: BigNumberish;
+}
+interface GetFeeAndQuoteBuyResponse {
+  fee: GetFeeResponse;
+  sellAmountBeforeFee: BigNumberish;
+}
+
+interface GetFeeAndQuoteSellOutput {
+  feeAmount: BigNumber;
+  buyAmountAfterFee: BigNumber;
+}
+interface GetFeeAndQuoteBuyOutput {
+  feeAmount: BigNumber;
+  sellAmountBeforeFee: BigNumber;
+}
+
 export interface ApiError {
   errorType: string;
   description: string;
@@ -120,7 +148,7 @@ async function call<T>(
   return JSON.parse(body);
 }
 
-export async function getFee({
+async function getFee({
   sellToken,
   buyToken,
   kind,
@@ -129,16 +157,16 @@ export async function getFee({
   environment,
 }: GetFeeQuery & ApiCall): Promise<BigNumber> {
   const response: GetFeeResponse = await call(
-    `fee?sellToken=${sellToken}&buyToken=${buyToken}&amount=${amount}&kind=${apiKind(
-      kind,
-    )}`,
+    `fee?sellToken=${sellToken}&buyToken=${buyToken}&amount=${BigNumber.from(
+      amount,
+    ).toString()}&kind=${apiKind(kind)}`,
     network,
     environment,
   );
   return BigNumber.from(response.amount);
 }
 
-export async function estimateTradeAmount({
+async function estimateTradeAmount({
   network,
   sellToken,
   buyToken,
@@ -147,7 +175,9 @@ export async function estimateTradeAmount({
   environment,
 }: EstimateTradeAmountQuery & ApiCall): Promise<BigNumber> {
   const response: EstimateAmountResponse = await call(
-    `markets/${sellToken}-${buyToken}/${apiKind(kind)}/${amount}`,
+    `markets/${sellToken}-${buyToken}/${apiKind(kind)}/${BigNumber.from(
+      amount,
+    ).toString()}`,
     network,
     environment,
   );
@@ -161,7 +191,7 @@ export async function estimateTradeAmount({
   return BigNumber.from(response.amount);
 }
 
-export async function placeOrder({
+async function placeOrder({
   order,
   signature,
   network,
@@ -188,7 +218,7 @@ export async function placeOrder({
   });
 }
 
-export async function getExecutedSellAmount({
+async function getExecutedSellAmount({
   uid,
   network,
   environment,
@@ -199,6 +229,46 @@ export async function getExecutedSellAmount({
     environment,
   );
   return BigNumber.from(response.executedSellAmount);
+}
+
+async function getFeeAndQuoteSell({
+  sellToken,
+  buyToken,
+  sellAmountBeforeFee,
+  network,
+  environment,
+}: GetFeeAndQuoteSellQuery & ApiCall): Promise<GetFeeAndQuoteSellOutput> {
+  const response: GetFeeAndQuoteSellResponse = await call(
+    `feeAndQuote/sell?sellToken=${sellToken}&buyToken=${buyToken}&sellAmountBeforeFee=${BigNumber.from(
+      sellAmountBeforeFee,
+    ).toString()}`,
+    network,
+    environment,
+  );
+  return {
+    feeAmount: BigNumber.from(response.fee.amount),
+    buyAmountAfterFee: BigNumber.from(response.buyAmountAfterFee),
+  };
+}
+
+async function getFeeAndQuoteBuy({
+  sellToken,
+  buyToken,
+  buyAmountAfterFee,
+  network,
+  environment,
+}: GetFeeAndQuoteBuyQuery & ApiCall): Promise<GetFeeAndQuoteBuyOutput> {
+  const response: GetFeeAndQuoteBuyResponse = await call(
+    `feeAndQuote/buy?sellToken=${sellToken}&buyToken=${buyToken}&buyAmountAfterFee=${BigNumber.from(
+      buyAmountAfterFee,
+    ).toString()}`,
+    network,
+    environment,
+  );
+  return {
+    feeAmount: BigNumber.from(response.fee.amount),
+    sellAmountBeforeFee: BigNumber.from(response.sellAmountBeforeFee),
+  };
 }
 
 export class Api {
@@ -229,5 +299,15 @@ export class Api {
     query: GetExecutedSellAmountQuery,
   ): Promise<BigNumber> {
     return getExecutedSellAmount({ ...this.apiCallParams(), ...query });
+  }
+  async getFeeAndQuoteSell(
+    query: GetFeeAndQuoteSellQuery,
+  ): Promise<GetFeeAndQuoteSellOutput> {
+    return getFeeAndQuoteSell({ ...this.apiCallParams(), ...query });
+  }
+  async getFeeAndQuoteBuy(
+    query: GetFeeAndQuoteBuyQuery,
+  ): Promise<GetFeeAndQuoteBuyOutput> {
+    return getFeeAndQuoteBuy({ ...this.apiCallParams(), ...query });
   }
 }
