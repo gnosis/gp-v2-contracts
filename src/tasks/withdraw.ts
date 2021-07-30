@@ -2,13 +2,14 @@ import "@nomiclabs/hardhat-ethers";
 
 import readline from "readline";
 
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import axios from "axios";
 import chalk from "chalk";
 import { BigNumber, utils, constants, Contract } from "ethers";
 import { task, types } from "hardhat/config";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
-import { BUY_ETH_ADDRESS, SettlementEncoder } from "../ts";
+import { SettlementEncoder } from "../ts";
 
 import {
   getDeployedContract,
@@ -27,6 +28,7 @@ import {
   formatTokenValue,
   appraise,
 } from "./ts/value";
+import { getAllTradedTokens } from "./withdraw/traded_tokens";
 
 const DAI_DECIMALS = 18;
 
@@ -83,63 +85,6 @@ async function fastTokenDetails(
     return { ...oneinchTokens[address.toLowerCase()], contract };
   }
   return erc20Token(address, hre);
-}
-
-function isErrorTooManyEvents(error: Error): boolean {
-  return /query returned more than \d* results/.test(error.message);
-}
-
-// List all traded tokens. Block range bounds are both inclusive.
-async function getAllTradedTokens(
-  settlement: Contract,
-  fromBlock: number,
-  toBlock: number,
-  hre: HardhatRuntimeEnvironment,
-): Promise<string[]> {
-  let trades = null;
-  try {
-    trades = await hre.ethers.provider.getLogs({
-      topics: [settlement.interface.getEventTopic("Trade")],
-      address: settlement.address,
-      fromBlock,
-      toBlock,
-    });
-  } catch (error) {
-    if (!isErrorTooManyEvents(error)) {
-      throw error;
-    }
-  }
-
-  let tokens;
-  if (trades === null) {
-    if (fromBlock === toBlock) {
-      throw new Error("Too many events in the same block");
-    }
-    const mid = Math.floor((toBlock + fromBlock) / 2);
-    tokens = (
-      await Promise.all([
-        getAllTradedTokens(settlement, fromBlock, mid, hre),
-        getAllTradedTokens(settlement, mid + 1, toBlock, hre), // note: mid+1 is not larger than toBlock thanks to flooring
-      ])
-    ).flat();
-  } else {
-    tokens = trades
-      .map((trade) => {
-        const decodedTrade = settlement.interface.decodeEventLog(
-          "Trade",
-          trade.data,
-          trade.topics,
-        );
-        return [decodedTrade.sellToken, decodedTrade.buyToken];
-      })
-      .flat();
-  }
-
-  tokens = new Set(tokens);
-  tokens.delete(BUY_ETH_ADDRESS);
-  return Array.from(tokens).sort((lhs, rhs) =>
-    lhs.toLowerCase() < rhs.toLowerCase() ? -1 : lhs === rhs ? 0 : 1,
-  );
 }
 
 async function getWithdrawals(
@@ -286,6 +231,130 @@ async function prompt(message: string) {
   return "y" === response.toLowerCase();
 }
 
+interface WithdrawInput {
+  solver: SignerWithAddress;
+  tokens: string[] | undefined;
+  minValue: string;
+  leftover: string;
+  receiver: string;
+  authenticator: Contract;
+  settlement: Contract;
+  settlementDeploymentBlock: number;
+  latestBlock: number;
+  network: SupportedNetwork;
+  hre: HardhatRuntimeEnvironment;
+  dryRun: boolean;
+  doNotPrompt?: boolean | undefined;
+}
+export async function withdraw({
+  solver,
+  tokens,
+  minValue,
+  leftover,
+  receiver,
+  authenticator,
+  settlement,
+  settlementDeploymentBlock,
+  latestBlock,
+  network,
+  hre,
+  dryRun,
+  doNotPrompt,
+}: WithdrawInput): Promise<string[]> {
+  if (!(await authenticator.isSolver(solver.address))) {
+    const message =
+      "Current account is not a solver. Only a solver can withdraw funds from the settlement contract.";
+    if (!dryRun) {
+      throw Error(message);
+    } else {
+      console.warn(message);
+    }
+  }
+
+  if (tokens === undefined) {
+    console.log("Recovering list of traded tokens...");
+    tokens = await getAllTradedTokens(
+      settlement,
+      settlementDeploymentBlock,
+      latestBlock,
+      hre,
+    );
+  }
+
+  // TODO: add eth withdrawal
+  // TODO: split large transaction in batches
+  const withdrawals = await getWithdrawals(
+    tokens,
+    settlement,
+    minValue,
+    leftover,
+    hre,
+    network,
+  );
+  withdrawals.sort((lhs, rhs) => {
+    const diff = lhs.balanceUsd.sub(rhs.balanceUsd);
+    return diff.isZero() ? 0 : diff.isNegative() ? -1 : 1;
+  });
+
+  displayWithdrawals(withdrawals, network);
+
+  if (withdrawals.length === 0) {
+    console.log("No tokens to withdraw.");
+    return [];
+  }
+
+  const encoder = new SettlementEncoder({});
+  withdrawals.forEach(({ token, amount }) =>
+    encoder.encodeInteraction({
+      target: token.address,
+      callData: token.contract.interface.encodeFunctionData("transfer", [
+        receiver,
+        amount,
+      ]),
+    }),
+  );
+
+  const finalSettlement = encoder.encodedSettlement({});
+  // TODO: use the address of a solver as the from address in dry run so
+  // that the price can always be estimated
+  const [gas, gasPrice] = await Promise.all([
+    settlement.connect(solver).estimateGas.settle(...finalSettlement),
+    hre.ethers.provider.getGasPrice(),
+  ]);
+  const amount = gas.mul(gasPrice);
+  const totalValue = withdrawals.reduce(
+    (sum, { amountUsd }) => sum.add(amountUsd),
+    constants.Zero,
+  );
+  console.log(
+    `The transaction will cost approximately ${await formatGasCost(
+      amount,
+      network,
+    )} and will withdraw the balance of ${
+      withdrawals.length
+    } tokens for an estimated total value of ${formatUsdValue(
+      totalValue,
+      network,
+    )} USD. All withdrawn funds will be sent to ${receiver}.`,
+  );
+
+  if (!dryRun && (doNotPrompt || (await prompt("Submit?")))) {
+    console.log("Executing the withdraw transaction on the blockchain...");
+    const response = await settlement
+      .connect(solver)
+      .settle(...finalSettlement);
+    console.log(
+      "Transaction submitted to the blockchain. Waiting for acceptance in a block...",
+    );
+    const receipt = await response.wait();
+    console.log(
+      `Transaction successfully executed. Transaction hash: ${receipt.transactionHash}`,
+    );
+  }
+
+  return withdrawals.map((w) => w.token.address);
+}
+
 const setupWithdrawTask: () => void = () =>
   task("withdraw", "Withdraw funds from the settlement contract")
     .addOptionalParam(
@@ -314,11 +383,11 @@ const setupWithdrawTask: () => void = () =>
         { minValue, dryRun, leftover, receiver: inputReceiver, tokens },
         hre: HardhatRuntimeEnvironment,
       ) => {
-        const receiver = utils.getAddress(inputReceiver);
-        if (!isSupportedNetwork(hre.network.name)) {
-          throw new Error(`Unsupported network ${hre.network.name}`);
-        }
         const network = hre.network.name;
+        if (!isSupportedNetwork(network)) {
+          throw new Error(`Unsupported network ${network}`);
+        }
+        const receiver = utils.getAddress(inputReceiver);
         const [
           authenticator,
           settlementDeployment,
@@ -334,100 +403,24 @@ const setupWithdrawTask: () => void = () =>
           settlementDeployment.address,
           settlementDeployment.abi,
         ).connect(hre.ethers.provider);
-        const deploymentBlock = settlementDeployment.receipt?.blockNumber;
+        const settlementDeploymentBlock =
+          settlementDeployment.receipt?.blockNumber ?? 0;
+        console.log(`Using account ${solver.address}`);
 
-        if (!(await authenticator.isSolver(solver.address))) {
-          const message =
-            "Current account is not a solver. Only a solver can withdraw funds from the settlement contract.";
-          if (!dryRun) {
-            throw Error(message);
-          } else {
-            console.warn(message);
-          }
-        }
-
-        if (tokens === undefined) {
-          console.log("Recovering list of traded tokens...");
-          tokens = await getAllTradedTokens(
-            settlement,
-            deploymentBlock ?? 0,
-            latestBlock,
-            hre,
-          );
-        }
-
-        // TODO: add eth withdrawal
-        // TODO: split large transaction in batches
-        const withdrawals = await getWithdrawals(
+        await withdraw({
+          solver,
           tokens,
-          settlement,
           minValue,
           leftover,
-          hre,
+          receiver,
+          authenticator,
+          settlement,
+          settlementDeploymentBlock,
+          latestBlock,
           network,
-        );
-        withdrawals.sort((lhs, rhs) => {
-          const diff = lhs.balanceUsd.sub(rhs.balanceUsd);
-          return diff.isZero() ? 0 : diff.isNegative() ? -1 : 1;
+          hre,
+          dryRun,
         });
-
-        displayWithdrawals(withdrawals, network);
-
-        if (withdrawals.length === 0) {
-          console.log("No tokens to withdraw.");
-          process.exit(0);
-        }
-
-        const encoder = new SettlementEncoder({});
-        withdrawals.forEach(({ token, amount }) =>
-          encoder.encodeInteraction({
-            target: token.address,
-            callData: token.contract.interface.encodeFunctionData("transfer", [
-              receiver,
-              amount,
-            ]),
-          }),
-        );
-
-        const finalSettlement = encoder.encodedSettlement({});
-        // TODO: use the address of a solver as the from address in dry run so
-        // that the price can always be estimated
-        const [gas, gasPrice] = await Promise.all([
-          settlement.estimateGas.settle(...finalSettlement),
-          hre.ethers.provider.getGasPrice(),
-        ]);
-        const amount = gas.mul(gasPrice);
-        const totalValue = withdrawals.reduce(
-          (sum, { amountUsd }) => sum.add(amountUsd),
-          constants.Zero,
-        );
-        console.log(
-          `The transaction will cost approximately ${await formatGasCost(
-            amount,
-            hre.network.name,
-          )} and will withdraw the balance of ${
-            withdrawals.length
-          } tokens for an estimated total value of ${formatUsdValue(
-            totalValue,
-            hre.network.name,
-          )} USD. All withdrawn funds will be sent to ${receiver}.`,
-        );
-
-        if (!dryRun && (await prompt("Submit?"))) {
-          console.log(
-            "Executing the withdraw transaction on the blockchain...",
-          );
-          const response = await settlement
-            .connect(solver)
-            .settle(...finalSettlement);
-          console.log(
-            "Transaction submitted to the blockchain. Waiting for acceptance in a block...",
-          );
-          const receipt = await response.wait();
-          console.log(
-            `Transaction successfully executed. Transaction hash: ${receipt.transactionHash}`,
-          );
-        }
       },
     );
 
