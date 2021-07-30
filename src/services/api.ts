@@ -71,11 +71,11 @@ interface GetFeeAndQuoteBuyResponse {
   sellAmountBeforeFee: BigNumberish;
 }
 
-interface GetFeeAndQuoteSellOutput {
+export interface GetFeeAndQuoteSellOutput {
   feeAmount: BigNumber;
   buyAmountAfterFee: BigNumber;
 }
-interface GetFeeAndQuoteBuyOutput {
+export interface GetFeeAndQuoteBuyOutput {
   feeAmount: BigNumber;
   sellAmountBeforeFee: BigNumber;
 }
@@ -86,6 +86,11 @@ export interface ApiError {
 }
 export interface CallError extends Error {
   apiError?: ApiError;
+}
+
+export enum GetFeeAndQuoteSellErrorType {
+  SellAmountDoesNotCoverFee = "SellAmountDoesNotCoverFee",
+  // other errors are added when necessary
 }
 
 function apiKind(kind: OrderKind): string {
