@@ -46,8 +46,8 @@ describe("E2E: Expired Order Gas Refunds", () => {
     const { chainId } = await ethers.provider.getNetwork();
     domainSeparator = domain(chainId, settlement.address);
 
-    owl = await waffle.deployContract(deployer, ERC20, ["OWL", 18]);
-    dai = await waffle.deployContract(deployer, ERC20, ["DAI", 18]);
+    owl = await waffle.deployContract(deployer, ERC20, ["OWL", "Owl token"]);
+    dai = await waffle.deployContract(deployer, ERC20, ["DAI", "Dai token"]);
   });
 
   it("should claim a gas refund for expired orders", async () => {
