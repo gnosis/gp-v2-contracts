@@ -21,6 +21,7 @@ export interface Erc20Token {
 export interface NativeToken {
   symbol: string;
   decimals: number;
+  wrappedToken: string | null;
   provider: providers.JsonRpcProvider;
 }
 
@@ -93,6 +94,10 @@ export function nativeToken({
   return {
     symbol: NATIVE_TOKEN_SYMBOL[network.name],
     decimals: 18, // assumption: every network supported by our protocol uses an 18-decimal native token
+    wrappedToken:
+      network.name !== "hardhat"
+        ? WRAPPED_NATIVE_TOKEN_ADDRESS[network.name]
+        : null,
     provider: ethers.provider,
   };
 }
