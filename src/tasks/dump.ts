@@ -30,7 +30,7 @@ import {
   SupportedNetwork,
 } from "./ts/deployment";
 import { promiseAllWithRateLimit } from "./ts/rate_limits";
-import { sleep } from "./ts/sleep";
+import { sleepMillis } from "./ts/sleep";
 import { Align, displayTable } from "./ts/table";
 import {
   isNativeToken,
@@ -528,7 +528,7 @@ export async function dump({
     // Moreover, there is no distinction in the error between a missing
     // allowance and a failed order creation, which could occur for
     // valid reasons.
-    await sleep(5000);
+    await sleepMillis(5000);
 
     await createOrders(
       instructions,
