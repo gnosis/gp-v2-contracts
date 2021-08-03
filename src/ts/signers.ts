@@ -236,6 +236,9 @@ export class IntChainIdTypedDataV4Signer implements TypedDataSigner {
   getGasPrice(): Promise<ethers.BigNumber> {
     return this.signer.getGasPrice();
   }
+  getFeeData(): Promise<ethers.providers.FeeData> {
+    return this.signer.getFeeData();
+  }
   resolveName(name: string): Promise<string> {
     return this.signer.resolveName(name);
   }
