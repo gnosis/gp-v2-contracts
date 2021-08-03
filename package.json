@@ -26,7 +26,7 @@
     "prepack": "yarn build"
   },
   "peerDependencies": {
-    "ethers": "~5.0.18"
+    "ethers": "~5.4.0"
   },
   "devDependencies": {
     "@0x/contract-artifacts-v2": "npm:@0x/contract-artifacts@^2.2.2",
