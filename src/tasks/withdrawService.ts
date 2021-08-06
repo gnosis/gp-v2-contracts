@@ -161,7 +161,12 @@ export async function withdrawAndDump({
         }
 
         // assumption: eth is not in the list (as it's not supported by the
-        // withdraw script).
+        // withdraw script). This should not happen unless the pending token
+        // list in the state was manually changed and ETH was added.
+        assert(
+          pendingToken.address.toLowerCase() !== BUY_ETH_ADDRESS.toLowerCase(),
+          "Pending tokens should not contain ETH",
+        );
         const token = await erc20Token(pendingToken.address, hre);
         if (token === null) {
           throw new Error(
