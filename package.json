@@ -56,7 +56,7 @@
     "eslint-plugin-no-only-tests": "^2.6.0",
     "eslint-plugin-prettier": "^3.4.0",
     "ethereum-waffle": "^3.4.0",
-    "ethers": "^5.4.3",
+    "ethers": "^5.4.4",
     "globby": "^11.0.4",
     "hardhat": "^2.5.0",
     "hardhat-deploy": "^0.7.3",
