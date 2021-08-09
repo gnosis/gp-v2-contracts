@@ -123,6 +123,7 @@ interface WithdrawAndDumpInput {
   hre: HardhatRuntimeEnvironment;
   api: Api;
   dryRun: boolean;
+  confirmationsAfterWithdrawing?: number | undefined;
 }
 export async function withdrawAndDump({
   state,
@@ -142,6 +143,7 @@ export async function withdrawAndDump({
   hre,
   api,
   dryRun,
+  confirmationsAfterWithdrawing,
 }: WithdrawAndDumpInput): Promise<State> {
   // Update list of pending tokens to determine which token was traded
   const pendingTokens = (
@@ -229,7 +231,7 @@ export async function withdrawAndDump({
     doNotPrompt: true,
     // Wait for node to pick up updated balances before running the dump
     // function
-    requiredConfirmations: 2,
+    requiredConfirmations: confirmationsAfterWithdrawing,
   });
 
   const tokensToDump = Array.from(
@@ -374,6 +376,7 @@ const setupWithdrawServiceTask: () => void = () =>
           hre,
           api,
           dryRun,
+          confirmationsAfterWithdrawing: 2,
         });
 
         console.debug(`Updated state: ${JSON.stringify(updatedState)}`);
