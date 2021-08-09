@@ -30,7 +30,6 @@ import {
   SupportedNetwork,
 } from "./ts/deployment";
 import { promiseAllWithRateLimit } from "./ts/rate_limits";
-import { sleep } from "./ts/sleep";
 import { Align, displayTable } from "./ts/table";
 import {
   isNativeToken,
@@ -328,21 +327,30 @@ async function prompt(message: string) {
   return "y" === response.toLowerCase();
 }
 
+interface CreateAllowancesOptions {
+  requiredConfirmations?: number | undefined;
+}
 async function createAllowances(
   allowances: Erc20Token[],
   signer: Signer,
   allowanceManager: string,
+  { requiredConfirmations }: CreateAllowancesOptions = {},
 ) {
-  if (allowances.length !== 0) {
-    for (const token of allowances) {
-      console.log(
-        `Approving allowance manager to trade token ${displayName(token)}...`,
-      );
-      const result: ContractTransaction = await token.contract
-        .connect(signer)
-        .approve(allowanceManager, constants.MaxUint256);
-      await result.wait();
-    }
+  let lastTransaction: ContractTransaction | undefined = undefined;
+  for (const token of allowances) {
+    console.log(
+      `Approving allowance manager to trade token ${displayName(token)}...`,
+    );
+    lastTransaction = (await token.contract
+      .connect(signer)
+      .approve(allowanceManager, constants.MaxUint256)) as ContractTransaction;
+    await lastTransaction.wait();
+  }
+  if (lastTransaction !== undefined) {
+    // note: the last approval is (excluded reorgs) the last that is included
+    // in a block, so awaiting it for confirmations means that also all others
+    // have at least this number of confirmations.
+    await lastTransaction.wait(requiredConfirmations);
   }
 }
 
@@ -521,14 +529,14 @@ export async function dump({
     )} ${toTokenName} from selling the tokens listed above.`,
   );
   if (!dryRun && (doNotPrompt || (await prompt("Submit?")))) {
-    await createAllowances(needAllowances, signer, allowanceManager);
-
-    // If the services don't register the allowance before the order,
-    // then creating a new order with the API returns an error.
-    // Moreover, there is no distinction in the error between a missing
-    // allowance and a failed order creation, which could occur for
-    // valid reasons.
-    await sleep(5000);
+    await createAllowances(needAllowances, signer, allowanceManager, {
+      // If the services don't register the allowance before the order,
+      // then creating a new order with the API returns an error.
+      // Moreover, there is no distinction in the error between a missing
+      // allowance and a failed order creation, which could occur for
+      // valid reasons.
+      requiredConfirmations: 2,
+    });
 
     await createOrders(
       instructions,
