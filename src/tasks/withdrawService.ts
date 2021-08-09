@@ -17,7 +17,6 @@ import {
   isSupportedNetwork,
   SupportedNetwork,
 } from "./ts/deployment";
-import { sleep } from "./ts/sleep";
 import { balanceOf, erc20Token } from "./ts/tokens";
 import { ReferenceToken, REFERENCE_TOKEN } from "./ts/value";
 import { withdraw } from "./withdraw";
@@ -228,14 +227,14 @@ export async function withdrawAndDump({
     api,
     dryRun,
     doNotPrompt: true,
+    // Wait for node to pick up updated balances before running the dump
+    // function
+    requiredConfirmations: 2,
   });
 
   const tokensToDump = Array.from(
     new Set(pendingTokens.map((t) => t.address).concat(withdrawnTokens)),
   ).filter((addr) => addr !== BUY_ETH_ADDRESS);
-
-  // wait for node to pick up updated balances
-  await sleep(5000);
 
   await dump({
     validity,
