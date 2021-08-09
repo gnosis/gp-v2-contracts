@@ -1,13 +1,9 @@
 import { BigNumber, constants } from "ethers";
 
-import { Api, ApiError, Environment } from "../../services/api";
+import { Api, ApiError } from "../../services/api";
 import { OrderKind } from "../../ts";
 import { SupportedNetwork } from "../ts/deployment";
-import {
-  NATIVE_TOKEN_SYMBOL,
-  Erc20Token,
-  WRAPPED_NATIVE_TOKEN_ADDRESS,
-} from "../ts/tokens";
+import { Erc20Token, WRAPPED_NATIVE_TOKEN_ADDRESS } from "../ts/tokens";
 
 interface PricedToken extends Erc20Token {
   // Overrides existing field in TokenDetails. The number of decimals must be
@@ -17,10 +13,12 @@ interface PricedToken extends Erc20Token {
   usdValue: BigNumber;
 }
 
-const REFERENCE_TOKEN: Record<
-  SupportedNetwork,
-  { symbol: string; decimals: number; address: string }
-> = {
+export interface ReferenceToken {
+  symbol: string;
+  decimals: number;
+  address: string;
+}
+export const REFERENCE_TOKEN: Record<SupportedNetwork, ReferenceToken> = {
   rinkeby: {
     symbol: "DAI",
     decimals: 18,
@@ -41,22 +39,15 @@ const REFERENCE_TOKEN: Record<
 } as const;
 
 export const usdValue = async function (
-  token: Pick<Erc20Token, "symbol" | "address"> | "native token",
+  token: Pick<Erc20Token, "symbol" | "address">,
   amount: BigNumber,
-  network: SupportedNetwork,
+  referenceToken: ReferenceToken,
+  api: Api,
 ): Promise<BigNumber> {
-  if (token === "native token") {
-    // Note: using wrapped token since the API does not support sell orders in
-    // native tokens.
-    token = {
-      symbol: NATIVE_TOKEN_SYMBOL[network],
-      address: WRAPPED_NATIVE_TOKEN_ADDRESS[network],
-    };
-  }
   try {
-    return await new Api(network, Environment.Prod).estimateTradeAmount({
+    return await api.estimateTradeAmount({
       sellToken: token.address,
-      buyToken: REFERENCE_TOKEN[network].address,
+      buyToken: referenceToken.address,
       amount,
       kind: OrderKind.SELL,
     });
@@ -91,16 +82,22 @@ export function formatTokenValue(
 
 export function formatUsdValue(
   amount: BigNumber,
-  network: SupportedNetwork,
+  usdReference: ReferenceToken,
 ): string {
-  return formatTokenValue(amount, REFERENCE_TOKEN[network].decimals, 2);
+  return formatTokenValue(amount, usdReference.decimals, 2);
 }
 
 export async function appraise(
   token: Erc20Token,
-  network: SupportedNetwork,
+  usdReference: ReferenceToken,
+  api: Api,
 ): Promise<PricedToken> {
   const decimals = token.decimals ?? 18;
-  const usd = await usdValue(token, BigNumber.from(10).pow(decimals), network);
+  const usd = await usdValue(
+    token,
+    BigNumber.from(10).pow(decimals),
+    usdReference,
+    api,
+  );
   return { ...token, usdValue: usd, decimals };
 }
