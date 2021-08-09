@@ -1,9 +1,11 @@
 import readline from "readline";
 
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import chalk from "chalk";
 import {
   BigNumber,
   constants,
+  Contract,
   ContractTransaction,
   Signer,
   utils,
@@ -43,7 +45,7 @@ import {
 import { formatTokenValue } from "./ts/value";
 
 const MAX_LATEST_BLOCK_DELAY_SECONDS = 2 * 60;
-const MAX_ORDER_VALIDITY_SECONDS = 24 * 3600;
+export const MAX_ORDER_VALIDITY_SECONDS = 24 * 3600;
 
 const keccak = utils.id;
 const APP_DATA = keccak("GPv2 dump script");
@@ -325,25 +327,30 @@ async function prompt(message: string) {
   return "y" === response.toLowerCase();
 }
 
-async function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+interface CreateAllowancesOptions {
+  requiredConfirmations?: number | undefined;
 }
-
 async function createAllowances(
   allowances: Erc20Token[],
   signer: Signer,
   allowanceManager: string,
+  { requiredConfirmations }: CreateAllowancesOptions = {},
 ) {
-  if (allowances.length !== 0) {
-    for (const token of allowances) {
-      console.log(
-        `Approving allowance manager to trade token ${displayName(token)}...`,
-      );
-      const result: ContractTransaction = await token.contract
-        .connect(signer)
-        .approve(allowanceManager, constants.MaxUint256);
-      await result.wait();
-    }
+  let lastTransaction: ContractTransaction | undefined = undefined;
+  for (const token of allowances) {
+    console.log(
+      `Approving allowance manager to trade token ${displayName(token)}...`,
+    );
+    lastTransaction = (await token.contract
+      .connect(signer)
+      .approve(allowanceManager, constants.MaxUint256)) as ContractTransaction;
+    await lastTransaction.wait();
+  }
+  if (lastTransaction !== undefined) {
+    // note: the last approval is (excluded reorgs) the last that is included
+    // in a block, so awaiting it for confirmations means that also all others
+    // have at least this number of confirmations.
+    await lastTransaction.wait(requiredConfirmations);
   }
 }
 
@@ -416,6 +423,143 @@ async function transferSameTokenToReceiver(
   }
 }
 
+interface DumpInput {
+  validity: number;
+  maxFeePercent: number;
+  dumpedTokens: string[];
+  toToken: string;
+  settlement: Contract;
+  signer: SignerWithAddress;
+  receiver: string | undefined;
+  network: SupportedNetwork;
+  hre: HardhatRuntimeEnvironment;
+  api: Api;
+  dryRun: boolean;
+  doNotPrompt?: boolean | undefined;
+}
+export async function dump({
+  validity,
+  maxFeePercent,
+  dumpedTokens,
+  toToken: toTokenAddress,
+  settlement,
+  signer,
+  receiver: inputReceiver,
+  network,
+  hre,
+  api,
+  dryRun,
+  doNotPrompt,
+}: DumpInput): Promise<void> {
+  const { ethers } = hre;
+  if (validity > MAX_ORDER_VALIDITY_SECONDS) {
+    throw new Error("Order validity too large");
+  }
+  const [chainId, allowanceManager] = await Promise.all([
+    ethers.provider.getNetwork().then((n) => n.chainId),
+    (await settlement.allowanceManager()) as string,
+  ]);
+  const domainSeparator = domain(chainId, settlement.address);
+  const receiver: string = inputReceiver ?? signer.address;
+  const hasCustomReceiver = receiver !== signer.address;
+
+  // todo: when sending ETH to a contract will be supported by the
+  // services, remove this check.
+  if (
+    (toTokenAddress === undefined || toTokenAddress === BUY_ETH_ADDRESS) &&
+    hasCustomReceiver
+  ) {
+    throw new Error("Receiver is not supported when buying ETH");
+  }
+
+  const {
+    instructions,
+    toToken,
+    transferToReceiver,
+  } = await getDumpInstructions({
+    dumpedTokens,
+    toTokenAddress,
+    user: signer.address,
+    allowanceManager,
+    maxFeePercent,
+    hasCustomReceiver,
+    hre,
+    network,
+    api,
+  });
+  if (instructions.length === 0) {
+    console.log("No token can be sold");
+    return;
+  }
+
+  displayOperations(instructions, toToken);
+
+  let sumReceived = instructions.reduce(
+    (sum, inst) => sum.add(inst.receivedAmount),
+    constants.Zero,
+  );
+  const needAllowances = instructions
+    .filter(({ needsAllowance }) => needsAllowance)
+    .map(({ token }) => token);
+  if (needAllowances.length !== 0) {
+    console.log(
+      `Before creating the orders, a total of ${needAllowances.length} allowances will be granted to the allowance manager.`,
+    );
+  }
+  const toTokenName = isNativeToken(toToken)
+    ? toToken.symbol
+    : toToken.symbol ?? `units of token ${toToken.address}`;
+  if (transferToReceiver !== undefined) {
+    console.log(
+      `Moreover, ${utils.formatUnits(
+        transferToReceiver.amount,
+        transferToReceiver.token.decimals ?? 0,
+      )} ${toTokenName} will be transfered to the receiver address ${receiver}.`,
+    );
+    sumReceived = sumReceived.add(transferToReceiver.amount);
+  }
+  console.log(
+    `${
+      hasCustomReceiver
+        ? `The receiver address ${receiver}`
+        : `Your address (${signer.address})`
+    } will receive at least ${utils.formatUnits(
+      sumReceived,
+      toToken.decimals ?? 0,
+    )} ${toTokenName} from selling the tokens listed above.`,
+  );
+  if (!dryRun && (doNotPrompt || (await prompt("Submit?")))) {
+    await createAllowances(needAllowances, signer, allowanceManager, {
+      // If the services don't register the allowance before the order,
+      // then creating a new order with the API returns an error.
+      // Moreover, there is no distinction in the error between a missing
+      // allowance and a failed order creation, which could occur for
+      // valid reasons.
+      requiredConfirmations: 2,
+    });
+
+    await createOrders(
+      instructions,
+      toToken,
+      signer,
+      receiver,
+      hasCustomReceiver,
+      domainSeparator,
+      validity,
+      ethers,
+      api,
+    );
+
+    if (transferToReceiver !== undefined) {
+      await transferSameTokenToReceiver(transferToReceiver, signer, receiver);
+    }
+
+    console.log(
+      `Done! The orders will expire in the next ${validity / 60} minutes.`,
+    );
+  }
+}
+
 const setupDumpTask: () => void = () =>
   task("dump")
     .addOptionalParam(
@@ -453,150 +597,51 @@ const setupDumpTask: () => void = () =>
     .setAction(
       async (
         {
-          origin: inputOrigin,
-          toToken: toTokenAddress,
+          origin,
+          toToken,
           dumpedTokens,
           maxFeePercent,
           dryRun,
-          receiver: inputReceiver,
+          receiver,
           validity,
         },
         hre,
       ) => {
-        const { ethers } = hre;
         const network = hre.network.name;
         if (!isSupportedNetwork(network)) {
           throw new Error(`Unsupported network ${hre.network.name}`);
         }
-        if (validity > MAX_ORDER_VALIDITY_SECONDS) {
-          throw new Error("Order validity too large");
-        }
-
         const api = new Api(network, Environment.Prod);
-        const [signers, settlement, chainId] = await Promise.all([
-          ethers.getSigners(),
+        const [signers, settlement] = await Promise.all([
+          hre.ethers.getSigners(),
           getDeployedContract("GPv2Settlement", hre),
-          ethers.provider.getNetwork().then((n) => n.chainId),
         ]);
-        const allowanceManager: string = await settlement.allowanceManager();
-        const domainSeparator = domain(chainId, settlement.address);
         const signer =
-          inputOrigin === undefined
+          origin === undefined
             ? signers[0]
-            : signers.find((signer) => signer.address === inputOrigin);
+            : signers.find((signer) => signer.address === origin);
         if (signer === undefined) {
           throw new Error(
             `No signer found${
-              inputOrigin === undefined ? "" : ` for address ${inputOrigin}`
+              origin === undefined ? "" : ` for address ${origin}`
             }. Did you export a valid private key?`,
           );
         }
-        const receiver: string = inputReceiver ?? signer.address;
-        const hasCustomReceiver = receiver !== signer.address;
-
         console.log(`Using account ${signer.address}`);
-        // todo: when sending ETH to a contract will be supported by the
-        // services, remove this check.
-        if (
-          (toTokenAddress === undefined ||
-            toTokenAddress === BUY_ETH_ADDRESS) &&
-          hasCustomReceiver
-        ) {
-          throw new Error("Receiver is not supported when buying ETH");
-        }
 
-        const {
-          instructions,
-          toToken,
-          transferToReceiver,
-        } = await getDumpInstructions({
-          dumpedTokens,
-          toTokenAddress,
-          user: signer.address,
-          allowanceManager,
+        await dump({
+          validity,
           maxFeePercent,
-          hasCustomReceiver,
-          hre,
+          dumpedTokens,
+          toToken,
+          settlement,
+          signer,
+          receiver,
           network,
+          hre,
           api,
+          dryRun,
         });
-        if (instructions.length === 0) {
-          console.log("No token can be sold");
-          return;
-        }
-
-        displayOperations(instructions, toToken);
-
-        let sumReceived = instructions.reduce(
-          (sum, inst) => sum.add(inst.receivedAmount),
-          constants.Zero,
-        );
-        const needAllowances = instructions
-          .filter(({ needsAllowance }) => needsAllowance)
-          .map(({ token }) => token);
-        if (needAllowances.length !== 0) {
-          console.log(
-            `Before creating the orders, a total of ${needAllowances.length} allowances will be granted to the allowance manager.`,
-          );
-        }
-        const toTokenName = isNativeToken(toToken)
-          ? toToken.symbol
-          : toToken.symbol ?? `units of token ${toToken.address}`;
-        if (transferToReceiver !== undefined) {
-          console.log(
-            `Moreover, ${utils.formatUnits(
-              transferToReceiver.amount,
-              transferToReceiver.token.decimals ?? 0,
-            )} ${toTokenName} will be transfered to the receiver address ${receiver}.`,
-          );
-          sumReceived = sumReceived.add(transferToReceiver.amount);
-        }
-        console.log(
-          `${
-            hasCustomReceiver
-              ? `The receiver address ${receiver}`
-              : `Your address (${signer.address})`
-          } will receive at least ${utils.formatUnits(
-            sumReceived,
-            toToken.decimals ?? 0,
-          )} ${toTokenName} from selling the tokens listed above.`,
-        );
-        if (!dryRun && (await prompt("Submit?"))) {
-          await createAllowances(needAllowances, signer, allowanceManager);
-
-          // If the services don't register the allowance before the order,
-          // then creating a new order with the API returns an error.
-          // Moreover, there is no distinction in the error between a missing
-          // allowance and a failed order creation, which could occur for
-          // valid reasons.
-          await sleep(5000);
-
-          await createOrders(
-            instructions,
-            toToken,
-            signer,
-            receiver,
-            hasCustomReceiver,
-            domainSeparator,
-            validity,
-            ethers,
-            api,
-          );
-
-          if (transferToReceiver !== undefined) {
-            await transferSameTokenToReceiver(
-              transferToReceiver,
-              signer,
-              receiver,
-            );
-          }
-
-          console.log(
-            `Done! The orders will expire in the next ${
-              validity / 60
-            } minutes.`,
-          );
-        }
       },
     );
 
