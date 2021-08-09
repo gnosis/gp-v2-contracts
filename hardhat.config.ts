@@ -46,15 +46,15 @@ switch (MOCHA_CONF) {
   case undefined:
     break;
   case "coverage":
-    // End to end tests are skipped because:
+    // End to end and task tests are skipped because:
     // - coverage tool does not play well with proxy deployment with
     //   hardhat-deploy
     // - coverage compiles without optimizer and, unlike Waffle, hardhat-deploy
     //   strictly enforces the contract size limits from EIP-170
-    mocha.grep = /^(?!E2E)/;
+    mocha.grep = /^(?!E2E|Task)/;
     break;
   case "ignored in coverage":
-    mocha.grep = /^E2E/;
+    mocha.grep = /^E2E|Task/;
     break;
   default:
     throw new Error("Invalid MOCHA_CONF");
