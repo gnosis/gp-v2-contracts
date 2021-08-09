@@ -42,8 +42,8 @@ describe("E2E: Burn fees", () => {
     const { chainId } = await ethers.provider.getNetwork();
     domainSeparator = domain(chainId, settlement.address);
 
-    owl = await waffle.deployContract(deployer, ERC20, ["OWL", 18]);
-    dai = await waffle.deployContract(deployer, ERC20, ["DAI", 18]);
+    owl = await waffle.deployContract(deployer, ERC20, ["OWL", "Owl token"]);
+    dai = await waffle.deployContract(deployer, ERC20, ["DAI", "Dai token"]);
   });
 
   it("uses post-interation to burn settlement fees", async () => {
