@@ -115,6 +115,13 @@ export interface TradeExecution {
 
 /**
  * Order refund data.
+ *
+ * Note: after the London hardfork (specifically the introduction of EIP-3529)
+ * order refunds have become meaningless as the refunded amount is less than the
+ * gas cost of triggering the refund. The logic surrounding this feature is kept
+ * in order to keep full test coverage and in case the value of a refund will be
+ * increased again in the future. However, order refunds should not be used in
+ * an actual settlement.
  */
 export interface OrderRefunds {
   /** Refund storage used for order filled amount */

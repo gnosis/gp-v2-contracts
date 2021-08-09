@@ -43,6 +43,7 @@ if (["rinkeby", "mainnet"].includes(argv.network) && INFURA_KEY === undefined) {
 }
 
 const mocha: MochaOptions = {};
+let initialBaseFeePerGas: number | undefined = undefined;
 switch (MOCHA_CONF) {
   case undefined:
     break;
@@ -53,6 +54,9 @@ switch (MOCHA_CONF) {
     // - coverage compiles without optimizer and, unlike Waffle, hardhat-deploy
     //   strictly enforces the contract size limits from EIP-170
     mocha.grep = /^(?!E2E|Task)/;
+    // Note: unit is Wei, not GWei. This is a workaround to make the coverage
+    // tool work with the London hardfork.
+    initialBaseFeePerGas = 1;
     break;
   case "ignored in coverage":
     mocha.grep = /^E2E|Task/;
@@ -91,6 +95,7 @@ export default {
   networks: {
     hardhat: {
       blockGasLimit: 12.5e6,
+      initialBaseFeePerGas,
     },
     mainnet: {
       ...sharedNetworkConfig,
