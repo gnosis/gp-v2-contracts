@@ -9,6 +9,7 @@ import { BigNumber, utils, constants, Contract } from "ethers";
 import { task, types } from "hardhat/config";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
+import { Api, Environment } from "../services/api";
 import { SettlementEncoder } from "../ts";
 
 import {
@@ -21,16 +22,20 @@ import {
   promiseAllWithRateLimit,
 } from "./ts/rate_limits";
 import { Align, displayTable } from "./ts/table";
-import { Erc20Token, erc20Token } from "./ts/tokens";
+import {
+  Erc20Token,
+  erc20Token,
+  WRAPPED_NATIVE_TOKEN_ADDRESS,
+} from "./ts/tokens";
 import {
   usdValue,
   formatUsdValue,
   formatTokenValue,
   appraise,
+  ReferenceToken,
+  REFERENCE_TOKEN,
 } from "./ts/value";
 import { getAllTradedTokens } from "./withdraw/traded_tokens";
-
-const DAI_DECIMALS = 18;
 
 interface Withdrawal {
   token: PricedToken;
@@ -93,10 +98,11 @@ async function getWithdrawals(
   minValue: string,
   leftover: string,
   hre: HardhatRuntimeEnvironment,
-  network: SupportedNetwork,
+  usdReference: ReferenceToken,
+  api: Api,
 ): Promise<Withdrawal[]> {
-  const minValueWei = utils.parseUnits(minValue, DAI_DECIMALS);
-  const leftoverWei = utils.parseUnits(leftover, DAI_DECIMALS);
+  const minValueWei = utils.parseUnits(minValue, usdReference.decimals);
+  const leftoverWei = utils.parseUnits(leftover, usdReference.decimals);
   const computeWithdrawalInstructions = tokens.map(
     (tokenAddress) => async ({ consoleWarn }: DisappearingLogFunctions) => {
       const token = await fastTokenDetails(tokenAddress, hre);
@@ -109,7 +115,7 @@ async function getWithdrawals(
       if (balance.eq(0)) {
         return null;
       }
-      const pricedToken = await appraise(token, network);
+      const pricedToken = await appraise(token, usdReference, api);
       const balanceUsd = pricedToken.usdValue
         .mul(balance)
         .div(BigNumber.from(10).pow(pricedToken.decimals));
@@ -126,7 +132,7 @@ async function getWithdrawals(
             pricedToken.decimals,
           )} units of ${token.symbol ?? "unknown token"} (${
             token.address
-          }) with value ${formatUsdValue(balanceUsd, network)} USD`,
+          }) with value ${formatUsdValue(balanceUsd, usdReference)} USD`,
         );
         return null;
       }
@@ -161,11 +167,11 @@ async function getWithdrawals(
 
 function formatWithdrawal(
   withdrawal: Withdrawal,
-  network: SupportedNetwork,
+  usdReference: ReferenceToken,
 ): DisplayWithdrawal {
   return {
     address: withdrawal.token.address,
-    value: formatUsdValue(withdrawal.balanceUsd, network),
+    value: formatUsdValue(withdrawal.balanceUsd, usdReference),
     balance: formatTokenValue(
       withdrawal.balance,
       withdrawal.token.decimals,
@@ -178,10 +184,10 @@ function formatWithdrawal(
 
 function displayWithdrawals(
   withdrawals: Withdrawal[],
-  network: SupportedNetwork,
+  usdReference: ReferenceToken,
 ) {
   const formattedWithdtrawals = withdrawals.map((w) =>
-    formatWithdrawal(w, network),
+    formatWithdrawal(w, usdReference),
   );
   const order = ["address", "value", "balance", "amount", "symbol"] as const;
   const header = {
@@ -204,13 +210,20 @@ function displayWithdrawals(
 async function formatGasCost(
   amount: BigNumber,
   network: SupportedNetwork,
+  usdReference: ReferenceToken,
+  api: Api,
 ): Promise<string> {
   switch (network) {
     case "mainnet": {
-      const value = await usdValue("native token", amount, "mainnet");
+      const value = await usdValue(
+        { symbol: "ETH", address: WRAPPED_NATIVE_TOKEN_ADDRESS[network] },
+        amount,
+        usdReference,
+        api,
+      );
       return `${utils.formatEther(amount)} ETH (${formatUsdValue(
         value,
-        network,
+        usdReference,
       )} USD)`;
     }
     case "xdai":
@@ -242,7 +255,9 @@ interface WithdrawInput {
   settlementDeploymentBlock: number;
   latestBlock: number;
   network: SupportedNetwork;
+  usdReference: ReferenceToken;
   hre: HardhatRuntimeEnvironment;
+  api: Api;
   dryRun: boolean;
   doNotPrompt?: boolean | undefined;
 }
@@ -257,7 +272,9 @@ export async function withdraw({
   settlementDeploymentBlock,
   latestBlock,
   network,
+  usdReference,
   hre,
+  api,
   dryRun,
   doNotPrompt,
 }: WithdrawInput): Promise<string[]> {
@@ -289,14 +306,15 @@ export async function withdraw({
     minValue,
     leftover,
     hre,
-    network,
+    usdReference,
+    api,
   );
   withdrawals.sort((lhs, rhs) => {
     const diff = lhs.balanceUsd.sub(rhs.balanceUsd);
     return diff.isZero() ? 0 : diff.isNegative() ? -1 : 1;
   });
 
-  displayWithdrawals(withdrawals, network);
+  displayWithdrawals(withdrawals, usdReference);
 
   if (withdrawals.length === 0) {
     console.log("No tokens to withdraw.");
@@ -330,11 +348,13 @@ export async function withdraw({
     `The transaction will cost approximately ${await formatGasCost(
       amount,
       network,
+      usdReference,
+      api,
     )} and will withdraw the balance of ${
       withdrawals.length
     } tokens for an estimated total value of ${formatUsdValue(
       totalValue,
-      network,
+      usdReference,
     )} USD. All withdrawn funds will be sent to ${receiver}.`,
   );
 
@@ -387,6 +407,7 @@ const setupWithdrawTask: () => void = () =>
         if (!isSupportedNetwork(network)) {
           throw new Error(`Unsupported network ${network}`);
         }
+        const api = new Api(network, Environment.Prod);
         const receiver = utils.getAddress(inputReceiver);
         const [
           authenticator,
@@ -418,7 +439,9 @@ const setupWithdrawTask: () => void = () =>
           settlementDeploymentBlock,
           latestBlock,
           network,
+          usdReference: REFERENCE_TOKEN[network],
           hre,
+          api,
           dryRun,
         });
       },
