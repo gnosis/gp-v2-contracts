@@ -20,90 +20,12 @@ import {
 import { balanceOf, erc20Token } from "./ts/tokens";
 import { ReferenceToken, REFERENCE_TOKEN } from "./ts/value";
 import { withdraw } from "./withdraw";
+import State from "./withdraw-service/state";
+import validateState from "./withdraw-service/state.validator";
 import { getAllTradedTokens } from "./withdraw/traded_tokens";
 
 const MAX_ORDER_RETRIES_BEFORE_SKIPPING = 10;
 const MAX_CHECKED_TOKENS_PER_RUN = 200;
-
-export interface State {
-  /**
-   * Latest block number when the balances were withdrawn in the previous run.
-   */
-  lastUpdateBlock: number;
-  /**
-   * All tokens ever traded on GPv2. Stored in the state to avoid stressing the
-   * node by recovering the list every time.
-   */
-  tradedTokens: string[];
-  /**
-   * Index (in tradedTokens) following that of the last withdrawn token in the
-   * previous run of this script.
-   */
-  nextTokenToTrade: number;
-  /**
-   * Tokens that have a pending order from a previous execution of the withdraw
-   * service.
-   */
-  pendingTokens: PendingToken[];
-}
-
-interface PendingToken {
-  /**
-   * The address of the token.
-   */
-  address: string;
-  /**
-   * How many consecutive times the script sold this token with no success.
-   * Note that the script will not wait to check if the orders were successful,
-   * which means that every order in a run will add a pending token with one
-   * retry.
-   */
-  retries: number;
-}
-
-function isValidState(state: unknown): state is State {
-  if (state === null || typeof state !== "object") {
-    console.error("State json is not an object");
-    return false;
-  }
-  const stateObject = state as State;
-  if (typeof stateObject["lastUpdateBlock"] !== "number") {
-    console.error("Invalid lastUpdateBlock");
-    return false;
-  }
-  if (typeof stateObject["nextTokenToTrade"] !== "number") {
-    console.error("Invalid nextTokenToTrade");
-    return false;
-  }
-  if (
-    !(
-      stateObject["tradedTokens"] instanceof Array &&
-      stateObject["tradedTokens"].every(
-        (elt) => typeof elt === "string" && utils.isAddress(elt),
-      )
-    )
-  ) {
-    console.error("Invalid tradedTokens");
-    return false;
-  }
-  if (
-    !(
-      stateObject["pendingTokens"] instanceof Array &&
-      stateObject["pendingTokens"].every(
-        (elt) =>
-          elt !== null &&
-          typeof elt === "object" &&
-          typeof elt.address === "string" &&
-          utils.isAddress(elt.address) &&
-          typeof elt.retries === "number",
-      )
-    )
-  ) {
-    console.error("Invalid pendingTokens");
-    return false;
-  }
-  return true;
-}
 
 export interface WithdrawAndDumpInput {
   state: State;
@@ -274,7 +196,8 @@ export async function withdrawAndDump({
       )
       .map((address) => ({ address, retries: 1 })),
   );
-  assert(isValidState(updatedState), "Must generate a valid state");
+
+  validateState(updatedState);
   return updatedState;
 }
 
@@ -333,11 +256,10 @@ const setupWithdrawServiceTask: () => void = () =>
         },
         hre: HardhatRuntimeEnvironment,
       ) => {
-        const state = JSON.parse((await fs.readFile(stateFilePath)).toString());
+        const state = validateState(
+          JSON.parse((await fs.readFile(stateFilePath)).toString()),
+        );
         console.debug(`Initial state: ${JSON.stringify(state)}`);
-        if (!isValidState(state)) {
-          throw new Error("Invalid state file");
-        }
         const network = hre.network.name;
         if (!isSupportedNetwork(network)) {
           throw new Error(`Unsupported network ${network}`);

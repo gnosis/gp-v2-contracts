@@ -12,8 +12,11 @@ import {
 } from "../../src/services/api";
 import { SupportedNetwork } from "../../src/tasks/ts/deployment";
 import { ReferenceToken } from "../../src/tasks/ts/value";
-import * as withdrawService from "../../src/tasks/withdrawService";
-import { WithdrawAndDumpInput } from "../../src/tasks/withdrawService";
+import {
+  WithdrawAndDumpInput,
+  withdrawAndDump,
+} from "../../src/tasks/withdraw-service";
+import State from "../../src/tasks/withdraw-service/state";
 import { OrderKind, domain, Order, timestamp } from "../../src/ts";
 import { deployTestContracts } from "../e2e/fixture";
 
@@ -125,7 +128,7 @@ describe("Task: withdrawService", () => {
   });
 
   it("should withdraw and dump", async () => {
-    const initalState: withdrawService.State = {
+    const initalState: State = {
       lastUpdateBlock: 0,
       tradedTokens: [],
       nextTokenToTrade: 0,
@@ -301,7 +304,7 @@ describe("Task: withdrawService", () => {
       }
     };
 
-    const updatedState = await withdrawService.withdrawAndDump({
+    const updatedState = await withdrawAndDump({
       ...(await withdrawAndDumpDefaultParams()),
       state: initalState,
       minValue,
@@ -354,7 +357,7 @@ describe("Task: withdrawService", () => {
   });
 
   it("should respect pagination", async () => {
-    const initalState: withdrawService.State = {
+    const initalState: State = {
       lastUpdateBlock: 0,
       // note: token order is set in the initial state
       tradedTokens: [dai.address, usdc.address, weth.address],
@@ -431,7 +434,7 @@ describe("Task: withdrawService", () => {
     };
 
     const pagination = 2;
-    const intermediateState = await withdrawService.withdrawAndDump({
+    const intermediateState = await withdrawAndDump({
       ...(await withdrawAndDumpDefaultParams()),
       state: initalState,
       pagination,
@@ -477,7 +480,7 @@ describe("Task: withdrawService", () => {
     await setupExpectations(weth, wethBalance);
     await setupExpectations(dai, daiBalance.sub(42));
 
-    const finalState = await withdrawService.withdrawAndDump({
+    const finalState = await withdrawAndDump({
       ...(await withdrawAndDumpDefaultParams()),
       state: intermediateState,
       pagination,
