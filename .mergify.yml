@@ -3,8 +3,10 @@ pull_request_rules:
     conditions:
       - "#approved-reviews-by>=1"
       - status-success~=^test \([0-9]+\.x, ubuntu-latest\)$
-      - base=main
       - label=merge when green
+      - or:
+          - base=main
+          - base=v0.0.1
     actions:
       merge:
         method: squash
