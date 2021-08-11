@@ -4,6 +4,7 @@ import { setupDumpTask } from "./dump";
 import { setupSolversTask } from "./solvers";
 import { setupTenderlyTask } from "./tenderly";
 import { setupWithdrawTask } from "./withdraw";
+import { setupWithdrawServiceTask } from "./withdrawService";
 
 export function setupTasks(): void {
   setupCopyArtifactsTask();
@@ -12,4 +13,5 @@ export function setupTasks(): void {
   setupSolversTask();
   setupTenderlyTask();
   setupWithdrawTask();
+  setupWithdrawServiceTask();
 }

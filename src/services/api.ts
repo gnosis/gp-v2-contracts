@@ -32,7 +32,7 @@ interface EstimateTradeAmountQuery {
   kind: OrderKind;
   amount: BigNumberish;
 }
-interface PlaceOrderQuery {
+export interface PlaceOrderQuery {
   order: Order;
   signature: Signature;
 }

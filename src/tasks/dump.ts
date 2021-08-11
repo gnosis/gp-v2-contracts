@@ -436,6 +436,7 @@ interface DumpInput {
   api: Api;
   dryRun: boolean;
   doNotPrompt?: boolean | undefined;
+  confirmationsAfterApproval?: number | undefined;
 }
 export async function dump({
   validity,
@@ -450,6 +451,7 @@ export async function dump({
   api,
   dryRun,
   doNotPrompt,
+  confirmationsAfterApproval,
 }: DumpInput): Promise<void> {
   const { ethers } = hre;
   if (validity > MAX_ORDER_VALIDITY_SECONDS) {
@@ -535,7 +537,7 @@ export async function dump({
       // Moreover, there is no distinction in the error between a missing
       // allowance and a failed order creation, which could occur for
       // valid reasons.
-      requiredConfirmations: 2,
+      requiredConfirmations: confirmationsAfterApproval,
     });
 
     await createOrders(
@@ -641,6 +643,7 @@ const setupDumpTask: () => void = () =>
           hre,
           api,
           dryRun,
+          confirmationsAfterApproval: 2,
         });
       },
     );
