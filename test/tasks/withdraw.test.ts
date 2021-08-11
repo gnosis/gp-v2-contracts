@@ -20,14 +20,14 @@ import { deployTestContracts } from "../e2e/fixture";
 import { restoreStandardConsole, useDebugConsole } from "./logging";
 
 // Executes trades between the input tokens in order to emit trade events.
-async function tradeTokensForNoFees(
+export async function tradeTokensForNoFees(
   tokens: Contract[],
   trader: Wallet,
   domainSeparator: TypedDataDomain,
   settlement: Contract,
   allowanceManager: Contract,
   solver: SignerWithAddress,
-) {
+): Promise<void> {
   const encoder = new SettlementEncoder(domainSeparator);
 
   const consecutiveTokenPairs = tokens.map((token, index) => [

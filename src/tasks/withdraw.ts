@@ -248,6 +248,7 @@ interface WithdrawInput {
   api: Api;
   dryRun: boolean;
   doNotPrompt?: boolean | undefined;
+  requiredConfirmations?: number | undefined;
 }
 export async function withdraw({
   solver,
@@ -265,6 +266,7 @@ export async function withdraw({
   api,
   dryRun,
   doNotPrompt,
+  requiredConfirmations,
 }: WithdrawInput): Promise<string[]> {
   if (!(await authenticator.isSolver(solver.address))) {
     const message =
@@ -354,7 +356,7 @@ export async function withdraw({
     console.log(
       "Transaction submitted to the blockchain. Waiting for acceptance in a block...",
     );
-    const receipt = await response.wait();
+    const receipt = await response.wait(requiredConfirmations);
     console.log(
       `Transaction successfully executed. Transaction hash: ${receipt.transactionHash}`,
     );
