@@ -126,6 +126,24 @@ export interface WithdrawAndDumpInput {
   confirmationsAfterWithdrawing?: number | undefined;
   pagination?: number | undefined;
 }
+/**
+ * This function withdraws funds from the settlement contracts and puts the
+ * withdrawn amount up for trade in GPv2 in exchange for a target token. The
+ * proceeds are sent to a receiver address.
+ *
+ * This function is supposed to be called regularly and only a portion of the
+ * possible withdraws are performed at a time. This is done in order not to
+ * stress the infrastructure with too many simultaneous requests (node calls,
+ * api queries, orders).
+ * Because of this, the withdraw processing works based on a state containing
+ * information on which tokens should be withdrawn next. The output of this
+ * function is the updated state.
+ *
+ * The process comprises two steps:
+ * 1. funds are withdrawn from the settlement contract to the solver
+ * 2. orders are signed by the solver to sell these funds
+ * This function inherit some of the parameters used in each intermediate step.
+ */
 export async function withdrawAndDump({
   state,
   solver,
