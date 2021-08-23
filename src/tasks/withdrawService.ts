@@ -105,7 +105,7 @@ function isValidState(state: unknown): state is State {
   return true;
 }
 
-interface WithdrawAndDumpInput {
+export interface WithdrawAndDumpInput {
   state: State;
   solver: SignerWithAddress;
   receiver: string;
@@ -124,6 +124,7 @@ interface WithdrawAndDumpInput {
   api: Api;
   dryRun: boolean;
   confirmationsAfterWithdrawing?: number | undefined;
+  pagination?: number | undefined;
 }
 /**
  * This function withdraws funds from the settlement contracts and puts the
@@ -162,7 +163,15 @@ export async function withdrawAndDump({
   api,
   dryRun,
   confirmationsAfterWithdrawing,
+  pagination,
 }: WithdrawAndDumpInput): Promise<State> {
+  if (pagination === undefined) {
+    pagination = MAX_CHECKED_TOKENS_PER_RUN;
+  } else if (pagination > MAX_CHECKED_TOKENS_PER_RUN) {
+    throw new Error(
+      `Too many tokens checked per run (${pagination}, max ${MAX_CHECKED_TOKENS_PER_RUN})`,
+    );
+  }
   // Update list of pending tokens to determine which token was traded
   const pendingTokens = (
     await Promise.all(
@@ -214,10 +223,7 @@ export async function withdrawAndDump({
         !(state.tradedTokens.includes(token) || token === BUY_ETH_ADDRESS),
     ),
   );
-  const numCheckedTokens = Math.min(
-    MAX_CHECKED_TOKENS_PER_RUN,
-    tradedTokens.length,
-  );
+  const numCheckedTokens = Math.min(pagination, tradedTokens.length);
   // The index of the checked token wraps around after reaching the end of the
   // traded token list
   const checkedTokens = tradedTokens
