@@ -13,6 +13,7 @@ import {
 import { SupportedNetwork } from "../../src/tasks/ts/deployment";
 import { ReferenceToken } from "../../src/tasks/ts/value";
 import * as withdrawService from "../../src/tasks/withdrawService";
+import { WithdrawAndDumpInput } from "../../src/tasks/withdrawService";
 import { OrderKind, domain, Order, timestamp } from "../../src/ts";
 import { deployTestContracts } from "../e2e/fixture";
 
@@ -36,6 +37,16 @@ describe("Task: withdrawService", () => {
 
   let apiMock: SinonMock;
   let api: Api;
+
+  let withdrawAndDumpDefaultParams: () => Promise<
+    Omit<WithdrawAndDumpInput, "state">
+  >;
+
+  const usdReference: ReferenceToken = {
+    address: "0x" + "42".repeat(20),
+    symbol: "USD",
+    decimals: 42,
+  };
 
   beforeEach(async () => {
     const deployment = await deployTestContracts();
@@ -83,6 +94,26 @@ describe("Task: withdrawService", () => {
       solver,
     );
 
+    withdrawAndDumpDefaultParams = async () => ({
+      solver,
+      receiver: receiver.address,
+      authenticator,
+      settlement,
+      settlementDeploymentBlock: 0,
+      minValue: "0",
+      leftover: "0",
+      validity: 3600,
+      maxFeePercent: 100,
+      toToken: toToken.address,
+      latestBlock: await hre.ethers.provider.getBlockNumber(),
+      // ignore network value
+      network: (undefined as unknown) as SupportedNetwork,
+      usdReference,
+      hre,
+      api,
+      dryRun: false,
+    });
+
     useDebugConsole();
   });
 
@@ -111,12 +142,6 @@ describe("Task: withdrawService", () => {
     // no usdc balance is there, which means that the usdc entry should not
     // affect the final result (this would occur in practice if for example they
     // were withdrawn in the previous run of the script)
-
-    const usdReference: ReferenceToken = {
-      address: "0x" + "42".repeat(20),
-      symbol: "USD",
-      decimals: 42,
-    };
 
     const minValue = "5.0";
     const leftover = "10.0";
@@ -277,24 +302,12 @@ describe("Task: withdrawService", () => {
     };
 
     const updatedState = await withdrawService.withdrawAndDump({
+      ...(await withdrawAndDumpDefaultParams()),
       state: initalState,
-      solver,
-      receiver: receiver.address,
-      authenticator,
-      settlement,
-      settlementDeploymentBlock: 0,
-      latestBlock: await ethers.provider.getBlockNumber(),
       minValue,
       leftover,
       validity,
       maxFeePercent,
-      toToken: toToken.address,
-      // ignore network value
-      network: (undefined as unknown) as SupportedNetwork,
-      usdReference,
-      hre,
-      api,
-      dryRun: false,
     });
 
     expect(
@@ -338,5 +351,162 @@ describe("Task: withdrawService", () => {
       address: weth.address,
       retries: 1,
     });
+  });
+
+  it("should respect pagination", async () => {
+    const initalState: withdrawService.State = {
+      lastUpdateBlock: 0,
+      // note: token order is set in the initial state
+      tradedTokens: [dai.address, usdc.address, weth.address],
+      nextTokenToTrade: 0,
+      pendingTokens: [],
+    };
+
+    const daiBalance = utils.parseUnits("21.0", 18);
+    await dai.mint(settlement.address, daiBalance);
+    const usdcBalance = utils.parseUnits("42.0", 6);
+    await usdc.mint(settlement.address, usdcBalance);
+    const wethBalance = utils.parseUnits("63.0", 18);
+    await weth.mint(settlement.address, wethBalance);
+
+    async function setupExpectations(
+      token: Contract,
+      soldAmount: BigNumber,
+    ): Promise<void> {
+      const oneUsd = Promise.resolve(
+        utils.parseUnits("1", usdReference.decimals),
+      );
+      // price
+      apiMock
+        .expects("estimateTradeAmount")
+        .withArgs({
+          sellToken: token.address,
+          buyToken: usdReference.address,
+          kind: OrderKind.SELL,
+          amount: utils.parseUnits("1", await token.decimals()),
+        })
+        .once()
+        .returns(oneUsd);
+      // fee and received amount
+      const feeAndQuote: GetFeeAndQuoteSellOutput = {
+        feeAmount: constants.Zero,
+        buyAmountAfterFee: BigNumber.from(1337),
+      };
+      apiMock
+        .expects("getFeeAndQuoteSell")
+        .withArgs({
+          sellToken: token.address,
+          buyToken: toToken.address,
+          sellAmountBeforeFee: soldAmount,
+        })
+        .once()
+        .returns(Promise.resolve(feeAndQuote));
+    }
+
+    await setupExpectations(dai, daiBalance);
+    await setupExpectations(usdc, usdcBalance);
+
+    let hasSoldUsdc = false;
+    let hasSoldDai = false;
+    let hasSoldWeth = false;
+    api.placeOrder = async function ({ order }: PlaceOrderQuery) {
+      switch (order.sellToken) {
+        case dai.address: {
+          hasSoldDai = true;
+          return "0xdaiOrderUid";
+        }
+        case usdc.address: {
+          hasSoldUsdc = true;
+          return "0xusdcOrderUid";
+        }
+        case weth.address: {
+          hasSoldWeth = true;
+          return "0xwethOrderUid";
+        }
+        default:
+          throw new Error(
+            `Invalid sell token ${order.sellToken} in mock order`,
+          );
+      }
+    };
+
+    const pagination = 2;
+    const intermediateState = await withdrawService.withdrawAndDump({
+      ...(await withdrawAndDumpDefaultParams()),
+      state: initalState,
+      pagination,
+    });
+
+    expect(intermediateState.tradedTokens).to.deep.equal(
+      initalState.tradedTokens,
+    );
+    expect(intermediateState.nextTokenToTrade).to.deep.equal(2);
+    expect(intermediateState.lastUpdateBlock).not.to.deep.equal(constants.Zero);
+    expect(hasSoldDai).to.be.true;
+    expect(hasSoldUsdc).to.be.true;
+    expect(hasSoldWeth).to.be.false;
+    expect(intermediateState.pendingTokens).to.have.length(2);
+    expect(intermediateState.pendingTokens).to.deep.include({
+      address: dai.address,
+      retries: 1,
+    });
+    expect(intermediateState.pendingTokens).to.deep.include({
+      address: usdc.address,
+      retries: 1,
+    });
+
+    expect(await dai.balanceOf(settlement.address)).to.deep.equal(
+      constants.Zero,
+    );
+    expect(await usdc.balanceOf(settlement.address)).to.deep.equal(
+      constants.Zero,
+    );
+    expect(await weth.balanceOf(settlement.address)).to.deep.equal(wethBalance);
+
+    // simulate order execution (without sending anything to the receiver)
+    await dai.connect(solver).burn(daiBalance);
+    await usdc.connect(solver).burn(usdcBalance);
+
+    // dai was withdrawn previously, so it needs new balances to be traded again
+    await dai.mint(settlement.address, daiBalance.sub(42));
+
+    hasSoldUsdc = false;
+    hasSoldDai = false;
+    hasSoldWeth = false;
+
+    await setupExpectations(weth, wethBalance);
+    await setupExpectations(dai, daiBalance.sub(42));
+
+    const finalState = await withdrawService.withdrawAndDump({
+      ...(await withdrawAndDumpDefaultParams()),
+      state: intermediateState,
+      pagination,
+    });
+
+    expect(finalState.tradedTokens).to.deep.equal(initalState.tradedTokens);
+    expect(finalState.nextTokenToTrade).to.deep.equal(1);
+    expect(finalState.lastUpdateBlock).not.to.deep.equal(constants.Zero);
+    expect(hasSoldDai).to.be.true;
+    expect(hasSoldUsdc).to.be.false;
+    expect(hasSoldWeth).to.be.true;
+    expect(finalState.pendingTokens).to.have.length(2);
+    expect(finalState.pendingTokens).to.deep.include({
+      address: weth.address,
+      retries: 1,
+    });
+    expect(finalState.pendingTokens).to.deep.include({
+      address: dai.address,
+      retries: 1,
+    });
+
+    expect(await dai.balanceOf(settlement.address)).to.deep.equal(
+      constants.Zero,
+    );
+    expect(await usdc.balanceOf(settlement.address)).to.deep.equal(
+      constants.Zero,
+    );
+    expect(await weth.balanceOf(settlement.address)).to.deep.equal(
+      constants.Zero,
+    );
   });
 });
