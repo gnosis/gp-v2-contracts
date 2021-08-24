@@ -13,3 +13,11 @@ export async function getDeployedContract(
     ethers.provider,
   );
 }
+
+export type SupportedNetwork = "mainnet" | "rinkeby" | "xdai";
+
+export function isSupportedNetwork(
+  network: string,
+): network is SupportedNetwork {
+  return network === "xdai";
+}
