@@ -13,7 +13,11 @@ async function rejectError(
     await promise;
     return undefined;
   } catch (err) {
-    return err;
+    if (err instanceof Error) {
+      return err;
+    } else {
+      throw new Error("Invalid rejection output");
+    }
   }
 }
 
