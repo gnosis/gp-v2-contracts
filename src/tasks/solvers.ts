@@ -1,30 +1,14 @@
 import "hardhat-deploy";
 import "@nomiclabs/hardhat-ethers";
 
-import { Signer } from "ethers";
 import { subtask, task } from "hardhat/config";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 import { getDeployedContract } from "./ts/deployment";
+import { getOwnerSigner } from "./ts/signers";
 
 const solversTaskList = ["add", "check", "remove"] as const;
 type SolversTasks = typeof solversTaskList[number];
-
-async function getOwnerSigner({
-  ethers,
-  getNamedAccounts,
-}: HardhatRuntimeEnvironment): Promise<Signer> {
-  const { manager } = await getNamedAccounts();
-  const signer = (await ethers.getSigners()).find(
-    (signer) => signer.address == manager,
-  );
-  if (signer == undefined) {
-    throw new Error(
-      'No owner found among the signers. Did you export the owner\'s private key with "export PK=<your key>"?',
-    );
-  }
-  return signer;
-}
 
 async function addSolver(
   solver: string,
