@@ -432,7 +432,7 @@ const setupWithdrawTask: () => void = () =>
           )} USD. All withdrawn funds will be sent to ${receiver}.`,
         );
 
-        if (!dryRun && (await prompt("Submit?"))) {
+        if (!dryRun && (await prompt(hre, "Submit?"))) {
           console.log(
             "Executing the withdraw transaction on the blockchain...",
           );

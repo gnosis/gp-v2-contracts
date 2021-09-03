@@ -1,14 +1,20 @@
-import type { HardhatRuntimeEnvironment, SignerWithAddress } from "hardhat/types";
+import type { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import type { HardhatRuntimeEnvironment } from "hardhat/types";
 
-export async function getOwnerSigner({
-  ethers,
-  getNamedAccounts,
-}: HardhatRuntimeEnvironment): Promise<SignerWithAddress> {
-  const { manager } = await getNamedAccounts();
+export async function getNamedSigner(
+  { ethers, getNamedAccounts }: HardhatRuntimeEnvironment,
+  name: string,
+): Promise<SignerWithAddress> {
+  const accounts = await getNamedAccounts();
+  const account = accounts[name];
+  if (account === undefined) {
+    throw new Error(`No account named ${name}`);
+  }
+
   const signer = (await ethers.getSigners()).find(
-    (signer) => signer.address == manager,
+    (signer) => signer.address == account,
   );
-  if (signer == undefined) {
+  if (signer === undefined) {
     throw new Error(
       'No owner found among the signers. Did you export the owner\'s private key with "export PK=<your key>"?',
     );

@@ -5,19 +5,16 @@ import { subtask, task } from "hardhat/config";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 import { getDeployedContract } from "./ts/deployment";
-import { getOwnerSigner } from "./ts/signers";
+import { getNamedSigner } from "./ts/signers";
 
 const solversTaskList = ["add", "check", "remove"] as const;
 type SolversTasks = typeof solversTaskList[number];
 
-async function addSolver(
-  solver: string,
-  hardhatRuntime: HardhatRuntimeEnvironment,
-) {
-  const owner = await getOwnerSigner(hardhatRuntime);
+async function addSolver(solver: string, hre: HardhatRuntimeEnvironment) {
+  const owner = await getNamedSigner(hre, "manager");
   const authenticator = await getDeployedContract(
     "GPv2AllowListAuthentication",
-    hardhatRuntime,
+    hre,
   );
 
   const tx = await authenticator.connect(owner).addSolver(solver);
@@ -25,14 +22,11 @@ async function addSolver(
   console.log("Solver added.");
 }
 
-const removeSolver = async (
-  solver: string,
-  hardhatRuntime: HardhatRuntimeEnvironment,
-) => {
-  const owner = await getOwnerSigner(hardhatRuntime);
+const removeSolver = async (solver: string, hre: HardhatRuntimeEnvironment) => {
+  const owner = await getNamedSigner(hre, "manager");
   const authenticator = await getDeployedContract(
     "GPv2AllowListAuthentication",
-    hardhatRuntime,
+    hre,
   );
 
   const tx = await authenticator.connect(owner).removeSolver(solver);
@@ -40,13 +34,10 @@ const removeSolver = async (
   console.log("Solver removed.");
 };
 
-const isSolver = async (
-  solver: string,
-  hardhatRuntime: HardhatRuntimeEnvironment,
-) => {
+const isSolver = async (solver: string, hre: HardhatRuntimeEnvironment) => {
   const authenticator = await getDeployedContract(
     "GPv2AllowListAuthentication",
-    hardhatRuntime,
+    hre,
   );
 
   console.log(
