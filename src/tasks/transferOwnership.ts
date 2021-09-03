@@ -30,7 +30,8 @@ async function transferOwnership(
   console.log(`Using account ${owner.address}`);
   const currentOwner = await proxy.owner();
   if (owner.address !== currentOwner) {
-    console.log(`Account does NOT match current owner ${currentOwner}`);
+    console.warn(`Account does NOT match current owner ${currentOwner}`);
+    return;
   }
 
   if (resetManager) {
