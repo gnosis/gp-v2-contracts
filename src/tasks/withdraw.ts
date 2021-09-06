@@ -1,7 +1,5 @@
 import "@nomiclabs/hardhat-ethers";
 
-import readline from "readline";
-
 import axios from "axios";
 import chalk from "chalk";
 import { BigNumber, utils, constants, Contract } from "ethers";
@@ -13,6 +11,7 @@ import { BUY_ETH_ADDRESS, SettlementEncoder } from "../ts";
 import { getDeployedContract } from "./ts/deployment";
 import { TokenDetails, tokenDetails } from "./ts/erc20";
 import { Align, displayTable } from "./ts/table";
+import { prompt } from "./ts/tui";
 
 const MAINNET_DAI = "0x6b175474e89094c44da98b954eedeac495271d0f";
 const ONEINCH_ETH_FLAG = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
@@ -331,17 +330,6 @@ async function formatGasCost(
   }
 }
 
-async function prompt(message: string) {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-  const response = await new Promise<string>((resolve) =>
-    rl.question(`${message} (y/N) `, (response) => resolve(response)),
-  );
-  return "y" === response.toLowerCase();
-}
-
 const setupWithdrawTask: () => void = () =>
   task("withdraw", "Withdraw funds from the settlement contract")
     .addOptionalParam(
@@ -444,7 +432,7 @@ const setupWithdrawTask: () => void = () =>
           )} USD. All withdrawn funds will be sent to ${receiver}.`,
         );
 
-        if (!dryRun && (await prompt("Submit?"))) {
+        if (!dryRun && (await prompt(hre, "Submit?"))) {
           console.log(
             "Executing the withdraw transaction on the blockchain...",
           );
