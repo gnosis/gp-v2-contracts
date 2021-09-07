@@ -105,7 +105,7 @@ describe("Task: withdraw", () => {
     api = new Api("mock", environment);
     apiMock = sinon.mock(api);
 
-    const { manager, allowanceManager } = deployment;
+    const { manager, vaultRelayer } = deployment;
     await authenticator.connect(manager).addSolver(solver.address);
 
     const { chainId } = await ethers.provider.getNetwork();
@@ -116,7 +116,7 @@ describe("Task: withdraw", () => {
       trader,
       domainSeparator,
       settlement,
-      allowanceManager,
+      vaultRelayer,
       solver,
     );
 

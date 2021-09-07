@@ -3,7 +3,10 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 import { BUY_ETH_ADDRESS } from "../../ts";
 
-function isErrorTooManyEvents(error: Error): boolean {
+function isErrorTooManyEvents(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    throw error;
+  }
   return /query returned more than \d* results/.test(error.message);
 }
 

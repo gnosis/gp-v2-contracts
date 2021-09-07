@@ -28,7 +28,7 @@ describe("Task: withdrawService", () => {
 
   let settlement: Contract;
   let authenticator: Contract;
-  let allowanceManager: Contract;
+  let vaultRelayer: Contract;
 
   let weth: Contract;
   let usdc: Contract;
@@ -56,7 +56,7 @@ describe("Task: withdrawService", () => {
       deployer,
       settlement,
       authenticator,
-      allowanceManager,
+      vaultRelayer,
       wallets: [solverWallet, receiver, trader],
     } = deployment);
     const foundSolver = (await ethers.getSigners()).find(
@@ -90,7 +90,7 @@ describe("Task: withdrawService", () => {
       trader,
       domainSeparator,
       settlement,
-      allowanceManager,
+      vaultRelayer,
       solver,
     );
 
@@ -309,16 +309,16 @@ describe("Task: withdrawService", () => {
       maxFeePercent,
     });
 
-    expect(
-      await usdc.allowance(solver.address, allowanceManager.address),
-    ).to.equal(constants.MaxUint256);
-    expect(
-      await weth.allowance(solver.address, allowanceManager.address),
-    ).to.equal(constants.MaxUint256);
+    expect(await usdc.allowance(solver.address, vaultRelayer.address)).to.equal(
+      constants.MaxUint256,
+    );
+    expect(await weth.allowance(solver.address, vaultRelayer.address)).to.equal(
+      constants.MaxUint256,
+    );
     // note: dai is not traded as fees are too high
-    expect(
-      await dai.allowance(solver.address, allowanceManager.address),
-    ).to.equal(constants.Zero);
+    expect(await dai.allowance(solver.address, vaultRelayer.address)).to.equal(
+      constants.Zero,
+    );
 
     expect(updatedState.lastUpdateBlock).not.to.equal(
       initalState.lastUpdateBlock,

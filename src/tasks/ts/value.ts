@@ -1,6 +1,6 @@
 import { BigNumber, constants } from "ethers";
 
-import { Api, ApiError } from "../../services/api";
+import { Api, ApiError, CallError } from "../../services/api";
 import { OrderKind } from "../../ts";
 import { SupportedNetwork } from "../ts/deployment";
 import { Erc20Token, WRAPPED_NATIVE_TOKEN_ADDRESS } from "../ts/tokens";
@@ -52,7 +52,10 @@ export const usdValue = async function (
       kind: OrderKind.SELL,
     });
   } catch (e) {
-    const errorData: ApiError = e.apiError ?? {
+    if (!(e instanceof Error)) {
+      throw e;
+    }
+    const errorData: ApiError = (e as CallError).apiError ?? {
       errorType: "script internal error",
       description: e?.message ?? "no details",
     };
