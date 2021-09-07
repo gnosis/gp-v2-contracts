@@ -1,5 +1,3 @@
-import readline from "readline";
-
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import chalk from "chalk";
 import {
@@ -42,6 +40,7 @@ import {
   transfer,
   displayName,
 } from "./ts/tokens";
+import { prompt } from "./ts/tui";
 import { formatTokenValue } from "./ts/value";
 
 const MAX_LATEST_BLOCK_DELAY_SECONDS = 2 * 60;
@@ -314,17 +313,6 @@ function displayOperations(
   console.log();
 }
 
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
-async function prompt(message: string) {
-  const response = await new Promise<string>((resolve) =>
-    rl.question(`${message} (y/N) `, (response) => resolve(response)),
-  );
-  return "y" === response.toLowerCase();
-}
-
 interface CreateAllowancesOptions {
   requiredConfirmations?: number | undefined;
 }
@@ -525,7 +513,7 @@ export async function dump({
       toToken.decimals ?? 0,
     )} ${toTokenName} from selling the tokens listed above.`,
   );
-  if (!dryRun && (doNotPrompt || (await prompt("Submit?")))) {
+  if (!dryRun && (doNotPrompt || (await prompt(hre, "Submit?")))) {
     await createAllowances(needAllowances, signer, vaultRelayer, {
       // If the services don't register the allowance before the order,
       // then creating a new order with the API returns an error.
