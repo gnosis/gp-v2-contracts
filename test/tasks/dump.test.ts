@@ -10,7 +10,7 @@ import {
   Wallet,
 } from "ethers";
 import hre, { waffle } from "hardhat";
-import sinon, { SinonMock } from "sinon";
+import { mock, SinonMock } from "sinon";
 
 import {
   Api,
@@ -110,7 +110,7 @@ describe("getDumpInstructions", () => {
     // environment parameter is unused in mock
     const environment = "unset environment" as unknown as Environment;
     api = new Api("mock", environment);
-    apiMock = sinon.mock(api);
+    apiMock = mock(api);
 
     defaultDumpInstructions = {
       user: user.address,

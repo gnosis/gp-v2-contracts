@@ -2,7 +2,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { BigNumber, constants, Contract, utils, Wallet } from "ethers";
 import hre, { ethers, waffle } from "hardhat";
-import sinon, { SinonMock } from "sinon";
+import { mock, SinonMock } from "sinon";
 
 import {
   Api,
@@ -77,7 +77,7 @@ describe("Task: withdrawService", () => {
     // environment parameter is unused in mock
     const environment = "unset environment" as unknown as Environment;
     api = new Api("mock", environment);
-    apiMock = sinon.mock(api);
+    apiMock = mock(api);
 
     const { manager } = deployment;
     await authenticator.connect(manager).addSolver(solver.address);
