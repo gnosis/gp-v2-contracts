@@ -10,7 +10,7 @@ import {
   Wallet,
 } from "ethers";
 import hre, { waffle } from "hardhat";
-import sinon, { SinonMock } from "sinon";
+import { mock, SinonMock } from "sinon";
 
 import {
   Api,
@@ -82,15 +82,15 @@ function mockApiCalls({
 describe("getDumpInstructions", () => {
   let consoleWarnOutput: unknown = undefined;
   let consoleWarn: typeof console.warn;
-  const allowanceManager = "0xa11044a9ce" + "42".repeat(20 - 5);
+  const vaultRelayer = "0xa11044a9ce" + "42".repeat(20 - 5);
   // The getDumpInstructions function depends on the network only to retrieve
   // the right weth address for the network, and even then this is only needed
   // because of an issue in the services where BUY_ETH_ADDRESS cannot be used
   // to get a price quote.
   // TODO: remove when BUY_ETH_ADDRESS is supported and implemented in price
   // quotes.
-  const network = (undefined as unknown) as SupportedNetwork;
-  const wrappedNativeToken = (undefined as unknown) as string;
+  const network = undefined as unknown as SupportedNetwork;
+  const wrappedNativeToken = undefined as unknown as string;
 
   let deployer: Wallet;
   let user: Wallet;
@@ -108,13 +108,13 @@ describe("getDumpInstructions", () => {
 
     [deployer, user] = await waffle.provider.getWallets();
     // environment parameter is unused in mock
-    const environment = ("unset environment" as unknown) as Environment;
+    const environment = "unset environment" as unknown as Environment;
     api = new Api("mock", environment);
-    apiMock = sinon.mock(api);
+    apiMock = mock(api);
 
     defaultDumpInstructions = {
       user: user.address,
-      allowanceManager,
+      vaultRelayer: vaultRelayer,
       maxFeePercent: 100,
       hasCustomReceiver: false,
       hre,
@@ -146,7 +146,7 @@ describe("getDumpInstructions", () => {
 
     await dumped.mock.balanceOf.withArgs(user.address).returns(balance);
     await dumped.mock.allowance
-      .withArgs(user.address, allowanceManager)
+      .withArgs(user.address, vaultRelayer)
       .returns(allowance);
     mockApiCalls({
       apiMock,
@@ -157,15 +157,12 @@ describe("getDumpInstructions", () => {
       boughtAmount,
     });
 
-    const {
-      toToken,
-      transferToReceiver,
-      instructions,
-    } = await getDumpInstructions({
-      ...defaultDumpInstructions,
-      dumpedTokens: [dumped.address],
-      toTokenAddress: to.address,
-    });
+    const { toToken, transferToReceiver, instructions } =
+      await getDumpInstructions({
+        ...defaultDumpInstructions,
+        dumpedTokens: [dumped.address],
+        toTokenAddress: to.address,
+      });
 
     expect(toToken.symbol).to.deep.equal("TOTOKEN");
     expect(toToken.decimals).to.deep.equal(101);
@@ -208,7 +205,7 @@ describe("getDumpInstructions", () => {
 
       await dumped.mock.balanceOf.withArgs(user.address).returns(balance);
       await dumped.mock.allowance
-        .withArgs(user.address, allowanceManager)
+        .withArgs(user.address, vaultRelayer)
         .returns(allowance);
       mockApiCalls({
         apiMock,
@@ -219,15 +216,12 @@ describe("getDumpInstructions", () => {
         boughtAmount,
       });
 
-      const {
-        toToken,
-        transferToReceiver,
-        instructions,
-      } = await getDumpInstructions({
-        ...defaultDumpInstructions,
-        dumpedTokens: [dumped.address],
-        toTokenAddress: to,
-      });
+      const { toToken, transferToReceiver, instructions } =
+        await getDumpInstructions({
+          ...defaultDumpInstructions,
+          dumpedTokens: [dumped.address],
+          toTokenAddress: to,
+        });
 
       expect(toToken.symbol).to.deep.equal("ETH");
       expect(toToken.decimals).to.deep.equal(18);
@@ -266,7 +260,7 @@ describe("getDumpInstructions", () => {
 
     await dumped.mock.balanceOf.withArgs(user.address).returns(balance);
     await dumped.mock.allowance
-      .withArgs(user.address, allowanceManager)
+      .withArgs(user.address, vaultRelayer)
       .returns(allowance);
     mockApiCalls({
       apiMock,
@@ -293,15 +287,12 @@ describe("getDumpInstructions", () => {
     await to.mock.symbol.returns("TOTOKEN");
     await to.mock.decimals.returns(101);
 
-    const {
-      toToken,
-      transferToReceiver,
-      instructions,
-    } = await getDumpInstructions({
-      ...defaultDumpInstructions,
-      dumpedTokens: [to.address],
-      toTokenAddress: to.address,
-    });
+    const { toToken, transferToReceiver, instructions } =
+      await getDumpInstructions({
+        ...defaultDumpInstructions,
+        dumpedTokens: [to.address],
+        toTokenAddress: to.address,
+      });
 
     expect(toToken.symbol).to.deep.equal("TOTOKEN");
     expect(toToken.decimals).to.deep.equal(101);
@@ -321,16 +312,13 @@ describe("getDumpInstructions", () => {
     const balance = utils.parseEther("4.2");
     await to.mock.balanceOf.withArgs(user.address).returns(balance);
 
-    const {
-      toToken,
-      transferToReceiver,
-      instructions,
-    } = await getDumpInstructions({
-      ...defaultDumpInstructions,
-      hasCustomReceiver: true,
-      dumpedTokens: [to.address],
-      toTokenAddress: to.address,
-    });
+    const { toToken, transferToReceiver, instructions } =
+      await getDumpInstructions({
+        ...defaultDumpInstructions,
+        hasCustomReceiver: true,
+        dumpedTokens: [to.address],
+        toTokenAddress: to.address,
+      });
 
     expect(toToken.symbol).to.deep.equal("TOTOKEN");
     expect(toToken.decimals).to.deep.equal(101);
@@ -368,7 +356,7 @@ describe("getDumpInstructions", () => {
 
     await dumped.mock.balanceOf.withArgs(user.address).returns(balance);
     await dumped.mock.allowance
-      .withArgs(user.address, allowanceManager)
+      .withArgs(user.address, vaultRelayer)
       .returns(allowance);
     apiMock
       .expects("getFeeAndQuoteSell")
@@ -398,7 +386,7 @@ describe("getDumpInstructions", () => {
 
     await dumped.mock.balanceOf.withArgs(user.address).returns(balance);
     await dumped.mock.allowance
-      .withArgs(user.address, allowanceManager)
+      .withArgs(user.address, vaultRelayer)
       .returns(allowance);
     const e: CallError = new Error("Test error");
     e.apiError = {
@@ -442,11 +430,11 @@ describe("getDumpInstructions", () => {
 
     await dumped.mock.balanceOf.withArgs(user.address).returns(balance);
     await dumped.mock.allowance
-      .withArgs(user.address, allowanceManager)
+      .withArgs(user.address, vaultRelayer)
       .returns(allowance);
     const result: GetFeeAndQuoteSellOutput = {
       feeAmount: BigNumber.from(fee),
-      buyAmountAfterFee: ("unused" as unknown) as BigNumber,
+      buyAmountAfterFee: "unused" as unknown as BigNumber,
     };
     apiMock
       .expects("getFeeAndQuoteSell")
@@ -530,7 +518,7 @@ describe("getDumpInstructions", () => {
       await dumped.mock.decimals.returns(decimals);
       await dumped.mock.balanceOf.withArgs(user.address).returns(balance);
       await dumped.mock.allowance
-        .withArgs(user.address, allowanceManager)
+        .withArgs(user.address, vaultRelayer)
         .returns(allowance);
       let apiReturnValue: Promise<GetFeeAndQuoteSellOutput>;
       if (isIndexWithTooLargeFee(index)) {
@@ -559,16 +547,13 @@ describe("getDumpInstructions", () => {
       dumpedTokens.push(dumped);
     }
 
-    const {
-      toToken,
-      transferToReceiver,
-      instructions,
-    } = await getDumpInstructions({
-      ...defaultDumpInstructions,
-      hasCustomReceiver: true,
-      dumpedTokens: dumpedTokens.map((t) => t.address).concat(to.address),
-      toTokenAddress: to.address,
-    });
+    const { toToken, transferToReceiver, instructions } =
+      await getDumpInstructions({
+        ...defaultDumpInstructions,
+        hasCustomReceiver: true,
+        dumpedTokens: dumpedTokens.map((t) => t.address).concat(to.address),
+        toTokenAddress: to.address,
+      });
 
     expect(toToken.symbol).to.deep.equal("TOTOKEN");
     expect(toToken.decimals).to.deep.equal(101);
@@ -606,14 +591,8 @@ describe("getDumpInstructions", () => {
         },
         sortedIndex,
       ) => {
-        const {
-          balance,
-          fee,
-          boughtAmount,
-          symbol,
-          decimals,
-          index,
-        } = successfulConfigs[sortedIndex];
+        const { balance, fee, boughtAmount, symbol, decimals, index } =
+          successfulConfigs[sortedIndex];
         expect(token.symbol).to.deep.equal(symbol);
         expect(token.decimals).to.deep.equal(decimals);
         expect(token.address).to.deep.equal(dumpedTokens[index].address);

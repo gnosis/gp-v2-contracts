@@ -84,11 +84,8 @@ export class Erc20Decoder extends InteractionDecoder {
       case erc20Interface.getSighash("transferFrom"):
         functionName = "transferFrom";
         try {
-          const {
-            sender,
-            recipient,
-            amount,
-          } = erc20Interface.decodeFunctionData(functionName, calldata);
+          const { sender, recipient, amount } =
+            erc20Interface.decodeFunctionData(functionName, calldata);
           args = new Map();
           args.set(
             "sender",

@@ -24,15 +24,13 @@ export interface NativeToken {
   provider: providers.JsonRpcProvider;
 }
 
-export const NATIVE_TOKEN_SYMBOL: Record<
-  SupportedNetwork | "hardhat",
-  string
-> = {
-  hardhat: "ETH",
-  mainnet: "ETH",
-  rinkeby: "ETH",
-  xdai: "xDAI",
-};
+export const NATIVE_TOKEN_SYMBOL: Record<SupportedNetwork | "hardhat", string> =
+  {
+    hardhat: "ETH",
+    mainnet: "ETH",
+    rinkeby: "ETH",
+    xdai: "xDAI",
+  };
 
 export const WRAPPED_NATIVE_TOKEN_ADDRESS: Record<SupportedNetwork, string> = {
   mainnet: WethNetworks.WETH9[1].address,

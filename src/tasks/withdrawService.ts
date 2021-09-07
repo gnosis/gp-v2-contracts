@@ -363,17 +363,13 @@ const setupWithdrawServiceTask: () => void = () =>
         const usdReference = REFERENCE_TOKEN[network];
         const api = new Api(network, Environment.Prod);
         const receiver = utils.getAddress(inputReceiver);
-        const [
-          authenticator,
-          settlementDeployment,
-          [solver],
-          latestBlock,
-        ] = await Promise.all([
-          getDeployedContract("GPv2AllowListAuthentication", hre),
-          hre.deployments.get("GPv2Settlement"),
-          hre.ethers.getSigners(),
-          hre.ethers.provider.getBlockNumber(),
-        ]);
+        const [authenticator, settlementDeployment, [solver], latestBlock] =
+          await Promise.all([
+            getDeployedContract("GPv2AllowListAuthentication", hre),
+            hre.deployments.get("GPv2Settlement"),
+            hre.ethers.getSigners(),
+            hre.ethers.provider.getBlockNumber(),
+          ]);
         const settlement = new Contract(
           settlementDeployment.address,
           settlementDeployment.abi,

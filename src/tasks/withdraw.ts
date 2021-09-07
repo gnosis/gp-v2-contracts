@@ -103,62 +103,64 @@ async function getWithdrawals(
   const minValueWei = utils.parseUnits(minValue, usdReference.decimals);
   const leftoverWei = utils.parseUnits(leftover, usdReference.decimals);
   const computeWithdrawalInstructions = tokens.map(
-    (tokenAddress) => async ({ consoleWarn }: DisappearingLogFunctions) => {
-      const token = await fastTokenDetails(tokenAddress, hre);
-      if (token === null) {
-        throw new Error(
-          `There is no valid ERC20 token at address ${tokenAddress}`,
-        );
-      }
-      const balance = await token.contract.balanceOf(settlement.address);
-      if (balance.eq(0)) {
-        return null;
-      }
-      const pricedToken = await appraise(token, usdReference, api);
-      const balanceUsd = pricedToken.usdValue
-        .mul(balance)
-        .div(BigNumber.from(10).pow(pricedToken.decimals));
-      // Note: if balanceUsd is zero, then setting either minValue or leftoverWei
-      // to a nonzero value means that nothing should be withdrawn. If neither
-      // flag is set, then whether to withdraw does not depend on the USD value.
-      if (
-        balanceUsd.lt(minValueWei.add(leftoverWei)) ||
-        (balanceUsd.isZero() && !(minValueWei.isZero() && leftoverWei.isZero()))
-      ) {
-        consoleWarn(
-          `Ignored ${utils.formatUnits(
-            balance,
-            pricedToken.decimals,
-          )} units of ${token.symbol ?? "unknown token"} (${
-            token.address
-          }) with value ${formatUsdValue(balanceUsd, usdReference)} USD`,
-        );
-        return null;
-      }
-      let amount;
-      let amountUsd;
-      if (balanceUsd.isZero()) {
-        // Note: minValueWei and leftoverWei are zero. Everything should be
-        // withdrawn.
-        amount = balance;
-        amountUsd = balanceUsd;
-      } else {
-        amount = balance.mul(balanceUsd.sub(leftoverWei)).div(balanceUsd);
-        amountUsd = balanceUsd.sub(leftoverWei);
-      }
-      return {
-        token: pricedToken,
-        amount,
-        amountUsd,
-        balance,
-        balanceUsd,
-      };
-    },
+    (tokenAddress) =>
+      async ({ consoleWarn }: DisappearingLogFunctions) => {
+        const token = await fastTokenDetails(tokenAddress, hre);
+        if (token === null) {
+          throw new Error(
+            `There is no valid ERC20 token at address ${tokenAddress}`,
+          );
+        }
+        const balance = await token.contract.balanceOf(settlement.address);
+        if (balance.eq(0)) {
+          return null;
+        }
+        const pricedToken = await appraise(token, usdReference, api);
+        const balanceUsd = pricedToken.usdValue
+          .mul(balance)
+          .div(BigNumber.from(10).pow(pricedToken.decimals));
+        // Note: if balanceUsd is zero, then setting either minValue or leftoverWei
+        // to a nonzero value means that nothing should be withdrawn. If neither
+        // flag is set, then whether to withdraw does not depend on the USD value.
+        if (
+          balanceUsd.lt(minValueWei.add(leftoverWei)) ||
+          (balanceUsd.isZero() &&
+            !(minValueWei.isZero() && leftoverWei.isZero()))
+        ) {
+          consoleWarn(
+            `Ignored ${utils.formatUnits(
+              balance,
+              pricedToken.decimals,
+            )} units of ${token.symbol ?? "unknown token"} (${
+              token.address
+            }) with value ${formatUsdValue(balanceUsd, usdReference)} USD`,
+          );
+          return null;
+        }
+        let amount;
+        let amountUsd;
+        if (balanceUsd.isZero()) {
+          // Note: minValueWei and leftoverWei are zero. Everything should be
+          // withdrawn.
+          amount = balance;
+          amountUsd = balanceUsd;
+        } else {
+          amount = balance.mul(balanceUsd.sub(leftoverWei)).div(balanceUsd);
+          amountUsd = balanceUsd.sub(leftoverWei);
+        }
+        return {
+          token: pricedToken,
+          amount,
+          amountUsd,
+          balance,
+          balanceUsd,
+        };
+      },
   );
-  const processedWithdrawals: (Withdrawal | null)[] = await promiseAllWithRateLimit(
-    computeWithdrawalInstructions,
-    { message: "computing withdrawals" },
-  );
+  const processedWithdrawals: (Withdrawal | null)[] =
+    await promiseAllWithRateLimit(computeWithdrawalInstructions, {
+      message: "computing withdrawals",
+    });
   return processedWithdrawals.filter(
     (withdrawal) => withdrawal !== null,
   ) as Withdrawal[];
@@ -399,17 +401,13 @@ const setupWithdrawTask: () => void = () =>
         }
         const api = new Api(network, Environment.Prod);
         const receiver = utils.getAddress(inputReceiver);
-        const [
-          authenticator,
-          settlementDeployment,
-          [solver],
-          latestBlock,
-        ] = await Promise.all([
-          getDeployedContract("GPv2AllowListAuthentication", hre),
-          hre.deployments.get("GPv2Settlement"),
-          hre.ethers.getSigners(),
-          hre.ethers.provider.getBlockNumber(),
-        ]);
+        const [authenticator, settlementDeployment, [solver], latestBlock] =
+          await Promise.all([
+            getDeployedContract("GPv2AllowListAuthentication", hre),
+            hre.deployments.get("GPv2Settlement"),
+            hre.ethers.getSigners(),
+            hre.ethers.provider.getBlockNumber(),
+          ]);
         const settlement = new Contract(
           settlementDeployment.address,
           settlementDeployment.abi,
