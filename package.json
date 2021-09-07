@@ -3,10 +3,12 @@
   "version": "0.0.1-alpha.20",
   "license": "LGPL-3.0-or-later",
   "scripts": {
+    "install": "yarn --silent prepare-build",
     "deploy": "hardhat deploy",
     "verify:etherscan": "hardhat etherscan-verify --license LGPL-3.0 --force-license",
     "verify:tenderly": "hardhat tenderly",
     "solvers": "hardhat solvers",
+    "prepare-build": "ts-node src/prebuild",
     "build": "yarn build:sol && yarn build:ts",
     "build:sol": "hardhat compile --force",
     "build:ts": "tsc && tsc -p tsconfig.lib.esm.json && tsc -p tsconfig.lib.commonjs.json",
@@ -44,6 +46,7 @@
     "@typescript-eslint/parser": "^4.22.0",
     "@uniswap/v2-core": "^1.0.1",
     "@uniswap/v2-periphery": "^1.1.0-beta.0",
+    "ajv": "^6.12.5",
     "canonical-weth": "^1.4.0",
     "chai": "^4.3.4",
     "chai-as-promised": "^7.1.1",
@@ -69,6 +72,7 @@
     "solidity-coverage": "^0.7.16",
     "ts-node": "^9.1.1",
     "typescript": "^4.2.4",
+    "typescript-json-validator": "^2.4.2",
     "yargs": "^16.2.0"
   },
   "main": "lib/commonjs/index.js",
