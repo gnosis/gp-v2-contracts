@@ -166,13 +166,13 @@ export async function getDumpInstructions({
           );
           return null;
         }
-        const [balance, approvedAmount]: [
-          BigNumber,
-          BigNumber,
-        ] = await Promise.all([
-          token.contract.balanceOf(user).then(BigNumber.from),
-          token.contract.allowance(user, allowanceManager).then(BigNumber.from),
-        ]);
+        const [balance, approvedAmount]: [BigNumber, BigNumber] =
+          await Promise.all([
+            token.contract.balanceOf(user).then(BigNumber.from),
+            token.contract
+              .allowance(user, allowanceManager)
+              .then(BigNumber.from),
+          ]);
         const needsAllowance = approvedAmount.lt(balance);
         if (balance.isZero()) {
           consoleWarn(
@@ -474,21 +474,18 @@ export async function dump({
     throw new Error("Receiver is not supported when buying ETH");
   }
 
-  const {
-    instructions,
-    toToken,
-    transferToReceiver,
-  } = await getDumpInstructions({
-    dumpedTokens,
-    toTokenAddress,
-    user: signer.address,
-    allowanceManager,
-    maxFeePercent,
-    hasCustomReceiver,
-    hre,
-    network,
-    api,
-  });
+  const { instructions, toToken, transferToReceiver } =
+    await getDumpInstructions({
+      dumpedTokens,
+      toTokenAddress,
+      user: signer.address,
+      allowanceManager,
+      maxFeePercent,
+      hasCustomReceiver,
+      hre,
+      network,
+      api,
+    });
   if (instructions.length === 0) {
     console.log("No token can be sold");
     return;

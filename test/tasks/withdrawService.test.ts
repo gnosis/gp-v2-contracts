@@ -75,7 +75,7 @@ describe("Task: withdrawService", () => {
     toToken = await waffle.deployContract(deployer, TestERC20, ["toToken", 2]);
 
     // environment parameter is unused in mock
-    const environment = ("unset environment" as unknown) as Environment;
+    const environment = "unset environment" as unknown as Environment;
     api = new Api("mock", environment);
     apiMock = sinon.mock(api);
 
@@ -107,7 +107,7 @@ describe("Task: withdrawService", () => {
       toToken: toToken.address,
       latestBlock: await hre.ethers.provider.getBlockNumber(),
       // ignore network value
-      network: (undefined as unknown) as SupportedNetwork,
+      network: undefined as unknown as SupportedNetwork,
       usdReference,
       hre,
       api,
@@ -217,13 +217,12 @@ describe("Task: withdrawService", () => {
       .returns(Promise.resolve(usdcFeeAndQuote));
     // the solver was storing dai balance from the previous run, which
     // should be included
-    const daiBalanceIncludingSolver = daiBalanceMinusLeftover.add(
-      solverDaiBalance,
-    );
+    const daiBalanceIncludingSolver =
+      daiBalanceMinusLeftover.add(solverDaiBalance);
     const daiFee = daiBalanceIncludingSolver.div(2);
     const daiFeeAndQuote: GetFeeAndQuoteSellOutput = {
       feeAmount: BigNumber.from(daiFee),
-      buyAmountAfterFee: ("unused" as unknown) as BigNumber,
+      buyAmountAfterFee: "unused" as unknown as BigNumber,
     };
     apiMock
       .expects("getFeeAndQuoteSell")

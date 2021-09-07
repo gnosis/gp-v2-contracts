@@ -101,7 +101,7 @@ describe("Task: withdraw", () => {
     weth = await waffle.deployContract(deployer, TestERC20, ["WETH", 18]);
 
     // environment parameter is unused in mock
-    const environment = ("unset environment" as unknown) as Environment;
+    const environment = "unset environment" as unknown as Environment;
     api = new Api("mock", environment);
     apiMock = sinon.mock(api);
 
@@ -204,7 +204,7 @@ describe("Task: withdraw", () => {
       tokens: undefined,
       usdReference,
       // ignored network value
-      network: (undefined as unknown) as SupportedNetwork,
+      network: undefined as unknown as SupportedNetwork,
       hre,
       api,
       dryRun: false,

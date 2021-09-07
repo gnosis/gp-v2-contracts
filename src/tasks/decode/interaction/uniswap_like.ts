@@ -67,13 +67,8 @@ export class UniswapLikeDecoder extends InteractionDecoder {
       case uniswapInterface.getSighash("swapTokensForExactTokens"):
         functionName = "swapTokensForExactTokens";
         try {
-          const {
-            amountOut,
-            amountInMax,
-            path,
-            to,
-            deadline,
-          } = uniswapInterface.decodeFunctionData(functionName, calldata);
+          const { amountOut, amountInMax, path, to, deadline } =
+            uniswapInterface.decodeFunctionData(functionName, calldata);
           args = new Map();
           const formatAmount = (
             amount: BigNumberish,
