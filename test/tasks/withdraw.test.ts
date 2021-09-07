@@ -2,7 +2,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { constants, Contract, utils, Wallet } from "ethers";
 import hre, { ethers, waffle } from "hardhat";
-import sinon, { SinonMock } from "sinon";
+import { mock, SinonMock } from "sinon";
 
 import { Api, Environment } from "../../src/services/api";
 import { SupportedNetwork } from "../../src/tasks/ts/deployment";
@@ -25,7 +25,7 @@ export async function tradeTokensForNoFees(
   trader: Wallet,
   domainSeparator: TypedDataDomain,
   settlement: Contract,
-  allowanceManager: Contract,
+  vaultRelayer: Contract,
   solver: SignerWithAddress,
 ): Promise<void> {
   const encoder = new SettlementEncoder(domainSeparator);
@@ -36,7 +36,7 @@ export async function tradeTokensForNoFees(
   ]);
   for (const [sell, buy] of consecutiveTokenPairs) {
     await sell.mint(trader.address, 1);
-    await sell.connect(trader).approve(allowanceManager.address, 1);
+    await sell.connect(trader).approve(vaultRelayer.address, 1);
     await encoder.signEncodeTrade(
       {
         kind: OrderKind.SELL,
@@ -101,11 +101,11 @@ describe("Task: withdraw", () => {
     weth = await waffle.deployContract(deployer, TestERC20, ["WETH", 18]);
 
     // environment parameter is unused in mock
-    const environment = ("unset environment" as unknown) as Environment;
+    const environment = "unset environment" as unknown as Environment;
     api = new Api("mock", environment);
-    apiMock = sinon.mock(api);
+    apiMock = mock(api);
 
-    const { manager, allowanceManager } = deployment;
+    const { manager, vaultRelayer } = deployment;
     await authenticator.connect(manager).addSolver(solver.address);
 
     const { chainId } = await ethers.provider.getNetwork();
@@ -116,7 +116,7 @@ describe("Task: withdraw", () => {
       trader,
       domainSeparator,
       settlement,
-      allowanceManager,
+      vaultRelayer,
       solver,
     );
 
@@ -204,7 +204,7 @@ describe("Task: withdraw", () => {
       tokens: undefined,
       usdReference,
       // ignored network value
-      network: (undefined as unknown) as SupportedNetwork,
+      network: undefined as unknown as SupportedNetwork,
       hre,
       api,
       dryRun: false,

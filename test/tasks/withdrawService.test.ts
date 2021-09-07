@@ -2,7 +2,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { BigNumber, constants, Contract, utils, Wallet } from "ethers";
 import hre, { ethers, waffle } from "hardhat";
-import sinon, { SinonMock } from "sinon";
+import { mock, SinonMock } from "sinon";
 
 import {
   Api,
@@ -28,7 +28,7 @@ describe("Task: withdrawService", () => {
 
   let settlement: Contract;
   let authenticator: Contract;
-  let allowanceManager: Contract;
+  let vaultRelayer: Contract;
 
   let weth: Contract;
   let usdc: Contract;
@@ -56,7 +56,7 @@ describe("Task: withdrawService", () => {
       deployer,
       settlement,
       authenticator,
-      allowanceManager,
+      vaultRelayer,
       wallets: [solverWallet, receiver, trader],
     } = deployment);
     const foundSolver = (await ethers.getSigners()).find(
@@ -75,9 +75,9 @@ describe("Task: withdrawService", () => {
     toToken = await waffle.deployContract(deployer, TestERC20, ["toToken", 2]);
 
     // environment parameter is unused in mock
-    const environment = ("unset environment" as unknown) as Environment;
+    const environment = "unset environment" as unknown as Environment;
     api = new Api("mock", environment);
-    apiMock = sinon.mock(api);
+    apiMock = mock(api);
 
     const { manager } = deployment;
     await authenticator.connect(manager).addSolver(solver.address);
@@ -90,7 +90,7 @@ describe("Task: withdrawService", () => {
       trader,
       domainSeparator,
       settlement,
-      allowanceManager,
+      vaultRelayer,
       solver,
     );
 
@@ -107,7 +107,7 @@ describe("Task: withdrawService", () => {
       toToken: toToken.address,
       latestBlock: await hre.ethers.provider.getBlockNumber(),
       // ignore network value
-      network: (undefined as unknown) as SupportedNetwork,
+      network: undefined as unknown as SupportedNetwork,
       usdReference,
       hre,
       api,
@@ -217,13 +217,12 @@ describe("Task: withdrawService", () => {
       .returns(Promise.resolve(usdcFeeAndQuote));
     // the solver was storing dai balance from the previous run, which
     // should be included
-    const daiBalanceIncludingSolver = daiBalanceMinusLeftover.add(
-      solverDaiBalance,
-    );
+    const daiBalanceIncludingSolver =
+      daiBalanceMinusLeftover.add(solverDaiBalance);
     const daiFee = daiBalanceIncludingSolver.div(2);
     const daiFeeAndQuote: GetFeeAndQuoteSellOutput = {
       feeAmount: BigNumber.from(daiFee),
-      buyAmountAfterFee: ("unused" as unknown) as BigNumber,
+      buyAmountAfterFee: "unused" as unknown as BigNumber,
     };
     apiMock
       .expects("getFeeAndQuoteSell")
@@ -310,16 +309,16 @@ describe("Task: withdrawService", () => {
       maxFeePercent,
     });
 
-    expect(
-      await usdc.allowance(solver.address, allowanceManager.address),
-    ).to.equal(constants.MaxUint256);
-    expect(
-      await weth.allowance(solver.address, allowanceManager.address),
-    ).to.equal(constants.MaxUint256);
+    expect(await usdc.allowance(solver.address, vaultRelayer.address)).to.equal(
+      constants.MaxUint256,
+    );
+    expect(await weth.allowance(solver.address, vaultRelayer.address)).to.equal(
+      constants.MaxUint256,
+    );
     // note: dai is not traded as fees are too high
-    expect(
-      await dai.allowance(solver.address, allowanceManager.address),
-    ).to.equal(constants.Zero);
+    expect(await dai.allowance(solver.address, vaultRelayer.address)).to.equal(
+      constants.Zero,
+    );
 
     expect(updatedState.lastUpdateBlock).not.to.equal(
       initalState.lastUpdateBlock,
