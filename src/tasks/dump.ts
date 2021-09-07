@@ -86,7 +86,7 @@ export interface GetDumpInstructionInput {
   dumpedTokens: string[];
   toTokenAddress: string | undefined; // undefined defaults to native token (e.g., ETH)
   user: string;
-  allowanceManager: string;
+  vaultRelayer: string;
   maxFeePercent: number;
   hasCustomReceiver: boolean;
   hre: HardhatRuntimeEnvironment;
@@ -115,7 +115,7 @@ export async function getDumpInstructions({
   dumpedTokens: inputDumpedTokens,
   toTokenAddress,
   user,
-  allowanceManager,
+  vaultRelayer: vaultRelayer,
   maxFeePercent,
   hasCustomReceiver,
   hre,
@@ -169,9 +169,7 @@ export async function getDumpInstructions({
         const [balance, approvedAmount]: [BigNumber, BigNumber] =
           await Promise.all([
             token.contract.balanceOf(user).then(BigNumber.from),
-            token.contract
-              .allowance(user, allowanceManager)
-              .then(BigNumber.from),
+            token.contract.allowance(user, vaultRelayer).then(BigNumber.from),
           ]);
         const needsAllowance = approvedAmount.lt(balance);
         if (balance.isZero()) {
@@ -333,17 +331,17 @@ interface CreateAllowancesOptions {
 async function createAllowances(
   allowances: Erc20Token[],
   signer: Signer,
-  allowanceManager: string,
+  vaultRelayer: string,
   { requiredConfirmations }: CreateAllowancesOptions = {},
 ) {
   let lastTransaction: ContractTransaction | undefined = undefined;
   for (const token of allowances) {
     console.log(
-      `Approving allowance manager to trade token ${displayName(token)}...`,
+      `Approving vault relayer to trade token ${displayName(token)}...`,
     );
     lastTransaction = (await token.contract
       .connect(signer)
-      .approve(allowanceManager, constants.MaxUint256)) as ContractTransaction;
+      .approve(vaultRelayer, constants.MaxUint256)) as ContractTransaction;
     await lastTransaction.wait();
   }
   if (lastTransaction !== undefined) {
@@ -457,9 +455,9 @@ export async function dump({
   if (validity > MAX_ORDER_VALIDITY_SECONDS) {
     throw new Error("Order validity too large");
   }
-  const [chainId, allowanceManager] = await Promise.all([
+  const [chainId, vaultRelayer] = await Promise.all([
     ethers.provider.getNetwork().then((n) => n.chainId),
-    (await settlement.allowanceManager()) as string,
+    (await settlement.vaultRelayer()) as string,
   ]);
   const domainSeparator = domain(chainId, settlement.address);
   const receiver: string = inputReceiver ?? signer.address;
@@ -479,7 +477,7 @@ export async function dump({
       dumpedTokens,
       toTokenAddress,
       user: signer.address,
-      allowanceManager,
+      vaultRelayer: vaultRelayer,
       maxFeePercent,
       hasCustomReceiver,
       hre,
@@ -502,7 +500,7 @@ export async function dump({
     .map(({ token }) => token);
   if (needAllowances.length !== 0) {
     console.log(
-      `Before creating the orders, a total of ${needAllowances.length} allowances will be granted to the allowance manager.`,
+      `Before creating the orders, a total of ${needAllowances.length} allowances will be granted to the vault relayer.`,
     );
   }
   const toTokenName = isNativeToken(toToken)
@@ -528,7 +526,7 @@ export async function dump({
     )} ${toTokenName} from selling the tokens listed above.`,
   );
   if (!dryRun && (doNotPrompt || (await prompt("Submit?")))) {
-    await createAllowances(needAllowances, signer, allowanceManager, {
+    await createAllowances(needAllowances, signer, vaultRelayer, {
       // If the services don't register the allowance before the order,
       // then creating a new order with the API returns an error.
       // Moreover, there is no distinction in the error between a missing

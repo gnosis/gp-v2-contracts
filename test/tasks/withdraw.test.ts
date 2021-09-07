@@ -25,7 +25,7 @@ export async function tradeTokensForNoFees(
   trader: Wallet,
   domainSeparator: TypedDataDomain,
   settlement: Contract,
-  allowanceManager: Contract,
+  vaultRelayer: Contract,
   solver: SignerWithAddress,
 ): Promise<void> {
   const encoder = new SettlementEncoder(domainSeparator);
@@ -36,7 +36,7 @@ export async function tradeTokensForNoFees(
   ]);
   for (const [sell, buy] of consecutiveTokenPairs) {
     await sell.mint(trader.address, 1);
-    await sell.connect(trader).approve(allowanceManager.address, 1);
+    await sell.connect(trader).approve(vaultRelayer.address, 1);
     await encoder.signEncodeTrade(
       {
         kind: OrderKind.SELL,

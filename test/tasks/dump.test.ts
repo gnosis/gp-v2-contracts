@@ -82,7 +82,7 @@ function mockApiCalls({
 describe("getDumpInstructions", () => {
   let consoleWarnOutput: unknown = undefined;
   let consoleWarn: typeof console.warn;
-  const allowanceManager = "0xa11044a9ce" + "42".repeat(20 - 5);
+  const vaultRelayer = "0xa11044a9ce" + "42".repeat(20 - 5);
   // The getDumpInstructions function depends on the network only to retrieve
   // the right weth address for the network, and even then this is only needed
   // because of an issue in the services where BUY_ETH_ADDRESS cannot be used
@@ -114,7 +114,7 @@ describe("getDumpInstructions", () => {
 
     defaultDumpInstructions = {
       user: user.address,
-      allowanceManager,
+      vaultRelayer: vaultRelayer,
       maxFeePercent: 100,
       hasCustomReceiver: false,
       hre,
@@ -146,7 +146,7 @@ describe("getDumpInstructions", () => {
 
     await dumped.mock.balanceOf.withArgs(user.address).returns(balance);
     await dumped.mock.allowance
-      .withArgs(user.address, allowanceManager)
+      .withArgs(user.address, vaultRelayer)
       .returns(allowance);
     mockApiCalls({
       apiMock,
@@ -205,7 +205,7 @@ describe("getDumpInstructions", () => {
 
       await dumped.mock.balanceOf.withArgs(user.address).returns(balance);
       await dumped.mock.allowance
-        .withArgs(user.address, allowanceManager)
+        .withArgs(user.address, vaultRelayer)
         .returns(allowance);
       mockApiCalls({
         apiMock,
@@ -260,7 +260,7 @@ describe("getDumpInstructions", () => {
 
     await dumped.mock.balanceOf.withArgs(user.address).returns(balance);
     await dumped.mock.allowance
-      .withArgs(user.address, allowanceManager)
+      .withArgs(user.address, vaultRelayer)
       .returns(allowance);
     mockApiCalls({
       apiMock,
@@ -356,7 +356,7 @@ describe("getDumpInstructions", () => {
 
     await dumped.mock.balanceOf.withArgs(user.address).returns(balance);
     await dumped.mock.allowance
-      .withArgs(user.address, allowanceManager)
+      .withArgs(user.address, vaultRelayer)
       .returns(allowance);
     apiMock
       .expects("getFeeAndQuoteSell")
@@ -386,7 +386,7 @@ describe("getDumpInstructions", () => {
 
     await dumped.mock.balanceOf.withArgs(user.address).returns(balance);
     await dumped.mock.allowance
-      .withArgs(user.address, allowanceManager)
+      .withArgs(user.address, vaultRelayer)
       .returns(allowance);
     const e: CallError = new Error("Test error");
     e.apiError = {
@@ -430,7 +430,7 @@ describe("getDumpInstructions", () => {
 
     await dumped.mock.balanceOf.withArgs(user.address).returns(balance);
     await dumped.mock.allowance
-      .withArgs(user.address, allowanceManager)
+      .withArgs(user.address, vaultRelayer)
       .returns(allowance);
     const result: GetFeeAndQuoteSellOutput = {
       feeAmount: BigNumber.from(fee),
@@ -518,7 +518,7 @@ describe("getDumpInstructions", () => {
       await dumped.mock.decimals.returns(decimals);
       await dumped.mock.balanceOf.withArgs(user.address).returns(balance);
       await dumped.mock.allowance
-        .withArgs(user.address, allowanceManager)
+        .withArgs(user.address, vaultRelayer)
         .returns(allowance);
       let apiReturnValue: Promise<GetFeeAndQuoteSellOutput>;
       if (isIndexWithTooLargeFee(index)) {
