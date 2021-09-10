@@ -455,9 +455,9 @@ export async function dump({
   // services, remove this check.
   if (
     (toTokenAddress === undefined || toTokenAddress === BUY_ETH_ADDRESS) &&
-    hasCustomReceiver
+    utils.arrayify(await ethers.provider.getCode(receiver)).length !== 0
   ) {
-    throw new Error("Receiver is not supported when buying ETH");
+    throw new Error("Cannot send eth to a contract");
   }
 
   const { instructions, toToken, transferToReceiver } =
