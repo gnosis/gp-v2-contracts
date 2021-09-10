@@ -365,6 +365,10 @@ const setupWithdrawServiceTask: () => void = () =>
       "./state.json",
       types.string,
     )
+    .addOptionalParam(
+      "tokensPerRun",
+      `The maximum number of tokens to process in a single withdraw run. Must be smaller than ${MAX_CHECKED_TOKENS_PER_RUN}`,
+    )
     .addParam("receiver", "The address receiving the withdrawn tokens")
     .addFlag(
       "dryRun",
@@ -381,6 +385,7 @@ const setupWithdrawServiceTask: () => void = () =>
           stateFilePath,
           receiver: inputReceiver,
           dryRun,
+          tokensPerRun,
         },
         hre: HardhatRuntimeEnvironment,
       ) => {
@@ -427,6 +432,7 @@ const setupWithdrawServiceTask: () => void = () =>
           api,
           dryRun,
           confirmationsAfterWithdrawing: 2,
+          pagination: tokensPerRun,
         });
 
         console.debug(`Updated state: ${JSON.stringify(updatedState)}`);
