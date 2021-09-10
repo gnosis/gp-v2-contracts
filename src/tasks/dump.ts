@@ -157,10 +157,10 @@ export async function getDumpInstructions({
 
   const computedInstructions: (DumpInstruction | null)[] = (
     await promiseAllWithRateLimit(
-      dumpedTokens.map((tokenAddress) => async ({ consoleWarn }) => {
+      dumpedTokens.map((tokenAddress) => async ({ consoleLog }) => {
         const token = await erc20Token(tokenAddress, hre);
         if (token === null) {
-          consoleWarn(
+          consoleLog(
             `Dump request skipped for invalid ERC-20 token at address ${tokenAddress}.`,
           );
           return null;
@@ -172,7 +172,7 @@ export async function getDumpInstructions({
           ]);
         const needsAllowance = approvedAmount.lt(balance);
         if (balance.isZero()) {
-          consoleWarn(
+          consoleLog(
             `Dump request skipped for token ${displayName(
               token,
             )}. No balance for that token is available.`,
@@ -197,7 +197,7 @@ export async function getDumpInstructions({
             (e as CallError)?.apiError?.errorType ===
             "SellAmountDoesNotCoverFee"
           ) {
-            consoleWarn(
+            consoleLog(
               `Dump request skipped for token ${displayName(
                 token,
               )}. The trading fee is larger than the dumped amount.`,
@@ -212,7 +212,7 @@ export async function getDumpInstructions({
         const approxFee = Number(fee.toString());
         const feePercent = (100 * approxFee) / approxBalance;
         if (feePercent > maxFeePercent) {
-          consoleWarn(
+          consoleLog(
             `Dump request skipped for token ${displayName(
               token,
             )}. The trading fee is too large compared to the balance (${feePercent.toFixed(

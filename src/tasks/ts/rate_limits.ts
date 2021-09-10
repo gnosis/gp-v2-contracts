@@ -7,6 +7,7 @@ const LINE_CLEARING_ENABLED =
 
 export interface DisappearingLogFunctions {
   consoleWarn: typeof console.warn;
+  consoleLog: typeof console.log;
 }
 
 interface VanishingProgressMessage {
@@ -21,18 +22,26 @@ interface RateLimitOptionalParameters {
 function createDisappearingLogFunctions(
   vanishingProgressMessage: VanishingProgressMessage,
 ): DisappearingLogFunctions {
-  const consoleWarn: typeof console.warn = (...args: unknown[]) => {
-    if (LINE_CLEARING_ENABLED) {
-      process.stdout.clearLine(0);
-    }
-    console.warn(...args);
-    if (LINE_CLEARING_ENABLED) {
-      process.stdout.write(vanishingProgressMessage.message);
-      process.stdout.cursorTo(0);
-    }
+  // note: if the message contains more than a line, only the last line is going
+  // to vanish
+  function clearable<LogInput extends unknown[]>(
+    logFunction: (...input: LogInput) => void,
+  ): (...input: LogInput) => void {
+    return (...args: LogInput) => {
+      if (LINE_CLEARING_ENABLED) {
+        process.stdout.clearLine(0);
+      }
+      logFunction(...args);
+      if (LINE_CLEARING_ENABLED) {
+        process.stdout.write(vanishingProgressMessage.message);
+        process.stdout.cursorTo(0);
+      }
+    };
+  }
+  return {
+    consoleWarn: clearable(console.warn),
+    consoleLog: clearable(console.log),
   };
-
-  return { consoleWarn };
 }
 
 export async function promiseAllWithRateLimit<T>(

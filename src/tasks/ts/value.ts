@@ -59,7 +59,7 @@ export const usdValue = async function (
       errorType: "script internal error",
       description: e?.message ?? "no details",
     };
-    console.warn(
+    console.log(
       `Warning: price retrieval failed for token ${token.symbol} (${token.address}): ${errorData.errorType} (${errorData.description})`,
     );
     return constants.Zero;
