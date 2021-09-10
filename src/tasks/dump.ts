@@ -384,10 +384,11 @@ async function createOrders(
     console.log(
       `Creating order selling ${inst.token.symbol ?? inst.token.address}...`,
     );
-    await api.placeOrder({
+    const orderUid = await api.placeOrder({
       order,
       signature,
     });
+    console.log(`Successfully created order with uid ${orderUid}`);
   }
 }
 async function transferSameTokenToReceiver(
