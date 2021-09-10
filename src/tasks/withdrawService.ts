@@ -1,6 +1,6 @@
 import "@nomiclabs/hardhat-ethers";
 
-import { promises as fs } from "fs";
+import { promises as fs, constants as fsConstants } from "fs";
 
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { assert } from "chai";
@@ -292,8 +292,41 @@ export async function withdrawAndDump({
       )
       .map((address) => ({ address, retries: 1 })),
   );
-  assert(isValidState(updatedState), "Must generate a valid state");
+  if (!isValidState(updatedState)) {
+    console.log("Generated state:", updatedState);
+    throw new Error("Withdraw service did not generate a valid state");
+  }
   return updatedState;
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await fs.access(path, fsConstants.F_OK);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function getState(stateFilePath: string): Promise<State> {
+  let state: State;
+  if (!(await fileExists(stateFilePath))) {
+    console.debug("No state found, using empty state");
+    state = {
+      lastUpdateBlock: 0,
+      tradedTokens: [],
+      nextTokenToTrade: 0,
+      pendingTokens: [],
+    };
+  } else {
+    console.debug(`Loading state from ${stateFilePath}...`);
+    state = JSON.parse((await fs.readFile(stateFilePath)).toString());
+  }
+  if (!isValidState(state)) {
+    console.error(`Bad initial state: ${JSON.stringify(state)}`);
+    throw new Error("Invalid state detect");
+  }
+  return state;
 }
 
 const setupWithdrawServiceTask: () => void = () =>
@@ -351,11 +384,8 @@ const setupWithdrawServiceTask: () => void = () =>
         },
         hre: HardhatRuntimeEnvironment,
       ) => {
-        const state = JSON.parse((await fs.readFile(stateFilePath)).toString());
+        const state = await getState(stateFilePath);
         console.debug(`Initial state: ${JSON.stringify(state)}`);
-        if (!isValidState(state)) {
-          throw new Error("Invalid state file");
-        }
         const network = hre.network.name;
         if (!isSupportedNetwork(network)) {
           throw new Error(`Unsupported network ${network}`);
