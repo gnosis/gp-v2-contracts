@@ -69,7 +69,7 @@ const ONEINCH_TOKENS: Promise<OneinchTokenList> = axios
   .get("https://api.1inch.exchange/v3.0/1/tokens")
   .then((response) => response.data.tokens)
   .catch(() => {
-    console.warn("Warning: unable to recover token list from 1inch");
+    console.log("Warning: unable to recover token list from 1inch");
     return {};
   });
 
@@ -104,7 +104,7 @@ async function getWithdrawals(
   const leftoverWei = utils.parseUnits(leftover, usdReference.decimals);
   const computeWithdrawalInstructions = tokens.map(
     (tokenAddress) =>
-      async ({ consoleWarn }: DisappearingLogFunctions) => {
+      async ({ consoleLog }: DisappearingLogFunctions) => {
         const token = await fastTokenDetails(tokenAddress, hre);
         if (token === null) {
           throw new Error(
@@ -127,7 +127,7 @@ async function getWithdrawals(
           (balanceUsd.isZero() &&
             !(minValueWei.isZero() && leftoverWei.isZero()))
         ) {
-          consoleWarn(
+          consoleLog(
             `Ignored ${utils.formatUnits(
               balance,
               pricedToken.decimals,
@@ -276,7 +276,7 @@ export async function withdraw({
     if (!dryRun) {
       throw Error(message);
     } else {
-      console.warn(message);
+      console.log(message);
     }
   }
 

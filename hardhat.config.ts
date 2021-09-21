@@ -22,7 +22,8 @@ const argv = yargs
 
 // Load environment variables.
 dotenv.config();
-const { INFURA_KEY, MNEMONIC, PK, REPORT_GAS, MOCHA_CONF } = process.env;
+const { INFURA_KEY, MNEMONIC, PK, REPORT_GAS, MOCHA_CONF, NODE_URL } =
+  process.env;
 
 const DEFAULT_MNEMONIC =
   "candy maple cake sugar pudding cream honey rich smooth crumble sweet treat";
@@ -36,10 +37,18 @@ if (PK) {
   };
 }
 
-if (["rinkeby", "mainnet"].includes(argv.network) && INFURA_KEY === undefined) {
+if (
+  ["rinkeby", "mainnet"].includes(argv.network) &&
+  NODE_URL === undefined &&
+  INFURA_KEY === undefined
+) {
   throw new Error(
     `Could not find Infura key in env, unable to connect to network ${argv.network}`,
   );
+}
+
+if (NODE_URL !== undefined) {
+  sharedNetworkConfig.url = NODE_URL;
 }
 
 const mocha: MochaOptions = {};
@@ -98,16 +107,16 @@ export default {
       initialBaseFeePerGas,
     },
     mainnet: {
-      ...sharedNetworkConfig,
       url: `https://mainnet.infura.io/v3/${INFURA_KEY}`,
+      ...sharedNetworkConfig,
     },
     rinkeby: {
-      ...sharedNetworkConfig,
       url: `https://rinkeby.infura.io/v3/${INFURA_KEY}`,
+      ...sharedNetworkConfig,
     },
     xdai: {
-      ...sharedNetworkConfig,
       url: "https://xdai.poanetwork.dev",
+      ...sharedNetworkConfig,
     },
   },
   namedAccounts: {

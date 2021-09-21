@@ -80,8 +80,8 @@ function mockApiCalls({
 }
 
 describe("getDumpInstructions", () => {
-  let consoleWarnOutput: unknown = undefined;
-  let consoleWarn: typeof console.warn;
+  let consoleLogOutput: unknown = undefined;
+  let consoleLog: typeof console.log;
   const vaultRelayer = "0xa11044a9ce" + "42".repeat(20 - 5);
   // The getDumpInstructions function depends on the network only to retrieve
   // the right weth address for the network, and even then this is only needed
@@ -103,8 +103,8 @@ describe("getDumpInstructions", () => {
   >;
 
   beforeEach(async () => {
-    consoleWarn = console.warn;
-    console.warn = (...args: unknown[]) => (consoleWarnOutput = args[0]);
+    consoleLog = console.log;
+    console.log = (...args: unknown[]) => (consoleLogOutput = args[0]);
 
     [deployer, user] = await waffle.provider.getWallets();
     // environment parameter is unused in mock
@@ -127,8 +127,8 @@ describe("getDumpInstructions", () => {
     if (this.currentTest?.isPassed()) {
       apiMock.verify();
     }
-    console.warn = consoleWarn;
-    consoleWarnOutput = undefined;
+    console.log = consoleLog;
+    consoleLogOutput = undefined;
   });
 
   it("dumps token for token", async () => {
@@ -412,7 +412,7 @@ describe("getDumpInstructions", () => {
     expect(transferToReceiver).to.be.undefined;
     expect(instructions).to.have.length(0);
 
-    expect(consoleWarnOutput).to.equal(
+    expect(consoleLogOutput).to.equal(
       `Dump request skipped for token ${dumped.address}. The trading fee is larger than the dumped amount.`,
     );
   });
@@ -456,7 +456,7 @@ describe("getDumpInstructions", () => {
     expect(transferToReceiver).to.be.undefined;
     expect(instructions).to.have.length(0);
 
-    expect(consoleWarnOutput).to.match(
+    expect(consoleLogOutput).to.match(
       new RegExp(
         `Dump request skipped for token ${dumped.address}\\. The trading fee is too large compared to the balance \\([0-9.]*%\\)\\.`,
       ),
