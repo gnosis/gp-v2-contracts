@@ -10,6 +10,13 @@ function isErrorTooManyEvents(error: unknown): boolean {
   return /query returned more than \d* results/.test(error.message);
 }
 
+function isTimeout(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    throw error;
+  }
+  return /Network connection timed out/.test(error.message);
+}
+
 /// Lists all tokens that were traded by the settlement contract in the range
 /// specified by the two input blocks. Range bounds are both inclusive.
 export async function getAllTradedTokens(
@@ -26,10 +33,15 @@ export async function getAllTradedTokens(
       fromBlock,
       toBlock,
     });
+    console.log(`Processed events from block ${fromBlock} to ${toBlock}`);
   } catch (error) {
-    if (!isErrorTooManyEvents(error)) {
+    // Infura throws "too many events" error. Other nodes time out.
+    if (!(isErrorTooManyEvents(error) || isTimeout(error))) {
       throw error;
     }
+    console.log(
+      `Failed to process events from block ${fromBlock} to ${toBlock}, reducing range...`,
+    );
   }
 
   let tokens;
@@ -38,12 +50,10 @@ export async function getAllTradedTokens(
       throw new Error("Too many events in the same block");
     }
     const mid = Math.floor((toBlock + fromBlock) / 2);
-    tokens = (
-      await Promise.all([
-        getAllTradedTokens(settlement, fromBlock, mid, hre),
-        getAllTradedTokens(settlement, mid + 1, toBlock, hre), // note: mid+1 is not larger than toBlock thanks to flooring
-      ])
-    ).flat();
+    tokens = [
+      await getAllTradedTokens(settlement, fromBlock, mid, hre),
+      await getAllTradedTokens(settlement, mid + 1, toBlock, hre), // note: mid+1 is not larger than toBlock thanks to flooring
+    ].flat();
   } else {
     tokens = trades
       .map((trade) => {
