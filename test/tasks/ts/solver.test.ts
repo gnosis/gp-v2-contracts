@@ -9,7 +9,7 @@ let wallets: Wallet[];
 
 let authenticator: Contract;
 
-describe("getSolvers", () => {
+describe("Task helper: getSolvers", () => {
   beforeEach(async () => {
     const deployment = await deployTestContracts();
 
