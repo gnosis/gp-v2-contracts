@@ -5,14 +5,6 @@ import { OrderKind } from "../../ts";
 import { SupportedNetwork } from "../ts/deployment";
 import { Erc20Token, WRAPPED_NATIVE_TOKEN_ADDRESS } from "../ts/tokens";
 
-interface PricedToken extends Erc20Token {
-  // Overrides existing field in TokenDetails. The number of decimals must be
-  // known to estimate the price
-  decimals: number;
-  // Amount of DAI wei equivalent to one unit of this token (10**decimals)
-  usdValue: BigNumber;
-}
-
 export interface ReferenceToken {
   symbol: string;
   decimals: number;
@@ -88,19 +80,4 @@ export function formatUsdValue(
   usdReference: ReferenceToken,
 ): string {
   return formatTokenValue(amount, usdReference.decimals, 2);
-}
-
-export async function appraise(
-  token: Erc20Token,
-  usdReference: ReferenceToken,
-  api: Api,
-): Promise<PricedToken> {
-  const decimals = token.decimals ?? 18;
-  const usd = await usdValue(
-    token,
-    BigNumber.from(10).pow(decimals),
-    usdReference,
-    api,
-  );
-  return { ...token, usdValue: usd, decimals };
 }
