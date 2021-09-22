@@ -170,32 +170,42 @@ describe("Task: withdrawService", () => {
         sellToken: usdc.address,
         buyToken: usdReference.address,
         kind: OrderKind.SELL,
-        amount: utils.parseUnits("1", 6),
+        amount: usdcBalance,
       })
       .once()
-      .returns(Promise.resolve(utils.parseUnits("1", usdReference.decimals)));
+      .returns(
+        Promise.resolve(
+          usdcBalance.mul(BigNumber.from(10).pow(usdReference.decimals - 6)),
+        ),
+      );
     apiMock
       .expects("estimateTradeAmount")
       .withArgs({
         sellToken: dai.address,
         buyToken: usdReference.address,
         kind: OrderKind.SELL,
-        amount: utils.parseUnits("1", 18),
+        amount: daiBalance,
       })
       .once()
-      .returns(Promise.resolve(utils.parseUnits("1", usdReference.decimals)));
+      .returns(
+        Promise.resolve(
+          daiBalance.mul(BigNumber.from(10).pow(usdReference.decimals - 18)),
+        ),
+      );
     apiMock
       .expects("estimateTradeAmount")
       .withArgs({
         sellToken: weth.address,
         buyToken: usdReference.address,
         kind: OrderKind.SELL,
-        amount: utils.parseUnits("1", 18),
+        amount: wethBalance,
       })
       .once()
       .returns(
         Promise.resolve(
-          utils.parseUnits("1", usdReference.decimals).mul(ethUsdValue),
+          wethBalance
+            .mul(ethUsdValue)
+            .mul(BigNumber.from(10).pow(usdReference.decimals - 18)),
         ),
       );
 
@@ -372,20 +382,23 @@ describe("Task: withdrawService", () => {
       token: Contract,
       soldAmount: BigNumber,
     ): Promise<void> {
-      const oneUsd = Promise.resolve(
-        utils.parseUnits("1", usdReference.decimals),
-      );
-      // price
+      // value
       apiMock
         .expects("estimateTradeAmount")
         .withArgs({
           sellToken: token.address,
           buyToken: usdReference.address,
           kind: OrderKind.SELL,
-          amount: utils.parseUnits("1", await token.decimals()),
+          amount: soldAmount,
         })
         .once()
-        .returns(oneUsd);
+        .returns(
+          soldAmount.mul(
+            BigNumber.from(10).pow(
+              usdReference.decimals - (await token.decimals()),
+            ),
+          ),
+        ); // stablecoin, so amount in is usd value
       // fee and received amount
       const feeAndQuote: GetFeeAndQuoteSellOutput = {
         feeAmount: constants.Zero,
