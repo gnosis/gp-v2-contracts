@@ -19,6 +19,7 @@ import {
   DisappearingLogFunctions,
   promiseAllWithRateLimit,
 } from "./ts/rate_limits";
+import { getSolvers } from "./ts/solver";
 import { Align, displayTable } from "./ts/table";
 import {
   Erc20Token,
@@ -270,13 +271,22 @@ export async function withdraw({
   doNotPrompt,
   requiredConfirmations,
 }: WithdrawInput): Promise<string[]> {
-  if (!(await authenticator.isSolver(solver.address))) {
+  let solverForSimulation: string;
+  if (await authenticator.isSolver(solver.address)) {
+    solverForSimulation = solver.address;
+  } else {
     const message =
       "Current account is not a solver. Only a solver can withdraw funds from the settlement contract.";
     if (!dryRun) {
       throw Error(message);
     } else {
+      solverForSimulation = (await getSolvers(authenticator))[0];
       console.log(message);
+      if (solverForSimulation === undefined) {
+        throw new Error(
+          `There are no valid solvers for network ${network}, withdrawing is not possible`,
+        );
+      }
     }
   }
 
@@ -328,7 +338,11 @@ export async function withdraw({
   // TODO: use the address of a solver as the from address in dry run so
   // that the price can always be estimated
   const [gas, gasPrice] = await Promise.all([
-    settlement.connect(solver).estimateGas.settle(...finalSettlement),
+    settlement
+      .connect(hre.ethers.provider)
+      .estimateGas.settle(...finalSettlement, {
+        from: solverForSimulation,
+      }),
     hre.ethers.provider.getGasPrice(),
   ]);
   const amount = gas.mul(gasPrice);
