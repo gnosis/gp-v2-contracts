@@ -31,14 +31,13 @@ import {
   usdValue,
   formatUsdValue,
   formatTokenValue,
-  appraise,
   ReferenceToken,
   REFERENCE_TOKEN,
 } from "./ts/value";
 import { getAllTradedTokens } from "./withdraw/traded_tokens";
 
 interface Withdrawal {
-  token: PricedToken;
+  token: Erc20Token;
   amount: BigNumber;
   amountUsd: BigNumber;
   balance: BigNumber;
@@ -51,14 +50,6 @@ interface DisplayWithdrawal {
   amount: string;
   value: string;
   address: string;
-}
-
-interface PricedToken extends Erc20Token {
-  // Overrides existing field in TokenDetails. The number of decimals must be
-  // known to estimate the price
-  decimals: number;
-  // Amount of DAI wei equivalent to one unit of this token (10**decimals)
-  usdValue: BigNumber;
 }
 
 // https://api.1inch.exchange/swagger/ethereum/#/Tokens/TokensController_getTokens
@@ -116,10 +107,7 @@ async function getWithdrawals(
         if (balance.eq(0)) {
           return null;
         }
-        const pricedToken = await appraise(token, usdReference, api);
-        const balanceUsd = pricedToken.usdValue
-          .mul(balance)
-          .div(BigNumber.from(10).pow(pricedToken.decimals));
+        const balanceUsd = await usdValue(token, balance, usdReference, api);
         // Note: if balanceUsd is zero, then setting either minValue or leftoverWei
         // to a nonzero value means that nothing should be withdrawn. If neither
         // flag is set, then whether to withdraw does not depend on the USD value.
@@ -128,13 +116,18 @@ async function getWithdrawals(
           (balanceUsd.isZero() &&
             !(minValueWei.isZero() && leftoverWei.isZero()))
         ) {
+          const decimals = token.decimals ?? 18;
           consoleLog(
-            `Ignored ${utils.formatUnits(
-              balance,
-              pricedToken.decimals,
-            )} units of ${token.symbol ?? "unknown token"} (${
-              token.address
-            }) with value ${formatUsdValue(balanceUsd, usdReference)} USD`,
+            `Ignored ${utils.formatUnits(balance, decimals)} units of ${
+              token.symbol ?? "unknown token"
+            } (${token.address}) with value ${formatUsdValue(
+              balanceUsd,
+              usdReference,
+            )} USD${
+              token.decimals === undefined
+                ? ` (the token has no decimals specified in the contract, assuming ${decimals})`
+                : ""
+            }`,
           );
           return null;
         }
@@ -150,7 +143,7 @@ async function getWithdrawals(
           amountUsd = balanceUsd.sub(leftoverWei);
         }
         return {
-          token: pricedToken,
+          token,
           amount,
           amountUsd,
           balance,
@@ -171,15 +164,12 @@ function formatWithdrawal(
   withdrawal: Withdrawal,
   usdReference: ReferenceToken,
 ): DisplayWithdrawal {
+  const formatDecimals = withdrawal.token.decimals ?? 18;
   return {
     address: withdrawal.token.address,
     value: formatUsdValue(withdrawal.balanceUsd, usdReference),
-    balance: formatTokenValue(
-      withdrawal.balance,
-      withdrawal.token.decimals,
-      18,
-    ),
-    amount: formatTokenValue(withdrawal.amount, withdrawal.token.decimals, 18),
+    balance: formatTokenValue(withdrawal.balance, formatDecimals, 18),
+    amount: formatTokenValue(withdrawal.amount, formatDecimals, 18),
     symbol: withdrawal.token.symbol ?? "unknown token",
   };
 }

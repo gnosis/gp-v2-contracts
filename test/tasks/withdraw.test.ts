@@ -1,6 +1,6 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
-import { constants, Contract, utils, Wallet } from "ethers";
+import { BigNumber, constants, Contract, utils, Wallet } from "ethers";
 import hre, { ethers, waffle } from "hardhat";
 import { mock, SinonMock } from "sinon";
 
@@ -163,32 +163,44 @@ describe("Task: withdraw", () => {
         sellToken: usdc.address,
         buyToken: usdReference.address,
         kind: OrderKind.SELL,
-        amount: utils.parseUnits("1", 6),
+        amount: usdcBalance,
       })
       .once()
-      .returns(Promise.resolve(utils.parseUnits("1", usdReference.decimals)));
+      .returns(
+        Promise.resolve(
+          usdcBalance.mul(BigNumber.from(10).pow(usdReference.decimals - 6)),
+        ),
+      );
     apiMock
       .expects("estimateTradeAmount")
       .withArgs({
         sellToken: dai.address,
         buyToken: usdReference.address,
         kind: OrderKind.SELL,
-        amount: utils.parseUnits("1", 18),
+        amount: daiBalance,
       })
       .once()
-      .returns(Promise.resolve(utils.parseUnits("1", usdReference.decimals)));
+      .returns(
+        Promise.resolve(
+          daiBalance.mul(BigNumber.from(10).pow(usdReference.decimals - 18)),
+        ),
+      );
     apiMock
       .expects("estimateTradeAmount")
       .withArgs({
         sellToken: weth.address,
         buyToken: usdReference.address,
         kind: OrderKind.SELL,
-        amount: utils.parseUnits("1", 18),
+        amount: wethBalance,
       })
       .once()
       .returns(
         Promise.resolve(
-          utils.parseUnits("1", usdReference.decimals).mul(ethUsdValue),
+          Promise.resolve(
+            wethBalance
+              .mul(ethUsdValue)
+              .mul(BigNumber.from(10).pow(usdReference.decimals - 18)),
+          ),
         ),
       );
 
