@@ -115,13 +115,18 @@ async function getWithdrawals(
           (balanceUsd.isZero() &&
             !(minValueWei.isZero() && leftoverWei.isZero()))
         ) {
+          const decimals = token.decimals ?? 18;
           consoleLog(
-            `Ignored ${utils.formatUnits(
-              balance,
-              token.decimals ?? 18,
-            )} units of ${token.symbol ?? "unknown token"} (${
-              token.address
-            }) with value ${formatUsdValue(balanceUsd, usdReference)} USD`,
+            `Ignored ${utils.formatUnits(balance, decimals)} units of ${
+              token.symbol ?? "unknown token"
+            } (${token.address}) with value ${formatUsdValue(
+              balanceUsd,
+              usdReference,
+            )} USD${
+              token.decimals === undefined
+                ? ` (the token has no decimals specified in the contract, assuming ${decimals})`
+                : ""
+            }`,
           );
           return null;
         }
