@@ -9,6 +9,7 @@ RUN apk add --no-cache tini git python3 linux-headers eudev-dev libusb-dev build
 # Tini is now available at /sbin/tini
 
 RUN yarn install --frozen
+RUN yarn build
 
 # Run Node app as child of tini
 # Signal handling for PID1 https://github.com/krallin/tini
