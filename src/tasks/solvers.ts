@@ -6,8 +6,9 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 import { getDeployedContract } from "./ts/deployment";
 import { getNamedSigner } from "./ts/signers";
+import { getSolvers } from "./ts/solver";
 
-const solversTaskList = ["add", "check", "remove"] as const;
+const solversTaskList = ["add", "check", "remove", "list"] as const;
 type SolversTasks = typeof solversTaskList[number];
 
 async function addSolver(solver: string, hre: HardhatRuntimeEnvironment) {
@@ -46,6 +47,15 @@ const isSolver = async (solver: string, hre: HardhatRuntimeEnvironment) => {
     }a solver.`,
   );
 };
+
+async function listSolvers(hre: HardhatRuntimeEnvironment) {
+  const authenticator = await getDeployedContract(
+    "GPv2AllowListAuthentication",
+    hre,
+  );
+
+  console.log((await getSolvers(authenticator)).join("\n"));
+}
 
 const setupSolversTask: () => void = () => {
   task("solvers", "Reads and changes the list of allowed solvers in GPv2.")
@@ -103,6 +113,13 @@ const setupSolversTask: () => void = () => {
       );
     }
     await isSolver(args[0], hardhatRuntime);
+  });
+
+  subtask(
+    "solvers-list",
+    "List all currently registered solvers of GPv2.",
+  ).setAction(async (_, hardhatRuntime) => {
+    await listSolvers(hardhatRuntime);
   });
 };
 
