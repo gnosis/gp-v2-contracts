@@ -384,11 +384,30 @@ async function createOrders(
     console.log(
       `Creating order selling ${inst.token.symbol ?? inst.token.address}...`,
     );
-    const orderUid = await api.placeOrder({
-      order,
-      signature,
-    });
-    console.log(`Successfully created order with uid ${orderUid}`);
+    try {
+      const orderUid = await api.placeOrder({
+        order,
+        signature,
+      });
+      console.log(`Successfully created order with uid ${orderUid}`);
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        (error as CallError)?.apiError !== undefined
+      ) {
+        // not null because of the condition in the if statement above
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        const { errorType, description } = (error as CallError).apiError!;
+        console.error(
+          `Failed submitting order selling ${
+            inst.token.symbol ?? inst.token.address
+          }, the server returns ${errorType} (${description})`,
+        );
+        console.error(`Order details: ${JSON.stringify(order)}`);
+      } else {
+        throw error;
+      }
+    }
   }
 }
 async function transferSameTokenToReceiver(
