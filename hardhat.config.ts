@@ -109,14 +109,17 @@ export default {
     mainnet: {
       url: `https://mainnet.infura.io/v3/${INFURA_KEY}`,
       ...sharedNetworkConfig,
+      chainId: 1,
     },
     rinkeby: {
       url: `https://rinkeby.infura.io/v3/${INFURA_KEY}`,
       ...sharedNetworkConfig,
+      chainId: 4,
     },
     xdai: {
       url: "https://xdai.poanetwork.dev",
       ...sharedNetworkConfig,
+      chainId: 100,
     },
   },
   namedAccounts: {
