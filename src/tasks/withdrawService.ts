@@ -237,6 +237,7 @@ export async function withdrawAndDump({
     pendingTokens,
   };
 
+  console.log("Starting withdraw step...");
   const withdrawnTokens = await withdraw({
     solver,
     tokens: checkedTokens,
