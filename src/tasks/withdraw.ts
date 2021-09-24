@@ -234,7 +234,6 @@ interface WithdrawInput {
   authenticator: Contract;
   settlement: Contract;
   settlementDeploymentBlock: number;
-  latestBlock: number;
   network: SupportedNetwork;
   usdReference: ReferenceToken;
   hre: HardhatRuntimeEnvironment;
@@ -252,7 +251,6 @@ export async function withdraw({
   authenticator,
   settlement,
   settlementDeploymentBlock,
-  latestBlock,
   network,
   usdReference,
   hre,
@@ -282,12 +280,12 @@ export async function withdraw({
 
   if (tokens === undefined) {
     console.log("Recovering list of traded tokens...");
-    tokens = await getAllTradedTokens(
+    ({ tokens } = await getAllTradedTokens(
       settlement,
       settlementDeploymentBlock,
-      latestBlock,
+      "latest",
       hre,
-    );
+    ));
   }
 
   // TODO: add eth withdrawal
@@ -405,12 +403,11 @@ const setupWithdrawTask: () => void = () =>
         }
         const api = new Api(network, Environment.Prod);
         const receiver = utils.getAddress(inputReceiver);
-        const [authenticator, settlementDeployment, [solver], latestBlock] =
+        const [authenticator, settlementDeployment, [solver]] =
           await Promise.all([
             getDeployedContract("GPv2AllowListAuthentication", hre),
             hre.deployments.get("GPv2Settlement"),
             hre.ethers.getSigners(),
-            hre.ethers.provider.getBlockNumber(),
           ]);
         const settlement = new Contract(
           settlementDeployment.address,
@@ -429,7 +426,6 @@ const setupWithdrawTask: () => void = () =>
           authenticator,
           settlement,
           settlementDeploymentBlock,
-          latestBlock,
           network,
           usdReference: REFERENCE_TOKEN[network],
           hre,
