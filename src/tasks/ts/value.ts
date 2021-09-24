@@ -1,6 +1,6 @@
-import { BigNumber, constants } from "ethers";
+import { BigNumber } from "ethers";
 
-import { Api, ApiError, CallError } from "../../services/api";
+import { Api } from "../../services/api";
 import { OrderKind } from "../../ts";
 import { SupportedNetwork } from "../ts/deployment";
 import { Erc20Token, WRAPPED_NATIVE_TOKEN_ADDRESS } from "../ts/tokens";
@@ -30,33 +30,33 @@ export const REFERENCE_TOKEN: Record<SupportedNetwork, ReferenceToken> = {
   },
 } as const;
 
-export const usdValue = async function (
+export async function usdValue(
   token: Pick<Erc20Token, "symbol" | "address">,
   amount: BigNumber,
   referenceToken: ReferenceToken,
   api: Api,
 ): Promise<BigNumber> {
-  try {
-    return await api.estimateTradeAmount({
-      sellToken: token.address,
-      buyToken: referenceToken.address,
-      amount,
-      kind: OrderKind.SELL,
-    });
-  } catch (e) {
-    if (!(e instanceof Error)) {
-      throw e;
-    }
-    const errorData: ApiError = (e as CallError).apiError ?? {
-      errorType: "script internal error",
-      description: e?.message ?? "no details",
-    };
-    console.log(
-      `Warning: price retrieval failed for token ${token.symbol} (${token.address}): ${errorData.errorType} (${errorData.description})`,
-    );
-    return constants.Zero;
-  }
-};
+  return await api.estimateTradeAmount({
+    sellToken: token.address,
+    buyToken: referenceToken.address,
+    amount,
+    kind: OrderKind.SELL,
+  });
+}
+
+export async function usdValueOfEth(
+  amount: BigNumber,
+  referenceToken: ReferenceToken,
+  network: SupportedNetwork,
+  api: Api,
+): Promise<BigNumber> {
+  return await usdValue(
+    { symbol: "ETH", address: WRAPPED_NATIVE_TOKEN_ADDRESS[network] },
+    amount,
+    referenceToken,
+    api,
+  );
+}
 
 // Format amount so that it has exactly a fixed amount of decimals.
 export function formatTokenValue(

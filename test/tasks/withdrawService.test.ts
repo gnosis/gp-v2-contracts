@@ -18,7 +18,10 @@ import { OrderKind, domain, Order, timestamp } from "../../src/ts";
 import { deployTestContracts } from "../e2e/fixture";
 
 import { restoreStandardConsole, useDebugConsole } from "./logging";
-import { tradeTokensForNoFees } from "./withdraw.test";
+import {
+  mockQuerySellingEthForUsd,
+  tradeTokensForNoFees,
+} from "./withdraw.test";
 
 describe("Task: withdrawService", () => {
   let deployer: Wallet;
@@ -163,6 +166,14 @@ describe("Task: withdrawService", () => {
     expect(await weth.balanceOf(receiver.address)).to.deep.equal(
       constants.Zero,
     );
+
+    // query to get eth price for the withdraw script
+    mockQuerySellingEthForUsd({
+      apiMock,
+      amount: utils.parseEther("1"),
+      usdReference,
+      usdValue: utils.parseUnits(ethUsdValue.toString(), usdReference.decimals),
+    });
 
     apiMock
       .expects("estimateTradeAmount")
@@ -415,6 +426,14 @@ describe("Task: withdrawService", () => {
         .returns(Promise.resolve(feeAndQuote));
     }
 
+    // query to get eth price for the withdraw script
+    mockQuerySellingEthForUsd({
+      apiMock,
+      amount: utils.parseEther("1"),
+      usdReference,
+      usdValue: constants.Zero,
+    });
+
     await setupExpectations(dai, daiBalance);
     await setupExpectations(usdc, usdcBalance);
 
@@ -485,6 +504,14 @@ describe("Task: withdrawService", () => {
     hasSoldUsdc = false;
     hasSoldDai = false;
     hasSoldWeth = false;
+
+    // query to get eth price for the withdraw script
+    mockQuerySellingEthForUsd({
+      apiMock,
+      amount: utils.parseEther("1"),
+      usdReference,
+      usdValue: constants.Zero,
+    });
 
     await setupExpectations(weth, wethBalance);
     await setupExpectations(dai, daiBalance.sub(42));
