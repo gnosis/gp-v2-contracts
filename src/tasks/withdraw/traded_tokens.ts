@@ -3,18 +3,31 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 import { BUY_ETH_ADDRESS } from "../../ts";
 
-function isErrorTooManyEvents(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    throw error;
-  }
-  return /query returned more than \d* results/.test(error.message);
+const enum ProviderError {
+  TooManyEvents,
+  Timeout,
+  BlockNotFound,
 }
 
-function isTimeout(error: unknown): boolean {
+function decodeError(error: unknown): ProviderError | null {
   if (!(error instanceof Error)) {
-    throw error;
+    return null;
   }
-  return /Network connection timed out/.test(error.message);
+  const message = error.message;
+  if (/query returned more than \d* results/.test(message)) {
+    return ProviderError.TooManyEvents;
+  }
+  if (/Network connection timed out/.test(message)) {
+    return ProviderError.Timeout;
+  }
+  if (
+    /One of the blocks specified in filter \(fromBlock, toBlock or blockHash\) cannot be found/.test(
+      message,
+    )
+  ) {
+    return ProviderError.BlockNotFound;
+  }
+  return null;
 }
 
 /// Lists all tokens that were traded by the settlement contract in the range
@@ -35,13 +48,35 @@ export async function getAllTradedTokens(
     });
     console.log(`Processed events from block ${fromBlock} to ${toBlock}`);
   } catch (error) {
-    // Infura throws "too many events" error. Other nodes time out.
-    if (!(isErrorTooManyEvents(error) || isTimeout(error))) {
-      throw error;
+    switch (decodeError(error)) {
+      // If the query is too large, Infura throws "too many events" error while
+      // other nodes time out.
+      case ProviderError.Timeout:
+      case ProviderError.TooManyEvents:
+        console.log(
+          `Failed to process events from block ${fromBlock} to ${toBlock}, reducing range...`,
+        );
+        break;
+      case ProviderError.BlockNotFound:
+        if (fromBlock < toBlock) {
+          console.log(
+            `Block not found when retrieving blocks ${fromBlock} to ${toBlock}, skipping last block...`,
+          );
+          return await getAllTradedTokens(
+            settlement,
+            fromBlock,
+            toBlock - 1,
+            hre,
+          );
+        } else {
+          console.error(
+            `Block not found when processing events from block ${fromBlock} to ${toBlock}`,
+          );
+          return [];
+        }
+      case null:
+        throw error;
     }
-    console.log(
-      `Failed to process events from block ${fromBlock} to ${toBlock}, reducing range...`,
-    );
   }
 
   let tokens;
