@@ -19,6 +19,30 @@ import { deployTestContracts } from "../e2e/fixture";
 
 import { restoreStandardConsole, useDebugConsole } from "./logging";
 
+interface MockQuerySellingEthForUsdInput {
+  apiMock: SinonMock;
+  amount: BigNumber;
+  usdReference: ReferenceToken;
+  usdValue: BigNumber;
+}
+export function mockQuerySellingEthForUsd({
+  apiMock,
+  amount,
+  usdReference,
+  usdValue,
+}: MockQuerySellingEthForUsdInput): void {
+  apiMock
+    .expects("estimateTradeAmount")
+    .withArgs({
+      sellToken: undefined, // note: weth is undefined for the hardhat network
+      buyToken: usdReference.address,
+      kind: OrderKind.SELL,
+      amount,
+    })
+    .once()
+    .returns(Promise.resolve(usdValue));
+}
+
 // Executes trades between the input tokens in order to emit trade events.
 export async function tradeTokensForNoFees(
   tokens: Contract[],
@@ -75,6 +99,12 @@ describe("Task: withdraw", () => {
 
   let apiMock: SinonMock;
   let api: Api;
+
+  const usdReference: ReferenceToken = {
+    address: "0x" + "42".repeat(20),
+    symbol: "USD",
+    decimals: 42,
+  };
 
   beforeEach(async () => {
     const deployment = await deployTestContracts();
@@ -151,11 +181,13 @@ describe("Task: withdraw", () => {
       constants.Zero,
     );
 
-    const usdReference: ReferenceToken = {
-      address: "0x" + "42".repeat(20),
-      symbol: "USD",
-      decimals: 42,
-    };
+    // query to get eth price
+    mockQuerySellingEthForUsd({
+      apiMock,
+      amount: utils.parseEther("1"),
+      usdReference,
+      usdValue: utils.parseUnits(ethUsdValue.toString(), usdReference.decimals),
+    });
 
     apiMock
       .expects("estimateTradeAmount")
@@ -213,6 +245,7 @@ describe("Task: withdraw", () => {
       latestBlock: await ethers.provider.getBlockNumber(),
       minValue,
       leftover,
+      maxFeePercent: Infinity,
       tokens: undefined,
       usdReference,
       // ignored network value
@@ -233,5 +266,105 @@ describe("Task: withdraw", () => {
     expect(await weth.balanceOf(receiver.address)).to.deep.equal(
       wethBalance.sub(utils.parseUnits(leftover, 18).div(ethUsdValue)),
     );
+  });
+
+  it("should withdraw only tokens for which the gas fee is not too high", async () => {
+    const minValue = "0";
+    const leftover = "0";
+    // This value was chosen so that the dai withdraw would not succeed because
+    // the gas fee is too expensive, but the weth one would.
+    // If this test fails, it could be because the Ethereum implementation of
+    // the test node changed the gas cost of some opcodes. You can update this
+    // value by running the test with this value set to zero and printing the
+    // output of the test with the DEBUG flag. In the output, you can find
+    // something similar to:
+    // ```
+    // test:console:log Ignored 10.0 units of DAI (0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6) with value 10.00 USD, the gas cost of including this transaction is too high (0.42% of the withdrawn amount) +2s
+    // test:console:log Ignored 0.02 units of WETH (0x610178dA211FEF7D417bC0e6FeD39F05609AD788) with value 20.00 USD, the gas cost of including this transaction is too high (0.21% of the withdrawn amount) +0ms
+    // ```
+    // Then, change the max fee percentage to a number between the two percent
+    // values from the logs.
+    const maxFeePercent = 0.3;
+    const ethUsdValue = 1000;
+
+    const daiBalance = utils.parseUnits("10.0", 18);
+    await dai.mint(settlement.address, daiBalance);
+    // The weth balance has double the value of the dai balance. The two values
+    // can't be too close, as otherwise the test would be too sensitive to
+    // small changes in gas when running the test, but also not too far so that
+    // errors in the math would cause an error in the test.
+    const wethBalance = utils.parseUnits("0.02", 18);
+    await weth.mint(settlement.address, wethBalance);
+
+    expect(await dai.balanceOf(receiver.address)).to.deep.equal(constants.Zero);
+    expect(await weth.balanceOf(receiver.address)).to.deep.equal(
+      constants.Zero,
+    );
+
+    // query to get eth price
+    mockQuerySellingEthForUsd({
+      apiMock,
+      amount: utils.parseEther("1"),
+      usdReference,
+      usdValue: utils.parseUnits(ethUsdValue.toString(), usdReference.decimals),
+    });
+
+    apiMock
+      .expects("estimateTradeAmount")
+      .withArgs({
+        sellToken: dai.address,
+        buyToken: usdReference.address,
+        kind: OrderKind.SELL,
+        amount: daiBalance,
+      })
+      .once()
+      .returns(
+        Promise.resolve(
+          daiBalance.mul(BigNumber.from(10).pow(usdReference.decimals - 18)),
+        ),
+      );
+    apiMock
+      .expects("estimateTradeAmount")
+      .withArgs({
+        sellToken: weth.address,
+        buyToken: usdReference.address,
+        kind: OrderKind.SELL,
+        amount: wethBalance,
+      })
+      .once()
+      .returns(
+        Promise.resolve(
+          Promise.resolve(
+            wethBalance
+              .mul(ethUsdValue)
+              .mul(BigNumber.from(10).pow(usdReference.decimals - 18)),
+          ),
+        ),
+      );
+
+    const withdrawnTokens = await withdraw({
+      solver,
+      receiver: receiver.address,
+      authenticator,
+      settlement,
+      settlementDeploymentBlock: 0,
+      latestBlock: await ethers.provider.getBlockNumber(),
+      minValue,
+      leftover,
+      maxFeePercent,
+      tokens: undefined,
+      usdReference,
+      // ignored network value
+      network: undefined as unknown as SupportedNetwork,
+      hre,
+      api,
+      dryRun: false,
+      doNotPrompt: true,
+    });
+
+    expect(withdrawnTokens).to.have.length(1);
+    expect(withdrawnTokens).to.include(weth.address);
+    expect(await dai.balanceOf(receiver.address)).to.deep.equal(constants.Zero);
+    expect(await weth.balanceOf(receiver.address)).to.deep.equal(wethBalance);
   });
 });

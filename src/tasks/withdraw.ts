@@ -7,7 +7,7 @@ import { BigNumber, utils, constants, Contract } from "ethers";
 import { task, types } from "hardhat/config";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
-import { Api, Environment } from "../services/api";
+import { Api, ApiError, CallError, Environment } from "../services/api";
 import { SettlementEncoder } from "../ts";
 
 import {
@@ -21,11 +21,7 @@ import {
 } from "./ts/rate_limits";
 import { getSolvers } from "./ts/solver";
 import { Align, displayTable } from "./ts/table";
-import {
-  Erc20Token,
-  erc20Token,
-  WRAPPED_NATIVE_TOKEN_ADDRESS,
-} from "./ts/tokens";
+import { Erc20Token, erc20Token } from "./ts/tokens";
 import { prompt } from "./ts/tui";
 import {
   usdValue,
@@ -33,6 +29,7 @@ import {
   formatTokenValue,
   ReferenceToken,
   REFERENCE_TOKEN,
+  usdValueOfEth,
 } from "./ts/value";
 import { getAllTradedTokens } from "./withdraw/traded_tokens";
 
@@ -42,6 +39,7 @@ interface Withdrawal {
   amountUsd: BigNumber;
   balance: BigNumber;
   balanceUsd: BigNumber;
+  gas: BigNumber;
 }
 
 interface DisplayWithdrawal {
@@ -83,15 +81,133 @@ async function fastTokenDetails(
   return erc20Token(address, hre);
 }
 
-async function getWithdrawals(
-  tokens: string[],
-  settlement: Contract,
-  minValue: string,
-  leftover: string,
-  hre: HardhatRuntimeEnvironment,
+interface ComputeSettlementInput {
+  withdrawals: Omit<Withdrawal, "gas">[];
+  receiver: string;
+  solverForSimulation: string;
+  settlement: Contract;
+  hre: HardhatRuntimeEnvironment;
+}
+async function computeSettlement({
+  withdrawals,
+  receiver,
+  solverForSimulation,
+  settlement,
+  hre,
+}: ComputeSettlementInput) {
+  const encoder = new SettlementEncoder({});
+  withdrawals.forEach(({ token, amount }) =>
+    encoder.encodeInteraction({
+      target: token.address,
+      callData: token.contract.interface.encodeFunctionData("transfer", [
+        receiver,
+        amount,
+      ]),
+    }),
+  );
+
+  const finalSettlement = encoder.encodedSettlement({});
+  const gas = await settlement
+    .connect(hre.ethers.provider)
+    .estimateGas.settle(...finalSettlement, {
+      from: solverForSimulation,
+    });
+  return {
+    finalSettlement,
+    gas,
+  };
+}
+
+interface ComputeSettlementWithPriceInput extends ComputeSettlementInput {
+  gasPrice: BigNumber;
+  network: SupportedNetwork;
+  usdReference: ReferenceToken;
+  api: Api;
+}
+async function computeSettlementWithPrice({
+  withdrawals,
+  receiver,
+  solverForSimulation,
+  settlement,
+  gasPrice,
+  network,
+  usdReference,
+  api,
+  hre,
+}: ComputeSettlementWithPriceInput) {
+  const { gas, finalSettlement } = await computeSettlement({
+    withdrawals,
+    receiver,
+    solverForSimulation,
+    settlement,
+    hre,
+  });
+
+  const transactionEthCost = gas.mul(gasPrice);
+  // The following ternary operator is used as a hack to avoid having to
+  // set expectations for the gas value in the tests, since gas values
+  // could easily change with any minor changes to the tests
+  const transactionUsdCost =
+    hre.network.name === "hardhat"
+      ? constants.Zero
+      : await usdValueOfEth(transactionEthCost, usdReference, network, api);
+  const withdrawnValue = withdrawals.reduce(
+    (sum, { amountUsd }) => sum.add(amountUsd),
+    constants.Zero,
+  );
+
+  return {
+    finalSettlement,
+    transactionEthCost,
+    transactionUsdCost,
+    gas,
+    withdrawnValue,
+  };
+}
+
+function ignoredTokenMessage(
+  amount: BigNumber,
+  token: Erc20Token,
   usdReference: ReferenceToken,
-  api: Api,
-): Promise<Withdrawal[]> {
+  valueUsd: BigNumber,
+  reason?: string,
+) {
+  const decimals = token.decimals ?? 18;
+  return `Ignored ${utils.formatUnits(amount, decimals)} units of ${
+    token.symbol ?? "unknown token"
+  } (${token.address})${
+    token.decimals === undefined
+      ? ` (no decimals specified in the contract, assuming ${decimals})`
+      : ""
+  } with value ${formatUsdValue(valueUsd, usdReference)} USD${
+    reason ? `, ${reason}` : ""
+  }`;
+}
+
+interface GetWithdrawalsInput {
+  tokens: string[];
+  settlement: Contract;
+  minValue: string;
+  leftover: string;
+  gasEmptySettlement: Promise<BigNumber>;
+  hre: HardhatRuntimeEnvironment;
+  usdReference: ReferenceToken;
+  receiver: string;
+  solverForSimulation: string;
+  api: Api;
+}
+async function getWithdrawals({
+  tokens,
+  settlement,
+  minValue,
+  leftover,
+  gasEmptySettlement,
+  hre,
+  usdReference,
+  receiver,
+  solverForSimulation,
+  api,
+}: GetWithdrawalsInput): Promise<Withdrawal[]> {
   const minValueWei = utils.parseUnits(minValue, usdReference.decimals);
   const leftoverWei = utils.parseUnits(leftover, usdReference.decimals);
   const computeWithdrawalInstructions = tokens.map(
@@ -107,7 +223,22 @@ async function getWithdrawals(
         if (balance.eq(0)) {
           return null;
         }
-        const balanceUsd = await usdValue(token, balance, usdReference, api);
+        let balanceUsd;
+        try {
+          balanceUsd = await usdValue(token, balance, usdReference, api);
+        } catch (e) {
+          if (!(e instanceof Error)) {
+            throw e;
+          }
+          const errorData: ApiError = (e as CallError).apiError ?? {
+            errorType: "script internal error",
+            description: e?.message ?? "no details",
+          };
+          consoleLog(
+            `Warning: price retrieval failed for token ${token.symbol} (${token.address}): ${errorData.errorType} (${errorData.description})`,
+          );
+          balanceUsd = constants.Zero;
+        }
         // Note: if balanceUsd is zero, then setting either minValue or leftoverWei
         // to a nonzero value means that nothing should be withdrawn. If neither
         // flag is set, then whether to withdraw does not depend on the USD value.
@@ -116,18 +247,14 @@ async function getWithdrawals(
           (balanceUsd.isZero() &&
             !(minValueWei.isZero() && leftoverWei.isZero()))
         ) {
-          const decimals = token.decimals ?? 18;
           consoleLog(
-            `Ignored ${utils.formatUnits(balance, decimals)} units of ${
-              token.symbol ?? "unknown token"
-            } (${token.address}) with value ${formatUsdValue(
-              balanceUsd,
+            ignoredTokenMessage(
+              balance,
+              token,
               usdReference,
-            )} USD${
-              token.decimals === undefined
-                ? ` (the token has no decimals specified in the contract, assuming ${decimals})`
-                : ""
-            }`,
+              balanceUsd,
+              "does not satisfy conditions on min value and leftover",
+            ),
           );
           return null;
         }
@@ -142,12 +269,41 @@ async function getWithdrawals(
           amount = balance.mul(balanceUsd.sub(leftoverWei)).div(balanceUsd);
           amountUsd = balanceUsd.sub(leftoverWei);
         }
-        return {
+
+        const withdrawalWithoutGas = {
           token,
           amount,
           amountUsd,
           balance,
           balanceUsd,
+        };
+        let gas;
+        try {
+          ({ gas } = await computeSettlement({
+            withdrawals: [withdrawalWithoutGas],
+            receiver,
+            solverForSimulation,
+            settlement,
+            hre,
+          }));
+        } catch (error) {
+          if (!(error instanceof Error)) {
+            throw error;
+          }
+          consoleLog(
+            ignoredTokenMessage(
+              balance,
+              token,
+              usdReference,
+              balanceUsd,
+              `cannot execute withdraw transaction (${error.message})`,
+            ),
+          );
+          return null;
+        }
+        return {
+          ...withdrawalWithoutGas,
+          gas: gas.sub(await gasEmptySettlement),
         };
       },
   );
@@ -199,22 +355,16 @@ function displayWithdrawals(
   console.log();
 }
 
-async function formatGasCost(
+function formatGasCost(
   amount: BigNumber,
+  usdAmount: BigNumber,
   network: SupportedNetwork,
   usdReference: ReferenceToken,
-  api: Api,
-): Promise<string> {
+): string {
   switch (network) {
     case "mainnet": {
-      const value = await usdValue(
-        { symbol: "ETH", address: WRAPPED_NATIVE_TOKEN_ADDRESS[network] },
-        amount,
-        usdReference,
-        api,
-      );
       return `${utils.formatEther(amount)} ETH (${formatUsdValue(
-        value,
+        usdAmount,
         usdReference,
       )} USD)`;
     }
@@ -230,6 +380,7 @@ interface WithdrawInput {
   tokens: string[] | undefined;
   minValue: string;
   leftover: string;
+  maxFeePercent: number;
   receiver: string;
   authenticator: Contract;
   settlement: Contract;
@@ -248,6 +399,7 @@ export async function withdraw({
   tokens,
   minValue,
   leftover,
+  maxFeePercent,
   receiver,
   authenticator,
   settlement,
@@ -279,6 +431,13 @@ export async function withdraw({
       }
     }
   }
+  const gasEmptySettlement = computeSettlement({
+    withdrawals: [],
+    receiver,
+    solverForSimulation,
+    settlement,
+    hre,
+  }).then(({ gas }) => gas);
 
   if (tokens === undefined) {
     console.log("Recovering list of traded tokens...");
@@ -292,64 +451,87 @@ export async function withdraw({
 
   // TODO: add eth withdrawal
   // TODO: split large transaction in batches
-  const withdrawals = await getWithdrawals(
+  let withdrawals = await getWithdrawals({
     tokens,
     settlement,
     minValue,
     leftover,
+    gasEmptySettlement,
     hre,
     usdReference,
+    receiver,
+    solverForSimulation,
     api,
-  );
+  });
   withdrawals.sort((lhs, rhs) => {
     const diff = lhs.balanceUsd.sub(rhs.balanceUsd);
     return diff.isZero() ? 0 : diff.isNegative() ? -1 : 1;
   });
 
-  displayWithdrawals(withdrawals, usdReference);
+  const oneEth = utils.parseEther("1");
+  const [oneEthUsdValue, gasPrice] = await Promise.all([
+    usdValueOfEth(oneEth, usdReference, network, api),
+    hre.ethers.provider.getGasPrice(),
+  ]);
+  withdrawals = withdrawals.filter(
+    ({ token, balance, balanceUsd, amountUsd, gas }) => {
+      const approxUsdValue = Number(amountUsd.toString());
+      const approxGasCost = Number(
+        gasPrice.mul(gas).mul(oneEthUsdValue).div(oneEth),
+      );
+      const feePercent = (100 * approxGasCost) / approxUsdValue;
+      if (feePercent > maxFeePercent) {
+        console.log(
+          ignoredTokenMessage(
+            balance,
+            token,
+            usdReference,
+            balanceUsd,
+            `the gas cost is too high (${feePercent.toFixed(
+              2,
+            )}% of the withdrawn amount)`,
+          ),
+        );
+        return false;
+      }
+
+      return true;
+    },
+  );
 
   if (withdrawals.length === 0) {
     console.log("No tokens to withdraw.");
     return [];
   }
+  displayWithdrawals(withdrawals, usdReference);
 
-  const encoder = new SettlementEncoder({});
-  withdrawals.forEach(({ token, amount }) =>
-    encoder.encodeInteraction({
-      target: token.address,
-      callData: token.contract.interface.encodeFunctionData("transfer", [
-        receiver,
-        amount,
-      ]),
-    }),
-  );
+  const {
+    finalSettlement,
+    transactionEthCost,
+    transactionUsdCost,
+    withdrawnValue,
+  } = await computeSettlementWithPrice({
+    withdrawals,
+    receiver,
+    gasPrice,
+    solverForSimulation,
+    settlement,
+    network,
+    usdReference,
+    api,
+    hre,
+  });
 
-  const finalSettlement = encoder.encodedSettlement({});
-  // TODO: use the address of a solver as the from address in dry run so
-  // that the price can always be estimated
-  const [gas, gasPrice] = await Promise.all([
-    settlement
-      .connect(hre.ethers.provider)
-      .estimateGas.settle(...finalSettlement, {
-        from: solverForSimulation,
-      }),
-    hre.ethers.provider.getGasPrice(),
-  ]);
-  const amount = gas.mul(gasPrice);
-  const totalValue = withdrawals.reduce(
-    (sum, { amountUsd }) => sum.add(amountUsd),
-    constants.Zero,
-  );
   console.log(
     `The transaction will cost approximately ${await formatGasCost(
-      amount,
+      transactionEthCost,
+      transactionUsdCost,
       network,
       usdReference,
-      api,
     )} and will withdraw the balance of ${
       withdrawals.length
     } tokens for an estimated total value of ${formatUsdValue(
-      totalValue,
+      withdrawnValue,
       usdReference,
     )} USD. All withdrawn funds will be sent to ${receiver}.`,
   );
@@ -385,6 +567,12 @@ const setupWithdrawTask: () => void = () =>
       "0",
       types.string,
     )
+    .addOptionalParam(
+      "maxFeePercent",
+      "If the extra gas needed to include a withdrawal is larger than this percent of the withdrawn amount, the token is not withdrawn.",
+      5,
+      types.float,
+    )
     .addParam("receiver", "The address receiving the withdrawn tokens.")
     .addFlag(
       "dryRun",
@@ -396,7 +584,14 @@ const setupWithdrawTask: () => void = () =>
     )
     .setAction(
       async (
-        { minValue, dryRun, leftover, receiver: inputReceiver, tokens },
+        {
+          minValue,
+          leftover,
+          maxFeePercent,
+          receiver: inputReceiver,
+          dryRun,
+          tokens,
+        },
         hre: HardhatRuntimeEnvironment,
       ) => {
         const network = hre.network.name;
@@ -426,6 +621,7 @@ const setupWithdrawTask: () => void = () =>
           minValue,
           leftover,
           receiver,
+          maxFeePercent,
           authenticator,
           settlement,
           settlementDeploymentBlock,
