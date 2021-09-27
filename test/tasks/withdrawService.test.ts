@@ -119,7 +119,12 @@ describe("Task: withdrawService", () => {
 
     // the script checks that the onchain time is not too far from the current
     // time
-    await synchronizeBlockchainAndCurrentTime();
+    if (
+      (await ethers.provider.getBlock("latest")).timestamp <
+      Math.floor(Date.now() / 1000)
+    ) {
+      await synchronizeBlockchainAndCurrentTime();
+    }
 
     useDebugConsole();
   });

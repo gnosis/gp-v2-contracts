@@ -10,7 +10,7 @@ import {
   utils,
   Wallet,
 } from "ethers";
-import hre, { waffle } from "hardhat";
+import hre, { ethers, waffle } from "hardhat";
 import { mock, SinonMock } from "sinon";
 
 import {
@@ -792,7 +792,12 @@ describe("Task: dump", () => {
 
     // the script checks that the onchain time is not too far from the current
     // time
-    await synchronizeBlockchainAndCurrentTime();
+    if (
+      (await ethers.provider.getBlock("latest")).timestamp <
+      Math.floor(Date.now() / 1000)
+    ) {
+      await synchronizeBlockchainAndCurrentTime();
+    }
 
     useDebugConsole();
   });
