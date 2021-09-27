@@ -30,6 +30,7 @@ import { SupportedNetwork } from "../../src/tasks/ts/deployment";
 import { Erc20Token, isNativeToken } from "../../src/tasks/ts/tokens";
 import { BUY_ETH_ADDRESS, OrderKind, timestamp } from "../../src/ts";
 import { deployTestContracts } from "../e2e/fixture";
+import { synchronizeBlockchainAndCurrentTime } from "../hardhatNetwork";
 
 import { restoreStandardConsole, useDebugConsole } from "./logging";
 
@@ -40,18 +41,6 @@ const IERC20 = hre.artifacts.readArtifact(
 );
 async function mockErc20(deployer: Wallet) {
   return waffle.deployMockContract(deployer, (await IERC20).abi);
-}
-
-// Even if internally handled in the mocking code, some (successful) tests throw
-// a warning "Promise rejection was handled asynchronously". This function
-// returns a pre-handled rejection to suppress that warning.
-// https://github.com/domenic/chai-as-promised/issues/173
-async function handledRejection(error?: unknown) {
-  const rejection = Promise.reject(error);
-  await rejection.catch(() => {
-    /* ignored */
-  });
-  return { rejection };
 }
 
 interface MockApiCallsInput {
@@ -85,6 +74,42 @@ function mockApiCalls({
     .returns(Promise.resolve(result));
 }
 
+interface MockQuerySellingTokenForEthInput {
+  apiMock: SinonMock;
+  amount: BigNumber;
+  token: string;
+  ethValue: BigNumber;
+}
+export function mockQuerySellingTokenForEth({
+  apiMock,
+  amount,
+  token,
+  ethValue,
+}: MockQuerySellingTokenForEthInput): void {
+  apiMock
+    .expects("estimateTradeAmount")
+    .withArgs({
+      sellToken: token,
+      buyToken: wrappedNativeToken,
+      kind: OrderKind.SELL,
+      amount,
+    })
+    .once()
+    .returns(Promise.resolve(ethValue));
+}
+
+// Even if internally handled in the mocking code, some (successful) tests throw
+// a warning "Promise rejection was handled asynchronously". This function
+// returns a pre-handled rejection to suppress that warning.
+// https://github.com/domenic/chai-as-promised/issues/173
+async function handledRejection(error?: unknown) {
+  const rejection = Promise.reject(error);
+  await rejection.catch(() => {
+    /* ignored */
+  });
+  return { rejection };
+}
+
 // The getDumpInstructions function depends on the network only to retrieve
 // the right weth address for the network, and even then this is only needed
 // because of an issue in the services where BUY_ETH_ADDRESS cannot be used
@@ -101,6 +126,7 @@ describe("getDumpInstructions", () => {
 
   let deployer: Wallet;
   let user: Wallet;
+  let receiver: Wallet;
   let apiMock: SinonMock;
   let api: Api;
 
@@ -113,7 +139,7 @@ describe("getDumpInstructions", () => {
     consoleLog = console.log;
     console.log = (...args: unknown[]) => (consoleLogOutput = args[0]);
 
-    [deployer, user] = await waffle.provider.getWallets();
+    [deployer, user, receiver] = await waffle.provider.getWallets();
     // environment parameter is unused in mock
     const environment = "unset environment" as unknown as Environment;
     api = new Api("mock", environment);
@@ -122,8 +148,11 @@ describe("getDumpInstructions", () => {
     defaultDumpInstructions = {
       user: user.address,
       vaultRelayer: vaultRelayer,
-      maxFeePercent: 100,
-      hasCustomReceiver: false,
+      maxFeePercent: Infinity,
+      receiver: {
+        address: receiver.address,
+        isSameAsUser: true,
+      },
       hre,
       network,
       api,
@@ -297,6 +326,10 @@ describe("getDumpInstructions", () => {
     const { toToken, transferToReceiver, instructions } =
       await getDumpInstructions({
         ...defaultDumpInstructions,
+        receiver: {
+          address: receiver.address,
+          isSameAsUser: true,
+        },
         dumpedTokens: [to.address],
         toTokenAddress: to.address,
       });
@@ -318,11 +351,23 @@ describe("getDumpInstructions", () => {
 
     const balance = utils.parseEther("4.2");
     await to.mock.balanceOf.withArgs(user.address).returns(balance);
+    // script estimates gas usage of a transfer
+    await to.mock.transfer.withArgs(receiver.address, balance).returns(true);
+
+    mockQuerySellingTokenForEth({
+      apiMock,
+      amount: balance,
+      token: to.address,
+      ethValue: BigNumber.from("1"), // default maxFeePercent is infinity, anything nonzero works
+    });
 
     const { toToken, transferToReceiver, instructions } =
       await getDumpInstructions({
         ...defaultDumpInstructions,
-        hasCustomReceiver: true,
+        receiver: {
+          address: receiver.address,
+          isSameAsUser: false,
+        },
         dumpedTokens: [to.address],
         toTokenAddress: to.address,
       });
@@ -345,7 +390,10 @@ describe("getDumpInstructions", () => {
     await expect(
       getDumpInstructions({
         ...defaultDumpInstructions,
-        hasCustomReceiver: true,
+        receiver: {
+          address: receiver.address,
+          isSameAsUser: false,
+        },
         dumpedTokens: [BUY_ETH_ADDRESS],
         toTokenAddress: constants.AddressZero,
       }),
@@ -470,6 +518,82 @@ describe("getDumpInstructions", () => {
     );
   });
 
+  it("does not transfer toToken if the balance is zero", async () => {
+    const to = await mockErc20(deployer);
+    await to.mock.symbol.returns("TOTOKEN");
+    await to.mock.decimals.returns(101);
+    await to.mock.balanceOf.withArgs(user.address).returns(constants.Zero);
+
+    const { transferToReceiver } = await getDumpInstructions({
+      ...defaultDumpInstructions,
+      receiver: {
+        address: receiver.address,
+        isSameAsUser: false,
+      },
+      dumpedTokens: [to.address],
+      toTokenAddress: to.address,
+    });
+
+    expect(transferToReceiver).to.be.undefined;
+  });
+
+  it("does not transfer toToken if the transfer fee is too high", async () => {
+    const symbol = "TOTOKEN";
+    const decimals = 18;
+    async function setupMockToToken(balance: BigNumber): Promise<MockContract> {
+      const token = await mockErc20(deployer);
+      await token.mock.symbol.returns(symbol);
+      await token.mock.decimals.returns(decimals);
+      await token.mock.balanceOf.withArgs(user.address).returns(balance);
+      await token.mock.transfer
+        .withArgs(receiver.address, balance)
+        .returns(true);
+      return token;
+    }
+    async function estimateTransferGasCost(): Promise<BigNumber> {
+      // assumptions: any deployed mock token has approximatively the same
+      // transfer cost. The transferred balance doesn't impact much the result.
+      // The number is close to 10¹⁸ but not divisible by 2.
+      const anyBalance = BigNumber.from(3).pow(32);
+      const mock = await setupMockToToken(anyBalance);
+      return (
+        await mock.estimateGas["transfer"](receiver.address, anyBalance)
+      ).mul(await hre.ethers.provider.getGasPrice());
+    }
+    const maxFeePercent = 5;
+    const toTokensForOneEth = 42;
+    const transferCost = await estimateTransferGasCost();
+    const minimumEthValueToTransfer = transferCost.mul(100).div(maxFeePercent);
+    const minimumToTokenBalance =
+      minimumEthValueToTransfer.mul(toTokensForOneEth);
+    // use half the minimum amount to account for inprecisions in computing
+    // the transfer cost
+    const balance = minimumToTokenBalance.div(2);
+    expect(minimumToTokenBalance).not.to.deep.equal(constants.Zero);
+    const to = await setupMockToToken(balance);
+
+    // ten-to-one value with eth
+    mockQuerySellingTokenForEth({
+      apiMock,
+      amount: balance,
+      token: to.address,
+      ethValue: balance.div(toTokensForOneEth),
+    });
+
+    const { transferToReceiver } = await getDumpInstructions({
+      ...defaultDumpInstructions,
+      receiver: {
+        address: receiver.address,
+        isSameAsUser: false,
+      },
+      maxFeePercent,
+      dumpedTokens: [to.address],
+      toTokenAddress: to.address,
+    });
+
+    expect(transferToReceiver).to.be.undefined;
+  });
+
   it("works with many tokens", async () => {
     const to = await mockErc20(deployer);
     await to.mock.symbol.returns("TOTOKEN");
@@ -554,10 +678,24 @@ describe("getDumpInstructions", () => {
       dumpedTokens.push(dumped);
     }
 
+    // mocks needed to estimate transfer cost
+    await to.mock.transfer
+      .withArgs(receiver.address, toTokenBalance)
+      .returns(true);
+    mockQuerySellingTokenForEth({
+      apiMock,
+      amount: toTokenBalance,
+      token: to.address,
+      ethValue: BigNumber.from("1"), // default maxFeePercent is infinity, anything nonzero works
+    });
+
     const { toToken, transferToReceiver, instructions } =
       await getDumpInstructions({
         ...defaultDumpInstructions,
-        hasCustomReceiver: true,
+        receiver: {
+          address: receiver.address,
+          isSameAsUser: false,
+        },
         dumpedTokens: dumpedTokens.map((t) => t.address).concat(to.address),
         toTokenAddress: to.address,
       });
@@ -652,6 +790,10 @@ describe("Task: dump", () => {
     api = new Api("mock", environment);
     apiMock = mock(api);
 
+    // the script checks that the onchain time is not too far from the current
+    // time
+    await synchronizeBlockchainAndCurrentTime();
+
     useDebugConsole();
   });
 
@@ -685,7 +827,6 @@ describe("Task: dump", () => {
     });
 
     api.placeOrder = async function ({ order }: PlaceOrderQuery) {
-      console.log(order);
       expect(order.sellToken).to.deep.equal(dai.address);
       expect(order.buyToken).to.deep.equal(weth.address);
       expect(order.sellAmount).to.deep.equal(daiData.balance.sub(daiData.fee));
@@ -703,9 +844,16 @@ describe("Task: dump", () => {
       return "0xorderUid";
     };
 
+    mockQuerySellingTokenForEth({
+      apiMock,
+      amount: wethData.balance,
+      token: weth.address,
+      ethValue: BigNumber.from("1"), // default maxFeePercent is infinity, anything nonzero works
+    });
+
     await dump({
       validity,
-      maxFeePercent: 100,
+      maxFeePercent: Infinity,
       dumpedTokens: [weth.address, dai.address],
       toToken: weth.address,
       settlement,
@@ -731,9 +879,16 @@ describe("Task: dump", () => {
       const balance = utils.parseEther("42");
       await weth.mint(signer.address, balance);
 
+      mockQuerySellingTokenForEth({
+        apiMock,
+        amount: balance,
+        token: weth.address,
+        ethValue: BigNumber.from("1"), // default maxFeePercent is infinity, anything nonzero works
+      });
+
       await dump({
         validity: 1337,
-        maxFeePercent: 100,
+        maxFeePercent: Infinity,
         dumpedTokens: [weth.address],
         toToken: weth.address,
         settlement,

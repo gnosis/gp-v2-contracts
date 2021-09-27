@@ -225,7 +225,12 @@ async function getWithdrawals({
         }
         let balanceUsd;
         try {
-          balanceUsd = await usdValue(token, balance, usdReference, api);
+          balanceUsd = await usdValue(
+            token.address,
+            balance,
+            usdReference,
+            api,
+          );
         } catch (e) {
           if (!(e instanceof Error)) {
             throw e;
