@@ -492,8 +492,8 @@ export async function dump({
       network,
       api,
     });
-  if (instructions.length === 0) {
-    console.log("No token can be sold");
+  if (instructions.length === 0 && transferToReceiver === undefined) {
+    console.log("Nothing to do");
     return;
   }
 

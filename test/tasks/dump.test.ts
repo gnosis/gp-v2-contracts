@@ -1,11 +1,12 @@
 import { MockContract } from "@ethereum-waffle/mock-contract";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import chai, { expect } from "chai";
 import chaiAsPromised from "chai-as-promised";
 import {
   BigNumber,
   BigNumberish,
   constants,
-  ethers,
+  Contract,
   utils,
   Wallet,
 } from "ethers";
@@ -18,14 +19,19 @@ import {
   Environment,
   GetFeeAndQuoteSellErrorType,
   GetFeeAndQuoteSellOutput,
+  PlaceOrderQuery,
 } from "../../src/services/api";
 import {
+  dump,
   GetDumpInstructionInput,
   getDumpInstructions,
 } from "../../src/tasks/dump";
 import { SupportedNetwork } from "../../src/tasks/ts/deployment";
 import { Erc20Token, isNativeToken } from "../../src/tasks/ts/tokens";
-import { BUY_ETH_ADDRESS } from "../../src/ts";
+import { BUY_ETH_ADDRESS, OrderKind, timestamp } from "../../src/ts";
+import { deployTestContracts } from "../e2e/fixture";
+
+import { restoreStandardConsole, useDebugConsole } from "./logging";
 
 chai.use(chaiAsPromised);
 
@@ -79,18 +85,19 @@ function mockApiCalls({
     .returns(Promise.resolve(result));
 }
 
+// The getDumpInstructions function depends on the network only to retrieve
+// the right weth address for the network, and even then this is only needed
+// because of an issue in the services where BUY_ETH_ADDRESS cannot be used
+// to get a price quote.
+// TODO: remove when BUY_ETH_ADDRESS is supported and implemented in price
+// quotes.
+const network = undefined as unknown as SupportedNetwork;
+const wrappedNativeToken = undefined as unknown as string;
+
 describe("getDumpInstructions", () => {
   let consoleLogOutput: unknown = undefined;
   let consoleLog: typeof console.log;
   const vaultRelayer = "0xa11044a9ce" + "42".repeat(20 - 5);
-  // The getDumpInstructions function depends on the network only to retrieve
-  // the right weth address for the network, and even then this is only needed
-  // because of an issue in the services where BUY_ETH_ADDRESS cannot be used
-  // to get a price quote.
-  // TODO: remove when BUY_ETH_ADDRESS is supported and implemented in price
-  // quotes.
-  const network = undefined as unknown as SupportedNetwork;
-  const wrappedNativeToken = undefined as unknown as string;
 
   let deployer: Wallet;
   let user: Wallet;
@@ -340,7 +347,7 @@ describe("getDumpInstructions", () => {
         ...defaultDumpInstructions,
         hasCustomReceiver: true,
         dumpedTokens: [BUY_ETH_ADDRESS],
-        toTokenAddress: ethers.constants.AddressZero,
+        toTokenAddress: constants.AddressZero,
       }),
     ).to.eventually.be.rejectedWith(
       `Dumping the native token is not supported. Remove the ETH flag address ${BUY_ETH_ADDRESS} from the list of tokens to dump.`,
@@ -603,5 +610,148 @@ describe("getDumpInstructions", () => {
         expect(returnedFee).to.deep.equal(fee);
       },
     );
+  });
+});
+
+describe("Task: dump", () => {
+  let deployer: Wallet;
+  let receiver: Wallet;
+  let signer: SignerWithAddress;
+  let apiMock: SinonMock;
+  let api: Api;
+
+  let settlement: Contract;
+  let weth: Contract;
+  let dai: Contract;
+
+  beforeEach(async () => {
+    const deployment = await deployTestContracts();
+
+    let signerWallet: Wallet;
+    ({
+      deployer,
+      settlement,
+      wallets: [receiver, signerWallet],
+    } = deployment);
+
+    const foundSigner = (await hre.ethers.getSigners()).find(
+      (signer) => signer.address == signerWallet.address,
+    );
+    expect(foundSigner).not.to.be.undefined;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    signer = foundSigner!;
+
+    const TestERC20 = await hre.artifacts.readArtifact(
+      "src/contracts/test/TestERC20.sol:TestERC20",
+    );
+    dai = await waffle.deployContract(deployer, TestERC20, ["DAI", 18]);
+    weth = await waffle.deployContract(deployer, TestERC20, ["WETH", 18]);
+
+    // environment parameter is unused in mock
+    const environment = "unset environment" as unknown as Environment;
+    api = new Api("mock", environment);
+    apiMock = mock(api);
+
+    useDebugConsole();
+  });
+
+  afterEach(function () {
+    restoreStandardConsole();
+    if (this.currentTest?.isPassed()) {
+      apiMock.verify();
+    }
+  });
+
+  it("should dump tokens", async () => {
+    // Dump dai and weth for weth to a different receiver
+    const validity = 4242;
+
+    const wethData = {
+      balance: utils.parseEther("42"),
+    };
+    const daiData = {
+      balance: utils.parseEther("31337"),
+      fee: utils.parseEther("1337"),
+      boughtAmount: utils.parseEther("30"),
+    };
+
+    await dai.mint(signer.address, daiData.balance);
+    await weth.mint(signer.address, wethData.balance);
+    mockApiCalls({
+      ...daiData,
+      apiMock,
+      toToken: weth.address,
+      dumpedToken: dai.address,
+    });
+
+    api.placeOrder = async function ({ order }: PlaceOrderQuery) {
+      console.log(order);
+      expect(order.sellToken).to.deep.equal(dai.address);
+      expect(order.buyToken).to.deep.equal(weth.address);
+      expect(order.sellAmount).to.deep.equal(daiData.balance.sub(daiData.fee));
+      expect(order.buyAmount).to.deep.equal(daiData.boughtAmount);
+      expect(order.feeAmount).to.deep.equal(daiData.fee);
+      expect(order.kind).to.deep.equal(OrderKind.SELL);
+      expect(order.receiver).to.deep.equal(receiver.address);
+      // leave a minute of margin to account for the fact that the actual
+      // time and the time at which they are compared are slightly different
+      expect(
+        Math.abs(timestamp(order.validTo) - (Date.now() / 1000 + validity)) <
+          60,
+      ).to.be.true;
+      expect(order.partiallyFillable).to.equal(false);
+      return "0xorderUid";
+    };
+
+    await dump({
+      validity,
+      maxFeePercent: 100,
+      dumpedTokens: [weth.address, dai.address],
+      toToken: weth.address,
+      settlement,
+      signer,
+      receiver: receiver.address,
+      network,
+      hre,
+      api,
+      dryRun: false,
+      doNotPrompt: true,
+    });
+
+    await expect(weth.balanceOf(receiver.address)).to.eventually.deep.equal(
+      wethData.balance,
+    );
+    await expect(weth.balanceOf(signer.address)).to.eventually.deep.equal(
+      constants.AddressZero,
+    );
+  });
+
+  describe("regressions", () => {
+    it("should withdraw toToken if it's the only action to perform", async () => {
+      const balance = utils.parseEther("42");
+      await weth.mint(signer.address, balance);
+
+      await dump({
+        validity: 1337,
+        maxFeePercent: 100,
+        dumpedTokens: [weth.address],
+        toToken: weth.address,
+        settlement,
+        signer,
+        receiver: receiver.address,
+        network,
+        hre,
+        api,
+        dryRun: false,
+        doNotPrompt: true,
+      });
+
+      await expect(weth.balanceOf(receiver.address)).to.eventually.deep.equal(
+        balance,
+      );
+      await expect(weth.balanceOf(signer.address)).to.eventually.deep.equal(
+        constants.AddressZero,
+      );
+    });
   });
 });
