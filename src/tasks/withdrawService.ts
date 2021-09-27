@@ -237,6 +237,7 @@ export async function withdrawAndDump({
     tokens: checkedTokens,
     minValue,
     leftover,
+    maxFeePercent,
     receiver: solver.address,
     authenticator,
     settlement,
