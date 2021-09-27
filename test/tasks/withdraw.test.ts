@@ -347,7 +347,6 @@ describe("Task: withdraw", () => {
       authenticator,
       settlement,
       settlementDeploymentBlock: 0,
-      latestBlock: await ethers.provider.getBlockNumber(),
       minValue,
       leftover,
       maxFeePercent,
