@@ -112,7 +112,6 @@ export interface WithdrawAndDumpInput {
   authenticator: Contract;
   settlement: Contract;
   settlementDeploymentBlock: number;
-  latestBlock: number;
   minValue: string;
   leftover: string;
   validity: number;
@@ -151,7 +150,6 @@ export async function withdrawAndDump({
   authenticator,
   settlement,
   settlementDeploymentBlock,
-  latestBlock,
   minValue,
   leftover,
   validity,
@@ -210,12 +208,8 @@ export async function withdrawAndDump({
   ).flat();
 
   console.log("Recovering list of tokens traded since the previous run...");
-  const recentlyTradedTokens = await getAllTradedTokens(
-    settlement,
-    state.lastUpdateBlock,
-    latestBlock,
-    hre,
-  );
+  const { tokens: recentlyTradedTokens, toBlock: latestBlock } =
+    await getAllTradedTokens(settlement, state.lastUpdateBlock, "latest", hre);
 
   const tradedTokens = state.tradedTokens.concat(
     recentlyTradedTokens.filter(
@@ -248,7 +242,6 @@ export async function withdrawAndDump({
     authenticator,
     settlement,
     settlementDeploymentBlock,
-    latestBlock,
     network,
     usdReference,
     hre,
@@ -400,12 +393,11 @@ const setupWithdrawServiceTask: () => void = () =>
         const usdReference = REFERENCE_TOKEN[network];
         const api = new Api(network, Environment.Prod);
         const receiver = utils.getAddress(inputReceiver);
-        const [authenticator, settlementDeployment, [solver], latestBlock] =
+        const [authenticator, settlementDeployment, [solver]] =
           await Promise.all([
             getDeployedContract("GPv2AllowListAuthentication", hre),
             hre.deployments.get("GPv2Settlement"),
             hre.ethers.getSigners(),
-            hre.ethers.provider.getBlockNumber(),
           ]);
         const settlement = new Contract(
           settlementDeployment.address,
@@ -422,7 +414,6 @@ const setupWithdrawServiceTask: () => void = () =>
           authenticator,
           settlement,
           settlementDeploymentBlock,
-          latestBlock,
           minValue,
           leftover,
           validity,

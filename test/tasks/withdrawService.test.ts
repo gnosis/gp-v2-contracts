@@ -108,7 +108,6 @@ describe("Task: withdrawService", () => {
       validity: 3600,
       maxFeePercent: 100,
       toToken: toToken.address,
-      latestBlock: await hre.ethers.provider.getBlockNumber(),
       // ignore network value
       network: undefined as unknown as SupportedNetwork,
       usdReference,
