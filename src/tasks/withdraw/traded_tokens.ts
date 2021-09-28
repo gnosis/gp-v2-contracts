@@ -6,6 +6,7 @@ import { BUY_ETH_ADDRESS } from "../../ts";
 const enum ProviderError {
   TooManyEvents,
   Timeout,
+  NetworkError,
 }
 
 function decodeError(error: unknown): ProviderError | null {
@@ -13,11 +14,29 @@ function decodeError(error: unknown): ProviderError | null {
     return null;
   }
   const message = error.message;
+  // Infura
   if (/query returned more than \d* results/.test(message)) {
     return ProviderError.TooManyEvents;
   }
+  // OpenEthereum
   if (/Network connection timed out/.test(message)) {
     return ProviderError.Timeout;
+  }
+  // POA Network xDai node
+  if (
+    /^timeout.*/.test(message) &&
+    (error as Error & Record<string, unknown>).reason === "timeout" &&
+    (error as Error & Record<string, unknown>).code === "TIMEOUT"
+  ) {
+    return ProviderError.Timeout;
+  }
+  if (
+    /^could not detect network.*/.test(message) &&
+    (error as Error & Record<string, unknown>).reason ===
+      "could not detect network" &&
+    (error as Error & Record<string, unknown>).code === "NETWORK_ERROR"
+  ) {
+    return ProviderError.NetworkError;
   }
   return null;
 }
@@ -55,10 +74,11 @@ export async function getAllTradedTokens(
     console.log(`Processed events from block ${fromBlock} to ${toBlock}`);
   } catch (error) {
     switch (decodeError(error)) {
-      // If the query is too large, Infura throws "too many events" error while
-      // other nodes time out.
+      // Different nodes throw different types of errors when the query is too
+      // large.
       case ProviderError.Timeout:
       case ProviderError.TooManyEvents:
+      case ProviderError.NetworkError:
         console.log(
           `Failed to process events from block ${fromBlock} to ${toBlock}, reducing range...`,
         );
