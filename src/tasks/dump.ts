@@ -117,21 +117,17 @@ async function getTransferToReceiver({
     return undefined;
   }
 
-  const gasPrice = hre.ethers.provider.getGasPrice();
   const amount = await balanceOf(toToken, user);
   if (amount.isZero()) {
-    gasPrice.catch(() => {
-      // Gas price is not needed. Empty catch to suppress Node warning
-      // (unhandled promise rejection) in case retrieving gas fails
-    });
     return undefined;
   }
 
-  const [gas, value] = await Promise.all([
+  const [gasPrice, gas, value] = await Promise.all([
+    hre.ethers.provider.getGasPrice(),
     estimateTransferGas(toToken, user, receiver.address, amount),
     ethValue(toToken, amount, network, api),
   ]);
-  const approxGasCost = Number(gas.mul(await gasPrice));
+  const approxGasCost = Number(gas.mul(gasPrice));
   const approxValue = Number(value.toString());
   const feePercent = (100 * approxGasCost) / approxValue;
   if (feePercent > maxFeePercent) {
