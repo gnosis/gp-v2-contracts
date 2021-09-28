@@ -492,12 +492,11 @@ export async function dump({
       network,
       api,
     });
-  if (instructions.length === 0) {
-    console.log("No token can be sold");
-    return;
+  const willTrade = instructions.length !== 0;
+  const willTransfer = transferToReceiver !== undefined;
+  if (willTrade) {
+    displayOperations(instructions, toToken);
   }
-
-  displayOperations(instructions, toToken);
 
   let sumReceived = instructions.reduce(
     (sum, inst) => sum.add(inst.receivedAmount),
@@ -514,25 +513,32 @@ export async function dump({
   const toTokenName = isNativeToken(toToken)
     ? toToken.symbol
     : toToken.symbol ?? `units of token ${toToken.address}`;
-  if (transferToReceiver !== undefined) {
+  if (willTransfer) {
     console.log(
-      `Moreover, ${utils.formatUnits(
+      `${
+        willTrade ? "Moreover, a" : "A"
+      } token transfer for ${utils.formatUnits(
         transferToReceiver.amount,
         transferToReceiver.token.decimals ?? 0,
-      )} ${toTokenName} will be transfered to the receiver address ${receiver}.`,
+      )} ${toTokenName} to the receiver address ${receiver} will be submitted onchain.`,
     );
     sumReceived = sumReceived.add(transferToReceiver.amount);
   }
-  console.log(
-    `${
-      hasCustomReceiver
-        ? `The receiver address ${receiver}`
-        : `Your address (${signer.address})`
-    } will receive at least ${utils.formatUnits(
-      sumReceived,
-      toToken.decimals ?? 0,
-    )} ${toTokenName} from selling the tokens listed above.`,
-  );
+  if (willTrade || willTransfer) {
+    console.log(
+      `${
+        hasCustomReceiver
+          ? `The receiver address ${receiver}`
+          : `Your address (${signer.address})`
+      } will receive at least ${utils.formatUnits(
+        sumReceived,
+        toToken.decimals ?? 0,
+      )} ${toTokenName} from selling the tokens listed above.`,
+    );
+  } else {
+    console.log("Nothing to do.");
+    return;
+  }
   if (!dryRun && (doNotPrompt || (await prompt(hre, "Submit?")))) {
     await createAllowances(needAllowances, signer, vaultRelayer, {
       // If the services don't register the allowance before the order,
