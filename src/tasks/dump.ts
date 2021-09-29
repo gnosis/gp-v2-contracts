@@ -88,6 +88,21 @@ interface Receiver {
   isSameAsUser: boolean;
 }
 
+function ignoredTokenMessage(
+  token: Erc20Token | NativeToken,
+  amount: BigNumber,
+  reason?: string,
+) {
+  const decimals = token.decimals ?? 18;
+  return `Ignored ${utils.formatUnits(amount, decimals)} units of ${displayName(
+    token,
+  )}${
+    token.decimals === undefined
+      ? ` (no decimals specified in the contract, assuming ${decimals})`
+      : ""
+  }${reason ? `, ${reason}` : ""}`;
+}
+
 interface GetTransferToReceiverInput {
   toToken: Erc20Token | NativeToken;
   inputDumpedTokens: string[];
@@ -119,6 +134,11 @@ async function getTransferToReceiver({
 
   const amount = await balanceOf(toToken, user);
   if (amount.isZero()) {
+    console.log(
+      `Ignored token ${displayName(
+        toToken,
+      )}. No balance for that token is available.`,
+    );
     return undefined;
   }
 
@@ -131,6 +151,15 @@ async function getTransferToReceiver({
   const approxValue = Number(value.toString());
   const feePercent = (100 * approxGasCost) / approxValue;
   if (feePercent > maxFeePercent) {
+    console.log(
+      ignoredTokenMessage(
+        toToken,
+        amount,
+        `the transaction fee is too large compared to the balance (${feePercent.toFixed(
+          2,
+        )}%).`,
+      ),
+    );
     return undefined;
   }
 
@@ -233,7 +262,7 @@ export async function getDumpInstructions({
         const needsAllowance = approvedAmount.lt(balance);
         if (balance.isZero()) {
           consoleLog(
-            `Dump request skipped for token ${displayName(
+            `Ignored token ${displayName(
               token,
             )}. No balance for that token is available.`,
           );
@@ -258,9 +287,11 @@ export async function getDumpInstructions({
             "SellAmountDoesNotCoverFee"
           ) {
             consoleLog(
-              `Dump request skipped for token ${displayName(
+              ignoredTokenMessage(
                 token,
-              )}. The trading fee is larger than the dumped amount.`,
+                balance,
+                "the trading fee is larger than the dumped amount.",
+              ),
             );
             return null;
           } else {
@@ -273,11 +304,13 @@ export async function getDumpInstructions({
         const feePercent = (100 * approxFee) / approxBalance;
         if (feePercent > maxFeePercent) {
           consoleLog(
-            `Dump request skipped for token ${displayName(
+            ignoredTokenMessage(
               token,
-            )}. The trading fee is too large compared to the balance (${feePercent.toFixed(
-              2,
-            )}%).`,
+              balance,
+              `the trading fee is too large compared to the balance (${feePercent.toFixed(
+                2,
+              )}%).`,
+            ),
           );
           return null;
         }
