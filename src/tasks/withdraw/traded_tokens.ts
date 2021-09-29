@@ -1,5 +1,5 @@
-import { Contract, providers } from "ethers";
-import { HardhatRuntimeEnvironment, HttpNetworkConfig } from "hardhat/types";
+import { Contract } from "ethers";
+import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 import { BUY_ETH_ADDRESS } from "../../ts";
 
@@ -25,28 +25,20 @@ function decodeError(error: unknown): ProviderError | null {
 /// Lists all tokens that were traded by the settlement contract in the range
 /// specified by the two input blocks. Range bounds are both inclusive.
 /// The output value `lastFullyIncludedBlock` returns the block numbers of the
-/// latest block for which traded tokens were searched.
+/// latest block for which traded tokens were searched. Note that the returned
+/// block value might not be exact in some circumstances like reorgs or
+/// load-balanced nodes.
 export async function getAllTradedTokens(
   settlement: Contract,
   fromBlock: number,
   toBlock: number | "latest",
   hre: HardhatRuntimeEnvironment,
 ): Promise<{ tokens: string[]; toBlock: number }> {
-  // The calls to getLogs and to getBlockNumber must be simultaneous, so that
-  // if running on a node with load balancing then both requests go to the same
-  // node and the block number actually represent the latest block for the logs.
-  // Note: a batch provider executes all requests at the end of the event loop
-  const url = (hre.network.config as HttpNetworkConfig).url;
-  // Note: URL is undefined for network hardhat
-  const batchProvider =
-    url !== undefined
-      ? new providers.JsonRpcBatchProvider(url, hre.network.config.chainId)
-      : hre.ethers.provider;
   let trades = null;
   let numericToBlock =
-    toBlock === "latest" ? batchProvider.getBlockNumber() : toBlock;
+    toBlock === "latest" ? hre.ethers.provider.getBlockNumber() : toBlock;
   try {
-    trades = await batchProvider.getLogs({
+    trades = await hre.ethers.provider.getLogs({
       topics: [settlement.interface.getEventTopic("Trade")],
       address: settlement.address,
       fromBlock,
