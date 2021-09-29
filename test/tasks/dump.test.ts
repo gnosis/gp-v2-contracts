@@ -468,7 +468,7 @@ describe("getDumpInstructions", () => {
     expect(instructions).to.have.length(0);
 
     expect(consoleLogOutput).to.equal(
-      `Dump request skipped for token ${dumped.address}. The trading fee is larger than the dumped amount.`,
+      `Ignored 42.0 units of ${dumped.address}, the trading fee is larger than the dumped amount.`,
     );
   });
 
@@ -513,7 +513,7 @@ describe("getDumpInstructions", () => {
 
     expect(consoleLogOutput).to.match(
       new RegExp(
-        `Dump request skipped for token ${dumped.address}\\. The trading fee is too large compared to the balance \\([0-9.]*%\\)\\.`,
+        `Ignored 42.0 units of ${dumped.address}, the trading fee is too large compared to the balance \\(5[0-9.]+%\\)\\.`,
       ),
     );
   });
