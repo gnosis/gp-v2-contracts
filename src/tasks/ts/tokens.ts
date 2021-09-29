@@ -62,6 +62,25 @@ export async function balanceOf(
   return BigNumber.from(await balanceFunction(user));
 }
 
+export async function estimateTransferGas(
+  token: Erc20Token | NativeToken,
+  from: string,
+  to: string,
+  amount: BigNumberish,
+): Promise<BigNumber> {
+  if (isNativeToken(token)) {
+    return await token.provider.estimateGas({
+      from,
+      to,
+      value: amount,
+    });
+  } else {
+    return await token.contract.estimateGas["transfer"](to, amount, {
+      from,
+    });
+  }
+}
+
 export async function transfer(
   token: Erc20Token | NativeToken,
   from: Signer,

@@ -3,7 +3,12 @@ import { BigNumber } from "ethers";
 import { Api } from "../../services/api";
 import { OrderKind } from "../../ts";
 import { SupportedNetwork } from "../ts/deployment";
-import { Erc20Token, WRAPPED_NATIVE_TOKEN_ADDRESS } from "../ts/tokens";
+import {
+  Erc20Token,
+  isNativeToken,
+  NativeToken,
+  WRAPPED_NATIVE_TOKEN_ADDRESS,
+} from "../ts/tokens";
 
 export interface ReferenceToken {
   symbol: string;
@@ -31,13 +36,13 @@ export const REFERENCE_TOKEN: Record<SupportedNetwork, ReferenceToken> = {
 } as const;
 
 export async function usdValue(
-  token: Pick<Erc20Token, "symbol" | "address">,
+  token: string,
   amount: BigNumber,
   referenceToken: ReferenceToken,
   api: Api,
 ): Promise<BigNumber> {
   return await api.estimateTradeAmount({
-    sellToken: token.address,
+    sellToken: token,
     buyToken: referenceToken.address,
     amount,
     kind: OrderKind.SELL,
@@ -51,11 +56,28 @@ export async function usdValueOfEth(
   api: Api,
 ): Promise<BigNumber> {
   return await usdValue(
-    { symbol: "ETH", address: WRAPPED_NATIVE_TOKEN_ADDRESS[network] },
+    WRAPPED_NATIVE_TOKEN_ADDRESS[network],
     amount,
     referenceToken,
     api,
   );
+}
+
+export async function ethValue(
+  token: Erc20Token | NativeToken,
+  amount: BigNumber,
+  network: SupportedNetwork,
+  api: Api,
+): Promise<BigNumber> {
+  if (isNativeToken(token)) {
+    return amount;
+  }
+  return await api.estimateTradeAmount({
+    sellToken: token.address,
+    buyToken: WRAPPED_NATIVE_TOKEN_ADDRESS[network], // todo: replace WETH address with BUY_ETH_ADDRESS when services support ETH estimates
+    amount,
+    kind: OrderKind.SELL,
+  });
 }
 
 // Format amount so that it has exactly a fixed amount of decimals.

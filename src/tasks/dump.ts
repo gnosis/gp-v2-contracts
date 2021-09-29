@@ -39,9 +39,10 @@ import {
   balanceOf,
   transfer,
   displayName,
+  estimateTransferGas,
 } from "./ts/tokens";
 import { prompt } from "./ts/tui";
-import { formatTokenValue } from "./ts/value";
+import { formatTokenValue, ethValue } from "./ts/value";
 
 const MAX_LATEST_BLOCK_DELAY_SECONDS = 2 * 60;
 export const MAX_ORDER_VALIDITY_SECONDS = 24 * 3600;
@@ -70,6 +71,7 @@ interface DisplayDumpInstruction {
 interface TransferToReceiver {
   token: Erc20Token | NativeToken;
   amount: BigNumber;
+  feePercent: number;
 }
 
 interface DumpInstructions {
@@ -81,13 +83,71 @@ interface DumpInstructions {
   transferToReceiver?: TransferToReceiver;
 }
 
+interface Receiver {
+  address: string;
+  isSameAsUser: boolean;
+}
+
+interface GetTransferToReceiverInput {
+  toToken: Erc20Token | NativeToken;
+  inputDumpedTokens: string[];
+  user: string;
+  receiver: Receiver;
+  maxFeePercent: number;
+  network: SupportedNetwork;
+  api: Api;
+  hre: HardhatRuntimeEnvironment;
+}
+async function getTransferToReceiver({
+  toToken,
+  inputDumpedTokens,
+  user,
+  receiver,
+  maxFeePercent,
+  network,
+  api,
+  hre,
+}: GetTransferToReceiverInput): Promise<TransferToReceiver | undefined> {
+  if (
+    receiver.isSameAsUser ||
+    !inputDumpedTokens.includes(
+      isNativeToken(toToken) ? BUY_ETH_ADDRESS : toToken.address,
+    )
+  ) {
+    return undefined;
+  }
+
+  const amount = await balanceOf(toToken, user);
+  if (amount.isZero()) {
+    return undefined;
+  }
+
+  const [gasPrice, gas, value] = await Promise.all([
+    hre.ethers.provider.getGasPrice(),
+    estimateTransferGas(toToken, user, receiver.address, amount),
+    ethValue(toToken, amount, network, api),
+  ]);
+  const approxGasCost = Number(gas.mul(gasPrice));
+  const approxValue = Number(value.toString());
+  const feePercent = (100 * approxGasCost) / approxValue;
+  if (feePercent > maxFeePercent) {
+    return undefined;
+  }
+
+  return {
+    token: toToken,
+    amount,
+    feePercent,
+  };
+}
+
 export interface GetDumpInstructionInput {
   dumpedTokens: string[];
   toTokenAddress: string | undefined; // undefined defaults to native token (e.g., ETH)
   user: string;
   vaultRelayer: string;
   maxFeePercent: number;
-  hasCustomReceiver: boolean;
+  receiver: Receiver;
   hre: HardhatRuntimeEnvironment;
   network: SupportedNetwork;
   api: Api;
@@ -116,7 +176,7 @@ export async function getDumpInstructions({
   user,
   vaultRelayer: vaultRelayer,
   maxFeePercent,
-  hasCustomReceiver,
+  receiver,
   hre,
   network,
   api,
@@ -141,20 +201,20 @@ export async function getDumpInstructions({
     toToken = erc20;
   }
 
-  let transferToReceiver: TransferToReceiver | undefined = undefined;
+  const transferToReceiver = getTransferToReceiver({
+    toToken,
+    inputDumpedTokens,
+    user,
+    receiver,
+    maxFeePercent,
+    network,
+    api,
+    hre,
+  });
+
   const dumpedTokens = Array.from(new Set(inputDumpedTokens)).filter(
     (token) => token !== (toTokenAddress ?? BUY_ETH_ADDRESS),
   );
-  if (
-    hasCustomReceiver &&
-    inputDumpedTokens.includes(toTokenAddress ?? BUY_ETH_ADDRESS)
-  ) {
-    transferToReceiver = {
-      token: toToken,
-      amount: await balanceOf(toToken, user),
-    };
-  }
-
   const computedInstructions: (DumpInstruction | null)[] = (
     await promiseAllWithRateLimit(
       dumpedTokens.map((tokenAddress) => async ({ consoleLog }) => {
@@ -243,7 +303,11 @@ export async function getDumpInstructions({
       : 1,
   );
 
-  return { instructions, toToken, transferToReceiver };
+  return {
+    instructions,
+    toToken,
+    transferToReceiver: await transferToReceiver,
+  };
 }
 
 function formatInstruction(
@@ -344,8 +408,7 @@ async function createOrders(
   instructions: DumpInstruction[],
   toToken: Erc20Token | NativeToken,
   signer: Signer,
-  receiver: string,
-  hasCustomReceiver: boolean,
+  receiver: Receiver,
   domainSeparator: TypedDataDomain,
   validity: number,
   ethers: HardhatRuntimeEnvironment["ethers"],
@@ -372,7 +435,7 @@ async function createOrders(
       // supported by the services
       partiallyFillable: false,
       validTo: now + validity,
-      receiver: hasCustomReceiver ? receiver : undefined,
+      receiver: receiver.isSameAsUser ? undefined : receiver.address,
     };
     const signature = await signOrder(
       domainSeparator,
@@ -413,20 +476,18 @@ async function createOrders(
 async function transferSameTokenToReceiver(
   transferToReceiver: TransferToReceiver,
   signer: Signer,
-  receiver: string,
+  receiver: Receiver,
 ) {
-  if (transferToReceiver !== undefined) {
-    console.log(
-      `Transfering token ${transferToReceiver.token.symbol} to receiver...`,
-    );
-    const receipt = await transfer(
-      transferToReceiver.token,
-      signer,
-      receiver,
-      transferToReceiver.amount,
-    );
-    await receipt.wait();
-  }
+  console.log(
+    `Transfering token ${transferToReceiver.token.symbol} to receiver...`,
+  );
+  const receipt = await transfer(
+    transferToReceiver.token,
+    signer,
+    receiver.address,
+    transferToReceiver.amount,
+  );
+  await receipt.wait();
 }
 
 interface DumpInput {
@@ -468,17 +529,11 @@ export async function dump({
     (await settlement.vaultRelayer()) as string,
   ]);
   const domainSeparator = domain(chainId, settlement.address);
-  const receiver: string = inputReceiver ?? signer.address;
-  const hasCustomReceiver = receiver !== signer.address;
-
-  // todo: when sending ETH to a contract will be supported by the
-  // services, remove this check.
-  if (
-    (toTokenAddress === undefined || toTokenAddress === BUY_ETH_ADDRESS) &&
-    utils.arrayify(await ethers.provider.getCode(receiver)).length !== 0
-  ) {
-    throw new Error("Cannot send eth to a contract");
-  }
+  const receiverAddress = inputReceiver ?? signer.address;
+  const receiver: Receiver = {
+    address: receiverAddress,
+    isSameAsUser: receiverAddress === signer.address,
+  };
 
   const { instructions, toToken, transferToReceiver } =
     await getDumpInstructions({
@@ -487,7 +542,7 @@ export async function dump({
       user: signer.address,
       vaultRelayer: vaultRelayer,
       maxFeePercent,
-      hasCustomReceiver,
+      receiver,
       hre,
       network,
       api,
@@ -514,26 +569,31 @@ export async function dump({
     ? toToken.symbol
     : toToken.symbol ?? `units of token ${toToken.address}`;
   if (willTransfer) {
+    const { amount, token, feePercent } = transferToReceiver;
     console.log(
       `${
         willTrade ? "Moreover, a" : "A"
       } token transfer for ${utils.formatUnits(
-        transferToReceiver.amount,
-        transferToReceiver.token.decimals ?? 0,
-      )} ${toTokenName} to the receiver address ${receiver} will be submitted onchain.`,
+        amount,
+        token.decimals ?? 0,
+      )} ${toTokenName} to the receiver address ${
+        receiver.address
+      } will be submitted onchain. The transfer network fee corresponds to about ${
+        feePercent < 0.01 ? "< 0.01" : feePercent.toFixed(1)
+      }% of the withdrawn amount.`,
     );
-    sumReceived = sumReceived.add(transferToReceiver.amount);
+    sumReceived = sumReceived.add(amount);
   }
   if (willTrade || willTransfer) {
     console.log(
       `${
-        hasCustomReceiver
+        receiver.isSameAsUser
           ? `The receiver address ${receiver}`
           : `Your address (${signer.address})`
       } will receive at least ${utils.formatUnits(
         sumReceived,
         toToken.decimals ?? 0,
-      )} ${toTokenName} from selling the tokens listed above.`,
+      )} ${toTokenName} from the tokens listed above.`,
     );
   } else {
     console.log("Nothing to do.");
@@ -554,14 +614,13 @@ export async function dump({
       toToken,
       signer,
       receiver,
-      hasCustomReceiver,
       domainSeparator,
       validity,
       ethers,
       api,
     );
 
-    if (transferToReceiver !== undefined) {
+    if (willTransfer) {
       await transferSameTokenToReceiver(transferToReceiver, signer, receiver);
     }
 

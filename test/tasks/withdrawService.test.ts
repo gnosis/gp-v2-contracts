@@ -16,6 +16,7 @@ import * as withdrawService from "../../src/tasks/withdrawService";
 import { WithdrawAndDumpInput } from "../../src/tasks/withdrawService";
 import { OrderKind, domain, Order, timestamp } from "../../src/ts";
 import { deployTestContracts } from "../e2e/fixture";
+import { synchronizeBlockchainAndCurrentTime } from "../hardhatNetwork";
 
 import { restoreStandardConsole, useDebugConsole } from "./logging";
 import {
@@ -115,6 +116,15 @@ describe("Task: withdrawService", () => {
       api,
       dryRun: false,
     });
+
+    // the script checks that the onchain time is not too far from the current
+    // time
+    if (
+      (await ethers.provider.getBlock("latest")).timestamp <
+      Math.floor(Date.now() / 1000)
+    ) {
+      await synchronizeBlockchainAndCurrentTime();
+    }
 
     useDebugConsole();
   });
