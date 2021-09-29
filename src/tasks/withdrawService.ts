@@ -208,8 +208,12 @@ export async function withdrawAndDump({
   ).flat();
 
   console.log("Recovering list of tokens traded since the previous run...");
+  // Add extra blocks before the last update in case there was a reorg and new
+  // transactions were included.
+  const maxReorgDistance = 20;
+  const fromBlock = Math.max(0, state.lastUpdateBlock - maxReorgDistance);
   const { tokens: recentlyTradedTokens, toBlock: latestBlock } =
-    await getAllTradedTokens(settlement, state.lastUpdateBlock, "latest", hre);
+    await getAllTradedTokens(settlement, fromBlock, "latest", hre);
 
   const tradedTokens = state.tradedTokens.concat(
     recentlyTradedTokens.filter(
