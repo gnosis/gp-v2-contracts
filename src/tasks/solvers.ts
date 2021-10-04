@@ -30,7 +30,6 @@ async function performSolverManagement(
   { solver, printTransaction }: Args,
   hre: HardhatRuntimeEnvironment,
 ): Promise<void> {
-  const owner = await getNamedSigner(hre, "manager");
   const authenticator = await getDeployedContract(
     "GPv2AllowListAuthentication",
     hre,
@@ -42,6 +41,7 @@ async function performSolverManagement(
     console.log(`To:   ${authenticator.address}`);
     console.log(`Data: ${data}`);
   } else {
+    const owner = await getNamedSigner(hre, "manager");
     const tx = await authenticator.connect(owner)[method](solver);
     console.log(transactionUrl(hre, tx));
     await tx.wait();
