@@ -26,7 +26,7 @@ const removeSolver = async (args: Args, hre: HardhatRuntimeEnvironment) => {
 };
 
 async function performSolverManagement(
-  method: string,
+  method: "addSolver" | "removeSolver",
   { solver, printTransaction }: Args,
   hre: HardhatRuntimeEnvironment,
 ): Promise<void> {
@@ -103,9 +103,7 @@ const setupSolversTask: () => void = () => {
   )
     .addPositionalParam<string>("solver", "The solver account to add.")
     .addFlag("printTransaction", "Prints the transaction to standard out.")
-    .setAction(async (args, hardhatRuntime) => {
-      await addSolver(args, hardhatRuntime);
-    });
+    .setAction(addSolver);
 
   subtask(
     "solvers-remove",
@@ -113,9 +111,7 @@ const setupSolversTask: () => void = () => {
   )
     .addPositionalParam<string>("solver", "The solver account to remove.")
     .addFlag("printTransaction", "Prints the transaction to standard out.")
-    .setAction(async (args, hardhatRuntime) => {
-      await removeSolver(args, hardhatRuntime);
-    });
+    .setAction(removeSolver);
 
   subtask(
     "solvers-check",
