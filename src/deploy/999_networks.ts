@@ -21,7 +21,7 @@ const updateNetworks: DeployFunction = async function ({
   ethers,
   network,
 }: HardhatRuntimeEnvironment) {
-  if (network.name === "hardhat") {
+  if (network.name === "hardhat" || network.name === "localhost") {
     return;
   }
 
