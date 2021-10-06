@@ -621,8 +621,8 @@ export async function dump({
     console.log(
       `${
         receiver.isSameAsUser
-          ? `The receiver address ${receiver}`
-          : `Your address (${signer.address})`
+          ? `Your address (${receiver.address})`
+          : `The receiver address ${receiver.address}`
       } will receive at least ${utils.formatUnits(
         sumReceived,
         toToken.decimals ?? 0,
