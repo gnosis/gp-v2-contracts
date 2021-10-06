@@ -7,33 +7,47 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { getDeployedContract } from "./ts/deployment";
 import { getNamedSigner } from "./ts/signers";
 import { getSolvers } from "./ts/solver";
+import { transactionUrl } from "./ts/tui";
 
 const solversTaskList = ["add", "check", "remove", "list"] as const;
 type SolversTasks = typeof solversTaskList[number];
 
-async function addSolver(solver: string, hre: HardhatRuntimeEnvironment) {
-  const owner = await getNamedSigner(hre, "manager");
-  const authenticator = await getDeployedContract(
-    "GPv2AllowListAuthentication",
-    hre,
-  );
-
-  const tx = await authenticator.connect(owner).addSolver(solver);
-  await tx.wait();
-  console.log("Solver added.");
+interface Args {
+  solver?: string;
+  printTransaction: boolean;
 }
 
-const removeSolver = async (solver: string, hre: HardhatRuntimeEnvironment) => {
-  const owner = await getNamedSigner(hre, "manager");
+async function addSolver(args: Args, hre: HardhatRuntimeEnvironment) {
+  await performSolverManagement("addSolver", args, hre);
+}
+
+const removeSolver = async (args: Args, hre: HardhatRuntimeEnvironment) => {
+  await performSolverManagement("removeSolver", args, hre);
+};
+
+async function performSolverManagement(
+  method: "addSolver" | "removeSolver",
+  { solver, printTransaction }: Args,
+  hre: HardhatRuntimeEnvironment,
+): Promise<void> {
   const authenticator = await getDeployedContract(
     "GPv2AllowListAuthentication",
     hre,
   );
 
-  const tx = await authenticator.connect(owner).removeSolver(solver);
-  await tx.wait();
-  console.log("Solver removed.");
-};
+  if (printTransaction) {
+    const data = authenticator.interface.encodeFunctionData(method, [solver]);
+    console.log(`\`${method}\` transaction:`);
+    console.log(`To:   ${authenticator.address}`);
+    console.log(`Data: ${data}`);
+  } else {
+    const owner = await getNamedSigner(hre, "manager");
+    const tx = await authenticator.connect(owner)[method](solver);
+    console.log(transactionUrl(hre, tx));
+    await tx.wait();
+    console.log(`Executed \`${method}\`.`);
+  }
+}
 
 const isSolver = async (solver: string, hre: HardhatRuntimeEnvironment) => {
   const authenticator = await getDeployedContract(
@@ -65,9 +79,13 @@ const setupSolversTask: () => void = () => {
         ", ",
       )}`,
     )
-    .addOptionalVariadicPositionalParam(
-      "args",
-      "Extra parameters of the subtask",
+    .addOptionalPositionalParam<string>(
+      "solver",
+      "The solver account to add, remove, or check",
+    )
+    .addFlag(
+      "printTransaction",
+      "Prints the transaction to standard out when adding or removing solvers.",
     )
     .setAction(async (taskArguments, { run }) => {
       const { subtask } = taskArguments;
@@ -82,38 +100,27 @@ const setupSolversTask: () => void = () => {
   subtask(
     "solvers-add",
     "Adds a solver to the list of allowed solvers in GPv2.",
-  ).setAction(async ({ args }, hardhatRuntime) => {
-    if (!args || args.length !== 1) {
-      throw new Error(
-        "Invalid number of arguments. Expected the address of the solver to be added.",
-      );
-    }
-    await addSolver(args[0], hardhatRuntime);
-  });
+  )
+    .addPositionalParam<string>("solver", "The solver account to add.")
+    .addFlag("printTransaction", "Prints the transaction to standard out.")
+    .setAction(addSolver);
 
   subtask(
     "solvers-remove",
     "Removes a solver from the list of allowed solvers in GPv2.",
-  ).setAction(async ({ args }, hardhatRuntime) => {
-    if (!args || args.length !== 1) {
-      throw new Error(
-        "Invalid number of arguments. Expected the address of the solver to be removed.",
-      );
-    }
-    await removeSolver(args[0], hardhatRuntime);
-  });
+  )
+    .addPositionalParam<string>("solver", "The solver account to remove.")
+    .addFlag("printTransaction", "Prints the transaction to standard out.")
+    .setAction(removeSolver);
 
   subtask(
     "solvers-check",
     "Checks that an address is registered as a solver of GPv2.",
-  ).setAction(async ({ args }, hardhatRuntime) => {
-    if (!args || args.length !== 1) {
-      throw new Error(
-        "Invalid number of arguments. Expected the address of the solver to be checked",
-      );
-    }
-    await isSolver(args[0], hardhatRuntime);
-  });
+  )
+    .addPositionalParam<string>("solver", "The solver account to check.")
+    .setAction(async ({ solver }, hardhatRuntime) => {
+      await isSolver(solver, hardhatRuntime);
+    });
 
   subtask(
     "solvers-list",
