@@ -323,7 +323,7 @@ export async function getDumpInstructions({
           needsAllowance,
         };
       }),
-      { rateLimit: 10 },
+      { rateLimit: 5 },
     )
   ).filter((inst) => inst !== null);
   // note: null entries have already been filtered out

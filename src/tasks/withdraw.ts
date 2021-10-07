@@ -315,6 +315,7 @@ async function getWithdrawals({
   const processedWithdrawals: (Withdrawal | null)[] =
     await promiseAllWithRateLimit(computeWithdrawalInstructions, {
       message: "computing withdrawals",
+      rateLimit: 5,
     });
   return processedWithdrawals.filter(
     (withdrawal) => withdrawal !== null,
