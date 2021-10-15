@@ -60,7 +60,7 @@
     "ethereum-waffle": "^3.4.0",
     "ethers": "^5.4.7",
     "globby": "^11.0.4",
-    "hardhat": "^2.6.5",
+    "hardhat": "^2.6.6",
     "hardhat-deploy": "^0.7.3",
     "hardhat-gas-reporter": "^1.0.4",
     "prettier": "^2.4.1",
