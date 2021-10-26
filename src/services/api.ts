@@ -300,10 +300,10 @@ async function getFeeAndQuoteBuy({
 }
 
 async function getQuote(
-  { network, environment }: ApiCall,
+  { baseUrl }: ApiCall,
   quote: QuoteQuery,
 ): Promise<GetQuoteResponse> {
-  return call("quote", network, environment, {
+  return call("quote", baseUrl, {
     method: "post",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(quote),
