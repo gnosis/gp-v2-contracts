@@ -689,6 +689,10 @@ const setupDumpTask: () => void = () =>
       5,
       types.float,
     )
+    .addOptionalParam(
+      "apiUrl",
+      "If set, the script contacts the API using the given url. Otherwise, the default prod url for the current network is used",
+    )
     .addFlag(
       "dryRun",
       "Just simulate the result instead of executing the transaction on the blockchain.",
@@ -707,6 +711,7 @@ const setupDumpTask: () => void = () =>
           dryRun,
           receiver,
           validity,
+          apiUrl,
         },
         hre,
       ) => {
@@ -714,7 +719,7 @@ const setupDumpTask: () => void = () =>
         if (!isSupportedNetwork(network)) {
           throw new Error(`Unsupported network ${hre.network.name}`);
         }
-        const api = new Api(network, Environment.Prod);
+        const api = new Api(network, apiUrl ?? Environment.Prod);
         const [signers, settlement] = await Promise.all([
           hre.ethers.getSigners(),
           getDeployedContract("GPv2Settlement", hre),
