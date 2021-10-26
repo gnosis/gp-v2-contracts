@@ -17,6 +17,7 @@ import {
   isSupportedNetwork,
   SupportedNetwork,
 } from "./ts/deployment";
+import { promiseAllWithRateLimit } from "./ts/rate_limits";
 import { balanceOf, erc20Token } from "./ts/tokens";
 import { ReferenceToken, REFERENCE_TOKEN } from "./ts/value";
 import { withdraw } from "./withdraw";
@@ -45,6 +46,12 @@ export interface State {
    * service.
    */
   pendingTokens: PendingToken[];
+  /**
+   * Number of consecutive soft errors in a row. A soft error is an error that
+   * has no irreversible consequences, for example a network timeout before
+   * any transactions has been sent onchain.
+   */
+  softErrorCount?: number;
 }
 
 interface PendingToken {
@@ -103,6 +110,66 @@ function isValidState(state: unknown): state is State {
     return false;
   }
   return true;
+}
+
+function bumpErrorCount(state: State) {
+  const softErrorCount = (state.softErrorCount ?? 0) + 1;
+  // exponential alert backoff
+  if (Number.isInteger(Math.log2(softErrorCount / 10))) {
+    console.error(`Encountered ${softErrorCount} soft errors in a row`);
+  }
+  return {
+    ...state,
+    softErrorCount,
+  };
+}
+
+async function updatePendingTokens(
+  pendingTokens: PendingToken[],
+  solver: string,
+  hre: HardhatRuntimeEnvironment,
+): Promise<PendingToken[]> {
+  return (
+    await promiseAllWithRateLimit(
+      pendingTokens.map((pendingToken) => async ({ consoleError }) => {
+        if (pendingToken.retries >= MAX_ORDER_RETRIES_BEFORE_SKIPPING) {
+          // Note that this error might be triggered in legitimate cases, for
+          // example if a token did not trade the first time and then the price
+          // has become so low that it's not enough to pay for the fee.
+          // TODO: revisit after getting an idea of the frequency at which this
+          // alert is triggered.
+          consoleError(
+            `Tried ${pendingToken.retries} times to sell token ${pendingToken.address} without success. Skipping token until future run`,
+          );
+          return [];
+        }
+
+        // assumption: eth is not in the list (as it's not supported by the
+        // withdraw script). This should not happen unless the pending token
+        // list in the state was manually changed and ETH was added.
+        assert(
+          pendingToken.address.toLowerCase() !== BUY_ETH_ADDRESS.toLowerCase(),
+          "Pending tokens should not contain ETH",
+        );
+        const token = await erc20Token(pendingToken.address, hre);
+        if (token === null) {
+          throw new Error(
+            `Previously sold a token that is not a valid ERC20 token anymore (address ${pendingToken.address})`,
+          );
+        }
+        return (await balanceOf(token, solver)).isZero() ? [] : [pendingToken];
+      }),
+    )
+  ).flat();
+}
+
+function bumpAllPendingTokenRetries(
+  pendingTokens: PendingToken[],
+): PendingToken[] {
+  return pendingTokens.map((pendingToken) => ({
+    ...pendingToken,
+    retries: pendingToken.retries + 1,
+  }));
 }
 
 export interface WithdrawAndDumpInput {
@@ -170,50 +237,37 @@ export async function withdrawAndDump({
       `Too many tokens checked per run (${pagination}, max ${MAX_CHECKED_TOKENS_PER_RUN})`,
     );
   }
-  // Update list of pending tokens to determine which token was traded
-  const pendingTokens = (
-    await Promise.all(
-      state.pendingTokens.map(async (pendingToken) => {
-        if (pendingToken.retries >= MAX_ORDER_RETRIES_BEFORE_SKIPPING) {
-          // Note that this error might be triggered in legitimate cases, for
-          // example if a token did not trade the first time and then the price
-          // has become so low that it's not enough to pay for the fee.
-          // TODO: revisit after getting an idea of the frequency at which this
-          // alert is triggered.
-          console.error(
-            `Tried ${pendingToken.retries} times to sell token ${pendingToken.address} without success. Skipping token until future run`,
-          );
-          return [];
-        }
+  const stateUpdates: Partial<State> = {};
 
-        // assumption: eth is not in the list (as it's not supported by the
-        // withdraw script). This should not happen unless the pending token
-        // list in the state was manually changed and ETH was added.
-        assert(
-          pendingToken.address.toLowerCase() !== BUY_ETH_ADDRESS.toLowerCase(),
-          "Pending tokens should not contain ETH",
-        );
-        const token = await erc20Token(pendingToken.address, hre);
-        if (token === null) {
-          throw new Error(
-            `Previously sold a token that is not a valid ERC20 token anymore (address ${pendingToken.address})`,
-          );
-        }
-        pendingToken.retries += 1;
-        return (await balanceOf(token, solver.address)).isZero()
-          ? []
-          : [pendingToken];
-      }),
-    )
-  ).flat();
+  // Update list of pending tokens to determine which token was traded
+  let pendingTokens;
+  try {
+    pendingTokens = await updatePendingTokens(
+      state.pendingTokens,
+      solver.address,
+      hre,
+    );
+  } catch (error) {
+    console.log(`Encountered soft error when updating pending token list`);
+    console.log(error);
+    return bumpErrorCount({ ...state, ...stateUpdates });
+  }
+  stateUpdates.pendingTokens = pendingTokens;
 
   console.log("Recovering list of tokens traded since the previous run...");
   // Add extra blocks before the last update in case there was a reorg and new
   // transactions were included.
   const maxReorgDistance = 20;
   const fromBlock = Math.max(0, state.lastUpdateBlock - maxReorgDistance);
-  const { tokens: recentlyTradedTokens, toBlock: latestBlock } =
-    await getAllTradedTokens(settlement, fromBlock, "latest", hre);
+  let recentlyTradedTokens, latestBlock;
+  try {
+    ({ tokens: recentlyTradedTokens, toBlock: latestBlock } =
+      await getAllTradedTokens(settlement, fromBlock, "latest", hre));
+  } catch (error) {
+    console.log(`Encountered soft error when retrieving traded tokens`);
+    console.log(error);
+    return bumpErrorCount({ ...state, ...stateUpdates });
+  }
 
   const tradedTokens = state.tradedTokens.concat(
     recentlyTradedTokens.filter(
@@ -221,19 +275,15 @@ export async function withdrawAndDump({
         !(state.tradedTokens.includes(token) || token === BUY_ETH_ADDRESS),
     ),
   );
+  stateUpdates.tradedTokens = tradedTokens;
+  stateUpdates.lastUpdateBlock = latestBlock;
+
   const numCheckedTokens = Math.min(pagination, tradedTokens.length);
   // The index of the checked token wraps around after reaching the end of the
   // traded token list
   const checkedTokens = tradedTokens
     .concat(tradedTokens)
     .slice(state.nextTokenToTrade, state.nextTokenToTrade + numCheckedTokens);
-  const updatedState: State = {
-    lastUpdateBlock: latestBlock,
-    tradedTokens,
-    nextTokenToTrade:
-      (state.nextTokenToTrade + numCheckedTokens) % tradedTokens.length,
-    pendingTokens,
-  };
 
   console.log("Starting withdraw step...");
   const withdrawnTokens = await withdraw({
@@ -256,6 +306,14 @@ export async function withdrawAndDump({
     // function
     requiredConfirmations: confirmationsAfterWithdrawing,
   });
+
+  if (withdrawnTokens === null) {
+    console.log(`Encountered soft error during withdraw step`);
+    return bumpErrorCount({ ...state, ...stateUpdates });
+  }
+
+  stateUpdates.nextTokenToTrade =
+    (state.nextTokenToTrade + numCheckedTokens) % tradedTokens.length;
 
   const tokensToDump = Array.from(
     new Set(pendingTokens.map((t) => t.address).concat(withdrawnTokens)),
@@ -281,21 +339,30 @@ export async function withdrawAndDump({
     );
   }
 
-  updatedState.pendingTokens.push(
+  const updatedPendingTokens = bumpAllPendingTokenRetries(
+    stateUpdates.pendingTokens,
+  );
+  updatedPendingTokens.push(
     ...tokensToDump
       .filter(
         (address) =>
-          !updatedState.pendingTokens
+          !updatedPendingTokens
             .map((pendingToken) => pendingToken.address)
             .includes(address),
       )
       .map((address) => ({ address, retries: 1 })),
   );
-  if (!isValidState(updatedState)) {
-    console.log("Generated state:", updatedState);
+  stateUpdates.pendingTokens = updatedPendingTokens;
+  stateUpdates.softErrorCount = 0;
+
+  // stateUpdates is now populated with everything needed to be a proper state.
+  // The type system isn't able to see that however, the second best thing to
+  // verify that everything is set is a runtime check and tests.
+  if (!isValidState(stateUpdates)) {
+    console.log("Generated state:", stateUpdates);
     throw new Error("Withdraw service did not generate a valid state");
   }
-  return updatedState;
+  return stateUpdates;
 }
 
 async function fileExists(path: string): Promise<boolean> {
@@ -326,6 +393,20 @@ async function getState(stateFilePath: string): Promise<State> {
     throw new Error("Invalid state detect");
   }
   return state;
+}
+
+async function updateStateOnDisk(
+  updatedState: State,
+  stateFilePath: string,
+  dryRun: boolean,
+) {
+  console.debug(`Updated state: ${JSON.stringify(updatedState)}`);
+  if (!dryRun) {
+    await fs.writeFile(
+      stateFilePath,
+      JSON.stringify(updatedState, undefined, 2),
+    );
+  }
 }
 
 const setupWithdrawServiceTask: () => void = () =>
@@ -402,12 +483,25 @@ const setupWithdrawServiceTask: () => void = () =>
         const usdReference = REFERENCE_TOKEN[network];
         const api = new Api(network, apiUrl ?? Environment.Prod);
         const receiver = utils.getAddress(inputReceiver);
-        const [authenticator, settlementDeployment, [solver]] =
-          await Promise.all([
+        let authenticator, settlementDeployment, solver;
+        try {
+          [authenticator, settlementDeployment, [solver]] = await Promise.all([
             getDeployedContract("GPv2AllowListAuthentication", hre),
             hre.deployments.get("GPv2Settlement"),
             hre.ethers.getSigners(),
           ]);
+        } catch (error) {
+          console.log(
+            "Soft error encountered when retrieving information from the node",
+          );
+          console.log(error);
+          const updatedState = {
+            ...state,
+            softErrorCount: (state.softErrorCount ?? 0) + 1,
+          };
+          await updateStateOnDisk(updatedState, stateFilePath, dryRun);
+          return;
+        }
         const settlement = new Contract(
           settlementDeployment.address,
           settlementDeployment.abi,
@@ -437,13 +531,7 @@ const setupWithdrawServiceTask: () => void = () =>
           pagination: tokensPerRun,
         });
 
-        console.debug(`Updated state: ${JSON.stringify(updatedState)}`);
-        if (!dryRun) {
-          await fs.writeFile(
-            stateFilePath,
-            JSON.stringify(updatedState, undefined, 2),
-          );
-        }
+        await updateStateOnDisk(updatedState, stateFilePath, dryRun);
       },
     );
 

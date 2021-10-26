@@ -8,7 +8,7 @@ import { task, types } from "hardhat/config";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 import { Api, ApiError, CallError, Environment } from "../services/api";
-import { SettlementEncoder } from "../ts";
+import { EncodedSettlement, SettlementEncoder } from "../ts";
 
 import {
   getDeployedContract,
@@ -399,7 +399,7 @@ interface WithdrawInput {
   doNotPrompt?: boolean | undefined;
   requiredConfirmations?: number | undefined;
 }
-export async function withdraw({
+async function prepareWithdrawals({
   solver,
   tokens,
   minValue,
@@ -414,9 +414,10 @@ export async function withdraw({
   hre,
   api,
   dryRun,
-  doNotPrompt,
-  requiredConfirmations,
-}: WithdrawInput): Promise<string[]> {
+}: WithdrawInput): Promise<{
+  withdrawals: Withdrawal[];
+  finalSettlement: EncodedSettlement | null;
+}> {
   let solverForSimulation: string;
   if (await authenticator.isSolver(solver.address)) {
     solverForSimulation = solver.address;
@@ -505,7 +506,7 @@ export async function withdraw({
 
   if (withdrawals.length === 0) {
     console.log("No tokens to withdraw.");
-    return [];
+    return { withdrawals: [], finalSettlement: null };
   }
   displayWithdrawals(withdrawals, usdReference);
 
@@ -540,6 +541,20 @@ export async function withdraw({
     )} USD. All withdrawn funds will be sent to ${receiver}.`,
   );
 
+  return { withdrawals, finalSettlement };
+}
+
+async function submitWithdrawals(
+  {
+    dryRun,
+    doNotPrompt,
+    hre,
+    settlement,
+    solver,
+    requiredConfirmations,
+  }: WithdrawInput,
+  finalSettlement: EncodedSettlement,
+) {
   if (!dryRun && (doNotPrompt || (await prompt(hre, "Submit?")))) {
     console.log("Executing the withdraw transaction on the blockchain...");
     const response = await settlement
@@ -553,6 +568,25 @@ export async function withdraw({
       `Transaction successfully executed. Transaction hash: ${receipt.transactionHash}`,
     );
   }
+}
+
+export async function withdraw(input: WithdrawInput): Promise<string[] | null> {
+  let withdrawals, finalSettlement;
+  try {
+    ({ withdrawals, finalSettlement } = await prepareWithdrawals(input));
+  } catch (error) {
+    console.log(
+      "Script failed execution but no irreversible operations were performed",
+    );
+    console.log(error);
+    return null;
+  }
+
+  if (finalSettlement === null) {
+    return [];
+  }
+
+  await submitWithdrawals(input, finalSettlement);
 
   return withdrawals.map((w) => w.token.address);
 }
