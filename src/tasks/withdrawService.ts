@@ -368,6 +368,10 @@ const setupWithdrawServiceTask: () => void = () =>
       "tokensPerRun",
       `The maximum number of tokens to process in a single withdraw run. Must be smaller than ${MAX_CHECKED_TOKENS_PER_RUN}`,
     )
+    .addOptionalParam(
+      "apiUrl",
+      "If set, the script contacts the API using the given url. Otherwise, the default prod url for the current network is used",
+    )
     .addParam("receiver", "The address receiving the withdrawn tokens")
     .addFlag(
       "dryRun",
@@ -385,6 +389,7 @@ const setupWithdrawServiceTask: () => void = () =>
           receiver: inputReceiver,
           dryRun,
           tokensPerRun,
+          apiUrl,
         },
         hre: HardhatRuntimeEnvironment,
       ) => {
@@ -395,7 +400,7 @@ const setupWithdrawServiceTask: () => void = () =>
           throw new Error(`Unsupported network ${network}`);
         }
         const usdReference = REFERENCE_TOKEN[network];
-        const api = new Api(network, Environment.Prod);
+        const api = new Api(network, apiUrl ?? Environment.Prod);
         const receiver = utils.getAddress(inputReceiver);
         const [authenticator, settlementDeployment, [solver]] =
           await Promise.all([
