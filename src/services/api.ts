@@ -15,9 +15,19 @@ export enum Environment {
   Prod,
 }
 
+export function apiUrl(environment: Environment, network: string): string {
+  switch (environment) {
+    case Environment.Dev:
+      return `https://protocol-${network}.dev.gnosisdev.com`;
+    case Environment.Prod:
+      return `https://protocol-${network}.gnosis.io`;
+    default:
+      throw new Error("Invalid environment");
+  }
+}
+
 interface ApiCall {
-  network: string;
-  environment: Environment;
+  baseUrl: string;
 }
 
 interface GetFeeQuery {
@@ -121,19 +131,9 @@ function apiSigningScheme(scheme: SigningScheme): string {
 
 async function call<T>(
   route: string,
-  network: string,
-  environment: Environment,
+  baseUrl: string,
   init?: RequestInit,
 ): Promise<T> {
-  let baseUrl: string;
-  switch (environment) {
-    case Environment.Dev:
-      baseUrl = `https://protocol-${network}.dev.gnosisdev.com`;
-      break;
-    case Environment.Prod:
-      baseUrl = `https://protocol-${network}.gnosis.io`;
-      break;
-  }
   const url = `${baseUrl}/api/v1/${route}`;
   const response = await fetch(url, init);
   const body = await response.text();
@@ -158,33 +158,29 @@ async function getFee({
   buyToken,
   kind,
   amount,
-  network,
-  environment,
+  baseUrl,
 }: GetFeeQuery & ApiCall): Promise<BigNumber> {
   const response: GetFeeResponse = await call(
     `fee?sellToken=${sellToken}&buyToken=${buyToken}&amount=${BigNumber.from(
       amount,
     ).toString()}&kind=${apiKind(kind)}`,
-    network,
-    environment,
+    baseUrl,
   );
   return BigNumber.from(response.amount);
 }
 
 async function estimateTradeAmount({
-  network,
   sellToken,
   buyToken,
   kind,
   amount,
-  environment,
+  baseUrl,
 }: EstimateTradeAmountQuery & ApiCall): Promise<BigNumber> {
   const response: EstimateAmountResponse = await call(
     `markets/${sellToken}-${buyToken}/${apiKind(kind)}/${BigNumber.from(
       amount,
     ).toString()}`,
-    network,
-    environment,
+    baseUrl,
   );
   // The services return the quote token used for the price. The quote token
   // is checked to make sure that the returned price meets our expectations.
@@ -199,11 +195,10 @@ async function estimateTradeAmount({
 async function placeOrder({
   order,
   signature,
-  network,
-  environment,
+  baseUrl,
 }: PlaceOrderQuery & ApiCall): Promise<string> {
   const normalizedOrder = normalizeOrder(order);
-  return await call("orders", network, environment, {
+  return await call("orders", baseUrl, {
     method: "post",
     body: JSON.stringify({
       sellToken: normalizedOrder.sellToken,
@@ -225,14 +220,9 @@ async function placeOrder({
 
 async function getExecutedSellAmount({
   uid,
-  network,
-  environment,
+  baseUrl,
 }: GetExecutedSellAmountQuery & ApiCall): Promise<BigNumber> {
-  const response: OrderDetailResponse = await call(
-    `orders/${uid}`,
-    network,
-    environment,
-  );
+  const response: OrderDetailResponse = await call(`orders/${uid}`, baseUrl);
   return BigNumber.from(response.executedSellAmount);
 }
 
@@ -240,15 +230,13 @@ async function getFeeAndQuoteSell({
   sellToken,
   buyToken,
   sellAmountBeforeFee,
-  network,
-  environment,
+  baseUrl,
 }: GetFeeAndQuoteSellQuery & ApiCall): Promise<GetFeeAndQuoteSellOutput> {
   const response: GetFeeAndQuoteSellResponse = await call(
     `feeAndQuote/sell?sellToken=${sellToken}&buyToken=${buyToken}&sellAmountBeforeFee=${BigNumber.from(
       sellAmountBeforeFee,
     ).toString()}`,
-    network,
-    environment,
+    baseUrl,
   );
   return {
     feeAmount: BigNumber.from(response.fee.amount),
@@ -260,15 +248,13 @@ async function getFeeAndQuoteBuy({
   sellToken,
   buyToken,
   buyAmountAfterFee,
-  network,
-  environment,
+  baseUrl,
 }: GetFeeAndQuoteBuyQuery & ApiCall): Promise<GetFeeAndQuoteBuyOutput> {
   const response: GetFeeAndQuoteBuyResponse = await call(
     `feeAndQuote/buy?sellToken=${sellToken}&buyToken=${buyToken}&buyAmountAfterFee=${BigNumber.from(
       buyAmountAfterFee,
     ).toString()}`,
-    network,
-    environment,
+    baseUrl,
   );
   return {
     feeAmount: BigNumber.from(response.fee.amount),
@@ -278,15 +264,21 @@ async function getFeeAndQuoteBuy({
 
 export class Api {
   network: string;
-  environment: Environment;
+  baseUrl: string;
 
-  constructor(network: string, environment: Environment) {
+  constructor(network: string, baseUrlOrEnv: string | Environment) {
     this.network = network;
-    this.environment = environment;
+    let baseUrl;
+    if (typeof baseUrlOrEnv === "string") {
+      baseUrl = baseUrlOrEnv;
+    } else {
+      baseUrl = apiUrl(baseUrlOrEnv, network);
+    }
+    this.baseUrl = baseUrl;
   }
 
   private apiCallParams() {
-    return { network: this.network, environment: this.environment };
+    return { network: this.network, baseUrl: this.baseUrl };
   }
 
   async getFee(query: GetFeeQuery): Promise<BigNumber> {

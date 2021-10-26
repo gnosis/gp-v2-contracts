@@ -611,6 +611,10 @@ const setupWithdrawTask: () => void = () =>
       5,
       types.float,
     )
+    .addOptionalParam(
+      "apiUrl",
+      "If set, the script contacts the API using the given url. Otherwise, the default prod url for the current network is used",
+    )
     .addParam("receiver", "The address receiving the withdrawn tokens.")
     .addFlag(
       "dryRun",
@@ -629,6 +633,7 @@ const setupWithdrawTask: () => void = () =>
           receiver: inputReceiver,
           dryRun,
           tokens,
+          apiUrl,
         },
         hre: HardhatRuntimeEnvironment,
       ) => {
@@ -636,7 +641,7 @@ const setupWithdrawTask: () => void = () =>
         if (!isSupportedNetwork(network)) {
           throw new Error(`Unsupported network ${network}`);
         }
-        const api = new Api(network, Environment.Prod);
+        const api = new Api(network, apiUrl ?? Environment.Prod);
         const receiver = utils.getAddress(inputReceiver);
         const [authenticator, settlementDeployment, [solver]] =
           await Promise.all([
