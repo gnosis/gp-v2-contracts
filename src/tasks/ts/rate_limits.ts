@@ -8,6 +8,7 @@ const LINE_CLEARING_ENABLED =
 export interface DisappearingLogFunctions {
   consoleWarn: typeof console.warn;
   consoleLog: typeof console.log;
+  consoleError: typeof console.error;
 }
 
 interface VanishingProgressMessage {
@@ -41,6 +42,7 @@ function createDisappearingLogFunctions(
   return {
     consoleWarn: clearable(console.warn),
     consoleLog: clearable(console.log),
+    consoleError: clearable(console.error),
   };
 }
 
