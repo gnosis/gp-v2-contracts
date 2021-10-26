@@ -8,6 +8,9 @@ import {
   Signature,
   SigningScheme,
   encodeSignatureData,
+  Timestamp,
+  HashLike,
+  OrderBalance,
 } from "../ts";
 
 export enum Environment {
@@ -50,6 +53,35 @@ interface GetFeeAndQuoteBuyQuery {
   buyAmountAfterFee: BigNumberish;
 }
 
+export type SellAmountBeforeFee = {
+  kind: OrderKind.SELL;
+  sellAmountBeforeFee: BigNumberish;
+};
+
+export type SellAmountAfterFee = {
+  kind: OrderKind.SELL;
+  sellAmountAfterFee: BigNumberish;
+};
+
+export type BuyAmountAfterFee = {
+  kind: OrderKind.BUY;
+  buyAmountAfterFee: BigNumberish;
+};
+
+type QuoteQuery = CommonQuoteQuery &
+  (SellAmountBeforeFee | SellAmountAfterFee | BuyAmountAfterFee);
+interface CommonQuoteQuery {
+  sellToken: string;
+  buyToken: string;
+  receiver?: string;
+  validTo: Timestamp;
+  appData: HashLike;
+  partiallyFillable: boolean;
+  sellTokenBalance?: OrderBalance;
+  buyTokenBalance?: OrderBalance;
+  from: string;
+}
+
 interface OrderDetailResponse {
   // Other fields are omitted until needed
   executedSellAmount: string;
@@ -69,6 +101,11 @@ interface GetFeeAndQuoteSellResponse {
 interface GetFeeAndQuoteBuyResponse {
   fee: GetFeeResponse;
   sellAmountBeforeFee: BigNumberish;
+}
+interface GetQuoteResponse {
+  quote: Order;
+  from: string;
+  expirationDate: Timestamp;
 }
 
 export interface GetFeeAndQuoteSellOutput {
@@ -276,6 +313,17 @@ async function getFeeAndQuoteBuy({
   };
 }
 
+async function getQuote(
+  { network, environment }: ApiCall,
+  quote: QuoteQuery,
+): Promise<GetQuoteResponse> {
+  return call("quote", network, environment, {
+    method: "post",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(quote),
+  });
+}
+
 export class Api {
   network: string;
   environment: Environment;
@@ -314,5 +362,8 @@ export class Api {
     query: GetFeeAndQuoteBuyQuery,
   ): Promise<GetFeeAndQuoteBuyOutput> {
     return getFeeAndQuoteBuy({ ...this.apiCallParams(), ...query });
+  }
+  async getQuote(query: QuoteQuery): Promise<GetQuoteResponse> {
+    return getQuote(this.apiCallParams(), query);
   }
 }
