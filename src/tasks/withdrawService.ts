@@ -370,7 +370,7 @@ const setupWithdrawServiceTask: () => void = () =>
     )
     .addOptionalParam(
       "apiUrl",
-      "If set, the scripts contacts the API using the given url. Otherwise, the default prod url for the current network is used",
+      "If set, the script contacts the API using the given url. Otherwise, the default prod url for the current network is used",
     )
     .addParam("receiver", "The address receiving the withdrawn tokens")
     .addFlag(
