@@ -78,9 +78,10 @@ export type BuyAmountAfterFee = {
   buyAmountAfterFee: BigNumberish;
 };
 
-type QuoteQuery = CommonQuoteQuery &
+export type QuoteQuery = CommonQuoteQuery &
   (SellAmountBeforeFee | SellAmountAfterFee | BuyAmountAfterFee);
-interface CommonQuoteQuery {
+
+export interface CommonQuoteQuery {
   sellToken: string;
   buyToken: string;
   receiver?: string;

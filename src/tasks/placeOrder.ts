@@ -53,7 +53,7 @@ async function placeOrder(
       };
       break;
     default:
-      throw "Unhandled order type";
+      throw new Error(`Unhandled order type ${orderType}`);
   }
 
   const [[signer], settlement, chainId] = await Promise.all([
@@ -73,9 +73,9 @@ async function placeOrder(
     ...amount,
   });
 
-  console.log(quote);
+  console.log("Received quote:", quote);
 
-  if (await prompt(hre, "Are you willing to place this order?")) {
+  if (await prompt(hre, "Would you like to place this order?")) {
     const domainSeparator = domain(parseInt(chainId), settlement.address);
     const signature = await signOrder(
       domainSeparator,
