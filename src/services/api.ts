@@ -215,6 +215,21 @@ async function getQuote(
   { baseUrl }: ApiCall,
   quote: QuoteQuery,
 ): Promise<GetQuoteResponse> {
+  if ((<SellAmountBeforeFee>quote).sellAmountBeforeFee) {
+    (<SellAmountBeforeFee>quote).sellAmountBeforeFee = (<SellAmountBeforeFee>(
+      quote
+    )).sellAmountBeforeFee.toString();
+  }
+  if ((<SellAmountAfterFee>quote).sellAmountAfterFee) {
+    (<SellAmountAfterFee>quote).sellAmountAfterFee = (<SellAmountAfterFee>(
+      quote
+    )).sellAmountAfterFee.toString();
+  }
+  if ((<BuyAmountAfterFee>quote).buyAmountAfterFee) {
+    (<BuyAmountAfterFee>quote).buyAmountAfterFee = (<BuyAmountAfterFee>(
+      quote
+    )).buyAmountAfterFee.toString();
+  }
   return call("quote", baseUrl, {
     method: "post",
     headers: { "Content-Type": "application/json" },
