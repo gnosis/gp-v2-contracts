@@ -10,7 +10,7 @@ import { SupportedNetwork } from "../../src/tasks/ts/deployment";
 import { ReferenceToken } from "../../src/tasks/ts/value";
 import * as withdrawService from "../../src/tasks/withdrawService";
 import { WithdrawAndDumpInput } from "../../src/tasks/withdrawService";
-import { OrderKind, domain, Order, timestamp } from "../../src/ts";
+import { OrderKind, domain, Order } from "../../src/ts";
 import { deployTestContracts } from "../e2e/fixture";
 import { synchronizeBlockchainAndCurrentTime } from "../hardhatNetwork";
 

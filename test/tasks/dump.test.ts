@@ -28,7 +28,7 @@ import {
 } from "../../src/tasks/dump";
 import { SupportedNetwork } from "../../src/tasks/ts/deployment";
 import { Erc20Token, isNativeToken } from "../../src/tasks/ts/tokens";
-import { BUY_ETH_ADDRESS, OrderKind, timestamp } from "../../src/ts";
+import { BUY_ETH_ADDRESS, OrderKind } from "../../src/ts";
 import { deployTestContracts } from "../e2e/fixture";
 import { synchronizeBlockchainAndCurrentTime } from "../hardhatNetwork";
 
