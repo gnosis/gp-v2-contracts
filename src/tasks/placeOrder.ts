@@ -81,7 +81,7 @@ async function placeOrder(
       domainSeparator,
       quote.quote,
       signer,
-      SigningScheme.ETHSIGN,
+      SigningScheme.EIP712,
     );
 
     const uid = await api.placeOrder({

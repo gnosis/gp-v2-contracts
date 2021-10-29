@@ -43,9 +43,7 @@ export class TypedDataV3Signer implements TypedDataSigner {
       domain,
       types,
       data,
-      (name: string) => {
-        return this.provider.resolveName(name);
-      },
+      (name: string) => this.resolveName(name),
     );
 
     const payload = _TypedDataEncoder.getPayload(
@@ -169,9 +167,7 @@ export class IntChainIdTypedDataV4Signer implements TypedDataSigner {
       domain,
       types,
       data,
-      (name: string) => {
-        return this.provider.resolveName(name);
-      },
+      (name: string) => this.resolveName(name),
     );
 
     const payload = _TypedDataEncoder.getPayload(
