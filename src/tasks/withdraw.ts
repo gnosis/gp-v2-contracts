@@ -7,7 +7,7 @@ import { BigNumber, utils, constants, Contract } from "ethers";
 import { task, types } from "hardhat/config";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
-import { Api, ApiError, CallError, Environment } from "../services/api";
+import { Api, ApiError, CallError, Environment } from "../ts/api";
 import { EncodedSettlement, SettlementEncoder } from "../ts";
 
 import {

@@ -4,7 +4,7 @@ import { BigNumber, constants, Contract, utils, Wallet } from "ethers";
 import hre, { ethers, waffle } from "hardhat";
 import { mock, SinonMock } from "sinon";
 
-import { Api, Environment } from "../../src/services/api";
+import { Api, Environment } from "../../src/ts/api";
 import { SupportedNetwork } from "../../src/tasks/ts/deployment";
 import { ReferenceToken } from "../../src/tasks/ts/value";
 import { withdraw } from "../../src/tasks/withdraw";

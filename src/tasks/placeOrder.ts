@@ -9,7 +9,7 @@ import {
   SellAmountAfterFee,
   SellAmountBeforeFee,
   BuyAmountAfterFee,
-} from "../services/api";
+} from "../ts/api";
 import { domain, OrderKind, SigningScheme, signOrder } from "../ts";
 
 import { getDeployedContract } from "./ts/deployment";

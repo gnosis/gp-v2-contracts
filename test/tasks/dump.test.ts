@@ -20,7 +20,7 @@ import {
   GetFeeAndQuoteSellErrorType,
   GetFeeAndQuoteSellOutput,
   PlaceOrderQuery,
-} from "../../src/services/api";
+} from "../../src/ts/api";
 import {
   dump,
   GetDumpInstructionInput,

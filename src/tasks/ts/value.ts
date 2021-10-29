@@ -1,6 +1,6 @@
 import { BigNumber } from "ethers";
 
-import { Api } from "../../services/api";
+import { Api } from "../../ts/api";
 import { OrderKind } from "../../ts";
 import { SupportedNetwork } from "../ts/deployment";
 import {

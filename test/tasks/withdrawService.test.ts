@@ -9,7 +9,7 @@ import {
   Environment,
   GetFeeAndQuoteSellOutput,
   PlaceOrderQuery,
-} from "../../src/services/api";
+} from "../../src/ts/api";
 import { SupportedNetwork } from "../../src/tasks/ts/deployment";
 import { ReferenceToken } from "../../src/tasks/ts/value";
 import * as withdrawService from "../../src/tasks/withdrawService";

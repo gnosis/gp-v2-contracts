@@ -11,7 +11,7 @@ import {
 import { task, types } from "hardhat/config";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
-import { Api, CallError, Environment } from "../services/api";
+import { Api, CallError, Environment } from "../ts/api";
 import {
   BUY_ETH_ADDRESS,
   domain,
