@@ -215,6 +215,7 @@ async function getQuote(
   { baseUrl }: ApiCall,
   quote: QuoteQuery,
 ): Promise<GetQuoteResponse> {
+  // Convert BigNumber into JSON strings (native serialisation is a hex object)
   if ((<SellAmountBeforeFee>quote).sellAmountBeforeFee) {
     (<SellAmountBeforeFee>quote).sellAmountBeforeFee = (<SellAmountBeforeFee>(
       quote
