@@ -8,8 +8,8 @@ import { utils, Contract } from "ethers";
 import { task, types } from "hardhat/config";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
-import { Api, Environment } from "../ts/api";
 import { BUY_ETH_ADDRESS } from "../ts";
+import { Api, Environment } from "../ts/api";
 
 import { dump, MAX_ORDER_VALIDITY_SECONDS } from "./dump";
 import {

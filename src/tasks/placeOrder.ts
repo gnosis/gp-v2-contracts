@@ -3,6 +3,7 @@ import { utils } from "ethers";
 import { task } from "hardhat/config";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
+import { domain, OrderKind, SigningScheme, signOrder } from "../ts";
 import {
   Api,
   Environment,
@@ -10,7 +11,6 @@ import {
   SellAmountBeforeFee,
   BuyAmountAfterFee,
 } from "../ts/api";
-import { domain, OrderKind, SigningScheme, signOrder } from "../ts";
 
 import { getDeployedContract } from "./ts/deployment";
 import { prompt } from "./ts/tui";
