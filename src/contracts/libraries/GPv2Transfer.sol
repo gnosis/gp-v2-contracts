@@ -60,8 +60,8 @@ library GPv2Transfer {
                 transfer.amount
             );
         } else {
-            IVault.UserBalanceOp[] memory balanceOps =
-                new IVault.UserBalanceOp[](1);
+            IVault.UserBalanceOp[]
+                memory balanceOps = new IVault.UserBalanceOp[](1);
 
             IVault.UserBalanceOp memory balanceOp = balanceOps[0];
             balanceOp.kind = transfer.balance == GPv2Order.BALANCE_EXTERNAL
@@ -97,8 +97,9 @@ library GPv2Transfer {
         // hold all GP transfers. This is done to avoid re-allocations (which
         // are gas inefficient) while still allowing all transfers to be batched
         // into a single Vault call.
-        IVault.UserBalanceOp[] memory balanceOps =
-            new IVault.UserBalanceOp[](transfers.length);
+        IVault.UserBalanceOp[] memory balanceOps = new IVault.UserBalanceOp[](
+            transfers.length
+        );
         uint256 balanceOpCount = 0;
 
         for (uint256 i = 0; i < transfers.length; i++) {
@@ -115,8 +116,9 @@ library GPv2Transfer {
                     transfer.amount
                 );
             } else {
-                IVault.UserBalanceOp memory balanceOp =
-                    balanceOps[balanceOpCount++];
+                IVault.UserBalanceOp memory balanceOp = balanceOps[
+                    balanceOpCount++
+                ];
                 balanceOp.kind = transfer.balance == GPv2Order.BALANCE_EXTERNAL
                     ? IVault.UserBalanceOpKind.TRANSFER_EXTERNAL
                     : IVault.UserBalanceOpKind.WITHDRAW_INTERNAL;
@@ -143,8 +145,9 @@ library GPv2Transfer {
     function transferToAccounts(IVault vault, Data[] memory transfers)
         internal
     {
-        IVault.UserBalanceOp[] memory balanceOps =
-            new IVault.UserBalanceOp[](transfers.length);
+        IVault.UserBalanceOp[] memory balanceOps = new IVault.UserBalanceOp[](
+            transfers.length
+        );
         uint256 balanceOpCount = 0;
 
         for (uint256 i = 0; i < transfers.length; i++) {
@@ -159,8 +162,9 @@ library GPv2Transfer {
             } else if (transfer.balance == GPv2Order.BALANCE_ERC20) {
                 transfer.token.safeTransfer(transfer.account, transfer.amount);
             } else {
-                IVault.UserBalanceOp memory balanceOp =
-                    balanceOps[balanceOpCount++];
+                IVault.UserBalanceOp memory balanceOp = balanceOps[
+                    balanceOpCount++
+                ];
                 balanceOp.kind = IVault.UserBalanceOpKind.DEPOSIT_INTERNAL;
                 balanceOp.asset = transfer.token;
                 balanceOp.amount = transfer.amount;
