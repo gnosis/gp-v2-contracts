@@ -62,12 +62,11 @@ contract StorageAccessible {
         address targetContract,
         bytes memory calldataPayload
     ) public returns (bytes memory response) {
-        bytes memory innerCall =
-            abi.encodeWithSelector(
-                this.simulateDelegatecallInternal.selector,
-                targetContract,
-                calldataPayload
-            );
+        bytes memory innerCall = abi.encodeWithSelector(
+            this.simulateDelegatecallInternal.selector,
+            targetContract,
+            calldataPayload
+        );
         // solhint-disable-next-line avoid-low-level-calls
         (, response) = address(this).call(innerCall);
         bool innerSuccess = response[response.length - 1] == 0x01;
