@@ -21,7 +21,12 @@ abstract contract GPv2Signing {
     }
 
     /// @dev Signing scheme used for recovery.
-    enum Scheme {Eip712, EthSign, Eip1271, PreSign}
+    enum Scheme {
+        Eip712,
+        EthSign,
+        Eip1271,
+        PreSign
+    }
 
     /// @dev The EIP-712 domain type hash used for computing the domain
     /// separator.
@@ -116,8 +121,11 @@ abstract contract GPv2Signing {
         GPv2Order.Data memory order = recoveredOrder.data;
 
         Scheme signingScheme = GPv2Trade.extractOrder(trade, tokens, order);
-        (bytes32 orderDigest, address owner) =
-            recoverOrderSigner(order, signingScheme, trade.signature);
+        (bytes32 orderDigest, address owner) = recoverOrderSigner(
+            order,
+            signingScheme,
+            trade.signature
+        );
 
         recoveredOrder.uid.packOrderUidParams(
             orderDigest,
@@ -243,13 +251,9 @@ abstract contract GPv2Signing {
         // `"\x19Ethereum Signed Message:\n" || length || data`, where
         // the length is a constant (32 bytes) and the data is defined as:
         // `orderDigest`.
-        bytes32 ethsignDigest =
-            keccak256(
-                abi.encodePacked(
-                    "\x19Ethereum Signed Message:\n32",
-                    orderDigest
-                )
-            );
+        bytes32 ethsignDigest = keccak256(
+            abi.encodePacked("\x19Ethereum Signed Message:\n32", orderDigest)
+        );
 
         owner = ecdsaRecover(ethsignDigest, encodedSignature);
     }

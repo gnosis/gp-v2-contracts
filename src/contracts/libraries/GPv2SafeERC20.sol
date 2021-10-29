@@ -105,33 +105,33 @@ library GPv2SafeERC20 {
             }
 
             switch returndatasize()
-                // Non-standard ERC20 transfer without return.
-                case 0 {
-                    // NOTE: When the return data size is 0, verify that there
-                    // is code at the address. This is done in order to maintain
-                    // compatibility with Solidity calling conventions.
-                    // <https://docs.soliditylang.org/en/v0.7.6/control-structures.html#external-function-calls>
-                    if iszero(extcodesize(token)) {
-                        revertWithMessage(20, "GPv2: not a contract")
-                    }
+            // Non-standard ERC20 transfer without return.
+            case 0 {
+                // NOTE: When the return data size is 0, verify that there
+                // is code at the address. This is done in order to maintain
+                // compatibility with Solidity calling conventions.
+                // <https://docs.soliditylang.org/en/v0.7.6/control-structures.html#external-function-calls>
+                if iszero(extcodesize(token)) {
+                    revertWithMessage(20, "GPv2: not a contract")
+                }
 
-                    success := 1
-                }
-                // Standard ERC20 transfer returning boolean success value.
-                case 32 {
-                    returndatacopy(0, 0, returndatasize())
+                success := 1
+            }
+            // Standard ERC20 transfer returning boolean success value.
+            case 32 {
+                returndatacopy(0, 0, returndatasize())
 
-                    // NOTE: For ABI encoding v1, any non-zero value is accepted
-                    // as `true` for a boolean. In order to stay compatible with
-                    // OpenZeppelin's `SafeERC20` library which is known to work
-                    // with the existing ERC20 implementation we care about,
-                    // make sure we return success for any non-zero return value
-                    // from the `transfer*` call.
-                    success := iszero(iszero(mload(0)))
-                }
-                default {
-                    revertWithMessage(31, "GPv2: malformed transfer result")
-                }
+                // NOTE: For ABI encoding v1, any non-zero value is accepted
+                // as `true` for a boolean. In order to stay compatible with
+                // OpenZeppelin's `SafeERC20` library which is known to work
+                // with the existing ERC20 implementation we care about,
+                // make sure we return success for any non-zero return value
+                // from the `transfer*` call.
+                success := iszero(iszero(mload(0)))
+            }
+            default {
+                revertWithMessage(31, "GPv2: malformed transfer result")
+            }
         }
     }
 }

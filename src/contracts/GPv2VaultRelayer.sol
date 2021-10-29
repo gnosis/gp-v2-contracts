@@ -25,7 +25,7 @@ contract GPv2VaultRelayer {
 
     /// @dev Modifier that ensures that a function can only be called by the
     /// creator of this contract.
-    modifier onlyCreator {
+    modifier onlyCreator() {
         require(msg.sender == creator, "GPv2: not creator");
         _;
     }

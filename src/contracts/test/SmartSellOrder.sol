@@ -48,7 +48,7 @@ contract SmartSellOrder is EIP1271Verifier {
         );
     }
 
-    modifier onlyOwner {
+    modifier onlyOwner() {
         require(msg.sender == owner, "not owner");
         _;
     }
@@ -107,14 +107,13 @@ contract SmartSellOrder is EIP1271Verifier {
         view
         returns (uint256 buyAmount)
     {
-        uint256 feeAdjustedBalance =
-            sellToken.balanceOf(address(this)).mul(totalSellAmount).div(
-                totalSellAmount.add(totalFeeAmount)
-            );
-        uint256 soldAmount =
-            totalSellAmount > feeAdjustedBalance
-                ? totalSellAmount - feeAdjustedBalance
-                : 0;
+        uint256 feeAdjustedBalance = sellToken
+            .balanceOf(address(this))
+            .mul(totalSellAmount)
+            .div(totalSellAmount.add(totalFeeAmount));
+        uint256 soldAmount = totalSellAmount > feeAdjustedBalance
+            ? totalSellAmount - feeAdjustedBalance
+            : 0;
 
         // NOTE: This is currently a silly price strategy where the xrate
         // increases linearly from 1:1 to 1:2 as the smart order gets filled.
