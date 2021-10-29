@@ -5,8 +5,7 @@ import "../interfaces/IERC20.sol";
 
 /// @title Gnosis Protocol v2 Safe ERC20 Transfer Library
 /// @author Gnosis Developers
-/// @dev Gas-efficient version of Openzeppelin's SafeERC20 contract that notably
-/// does not revert when calling a non-contract.
+/// @dev Gas-efficient version of Openzeppelin's SafeERC20 contract.
 library GPv2SafeERC20 {
     /// @dev Wrapper around a call to the ERC20 function `transfer` that reverts
     /// also when the token returns `false`.
