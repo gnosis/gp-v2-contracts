@@ -474,7 +474,7 @@ async function createOrders(
       domainSeparator,
       order,
       signer,
-      SigningScheme.ETHSIGN,
+      SigningScheme.EIP712,
     );
 
     console.log(
