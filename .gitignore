@@ -8,3 +8,4 @@ coverage.json
 yarn-error.log
 *.tgz
 state.json
+.mocharc.json
