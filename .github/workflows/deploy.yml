@@ -10,8 +10,8 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v1
         with:
-          node-version: 14.7
-      - run: yarn --frozen-lockfile
+          node-version: 14.x
+      - run: yarn --frozen-lockfilx
       - run: yarn build
       - run: bash src/workflows/deploy.sh "automated-contract-deployment-${{github.run_number}}"
         env:
