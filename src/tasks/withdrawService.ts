@@ -11,7 +11,11 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { Api, Environment } from "../services/api";
 import { BUY_ETH_ADDRESS } from "../ts";
 
-import { dump, MAX_ORDER_VALIDITY_SECONDS } from "./dump";
+import {
+  dump,
+  MAX_LATEST_BLOCK_DELAY_SECONDS,
+  MAX_ORDER_VALIDITY_SECONDS,
+} from "./dump";
 import {
   getDeployedContract,
   isSupportedNetwork,
@@ -181,7 +185,7 @@ export interface WithdrawAndDumpInput {
   settlementDeploymentBlock: number;
   minValue: string;
   leftover: string;
-  validity: number;
+  validTo: number;
   maxFeePercent: number;
   toToken: string;
   network: SupportedNetwork;
@@ -219,7 +223,7 @@ export async function withdrawAndDump({
   settlementDeploymentBlock,
   minValue,
   leftover,
-  validity,
+  validTo,
   maxFeePercent,
   toToken,
   network,
@@ -320,7 +324,7 @@ export async function withdrawAndDump({
   ).filter((addr) => addr !== BUY_ETH_ADDRESS);
 
   await dump({
-    validity,
+    validTo,
     maxFeePercent,
     dumpedTokens: tokensToDump,
     toToken,
@@ -510,6 +514,16 @@ const setupWithdrawServiceTask: () => void = () =>
           settlementDeployment.receipt?.blockNumber ?? 0;
         console.log(`Using account ${solver.address}`);
 
+        // Check that the local time is consistent with that of the blockchain
+        // to avoid signing orders that are valid for too long
+        const now = Math.floor(Date.now() / 1000);
+        const blockTimestamp = (await hre.ethers.provider.getBlock("latest"))
+          .timestamp;
+        if (Math.abs(now - blockTimestamp) > MAX_LATEST_BLOCK_DELAY_SECONDS) {
+          throw new Error("Blockchain time is not consistent with local time.");
+        }
+        const validTo = now + validity;
+
         const updatedState = await withdrawAndDump({
           state,
           solver,
@@ -519,7 +533,7 @@ const setupWithdrawServiceTask: () => void = () =>
           settlementDeploymentBlock,
           minValue,
           leftover,
-          validity,
+          validTo,
           maxFeePercent,
           toToken,
           network,

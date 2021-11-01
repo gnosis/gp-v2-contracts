@@ -4,17 +4,13 @@ import { BigNumber, constants, Contract, utils, Wallet } from "ethers";
 import hre, { ethers, waffle } from "hardhat";
 import { mock, SinonMock } from "sinon";
 
-import {
-  Api,
-  Environment,
-  GetFeeAndQuoteSellOutput,
-  PlaceOrderQuery,
-} from "../../src/services/api";
+import { Api, Environment, PlaceOrderQuery } from "../../src/services/api";
+import { APP_DATA } from "../../src/tasks/dump";
 import { SupportedNetwork } from "../../src/tasks/ts/deployment";
 import { ReferenceToken } from "../../src/tasks/ts/value";
 import * as withdrawService from "../../src/tasks/withdrawService";
 import { WithdrawAndDumpInput } from "../../src/tasks/withdrawService";
-import { OrderKind, domain, Order, timestamp } from "../../src/ts";
+import { OrderKind, domain, Order } from "../../src/ts";
 import { deployTestContracts } from "../e2e/fixture";
 import { synchronizeBlockchainAndCurrentTime } from "../hardhatNetwork";
 
@@ -106,7 +102,7 @@ describe("Task: withdrawService", () => {
       settlementDeploymentBlock: 0,
       minValue: "0",
       leftover: "0",
-      validity: 3600,
+      validTo: 3600,
       maxFeePercent: 100,
       toToken: toToken.address,
       // ignore network value
@@ -148,6 +144,7 @@ describe("Task: withdrawService", () => {
         { address: usdc.address, retries: 4 },
       ],
     };
+    const defaultParams = await withdrawAndDumpDefaultParams();
     const solverDaiBalance = BigNumber.from(utils.parseUnits("100.0", 18));
     // some dai are left over in the solver address from a previous run
     await dai.mint(solver.address, solverDaiBalance);
@@ -232,15 +229,25 @@ describe("Task: withdrawService", () => {
     // fee is low except for dai, where it's larger than the maximum allowed
     const maxFeePercent = 25;
     const usdcFee = usdcBalance.div(42);
-    const usdcFeeAndQuote: GetFeeAndQuoteSellOutput = {
-      feeAmount: usdcFee,
-      buyAmountAfterFee: BigNumber.from(42),
+    const usdcFeeAndQuote = {
+      quote: {
+        feeAmount: usdcFee,
+        buyAmount: BigNumber.from(42),
+      },
     };
+    const validity = 3600;
+    const validTo = Math.floor(Date.now() / 1000) + validity;
+
     apiMock
-      .expects("getFeeAndQuoteSell")
+      .expects("getQuote")
       .withArgs({
         sellToken: usdc.address,
         buyToken: toToken.address,
+        validTo: validTo,
+        appData: APP_DATA,
+        partiallyFillable: false,
+        from: defaultParams.solver.address,
+        kind: OrderKind.SELL,
         sellAmountBeforeFee: usdcBalanceMinusLeftover,
       })
       .once()
@@ -250,35 +257,49 @@ describe("Task: withdrawService", () => {
     const daiBalanceIncludingSolver =
       daiBalanceMinusLeftover.add(solverDaiBalance);
     const daiFee = daiBalanceIncludingSolver.div(2);
-    const daiFeeAndQuote: GetFeeAndQuoteSellOutput = {
-      feeAmount: BigNumber.from(daiFee),
-      buyAmountAfterFee: "unused" as unknown as BigNumber,
+    const daiFeeAndQuote = {
+      quote: {
+        feeAmount: BigNumber.from(daiFee),
+        buyAmount: BigNumber.from(1337),
+      },
     };
     apiMock
-      .expects("getFeeAndQuoteSell")
+      .expects("getQuote")
       .withArgs({
         sellToken: dai.address,
         buyToken: toToken.address,
+        validTo: validTo,
+        appData: APP_DATA,
+        partiallyFillable: false,
+        from: defaultParams.solver.address,
+        kind: OrderKind.SELL,
         sellAmountBeforeFee: daiBalanceIncludingSolver,
       })
       .once()
       .returns(Promise.resolve(daiFeeAndQuote));
     const wethFee = wethBalance.div(1337);
-    const wethFeeAndQuote: GetFeeAndQuoteSellOutput = {
-      feeAmount: wethFee,
-      buyAmountAfterFee: BigNumber.from(1337),
+    const wethFeeAndQuote = {
+      quote: {
+        feeAmount: wethFee,
+        buyAmount: BigNumber.from(1337),
+      },
     };
+
     apiMock
-      .expects("getFeeAndQuoteSell")
+      .expects("getQuote")
       .withArgs({
         sellToken: weth.address,
         buyToken: toToken.address,
+        validTo: validTo,
+        appData: APP_DATA,
+        partiallyFillable: false,
+        from: defaultParams.solver.address,
+        kind: OrderKind.SELL,
         sellAmountBeforeFee: wethBalanceMinusLeftover,
       })
       .once()
       .returns(Promise.resolve(wethFeeAndQuote));
 
-    const validity = 3600;
     function assertGoodOrder(
       order: Order,
       sellToken: string,
@@ -293,12 +314,7 @@ describe("Task: withdrawService", () => {
       expect(order.feeAmount).to.deep.equal(feeAmount);
       expect(order.kind).to.deep.equal(OrderKind.SELL);
       expect(order.receiver).to.deep.equal(receiver.address);
-      // leave a minute of margin to account for the fact that the actual
-      // time and the time at which they are compared are slightly different
-      expect(
-        Math.abs(timestamp(order.validTo) - (Date.now() / 1000 + validity)) <
-          60,
-      ).to.be.true;
+      expect(order.validTo).to.equal(validTo);
       expect(order.partiallyFillable).to.equal(false);
     }
     api.placeOrder = async function ({ order }: PlaceOrderQuery) {
@@ -307,9 +323,9 @@ describe("Task: withdrawService", () => {
           assertGoodOrder(
             order,
             usdc.address,
-            usdcBalanceMinusLeftover.sub(usdcFeeAndQuote.feeAmount),
-            usdcFeeAndQuote.buyAmountAfterFee,
-            usdcFeeAndQuote.feeAmount,
+            usdcBalanceMinusLeftover.sub(usdcFeeAndQuote.quote.feeAmount),
+            usdcFeeAndQuote.quote.buyAmount,
+            usdcFeeAndQuote.quote.feeAmount,
           );
           return "0xusdcOrderUid";
         }
@@ -317,9 +333,9 @@ describe("Task: withdrawService", () => {
           assertGoodOrder(
             order,
             weth.address,
-            wethBalanceMinusLeftover.sub(wethFeeAndQuote.feeAmount),
-            wethFeeAndQuote.buyAmountAfterFee,
-            wethFeeAndQuote.feeAmount,
+            wethBalanceMinusLeftover.sub(wethFeeAndQuote.quote.feeAmount),
+            wethFeeAndQuote.quote.buyAmount,
+            wethFeeAndQuote.quote.feeAmount,
           );
           return "0xwethOrderUid";
         }
@@ -331,11 +347,11 @@ describe("Task: withdrawService", () => {
     };
 
     const updatedState = await withdrawService.withdrawAndDump({
-      ...(await withdrawAndDumpDefaultParams()),
+      ...defaultParams,
       state: initalState,
       minValue,
       leftover,
-      validity,
+      validTo,
       maxFeePercent,
     });
 
@@ -390,6 +406,7 @@ describe("Task: withdrawService", () => {
       nextTokenToTrade: 0,
       pendingTokens: [],
     };
+    const defaultParams = await withdrawAndDumpDefaultParams();
 
     const daiBalance = utils.parseUnits("21.0", 18);
     await dai.mint(settlement.address, daiBalance);
@@ -420,15 +437,22 @@ describe("Task: withdrawService", () => {
           ),
         ); // stablecoin, so amount in is usd value
       // fee and received amount
-      const feeAndQuote: GetFeeAndQuoteSellOutput = {
-        feeAmount: constants.Zero,
-        buyAmountAfterFee: BigNumber.from(1337),
+      const feeAndQuote = {
+        quote: {
+          feeAmount: constants.Zero,
+          buyAmount: BigNumber.from(1337),
+        },
       };
       apiMock
-        .expects("getFeeAndQuoteSell")
+        .expects("getQuote")
         .withArgs({
           sellToken: token.address,
           buyToken: toToken.address,
+          validTo: defaultParams.validTo,
+          appData: APP_DATA,
+          partiallyFillable: false,
+          from: defaultParams.solver.address,
+          kind: OrderKind.SELL,
           sellAmountBeforeFee: soldAmount,
         })
         .once()
@@ -472,7 +496,7 @@ describe("Task: withdrawService", () => {
 
     const pagination = 2;
     const intermediateState = await withdrawService.withdrawAndDump({
-      ...(await withdrawAndDumpDefaultParams()),
+      ...defaultParams,
       state: initalState,
       pagination,
     });

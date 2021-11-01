@@ -17,18 +17,18 @@ import {
   Api,
   CallError,
   Environment,
-  GetFeeAndQuoteSellErrorType,
-  GetFeeAndQuoteSellOutput,
+  GetQuoteErrorType,
   PlaceOrderQuery,
 } from "../../src/services/api";
 import {
+  APP_DATA,
   dump,
   GetDumpInstructionInput,
   getDumpInstructions,
 } from "../../src/tasks/dump";
 import { SupportedNetwork } from "../../src/tasks/ts/deployment";
 import { Erc20Token, isNativeToken } from "../../src/tasks/ts/tokens";
-import { BUY_ETH_ADDRESS, OrderKind, timestamp } from "../../src/ts";
+import { BUY_ETH_ADDRESS, OrderKind } from "../../src/ts";
 import { deployTestContracts } from "../e2e/fixture";
 import { synchronizeBlockchainAndCurrentTime } from "../hardhatNetwork";
 
@@ -50,6 +50,8 @@ interface MockApiCallsInput {
   balance: BigNumberish;
   fee: BigNumberish;
   boughtAmount: BigNumberish;
+  from: string;
+  validTo: number;
 }
 function mockApiCalls({
   apiMock,
@@ -58,16 +60,25 @@ function mockApiCalls({
   balance,
   fee,
   boughtAmount,
+  from,
+  validTo,
 }: MockApiCallsInput): void {
-  const result: GetFeeAndQuoteSellOutput = {
-    feeAmount: BigNumber.from(fee),
-    buyAmountAfterFee: BigNumber.from(boughtAmount),
+  const result = {
+    quote: {
+      feeAmount: BigNumber.from(fee),
+      buyAmount: BigNumber.from(boughtAmount),
+    },
   };
   apiMock
-    .expects("getFeeAndQuoteSell")
+    .expects("getQuote")
     .withArgs({
       sellToken: dumpedToken,
       buyToken: toToken,
+      validTo,
+      appData: APP_DATA,
+      partiallyFillable: false,
+      from,
+      kind: OrderKind.SELL,
       sellAmountBeforeFee: balance,
     })
     .once()
@@ -153,6 +164,7 @@ describe("getDumpInstructions", () => {
         address: receiver.address,
         isSameAsUser: true,
       },
+      validTo: Math.floor(Date.now() / 1000) + 30 * 60,
       hre,
       network,
       api,
@@ -191,6 +203,8 @@ describe("getDumpInstructions", () => {
       balance,
       fee,
       boughtAmount,
+      validTo: defaultDumpInstructions.validTo,
+      from: defaultDumpInstructions.user,
     });
 
     const { toToken, transferToReceiver, instructions } =
@@ -250,6 +264,8 @@ describe("getDumpInstructions", () => {
         balance,
         fee,
         boughtAmount,
+        validTo: defaultDumpInstructions.validTo,
+        from: defaultDumpInstructions.user,
       });
 
       const { toToken, transferToReceiver, instructions } =
@@ -305,6 +321,8 @@ describe("getDumpInstructions", () => {
       balance,
       fee,
       boughtAmount,
+      validTo: defaultDumpInstructions.validTo,
+      from: defaultDumpInstructions.user,
     });
 
     const { instructions } = await getDumpInstructions({
@@ -414,10 +432,15 @@ describe("getDumpInstructions", () => {
       .withArgs(user.address, vaultRelayer)
       .returns(allowance);
     apiMock
-      .expects("getFeeAndQuoteSell")
+      .expects("getQuote")
       .withArgs({
         sellToken: dumped.address,
         buyToken: to.address,
+        validTo: defaultDumpInstructions.validTo,
+        appData: APP_DATA,
+        partiallyFillable: false,
+        from: defaultDumpInstructions.user,
+        kind: OrderKind.SELL,
         sellAmountBeforeFee: balance,
       })
       .once()
@@ -445,14 +468,19 @@ describe("getDumpInstructions", () => {
       .returns(allowance);
     const e: CallError = new Error("Test error");
     e.apiError = {
-      errorType: GetFeeAndQuoteSellErrorType.SellAmountDoesNotCoverFee,
+      errorType: GetQuoteErrorType.SellAmountDoesNotCoverFee,
       description: "unused",
     };
     apiMock
-      .expects("getFeeAndQuoteSell")
+      .expects("getQuote")
       .withArgs({
         sellToken: dumped.address,
         buyToken: to.address,
+        validTo: defaultDumpInstructions.validTo,
+        appData: APP_DATA,
+        partiallyFillable: false,
+        from: defaultDumpInstructions.user,
+        kind: OrderKind.SELL,
         sellAmountBeforeFee: balance,
       })
       .once()
@@ -487,15 +515,22 @@ describe("getDumpInstructions", () => {
     await dumped.mock.allowance
       .withArgs(user.address, vaultRelayer)
       .returns(allowance);
-    const result: GetFeeAndQuoteSellOutput = {
-      feeAmount: BigNumber.from(fee),
-      buyAmountAfterFee: "unused" as unknown as BigNumber,
+    const result = {
+      quote: {
+        feeAmount: BigNumber.from(fee),
+        buyAmount: BigNumber.from(1337),
+      },
     };
     apiMock
-      .expects("getFeeAndQuoteSell")
+      .expects("getQuote")
       .withArgs({
         sellToken: dumped.address,
         buyToken: to.address,
+        validTo: defaultDumpInstructions.validTo,
+        appData: APP_DATA,
+        partiallyFillable: false,
+        from: defaultDumpInstructions.user,
+        kind: OrderKind.SELL,
         sellAmountBeforeFee: balance,
       })
       .once()
@@ -651,26 +686,33 @@ describe("getDumpInstructions", () => {
       await dumped.mock.allowance
         .withArgs(user.address, vaultRelayer)
         .returns(allowance);
-      let apiReturnValue: Promise<GetFeeAndQuoteSellOutput>;
+      let apiReturnValue;
       if (isIndexWithTooLargeFee(index)) {
         const e: CallError = new Error("Test error");
         e.apiError = {
-          errorType: GetFeeAndQuoteSellErrorType.SellAmountDoesNotCoverFee,
+          errorType: GetQuoteErrorType.SellAmountDoesNotCoverFee,
           description: "unused",
         };
         apiReturnValue = (await handledRejection(e)).rejection;
       } else {
-        const result: GetFeeAndQuoteSellOutput = {
-          feeAmount: fee,
-          buyAmountAfterFee: boughtAmount,
+        const result = {
+          quote: {
+            feeAmount: fee,
+            buyAmount: boughtAmount,
+          },
         };
         apiReturnValue = Promise.resolve(result);
       }
       apiMock
-        .expects("getFeeAndQuoteSell")
+        .expects("getQuote")
         .withArgs({
           sellToken: dumped.address,
           buyToken: to.address,
+          validTo: defaultDumpInstructions.validTo,
+          appData: APP_DATA,
+          partiallyFillable: false,
+          from: defaultDumpInstructions.user,
+          kind: OrderKind.SELL,
           sellAmountBeforeFee: balance,
         })
         .once()
@@ -812,6 +854,7 @@ describe("Task: dump", () => {
   it("should dump tokens", async () => {
     // Dump dai and weth for weth to a different receiver
     const validity = 4242;
+    const validTo = Math.floor(Date.now() / 1000) + validity;
 
     const wethData = {
       balance: utils.parseEther("42"),
@@ -829,6 +872,8 @@ describe("Task: dump", () => {
       apiMock,
       toToken: weth.address,
       dumpedToken: dai.address,
+      validTo,
+      from: signer.address,
     });
 
     api.placeOrder = async function ({ order }: PlaceOrderQuery) {
@@ -839,12 +884,7 @@ describe("Task: dump", () => {
       expect(order.feeAmount).to.deep.equal(daiData.fee);
       expect(order.kind).to.deep.equal(OrderKind.SELL);
       expect(order.receiver).to.deep.equal(receiver.address);
-      // leave a minute of margin to account for the fact that the actual
-      // time and the time at which they are compared are slightly different
-      expect(
-        Math.abs(timestamp(order.validTo) - (Date.now() / 1000 + validity)) <
-          60,
-      ).to.be.true;
+      expect(order.validTo).to.equal(validTo);
       expect(order.partiallyFillable).to.equal(false);
       return "0xorderUid";
     };
@@ -857,7 +897,7 @@ describe("Task: dump", () => {
     });
 
     await dump({
-      validity,
+      validTo,
       maxFeePercent: Infinity,
       dumpedTokens: [weth.address, dai.address],
       toToken: weth.address,
@@ -892,7 +932,7 @@ describe("Task: dump", () => {
       });
 
       await dump({
-        validity: 1337,
+        validTo: 1337,
         maxFeePercent: Infinity,
         dumpedTokens: [weth.address],
         toToken: weth.address,
