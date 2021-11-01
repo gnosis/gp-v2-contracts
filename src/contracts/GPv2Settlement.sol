@@ -84,14 +84,14 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
 
     /// @dev This modifier is called by settle function to block any non-listed
     /// senders from settling batches.
-    modifier onlySolver {
+    modifier onlySolver() {
         require(authenticator.isSolver(msg.sender), "GPv2: not a solver");
         _;
     }
 
     /// @dev Modifier to ensure that an external function is only callable as a
     /// settlement interaction.
-    modifier onlyInteraction {
+    modifier onlyInteraction() {
         require(address(this) == msg.sender, "GPv2: not an interaction");
         _;
     }
@@ -159,10 +159,9 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         GPv2Order.Data memory order = recoveredOrder.data;
         recoverOrderFromTrade(recoveredOrder, tokens, trade);
 
-        IVault.SwapKind kind =
-            order.kind == GPv2Order.KIND_SELL
-                ? IVault.SwapKind.GIVEN_IN
-                : IVault.SwapKind.GIVEN_OUT;
+        IVault.SwapKind kind = order.kind == GPv2Order.KIND_SELL
+            ? IVault.SwapKind.GIVEN_IN
+            : IVault.SwapKind.GIVEN_OUT;
 
         IVault.FundManagement memory funds;
         funds.sender = recoveredOrder.owner;
@@ -193,24 +192,23 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
         feeTransfer.amount = order.feeAmount;
         feeTransfer.balance = order.sellTokenBalance;
 
-        int256[] memory tokenDeltas =
-            vaultRelayer.batchSwapWithFee(
-                kind,
-                swaps,
-                tokens,
-                funds,
-                limits,
-                // NOTE: Specify a deadline to ensure that an expire order
-                // cannot be used to trade.
-                order.validTo,
-                feeTransfer
-            );
+        int256[] memory tokenDeltas = vaultRelayer.batchSwapWithFee(
+            kind,
+            swaps,
+            tokens,
+            funds,
+            limits,
+            // NOTE: Specify a deadline to ensure that an expire order
+            // cannot be used to trade.
+            order.validTo,
+            feeTransfer
+        );
 
         bytes memory orderUid = recoveredOrder.uid;
-        uint256 executedSellAmount =
-            tokenDeltas[trade.sellTokenIndex].toUint256();
-        uint256 executedBuyAmount =
-            (-tokenDeltas[trade.buyTokenIndex]).toUint256();
+        uint256 executedSellAmount = tokenDeltas[trade.sellTokenIndex]
+            .toUint256();
+        uint256 executedBuyAmount = (-tokenDeltas[trade.buyTokenIndex])
+            .toUint256();
 
         // NOTE: Check that the orders were completely filled and update their
         // filled amounts to avoid replaying them. The limit price and order
@@ -383,8 +381,8 @@ contract GPv2Settlement is GPv2Signing, ReentrancyGuard, StorageAccessible {
             if (order.partiallyFillable) {
                 executedSellAmount = executedAmount;
                 executedFeeAmount = order.feeAmount.mul(executedSellAmount).div(
-                    order.sellAmount
-                );
+                        order.sellAmount
+                    );
             } else {
                 executedSellAmount = order.sellAmount;
                 executedFeeAmount = order.feeAmount;
