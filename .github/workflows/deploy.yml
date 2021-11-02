@@ -11,7 +11,7 @@ jobs:
       - uses: actions/setup-node@v1
         with:
           node-version: 14.x
-      - run: yarn --frozen-lockfilx
+      - run: yarn --frozen-lockfile
       - run: yarn build
       - run: bash src/workflows/deploy.sh "automated-contract-deployment-${{github.run_number}}"
         env:
