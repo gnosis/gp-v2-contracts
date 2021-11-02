@@ -5,13 +5,12 @@ import {
   normalizeOrder,
   Order,
   OrderKind,
-  Signature,
-  SigningScheme,
-  encodeSignatureData,
   Timestamp,
   HashLike,
   OrderBalance,
-} from "../ts";
+} from "./order";
+import { encodeSignatureData } from "./settlement";
+import { Signature, SigningScheme } from "./sign";
 
 export enum Environment {
   Dev,
