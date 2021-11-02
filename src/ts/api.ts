@@ -29,11 +29,11 @@ export function apiUrl(environment: Environment, network: string): string {
   }
 }
 
-interface ApiCall {
+export interface ApiCall {
   baseUrl: string;
 }
 
-interface EstimateTradeAmountQuery {
+export interface EstimateTradeAmountQuery {
   sellToken: string;
   buyToken: string;
   kind: OrderKind;
@@ -43,7 +43,7 @@ export interface PlaceOrderQuery {
   order: Order;
   signature: Signature;
 }
-interface GetExecutedSellAmountQuery {
+export interface GetExecutedSellAmountQuery {
   uid: string;
 }
 
@@ -77,15 +77,15 @@ export interface CommonQuoteQuery {
   from: string;
 }
 
-interface OrderDetailResponse {
+export interface OrderDetailResponse {
   // Other fields are omitted until needed
   executedSellAmount: string;
 }
-interface EstimateAmountResponse {
+export interface EstimateAmountResponse {
   amount: string;
   token: string;
 }
-interface GetQuoteResponse {
+export interface GetQuoteResponse {
   quote: Order;
   from: string;
   expirationDate: Timestamp;

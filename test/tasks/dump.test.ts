@@ -14,13 +14,6 @@ import hre, { ethers, waffle } from "hardhat";
 import { mock, SinonMock } from "sinon";
 
 import {
-  Api,
-  CallError,
-  Environment,
-  GetQuoteErrorType,
-  PlaceOrderQuery,
-} from "../../src/services/api";
-import {
   APP_DATA,
   dump,
   GetDumpInstructionInput,
@@ -29,6 +22,13 @@ import {
 import { SupportedNetwork } from "../../src/tasks/ts/deployment";
 import { Erc20Token, isNativeToken } from "../../src/tasks/ts/tokens";
 import { BUY_ETH_ADDRESS, OrderKind } from "../../src/ts";
+import {
+  Api,
+  CallError,
+  Environment,
+  GetQuoteErrorType,
+  PlaceOrderQuery,
+} from "../../src/ts/api";
 import { deployTestContracts } from "../e2e/fixture";
 import { synchronizeBlockchainAndCurrentTime } from "../hardhatNetwork";
 

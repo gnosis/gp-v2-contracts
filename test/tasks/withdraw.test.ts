@@ -4,7 +4,6 @@ import { BigNumber, constants, Contract, utils, Wallet } from "ethers";
 import hre, { ethers, waffle } from "hardhat";
 import { mock, SinonMock } from "sinon";
 
-import { Api, Environment } from "../../src/services/api";
 import { SupportedNetwork } from "../../src/tasks/ts/deployment";
 import { ReferenceToken } from "../../src/tasks/ts/value";
 import { withdraw } from "../../src/tasks/withdraw";
@@ -15,6 +14,7 @@ import {
   TypedDataDomain,
   domain,
 } from "../../src/ts";
+import { Api, Environment } from "../../src/ts/api";
 import { deployTestContracts } from "../e2e/fixture";
 
 import { restoreStandardConsole, useDebugConsole } from "./logging";

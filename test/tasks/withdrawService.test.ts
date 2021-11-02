@@ -4,13 +4,13 @@ import { BigNumber, constants, Contract, utils, Wallet } from "ethers";
 import hre, { ethers, waffle } from "hardhat";
 import { mock, SinonMock } from "sinon";
 
-import { Api, Environment, PlaceOrderQuery } from "../../src/services/api";
 import { APP_DATA } from "../../src/tasks/dump";
 import { SupportedNetwork } from "../../src/tasks/ts/deployment";
 import { ReferenceToken } from "../../src/tasks/ts/value";
 import * as withdrawService from "../../src/tasks/withdrawService";
 import { WithdrawAndDumpInput } from "../../src/tasks/withdrawService";
 import { OrderKind, domain, Order } from "../../src/ts";
+import { Api, Environment, PlaceOrderQuery } from "../../src/ts/api";
 import { deployTestContracts } from "../e2e/fixture";
 import { synchronizeBlockchainAndCurrentTime } from "../hardhatNetwork";
 

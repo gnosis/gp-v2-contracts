@@ -19,6 +19,7 @@ export function domain(
   };
 }
 
+export * from "./api";
 export * from "./deploy";
 export * from "./interaction";
 export * from "./order";

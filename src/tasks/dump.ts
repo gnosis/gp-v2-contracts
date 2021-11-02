@@ -11,7 +11,6 @@ import {
 import { task, types } from "hardhat/config";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
-import { Api, CallError, Environment } from "../services/api";
 import {
   BUY_ETH_ADDRESS,
   domain,
@@ -21,6 +20,7 @@ import {
   signOrder,
   TypedDataDomain,
 } from "../ts";
+import { Api, CallError, Environment } from "../ts/api";
 
 import {
   getDeployedContract,
