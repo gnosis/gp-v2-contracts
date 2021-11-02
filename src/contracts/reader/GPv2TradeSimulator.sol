@@ -23,11 +23,6 @@ contract GPv2TradeSimulator {
         bytes32 buyTokenBalance;
     }
 
-    /// @dev Sentinal value to indicate that the buy amount for the trade's out
-    /// transfer should use all received buy tokens from the interactions
-    /// specified for the simulation.
-    uint256 private constant USE_ALL_RECEIVED_BUY_TOKENS = 0;
-
     /// @dev Initial token state used internally for computing balance changes.
     struct TokenState {
         IERC20 token;
@@ -41,6 +36,11 @@ contract GPv2TradeSimulator {
         TokenState sellTokenState;
         TokenState buyTokenState;
     }
+
+    /// @dev Sentinal value to indicate that the buy amount for the trade's out
+    /// transfer should use all received buy tokens from the interactions
+    /// specified for the simulation.
+    uint256 private constant USE_ALL_RECEIVED_BUY_TOKENS = 0;
 
     /// @dev Simulates a user trade.
     ///
@@ -114,8 +114,8 @@ contract GPv2TradeSimulator {
     }
 
     /// @dev Updates the out transfer token amount to be the exact amount of buy
-    /// token that has been received so far. This allows buy amounts to be
-    /// omitted from the trade simulation using a special sential value.
+    /// token that has been received so far if the trade simulation was done
+    /// using a special sentinal values for the buy amount.
     function updateOutTransferAmount(Context memory context) private view {
         if (context.outTransfers[0].amount == USE_ALL_RECEIVED_BUY_TOKENS) {
             context.outTransfers[0].amount ==
@@ -123,6 +123,7 @@ contract GPv2TradeSimulator {
         }
     }
 
+    /// @dev Compues the balance delta for the specified token state.
     function computeBalanceDelta(TokenState memory state)
         private
         view
