@@ -21,6 +21,7 @@ import {
   isSupportedNetwork,
   SupportedNetwork,
 } from "./ts/deployment";
+import { createGasEstimator, IGasEstimator } from "./ts/gas";
 import { promiseAllWithRateLimit } from "./ts/rate_limits";
 import { balanceOf, erc20Token } from "./ts/tokens";
 import { ReferenceToken, REFERENCE_TOKEN } from "./ts/value";
@@ -193,6 +194,7 @@ export interface WithdrawAndDumpInput {
   hre: HardhatRuntimeEnvironment;
   api: Api;
   dryRun: boolean;
+  gasEstimator: IGasEstimator;
   confirmationsAfterWithdrawing?: number | undefined;
   pagination?: number | undefined;
 }
@@ -231,6 +233,7 @@ export async function withdrawAndDump({
   hre,
   api,
   dryRun,
+  gasEstimator,
   confirmationsAfterWithdrawing,
   pagination,
 }: WithdrawAndDumpInput): Promise<State> {
@@ -305,6 +308,7 @@ export async function withdrawAndDump({
     hre,
     api,
     dryRun,
+    gasEstimator,
     doNotPrompt: true,
     // Wait for node to pick up updated balances before running the dump
     // function
@@ -335,6 +339,7 @@ export async function withdrawAndDump({
     hre,
     api,
     dryRun,
+    gasEstimator,
     doNotPrompt: true,
   });
   if (dryRun) {
@@ -462,6 +467,10 @@ const setupWithdrawServiceTask: () => void = () =>
       "dryRun",
       "Just simulate the settlement instead of executing the transaction on the blockchain",
     )
+    .addFlag(
+      "blocknativeGasPrice",
+      "Use BlockNative gas price estimates for transactions.",
+    )
     .setAction(
       async (
         {
@@ -475,6 +484,7 @@ const setupWithdrawServiceTask: () => void = () =>
           dryRun,
           tokensPerRun,
           apiUrl,
+          blocknativeGasPrice,
         },
         hre: HardhatRuntimeEnvironment,
       ) => {
@@ -484,6 +494,9 @@ const setupWithdrawServiceTask: () => void = () =>
         if (!isSupportedNetwork(network)) {
           throw new Error(`Unsupported network ${network}`);
         }
+        const gasEstimator = createGasEstimator(hre, {
+          blockNative: blocknativeGasPrice,
+        });
         const usdReference = REFERENCE_TOKEN[network];
         const api = new Api(network, apiUrl ?? Environment.Prod);
         const receiver = utils.getAddress(inputReceiver);
@@ -541,6 +554,7 @@ const setupWithdrawServiceTask: () => void = () =>
           hre,
           api,
           dryRun,
+          gasEstimator,
           confirmationsAfterWithdrawing: 2,
           pagination: tokensPerRun,
         });

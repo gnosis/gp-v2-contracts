@@ -20,6 +20,7 @@ import {
   getDumpInstructions,
 } from "../../src/tasks/dump";
 import { SupportedNetwork } from "../../src/tasks/ts/deployment";
+import { ProviderGasEstimator } from "../../src/tasks/ts/gas";
 import { Erc20Token, isNativeToken } from "../../src/tasks/ts/tokens";
 import { BUY_ETH_ADDRESS, OrderKind } from "../../src/ts";
 import {
@@ -150,7 +151,7 @@ describe("getDumpInstructions", () => {
     consoleLog = console.log;
     console.log = (...args: unknown[]) => (consoleLogOutput = args[0]);
 
-    [deployer, user, receiver] = await waffle.provider.getWallets();
+    [deployer, user, receiver] = waffle.provider.getWallets();
     // environment parameter is unused in mock
     const environment = "unset environment" as unknown as Environment;
     api = new Api("mock", environment);
@@ -168,6 +169,7 @@ describe("getDumpInstructions", () => {
       hre,
       network,
       api,
+      gasEstimator: new ProviderGasEstimator(ethers.provider),
     };
   });
 
@@ -907,6 +909,7 @@ describe("Task: dump", () => {
       network,
       hre,
       api,
+      gasEstimator: new ProviderGasEstimator(ethers.provider),
       dryRun: false,
       doNotPrompt: true,
     });
@@ -942,6 +945,7 @@ describe("Task: dump", () => {
         network,
         hre,
         api,
+        gasEstimator: new ProviderGasEstimator(ethers.provider),
         dryRun: false,
         doNotPrompt: true,
       });
