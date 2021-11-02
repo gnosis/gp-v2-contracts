@@ -2,14 +2,7 @@ import axios from "axios";
 import { BigNumber, ethers } from "ethers";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
-/**
- * Transaction gas price options.
- */
-export interface TransactionGasPrice {
-  gasPrice?: BigNumber;
-  maxFeePerGas?: BigNumber;
-  maxPriorityFeePerGas?: BigNumber;
-}
+export type FeeData = Partial<ethers.providers.FeeData>;
 
 /**
  * Gas estimator interface.
@@ -23,7 +16,7 @@ export interface IGasEstimator {
   /**
    * Computes the optimal transaction gas price options to use.
    */
-  txGasPrice(): Promise<TransactionGasPrice>;
+  txGasPrice(): Promise<FeeData>;
 }
 
 export function createGasEstimator(
@@ -49,7 +42,7 @@ export class ProviderGasEstimator implements IGasEstimator {
     return this.provider.getGasPrice();
   }
 
-  txGasPrice(): Promise<TransactionGasPrice> {
+  txGasPrice(): Promise<FeeData> {
     return Promise.resolve({});
   }
 }
@@ -93,7 +86,7 @@ export class BlockNativeGasEstimator implements IGasEstimator {
     return gweiToWei(price);
   }
 
-  async txGasPrice(): Promise<TransactionGasPrice> {
+  async txGasPrice(): Promise<FeeData> {
     const { maxFeePerGas, maxPriorityFeePerGas } =
       await this.queryEstimatedPrice();
 
