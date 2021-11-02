@@ -5,6 +5,7 @@ import hre, { ethers, waffle } from "hardhat";
 import { mock, SinonMock } from "sinon";
 
 import { SupportedNetwork } from "../../src/tasks/ts/deployment";
+import { ProviderGasEstimator } from "../../src/tasks/ts/gas";
 import { ReferenceToken } from "../../src/tasks/ts/value";
 import { withdraw } from "../../src/tasks/withdraw";
 import {
@@ -251,6 +252,7 @@ describe("Task: withdraw", () => {
       network: undefined as unknown as SupportedNetwork,
       hre,
       api,
+      gasEstimator: new ProviderGasEstimator(ethers.provider),
       dryRun: false,
       doNotPrompt: true,
     });
@@ -356,6 +358,7 @@ describe("Task: withdraw", () => {
       network: undefined as unknown as SupportedNetwork,
       hre,
       api,
+      gasEstimator: new ProviderGasEstimator(ethers.provider),
       dryRun: false,
       doNotPrompt: true,
     });

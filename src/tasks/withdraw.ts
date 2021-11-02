@@ -15,6 +15,7 @@ import {
   isSupportedNetwork,
   SupportedNetwork,
 } from "./ts/deployment";
+import { IGasEstimator, createGasEstimator } from "./ts/gas";
 import {
   DisappearingLogFunctions,
   promiseAllWithRateLimit,
@@ -396,6 +397,7 @@ interface WithdrawInput {
   hre: HardhatRuntimeEnvironment;
   api: Api;
   dryRun: boolean;
+  gasEstimator: IGasEstimator;
   doNotPrompt?: boolean | undefined;
   requiredConfirmations?: number | undefined;
 }
@@ -414,6 +416,7 @@ async function prepareWithdrawals({
   hre,
   api,
   dryRun,
+  gasEstimator,
 }: WithdrawInput): Promise<{
   withdrawals: Withdrawal[];
   finalSettlement: EncodedSettlement | null;
@@ -476,7 +479,7 @@ async function prepareWithdrawals({
   const oneEth = utils.parseEther("1");
   const [oneEthUsdValue, gasPrice] = await Promise.all([
     usdValueOfEth(oneEth, usdReference, network, api),
-    hre.ethers.provider.getGasPrice(),
+    gasEstimator.gasPriceEstimate(),
   ]);
   withdrawals = withdrawals.filter(
     ({ token, balance, balanceUsd, amountUsd, gas }) => {
@@ -528,7 +531,7 @@ async function prepareWithdrawals({
   });
 
   console.log(
-    `The transaction will cost approximately ${await formatGasCost(
+    `The transaction will cost approximately ${formatGasCost(
       transactionEthCost,
       transactionUsdCost,
       network,
@@ -552,6 +555,7 @@ async function submitWithdrawals(
     settlement,
     solver,
     requiredConfirmations,
+    gasEstimator,
   }: WithdrawInput,
   finalSettlement: EncodedSettlement,
 ) {
@@ -559,7 +563,7 @@ async function submitWithdrawals(
     console.log("Executing the withdraw transaction on the blockchain...");
     const response = await settlement
       .connect(solver)
-      .settle(...finalSettlement);
+      .settle(...finalSettlement, await gasEstimator.txGasPrice());
     console.log(
       "Transaction submitted to the blockchain. Waiting for acceptance in a block...",
     );
@@ -620,6 +624,10 @@ const setupWithdrawTask: () => void = () =>
       "dryRun",
       "Just simulate the settlement instead of executing the transaction on the blockchain.",
     )
+    .addFlag(
+      "blocknativeGasPrice",
+      "Use BlockNative gas price estimates for transactions.",
+    )
     .addOptionalVariadicPositionalParam(
       "tokens",
       "An optional subset of tokens to consider for withdraw (otherwise all traded tokens will be queried).",
@@ -634,6 +642,7 @@ const setupWithdrawTask: () => void = () =>
           dryRun,
           tokens,
           apiUrl,
+          blocknativeGasPrice,
         },
         hre: HardhatRuntimeEnvironment,
       ) => {
@@ -641,6 +650,9 @@ const setupWithdrawTask: () => void = () =>
         if (!isSupportedNetwork(network)) {
           throw new Error(`Unsupported network ${network}`);
         }
+        const gasEstimator = createGasEstimator(hre, {
+          blockNative: blocknativeGasPrice,
+        });
         const api = new Api(network, apiUrl ?? Environment.Prod);
         const receiver = utils.getAddress(inputReceiver);
         const [authenticator, settlementDeployment, [solver]] =
@@ -672,6 +684,7 @@ const setupWithdrawTask: () => void = () =>
           hre,
           api,
           dryRun,
+          gasEstimator,
         });
       },
     );
