@@ -70,10 +70,11 @@ interface BlockPrices {
 }
 
 export class BlockNativeGasEstimator implements IGasEstimator {
-  constructor(public confidence: number = 0.9) {}
+  constructor(public confidence: number = 90) {}
 
   private async queryEstimatedPrice(): Promise<EstimatedPrice> {
-    const { estimatedPrices }: BlockPrices = await axios.get(BLOCKNATIVE_URL);
+    const response = await axios.get(BLOCKNATIVE_URL);
+    const { estimatedPrices }: BlockPrices = response.data;
     estimatedPrices.sort((a, b) => a.confidence - b.confidence);
     const price = estimatedPrices.find(
       (price) => price.confidence >= this.confidence,
