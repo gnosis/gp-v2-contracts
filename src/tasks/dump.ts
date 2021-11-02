@@ -27,6 +27,7 @@ import {
   isSupportedNetwork,
   SupportedNetwork,
 } from "./ts/deployment";
+import { IGasEstimator, createGasEstimator } from "./ts/gas";
 import { promiseAllWithRateLimit } from "./ts/rate_limits";
 import { Align, displayTable } from "./ts/table";
 import {
@@ -111,7 +112,7 @@ interface GetTransferToReceiverInput {
   maxFeePercent: number;
   network: SupportedNetwork;
   api: Api;
-  hre: HardhatRuntimeEnvironment;
+  gasEstimator: IGasEstimator;
 }
 async function getTransferToReceiver({
   toToken,
@@ -121,7 +122,7 @@ async function getTransferToReceiver({
   maxFeePercent,
   network,
   api,
-  hre,
+  gasEstimator,
 }: GetTransferToReceiverInput): Promise<TransferToReceiver | undefined> {
   if (
     receiver.isSameAsUser ||
@@ -143,7 +144,7 @@ async function getTransferToReceiver({
   }
 
   const [gasPrice, gas, value] = await Promise.all([
-    hre.ethers.provider.getGasPrice(),
+    gasEstimator.gasPriceEstimate(),
     estimateTransferGas(toToken, user, receiver.address, amount),
     ethValue(toToken, amount, network, api),
   ]);
@@ -181,6 +182,7 @@ export interface GetDumpInstructionInput {
   hre: HardhatRuntimeEnvironment;
   network: SupportedNetwork;
   api: Api;
+  gasEstimator: IGasEstimator;
 }
 /**
  * This function recovers all information needed to dump the input list of
@@ -211,6 +213,7 @@ export async function getDumpInstructions({
   hre,
   network,
   api,
+  gasEstimator,
 }: GetDumpInstructionInput): Promise<DumpInstructions> {
   // todo: support dumping ETH by wrapping them
   if (inputDumpedTokens.includes(BUY_ETH_ADDRESS)) {
@@ -240,7 +243,7 @@ export async function getDumpInstructions({
     maxFeePercent,
     network,
     api,
-    hre,
+    gasEstimator,
   });
 
   const dumpedTokens = Array.from(new Set(inputDumpedTokens)).filter(
@@ -419,13 +422,14 @@ function displayOperations(
 }
 
 interface CreateAllowancesOptions {
+  gasEstimator: IGasEstimator;
   requiredConfirmations?: number | undefined;
 }
 async function createAllowances(
   allowances: Erc20Token[],
   signer: Signer,
   vaultRelayer: string,
-  { requiredConfirmations }: CreateAllowancesOptions = {},
+  { gasEstimator, requiredConfirmations }: CreateAllowancesOptions,
 ) {
   let lastTransaction: ContractTransaction | undefined = undefined;
   for (const token of allowances) {
@@ -434,7 +438,11 @@ async function createAllowances(
     );
     lastTransaction = (await token.contract
       .connect(signer)
-      .approve(vaultRelayer, constants.MaxUint256)) as ContractTransaction;
+      .approve(
+        vaultRelayer,
+        constants.MaxUint256,
+        await gasEstimator.txGasPrice(),
+      )) as ContractTransaction;
     await lastTransaction.wait();
   }
   if (lastTransaction !== undefined) {
@@ -534,6 +542,7 @@ interface DumpInput {
   hre: HardhatRuntimeEnvironment;
   api: Api;
   dryRun: boolean;
+  gasEstimator: IGasEstimator;
   doNotPrompt?: boolean | undefined;
   confirmationsAfterApproval?: number | undefined;
 }
@@ -549,6 +558,7 @@ export async function dump({
   hre,
   api,
   dryRun,
+  gasEstimator,
   doNotPrompt,
   confirmationsAfterApproval,
 }: DumpInput): Promise<void> {
@@ -577,6 +587,7 @@ export async function dump({
       hre,
       network,
       api,
+      gasEstimator,
     });
   const willTrade = instructions.length !== 0;
   const willTransfer = transferToReceiver !== undefined;
@@ -632,6 +643,7 @@ export async function dump({
   }
   if (!dryRun && (doNotPrompt || (await prompt(hre, "Submit?")))) {
     await createAllowances(needAllowances, signer, vaultRelayer, {
+      gasEstimator,
       // If the services don't register the allowance before the order,
       // then creating a new order with the API returns an error.
       // Moreover, there is no distinction in the error between a missing
@@ -696,6 +708,10 @@ const setupDumpTask: () => void = () =>
       "dryRun",
       "Just simulate the result instead of executing the transaction on the blockchain.",
     )
+    .addFlag(
+      "blocknativeGasPrice",
+      "Use BlockNative gas price estimates for transactions.",
+    )
     .addVariadicPositionalParam(
       "dumpedTokens",
       "List of tokens that will be dumped in exchange for toToken. Multiple tokens are separated by spaces",
@@ -711,6 +727,7 @@ const setupDumpTask: () => void = () =>
           receiver,
           validity,
           apiUrl,
+          blocknativeGasPrice,
         },
         hre,
       ) => {
@@ -718,6 +735,9 @@ const setupDumpTask: () => void = () =>
         if (!isSupportedNetwork(network)) {
           throw new Error(`Unsupported network ${hre.network.name}`);
         }
+        const gasEstimator = createGasEstimator(hre, {
+          blockNative: blocknativeGasPrice,
+        });
         const api = new Api(network, apiUrl ?? Environment.Prod);
         const [signers, settlement] = await Promise.all([
           hre.ethers.getSigners(),
@@ -761,6 +781,7 @@ const setupDumpTask: () => void = () =>
           hre,
           api,
           dryRun,
+          gasEstimator,
           confirmationsAfterApproval: 2,
         });
       },

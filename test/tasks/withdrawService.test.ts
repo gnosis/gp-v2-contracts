@@ -6,6 +6,7 @@ import { mock, SinonMock } from "sinon";
 
 import { APP_DATA } from "../../src/tasks/dump";
 import { SupportedNetwork } from "../../src/tasks/ts/deployment";
+import { ProviderGasEstimator } from "../../src/tasks/ts/gas";
 import { ReferenceToken } from "../../src/tasks/ts/value";
 import * as withdrawService from "../../src/tasks/withdrawService";
 import { WithdrawAndDumpInput } from "../../src/tasks/withdrawService";
@@ -110,6 +111,7 @@ describe("Task: withdrawService", () => {
       usdReference,
       hre,
       api,
+      gasEstimator: new ProviderGasEstimator(ethers.provider),
       dryRun: false,
     });
 
