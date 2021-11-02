@@ -44,11 +44,11 @@ import {
 import { prompt } from "./ts/tui";
 import { formatTokenValue, ethValue } from "./ts/value";
 
-const MAX_LATEST_BLOCK_DELAY_SECONDS = 2 * 60;
+export const MAX_LATEST_BLOCK_DELAY_SECONDS = 2 * 60;
 export const MAX_ORDER_VALIDITY_SECONDS = 24 * 3600;
 
 const keccak = utils.id;
-const APP_DATA = keccak("GPv2 dump script");
+export const APP_DATA = keccak("GPv2 dump script");
 
 interface DumpInstruction {
   token: Erc20Token;
@@ -176,6 +176,7 @@ export interface GetDumpInstructionInput {
   user: string;
   vaultRelayer: string;
   maxFeePercent: number;
+  validTo: number;
   receiver: Receiver;
   hre: HardhatRuntimeEnvironment;
   network: SupportedNetwork;
@@ -205,6 +206,7 @@ export async function getDumpInstructions({
   user,
   vaultRelayer: vaultRelayer,
   maxFeePercent,
+  validTo,
   receiver,
   hre,
   network,
@@ -244,6 +246,7 @@ export async function getDumpInstructions({
   const dumpedTokens = Array.from(new Set(inputDumpedTokens)).filter(
     (token) => token !== (toTokenAddress ?? BUY_ETH_ADDRESS),
   );
+
   const computedInstructions: (DumpInstruction | null)[] = (
     await promiseAllWithRateLimit(
       dumpedTokens.map((tokenAddress) => async ({ consoleLog }) => {
@@ -274,13 +277,18 @@ export async function getDumpInstructions({
           : toToken.address;
         let fee, buyAmountAfterFee;
         try {
-          const feeAndQuote = await api.getFeeAndQuoteSell({
+          const { quote } = await api.getQuote({
             sellToken,
             buyToken,
+            validTo,
+            appData: APP_DATA,
+            partiallyFillable: false,
+            from: user,
+            kind: OrderKind.SELL,
             sellAmountBeforeFee: balance,
           });
-          fee = feeAndQuote.feeAmount;
-          buyAmountAfterFee = feeAndQuote.buyAmountAfterFee;
+          fee = BigNumber.from(quote.feeAmount);
+          buyAmountAfterFee = BigNumber.from(quote.buyAmount);
         } catch (e) {
           if (
             (e as CallError)?.apiError?.errorType ===
@@ -443,18 +451,9 @@ async function createOrders(
   signer: Signer,
   receiver: Receiver,
   domainSeparator: TypedDataDomain,
-  validity: number,
-  ethers: HardhatRuntimeEnvironment["ethers"],
+  validTo: number,
   api: Api,
 ) {
-  const blockTimestamp = (await ethers.provider.getBlock("latest")).timestamp;
-  // Check that the local time is consistent with that of the blockchain
-  // to avoid signing orders that are valid for too long
-  const now = Math.floor(Date.now() / 1000);
-  if (Math.abs(now - blockTimestamp) > MAX_LATEST_BLOCK_DELAY_SECONDS) {
-    throw new Error("Blockchain time is not consistent with local time.");
-  }
-
   for (const inst of instructions) {
     const order: Order = {
       sellToken: inst.token.address,
@@ -467,7 +466,7 @@ async function createOrders(
       // todo: switch to true when partially fillable orders will be
       // supported by the services
       partiallyFillable: false,
-      validTo: now + validity,
+      validTo,
       receiver: receiver.isSameAsUser ? undefined : receiver.address,
     };
     const signature = await signOrder(
@@ -524,7 +523,7 @@ async function transferSameTokenToReceiver(
 }
 
 interface DumpInput {
-  validity: number;
+  validTo: number;
   maxFeePercent: number;
   dumpedTokens: string[];
   toToken: string;
@@ -539,7 +538,7 @@ interface DumpInput {
   confirmationsAfterApproval?: number | undefined;
 }
 export async function dump({
-  validity,
+  validTo,
   maxFeePercent,
   dumpedTokens,
   toToken: toTokenAddress,
@@ -554,9 +553,7 @@ export async function dump({
   confirmationsAfterApproval,
 }: DumpInput): Promise<void> {
   const { ethers } = hre;
-  if (validity > MAX_ORDER_VALIDITY_SECONDS) {
-    throw new Error("Order validity too large");
-  }
+
   const [chainId, vaultRelayer] = await Promise.all([
     ethers.provider.getNetwork().then((n) => n.chainId),
     (await settlement.vaultRelayer()) as string,
@@ -575,6 +572,7 @@ export async function dump({
       user: signer.address,
       vaultRelayer: vaultRelayer,
       maxFeePercent,
+      validTo,
       receiver,
       hre,
       network,
@@ -648,8 +646,7 @@ export async function dump({
       signer,
       receiver,
       domainSeparator,
-      validity,
-      ethers,
+      validTo,
       api,
     );
 
@@ -658,7 +655,9 @@ export async function dump({
     }
 
     console.log(
-      `Done! The orders will expire in the next ${validity / 60} minutes.`,
+      `Done! The orders will expire in the next ${
+        (validTo - Math.floor(Date.now() / 1000)) / 60
+      } minutes.`,
     );
   }
 }
@@ -737,8 +736,21 @@ const setupDumpTask: () => void = () =>
         }
         console.log(`Using account ${signer.address}`);
 
+        if (validity > MAX_ORDER_VALIDITY_SECONDS) {
+          throw new Error("Order validity too large");
+        }
+        // Check that the local time is consistent with that of the blockchain
+        // to avoid signing orders that are valid for too long
+        const now = Math.floor(Date.now() / 1000);
+        const blockTimestamp = (await hre.ethers.provider.getBlock("latest"))
+          .timestamp;
+        if (Math.abs(now - blockTimestamp) > MAX_LATEST_BLOCK_DELAY_SECONDS) {
+          throw new Error("Blockchain time is not consistent with local time.");
+        }
+        const validTo = now + validity;
+
         await dump({
-          validity,
+          validTo,
           maxFeePercent,
           dumpedTokens,
           toToken,
