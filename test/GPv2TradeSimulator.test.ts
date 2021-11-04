@@ -207,8 +207,7 @@ describe("GPv2TradeSimulator", () => {
         .withArgs(trader.address, actualBuyAmount)
         .returns(true);
 
-      //const { executedBuyAmount } = await tradeSimulator.simulateTrade(
-      const x = await tradeSimulator.simulateTrade(
+      const { executedBuyAmount } = await tradeSimulator.simulateTrade(
         {
           owner: trader.address,
           sellToken: tokens[0].address,
@@ -228,7 +227,7 @@ describe("GPv2TradeSimulator", () => {
         },
       );
 
-      expect(x.executedBuyAmount).to.equal(actualBuyAmount);
+      expect(executedBuyAmount).to.equal(actualBuyAmount);
     });
   });
 });
