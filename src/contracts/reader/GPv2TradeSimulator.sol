@@ -45,7 +45,7 @@ contract GPv2TradeSimulator {
         AccountState ownerAccount;
     }
 
-    /// @dev Address balance changes included in the results.
+    /// @dev Account balance changes included in the results.
     struct BalanceDelta {
         int256 sellTokenDelta;
         int256 buyTokenDelta;
@@ -119,7 +119,12 @@ contract GPv2TradeSimulator {
         view
         returns (Context memory context)
     {
-        context.gasCounter = gasCounter();
+        context.gasCounter = gasleft();
+
+        address actualReceiver = trade.receiver ==
+            GPv2Order.RECEIVER_SAME_AS_OWNER
+            ? trade.owner
+            : trade.receiver;
 
         context.inTransfers = new GPv2Transfer.Data[](1);
         {
@@ -133,27 +138,50 @@ contract GPv2TradeSimulator {
         context.outTransfers = new GPv2Transfer.Data[](1);
         {
             GPv2Transfer.Data memory outTransfer = context.outTransfers[0];
-            outTransfer.account = trade.receiver ==
-                GPv2Order.RECEIVER_SAME_AS_OWNER
-                ? trade.owner
-                : trade.receiver;
+            outTransfer.account = actualReceiver;
             outTransfer.token = trade.buyToken;
             outTransfer.amount = trade.buyAmount;
             outTransfer.balance = trade.buyTokenBalance;
         }
 
-        initializeAccountState(context.contractAccount, address(this), trade);
-        initializeAccountState(context.ownerAccount, trade.owner, trade);
+        {
+            AccountState memory contractAccount = context.contractAccount;
+            initializeTokenState(
+                contractAccount.sellTokenState,
+                trade.sellToken,
+                address(this)
+            );
+            initializeTokenState(
+                contractAccount.buyTokenState,
+                trade.buyToken,
+                address(this)
+            );
+        }
+
+        {
+            AccountState memory ownerAccount = context.ownerAccount;
+            initializeTokenState(
+                ownerAccount.sellTokenState,
+                trade.sellToken,
+                trade.owner
+            );
+            initializeTokenState(
+                ownerAccount.buyTokenState,
+                trade.buyToken,
+                actualReceiver
+            );
+        }
     }
 
     /// @dev Updates the out transfer token amount to be the exact amount of buy
     /// token that has been received so far if the trade simulation was done
     /// using a special sentinal values for the buy amount.
     function updateOutTransferAmount(Context memory context) private view {
-        if (context.outTransfers[0].amount == USE_ALL_RECEIVED_BUY_TOKENS) {
-            context.outTransfers[0].amount ==
-                computeTokenDelta(context.contractAccount.buyTokenState)
-                    .toUint256();
+        GPv2Transfer.Data memory outTransfer = context.outTransfers[0];
+        if (outTransfer.amount == USE_ALL_RECEIVED_BUY_TOKENS) {
+            outTransfer.amount = computeTokenDelta(
+                context.contractAccount.buyTokenState
+            ).toUint256();
         }
     }
 
@@ -165,17 +193,7 @@ contract GPv2TradeSimulator {
         result.executedBuyAmount = context.outTransfers[0].amount;
         computeBalanceDelta(context.contractAccount, result.contractBalance);
         computeBalanceDelta(context.ownerAccount, result.ownerBalance);
-        result.gasUsed = context.gasCounter - gasCounter();
-    }
-
-    /// @dev Initializes an account state for the specified address.
-    function initializeAccountState(
-        AccountState memory state,
-        address account,
-        Trade calldata trade
-    ) private view {
-        initializeTokenState(state.sellTokenState, trade.sellToken, account);
-        initializeTokenState(state.buyTokenState, trade.buyToken, account);
+        result.gasUsed = context.gasCounter - gasleft();
     }
 
     /// @dev Initializes a token state for the specified token and address
@@ -206,14 +224,5 @@ contract GPv2TradeSimulator {
     {
         uint256 currentBalance = state.token.balanceOf(state.account);
         return currentBalance.toInt256() - state.initialBalance.toInt256();
-    }
-
-    /// @dev Reads the remaining gas counter.
-    ///
-    /// This function abstracts over the EVM `gas()` assembly instruction.
-    function gasCounter() private view returns (uint256 g) {
-        assembly {
-            g := gas()
-        }
     }
 }
