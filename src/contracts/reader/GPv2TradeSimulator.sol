@@ -81,21 +81,32 @@ contract GPv2TradeSimulator {
     /// @param interactions A set of interactions to settle the trade against.
     function simulateTrade(
         Trade calldata trade,
-        GPv2Interaction.Data[] calldata interactions
+        GPv2Interaction.Data[][3] calldata interactions
     ) external returns (Result memory result) {
         Context memory context = createContext(trade);
         GPv2Settlement self = GPv2Settlement(payable(address(this)));
 
+        executeInteractions(interactions[0]);
+
         self.vaultRelayer().transferFromAccounts(context.inTransfers);
 
-        for (uint256 i; i < interactions.length; i++) {
-            GPv2Interaction.execute(interactions[i]);
-        }
+        executeInteractions(interactions[1]);
 
         updateOutTransferAmount(context);
         self.vault().transferToAccounts(context.outTransfers);
 
+        executeInteractions(interactions[2]);
+
         finalizeResult(context, result);
+    }
+
+    /// @dev Executes interactions.
+    function executeInteractions(GPv2Interaction.Data[] calldata interactions)
+        private
+    {
+        for (uint256 i; i < interactions.length; i++) {
+            GPv2Interaction.execute(interactions[i]);
+        }
     }
 
     /// @dev Initializes a simulation context in memory for the current trade
