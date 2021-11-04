@@ -185,7 +185,7 @@ describe("GPv2TradeSimulator", () => {
         {},
       );
 
-      expect(gasUsed.gt(ethers.constants.Zero)).to.be.true;
+      expect(gasUsed.gt(10000) && gasUsed.lt(1000000)).to.be.true;
     });
 
     it("computes executed buy amount settlement contract balance change", async () => {
