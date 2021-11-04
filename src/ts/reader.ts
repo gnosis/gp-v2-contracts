@@ -119,8 +119,8 @@ export class TradeSimulator {
     interactions: Partial<Record<InteractionStage, InteractionLike[]>>,
   ): Promise<TradeSimulationResult> {
     const normalizedTrade = {
-      receiver: ethers.constants.AddressZero,
       ...trade,
+      receiver: trade.receiver ?? ethers.constants.AddressZero,
       sellTokenBalance: ethers.utils.id(
         trade.sellTokenBalance || OrderBalance.ERC20,
       ),
