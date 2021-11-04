@@ -122,10 +122,10 @@ export class TradeSimulator {
       ...trade,
       receiver: trade.receiver ?? ethers.constants.AddressZero,
       sellTokenBalance: ethers.utils.id(
-        trade.sellTokenBalance || OrderBalance.ERC20,
+        trade.sellTokenBalance ?? OrderBalance.ERC20,
       ),
       buyTokenBalance: ethers.utils.id(
-        trade.buyTokenBalance || OrderBalance.ERC20,
+        trade.buyTokenBalance ?? OrderBalance.ERC20,
       ),
     };
     const normalizedInteractions = [
