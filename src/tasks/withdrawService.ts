@@ -8,15 +8,20 @@ import { utils, Contract } from "ethers";
 import { task, types } from "hardhat/config";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
-import { Api, Environment } from "../services/api";
 import { BUY_ETH_ADDRESS } from "../ts";
+import { Api, Environment } from "../ts/api";
 
-import { dump, MAX_ORDER_VALIDITY_SECONDS } from "./dump";
+import {
+  dump,
+  MAX_LATEST_BLOCK_DELAY_SECONDS,
+  MAX_ORDER_VALIDITY_SECONDS,
+} from "./dump";
 import {
   getDeployedContract,
   isSupportedNetwork,
   SupportedNetwork,
 } from "./ts/deployment";
+import { createGasEstimator, IGasEstimator } from "./ts/gas";
 import { promiseAllWithRateLimit } from "./ts/rate_limits";
 import { balanceOf, erc20Token } from "./ts/tokens";
 import { ReferenceToken, REFERENCE_TOKEN } from "./ts/value";
@@ -181,7 +186,7 @@ export interface WithdrawAndDumpInput {
   settlementDeploymentBlock: number;
   minValue: string;
   leftover: string;
-  validity: number;
+  validTo: number;
   maxFeePercent: number;
   toToken: string;
   network: SupportedNetwork;
@@ -189,6 +194,7 @@ export interface WithdrawAndDumpInput {
   hre: HardhatRuntimeEnvironment;
   api: Api;
   dryRun: boolean;
+  gasEstimator: IGasEstimator;
   confirmationsAfterWithdrawing?: number | undefined;
   pagination?: number | undefined;
 }
@@ -219,7 +225,7 @@ export async function withdrawAndDump({
   settlementDeploymentBlock,
   minValue,
   leftover,
-  validity,
+  validTo,
   maxFeePercent,
   toToken,
   network,
@@ -227,6 +233,7 @@ export async function withdrawAndDump({
   hre,
   api,
   dryRun,
+  gasEstimator,
   confirmationsAfterWithdrawing,
   pagination,
 }: WithdrawAndDumpInput): Promise<State> {
@@ -301,6 +308,7 @@ export async function withdrawAndDump({
     hre,
     api,
     dryRun,
+    gasEstimator,
     doNotPrompt: true,
     // Wait for node to pick up updated balances before running the dump
     // function
@@ -320,7 +328,7 @@ export async function withdrawAndDump({
   ).filter((addr) => addr !== BUY_ETH_ADDRESS);
 
   await dump({
-    validity,
+    validTo,
     maxFeePercent,
     dumpedTokens: tokensToDump,
     toToken,
@@ -331,6 +339,7 @@ export async function withdrawAndDump({
     hre,
     api,
     dryRun,
+    gasEstimator,
     doNotPrompt: true,
   });
   if (dryRun) {
@@ -458,6 +467,10 @@ const setupWithdrawServiceTask: () => void = () =>
       "dryRun",
       "Just simulate the settlement instead of executing the transaction on the blockchain",
     )
+    .addFlag(
+      "blocknativeGasPrice",
+      "Use BlockNative gas price estimates for transactions.",
+    )
     .setAction(
       async (
         {
@@ -471,6 +484,7 @@ const setupWithdrawServiceTask: () => void = () =>
           dryRun,
           tokensPerRun,
           apiUrl,
+          blocknativeGasPrice,
         },
         hre: HardhatRuntimeEnvironment,
       ) => {
@@ -480,6 +494,9 @@ const setupWithdrawServiceTask: () => void = () =>
         if (!isSupportedNetwork(network)) {
           throw new Error(`Unsupported network ${network}`);
         }
+        const gasEstimator = createGasEstimator(hre, {
+          blockNative: blocknativeGasPrice,
+        });
         const usdReference = REFERENCE_TOKEN[network];
         const api = new Api(network, apiUrl ?? Environment.Prod);
         const receiver = utils.getAddress(inputReceiver);
@@ -510,6 +527,16 @@ const setupWithdrawServiceTask: () => void = () =>
           settlementDeployment.receipt?.blockNumber ?? 0;
         console.log(`Using account ${solver.address}`);
 
+        // Check that the local time is consistent with that of the blockchain
+        // to avoid signing orders that are valid for too long
+        const now = Math.floor(Date.now() / 1000);
+        const blockTimestamp = (await hre.ethers.provider.getBlock("latest"))
+          .timestamp;
+        if (Math.abs(now - blockTimestamp) > MAX_LATEST_BLOCK_DELAY_SECONDS) {
+          throw new Error("Blockchain time is not consistent with local time.");
+        }
+        const validTo = now + validity;
+
         const updatedState = await withdrawAndDump({
           state,
           solver,
@@ -519,7 +546,7 @@ const setupWithdrawServiceTask: () => void = () =>
           settlementDeploymentBlock,
           minValue,
           leftover,
-          validity,
+          validTo,
           maxFeePercent,
           toToken,
           network,
@@ -527,6 +554,7 @@ const setupWithdrawServiceTask: () => void = () =>
           hre,
           api,
           dryRun,
+          gasEstimator,
           confirmationsAfterWithdrawing: 2,
           pagination: tokensPerRun,
         });

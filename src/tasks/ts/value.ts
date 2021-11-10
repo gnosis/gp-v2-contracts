@@ -1,7 +1,7 @@
 import { BigNumber } from "ethers";
 
-import { Api } from "../../services/api";
 import { OrderKind } from "../../ts";
+import { Api } from "../../ts/api";
 import { SupportedNetwork } from "../ts/deployment";
 import {
   Erc20Token,

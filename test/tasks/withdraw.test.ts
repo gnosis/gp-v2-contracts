@@ -4,8 +4,8 @@ import { BigNumber, constants, Contract, utils, Wallet } from "ethers";
 import hre, { ethers, waffle } from "hardhat";
 import { mock, SinonMock } from "sinon";
 
-import { Api, Environment } from "../../src/services/api";
 import { SupportedNetwork } from "../../src/tasks/ts/deployment";
+import { ProviderGasEstimator } from "../../src/tasks/ts/gas";
 import { ReferenceToken } from "../../src/tasks/ts/value";
 import { withdraw } from "../../src/tasks/withdraw";
 import {
@@ -15,6 +15,7 @@ import {
   TypedDataDomain,
   domain,
 } from "../../src/ts";
+import { Api, Environment } from "../../src/ts/api";
 import { deployTestContracts } from "../e2e/fixture";
 
 import { restoreStandardConsole, useDebugConsole } from "./logging";
@@ -251,6 +252,7 @@ describe("Task: withdraw", () => {
       network: undefined as unknown as SupportedNetwork,
       hre,
       api,
+      gasEstimator: new ProviderGasEstimator(ethers.provider),
       dryRun: false,
       doNotPrompt: true,
     });
@@ -356,6 +358,7 @@ describe("Task: withdraw", () => {
       network: undefined as unknown as SupportedNetwork,
       hre,
       api,
+      gasEstimator: new ProviderGasEstimator(ethers.provider),
       dryRun: false,
       doNotPrompt: true,
     });

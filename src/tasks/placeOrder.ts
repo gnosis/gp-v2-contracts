@@ -3,14 +3,14 @@ import { utils } from "ethers";
 import { task } from "hardhat/config";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
+import { domain, OrderKind, SigningScheme, signOrder } from "../ts";
 import {
   Api,
   Environment,
   SellAmountAfterFee,
   SellAmountBeforeFee,
   BuyAmountAfterFee,
-} from "../services/api";
-import { domain, OrderKind, SigningScheme, signOrder } from "../ts";
+} from "../ts/api";
 
 import { getDeployedContract } from "./ts/deployment";
 import { prompt } from "./ts/tui";

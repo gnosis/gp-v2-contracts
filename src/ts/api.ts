@@ -5,13 +5,12 @@ import {
   normalizeOrder,
   Order,
   OrderKind,
-  Signature,
-  SigningScheme,
-  encodeSignatureData,
   Timestamp,
   HashLike,
   OrderBalance,
-} from "../ts";
+} from "./order";
+import { encodeSignatureData } from "./settlement";
+import { Signature, SigningScheme } from "./sign";
 
 export enum Environment {
   Dev,
@@ -29,17 +28,11 @@ export function apiUrl(environment: Environment, network: string): string {
   }
 }
 
-interface ApiCall {
+export interface ApiCall {
   baseUrl: string;
 }
 
-interface GetFeeQuery {
-  sellToken: string;
-  buyToken: string;
-  kind: OrderKind;
-  amount: BigNumberish;
-}
-interface EstimateTradeAmountQuery {
+export interface EstimateTradeAmountQuery {
   sellToken: string;
   buyToken: string;
   kind: OrderKind;
@@ -49,18 +42,8 @@ export interface PlaceOrderQuery {
   order: Order;
   signature: Signature;
 }
-interface GetExecutedSellAmountQuery {
+export interface GetExecutedSellAmountQuery {
   uid: string;
-}
-interface GetFeeAndQuoteSellQuery {
-  sellToken: string;
-  buyToken: string;
-  sellAmountBeforeFee: BigNumberish;
-}
-interface GetFeeAndQuoteBuyQuery {
-  sellToken: string;
-  buyToken: string;
-  buyAmountAfterFee: BigNumberish;
 }
 
 export type SellAmountBeforeFee = {
@@ -93,39 +76,18 @@ export interface CommonQuoteQuery {
   from: string;
 }
 
-interface OrderDetailResponse {
+export interface OrderDetailResponse {
   // Other fields are omitted until needed
   executedSellAmount: string;
 }
-interface GetFeeResponse {
-  amount: string;
-  expirationDate: Date;
-}
-interface EstimateAmountResponse {
+export interface EstimateAmountResponse {
   amount: string;
   token: string;
 }
-interface GetFeeAndQuoteSellResponse {
-  fee: GetFeeResponse;
-  buyAmountAfterFee: BigNumberish;
-}
-interface GetFeeAndQuoteBuyResponse {
-  fee: GetFeeResponse;
-  sellAmountBeforeFee: BigNumberish;
-}
-interface GetQuoteResponse {
+export interface GetQuoteResponse {
   quote: Order;
   from: string;
   expirationDate: Timestamp;
-}
-
-export interface GetFeeAndQuoteSellOutput {
-  feeAmount: BigNumber;
-  buyAmountAfterFee: BigNumber;
-}
-export interface GetFeeAndQuoteBuyOutput {
-  feeAmount: BigNumber;
-  sellAmountBeforeFee: BigNumber;
 }
 
 export interface ApiError {
@@ -136,7 +98,7 @@ export interface CallError extends Error {
   apiError?: ApiError;
 }
 
-export enum GetFeeAndQuoteSellErrorType {
+export enum GetQuoteErrorType {
   SellAmountDoesNotCoverFee = "SellAmountDoesNotCoverFee",
   // other errors are added when necessary
 }
@@ -189,22 +151,6 @@ async function call<T>(
     throw error;
   }
   return JSON.parse(body);
-}
-
-async function getFee({
-  sellToken,
-  buyToken,
-  kind,
-  amount,
-  baseUrl,
-}: GetFeeQuery & ApiCall): Promise<BigNumber> {
-  const response: GetFeeResponse = await call(
-    `fee?sellToken=${sellToken}&buyToken=${buyToken}&amount=${BigNumber.from(
-      amount,
-    ).toString()}&kind=${apiKind(kind)}`,
-    baseUrl,
-  );
-  return BigNumber.from(response.amount);
 }
 
 async function estimateTradeAmount({
@@ -264,46 +210,26 @@ async function getExecutedSellAmount({
   return BigNumber.from(response.executedSellAmount);
 }
 
-async function getFeeAndQuoteSell({
-  sellToken,
-  buyToken,
-  sellAmountBeforeFee,
-  baseUrl,
-}: GetFeeAndQuoteSellQuery & ApiCall): Promise<GetFeeAndQuoteSellOutput> {
-  const response: GetFeeAndQuoteSellResponse = await call(
-    `feeAndQuote/sell?sellToken=${sellToken}&buyToken=${buyToken}&sellAmountBeforeFee=${BigNumber.from(
-      sellAmountBeforeFee,
-    ).toString()}`,
-    baseUrl,
-  );
-  return {
-    feeAmount: BigNumber.from(response.fee.amount),
-    buyAmountAfterFee: BigNumber.from(response.buyAmountAfterFee),
-  };
-}
-
-async function getFeeAndQuoteBuy({
-  sellToken,
-  buyToken,
-  buyAmountAfterFee,
-  baseUrl,
-}: GetFeeAndQuoteBuyQuery & ApiCall): Promise<GetFeeAndQuoteBuyOutput> {
-  const response: GetFeeAndQuoteBuyResponse = await call(
-    `feeAndQuote/buy?sellToken=${sellToken}&buyToken=${buyToken}&buyAmountAfterFee=${BigNumber.from(
-      buyAmountAfterFee,
-    ).toString()}`,
-    baseUrl,
-  );
-  return {
-    feeAmount: BigNumber.from(response.fee.amount),
-    sellAmountBeforeFee: BigNumber.from(response.sellAmountBeforeFee),
-  };
-}
-
 async function getQuote(
   { baseUrl }: ApiCall,
   quote: QuoteQuery,
 ): Promise<GetQuoteResponse> {
+  // Convert BigNumber into JSON strings (native serialisation is a hex object)
+  if ((<SellAmountBeforeFee>quote).sellAmountBeforeFee) {
+    (<SellAmountBeforeFee>quote).sellAmountBeforeFee = (<SellAmountBeforeFee>(
+      quote
+    )).sellAmountBeforeFee.toString();
+  }
+  if ((<SellAmountAfterFee>quote).sellAmountAfterFee) {
+    (<SellAmountAfterFee>quote).sellAmountAfterFee = (<SellAmountAfterFee>(
+      quote
+    )).sellAmountAfterFee.toString();
+  }
+  if ((<BuyAmountAfterFee>quote).buyAmountAfterFee) {
+    (<BuyAmountAfterFee>quote).buyAmountAfterFee = (<BuyAmountAfterFee>(
+      quote
+    )).buyAmountAfterFee.toString();
+  }
   return call("quote", baseUrl, {
     method: "post",
     headers: { "Content-Type": "application/json" },
@@ -330,9 +256,6 @@ export class Api {
     return { network: this.network, baseUrl: this.baseUrl };
   }
 
-  async getFee(query: GetFeeQuery): Promise<BigNumber> {
-    return getFee({ ...this.apiCallParams(), ...query });
-  }
   async estimateTradeAmount(
     query: EstimateTradeAmountQuery,
   ): Promise<BigNumber> {
@@ -345,16 +268,6 @@ export class Api {
     query: GetExecutedSellAmountQuery,
   ): Promise<BigNumber> {
     return getExecutedSellAmount({ ...this.apiCallParams(), ...query });
-  }
-  async getFeeAndQuoteSell(
-    query: GetFeeAndQuoteSellQuery,
-  ): Promise<GetFeeAndQuoteSellOutput> {
-    return getFeeAndQuoteSell({ ...this.apiCallParams(), ...query });
-  }
-  async getFeeAndQuoteBuy(
-    query: GetFeeAndQuoteBuyQuery,
-  ): Promise<GetFeeAndQuoteBuyOutput> {
-    return getFeeAndQuoteBuy({ ...this.apiCallParams(), ...query });
   }
   async getQuote(query: QuoteQuery): Promise<GetQuoteResponse> {
     return getQuote(this.apiCallParams(), query);
