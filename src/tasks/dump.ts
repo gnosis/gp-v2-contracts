@@ -463,12 +463,27 @@ async function createOrders(
   api: Api,
 ) {
   for (const inst of instructions) {
+    const sellToken = inst.token.address;
+    const buyToken = isNativeToken(toToken) ? BUY_ETH_ADDRESS : toToken.address;
+
+    // Re-quote for up-to-date fee (in case approval took long)
+    const updatedQuote = await api.getQuote({
+      sellToken,
+      buyToken,
+      sellAmountBeforeFee: inst.amountWithoutFee,
+      kind: OrderKind.SELL,
+      appData: APP_DATA,
+      partiallyFillable: false,
+      validTo,
+      from: receiver.address,
+    });
+
     const order: Order = {
-      sellToken: inst.token.address,
-      buyToken: isNativeToken(toToken) ? BUY_ETH_ADDRESS : toToken.address,
+      sellToken,
+      buyToken,
       sellAmount: inst.amountWithoutFee,
       buyAmount: inst.receivedAmount,
-      feeAmount: inst.fee,
+      feeAmount: updatedQuote.quote.feeAmount,
       kind: OrderKind.SELL,
       appData: APP_DATA,
       // todo: switch to true when partially fillable orders will be
