@@ -460,6 +460,7 @@ async function createOrders(
   receiver: Receiver,
   domainSeparator: TypedDataDomain,
   validTo: number,
+  maxFeePercent: number,
   api: Api,
 ) {
   for (const inst of instructions) {
@@ -477,6 +478,21 @@ async function createOrders(
       validTo,
       from: receiver.address,
     });
+    const feePercent =
+      (100 * Number(updatedQuote.quote.feeAmount.toString())) /
+      Number(inst.amountWithoutFee);
+    if (feePercent > maxFeePercent) {
+      console.log(
+        ignoredTokenMessage(
+          inst.token,
+          inst.amountWithoutFee,
+          `the trading fee is too large compared to the balance (${feePercent.toFixed(
+            2,
+          )}%).`,
+        ),
+      );
+      continue;
+    }
 
     const order: Order = {
       sellToken,
@@ -674,6 +690,7 @@ export async function dump({
       receiver,
       domainSeparator,
       validTo,
+      maxFeePercent,
       api,
     );
 
