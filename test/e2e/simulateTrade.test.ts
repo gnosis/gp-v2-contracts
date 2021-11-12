@@ -1,4 +1,3 @@
-import ERC20 from "@openzeppelin/contracts/build/contracts/ERC20PresetMinterPauser.json";
 import UniswapV2Factory from "@uniswap/v2-core/build/UniswapV2Factory.json";
 import UniswapV2Pair from "@uniswap/v2-core/build/UniswapV2Pair.json";
 import UniswapV2Router02 from "@uniswap/v2-periphery/build/UniswapV2Router02.json";
@@ -54,8 +53,9 @@ describe("E2E: Simulates Uniswap Trade", () => {
     domainSeparator = domain(chainId, settlement.address);
     tradeSimulator = new TradeSimulator(settlement, deployment.tradeSimulator);
 
-    weth = await waffle.deployContract(deployer, ERC20, ["WETH", 18]);
-    usdt = await waffle.deployContract(deployer, ERC20, ["USDT", 6]);
+    const TestERC20 = await ethers.getContractFactory("TestERC20");
+    weth = await TestERC20.deploy("WETH", 18);
+    usdt = await TestERC20.deploy("USDT", 6);
 
     const FeeClaimingERC20 = await ethers.getContractFactory(
       "FeeClaimingERC20",
@@ -181,7 +181,8 @@ describe("E2E: Simulates Uniswap Trade", () => {
       (actualGasUsed.toNumber() - simulatedGasUsed.toNumber() - gasOverhead) /
       actualGasUsed.toNumber();
     console.log(
-      `Simulated trade used ${simulatedGasUsed} (+${gasOverhead}) and cost ${actualGasUsed}`,
+      `Simulated trade used ${simulatedGasUsed} (+${gasOverhead}) and cost ${actualGasUsed} ` +
+        `(${(gasUsageRatio * 100).toFixed(2)}% difference)`,
     );
     expect(gasUsageRatio).to.be.lessThan(0.05);
   });
