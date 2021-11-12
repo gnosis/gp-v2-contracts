@@ -466,32 +466,38 @@ async function createOrders(
   for (const inst of instructions) {
     const sellToken = inst.token.address;
     const buyToken = isNativeToken(toToken) ? BUY_ETH_ADDRESS : toToken.address;
-
-    // Re-quote for up-to-date fee (in case approval took long)
-    const updatedQuote = await api.getQuote({
-      sellToken,
-      buyToken,
-      sellAmountBeforeFee: inst.amountWithoutFee,
-      kind: OrderKind.SELL,
-      appData: APP_DATA,
-      partiallyFillable: false,
-      validTo,
-      from: receiver.address,
-    });
-    const feePercent =
-      (100 * Number(updatedQuote.quote.feeAmount.toString())) /
-      Number(inst.amountWithoutFee);
-    if (feePercent > maxFeePercent) {
-      console.log(
-        ignoredTokenMessage(
-          inst.token,
-          inst.amountWithoutFee,
-          `the trading fee is too large compared to the balance (${feePercent.toFixed(
-            2,
-          )}%).`,
-        ),
-      );
-      continue;
+    let feeAmount;
+    try {
+      // Re-quote for up-to-date fee (in case approval took long)
+      const updatedQuote = await api.getQuote({
+        sellToken,
+        buyToken,
+        sellAmountBeforeFee: inst.amountWithoutFee,
+        kind: OrderKind.SELL,
+        appData: APP_DATA,
+        partiallyFillable: false,
+        validTo,
+        from: receiver.address,
+      });
+      const feePercent =
+        (100 * Number(updatedQuote.quote.feeAmount.toString())) /
+        Number(inst.amountWithoutFee);
+      if (feePercent > maxFeePercent) {
+        console.log(
+          ignoredTokenMessage(
+            inst.token,
+            inst.amountWithoutFee,
+            `the trading fee is too large compared to the balance (${feePercent.toFixed(
+              2,
+            )}%).`,
+          ),
+        );
+        continue;
+      }
+      feeAmount = updatedQuote.quote.feeAmount;
+    } catch (error) {
+      console.log(error, "Couldn't re-quote fee, hoping old fee is still good");
+      feeAmount = inst.fee;
     }
 
     const order: Order = {
@@ -499,7 +505,7 @@ async function createOrders(
       buyToken,
       sellAmount: inst.amountWithoutFee,
       buyAmount: inst.receivedAmount,
-      feeAmount: updatedQuote.quote.feeAmount,
+      feeAmount,
       kind: OrderKind.SELL,
       appData: APP_DATA,
       // todo: switch to true when partially fillable orders will be
