@@ -235,6 +235,7 @@ describe("Task: withdrawService", () => {
       quote: {
         feeAmount: usdcFee,
         buyAmount: BigNumber.from(42),
+        sellAmount: BigNumber.from(usdcBalanceMinusLeftover).sub(usdcFee),
       },
     };
     const validity = 3600;
@@ -252,7 +253,7 @@ describe("Task: withdrawService", () => {
         kind: OrderKind.SELL,
         sellAmountBeforeFee: usdcBalanceMinusLeftover,
       })
-      .once()
+      .twice()
       .returns(Promise.resolve(usdcFeeAndQuote));
     // the solver was storing dai balance from the previous run, which
     // should be included
@@ -263,6 +264,7 @@ describe("Task: withdrawService", () => {
       quote: {
         feeAmount: BigNumber.from(daiFee),
         buyAmount: BigNumber.from(1337),
+        sellAmount: BigNumber.from(daiBalanceIncludingSolver).sub(daiFee),
       },
     };
     apiMock
@@ -284,6 +286,7 @@ describe("Task: withdrawService", () => {
       quote: {
         feeAmount: wethFee,
         buyAmount: BigNumber.from(1337),
+        sellAmount: BigNumber.from(wethBalanceMinusLeftover).sub(wethFee),
       },
     };
 
@@ -299,7 +302,7 @@ describe("Task: withdrawService", () => {
         kind: OrderKind.SELL,
         sellAmountBeforeFee: wethBalanceMinusLeftover,
       })
-      .once()
+      .twice()
       .returns(Promise.resolve(wethFeeAndQuote));
 
     function assertGoodOrder(
@@ -443,6 +446,7 @@ describe("Task: withdrawService", () => {
         quote: {
           feeAmount: constants.Zero,
           buyAmount: BigNumber.from(1337),
+          sellAmount: soldAmount,
         },
       };
       apiMock
@@ -457,7 +461,7 @@ describe("Task: withdrawService", () => {
           kind: OrderKind.SELL,
           sellAmountBeforeFee: soldAmount,
         })
-        .once()
+        .twice()
         .returns(Promise.resolve(feeAndQuote));
     }
 

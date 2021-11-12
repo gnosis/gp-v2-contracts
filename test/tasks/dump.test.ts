@@ -68,6 +68,7 @@ function mockApiCalls({
     quote: {
       feeAmount: BigNumber.from(fee),
       buyAmount: BigNumber.from(boughtAmount),
+      sellAmount: BigNumber.from(balance).sub(fee),
     },
   };
   apiMock
@@ -82,7 +83,7 @@ function mockApiCalls({
       kind: OrderKind.SELL,
       sellAmountBeforeFee: balance,
     })
-    .once()
+    .atLeast(1)
     .returns(Promise.resolve(result));
 }
 

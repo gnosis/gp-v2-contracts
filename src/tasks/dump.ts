@@ -466,18 +466,18 @@ async function createOrders(
   for (const inst of instructions) {
     const sellToken = inst.token.address;
     const buyToken = isNativeToken(toToken) ? BUY_ETH_ADDRESS : toToken.address;
-    let feeAmount;
+    let feeAmount, sellAmount, buyAmount;
     try {
       // Re-quote for up-to-date fee (in case approval took long)
       const updatedQuote = await api.getQuote({
         sellToken,
         buyToken,
-        sellAmountBeforeFee: inst.amountWithoutFee,
+        sellAmountBeforeFee: inst.balance,
         kind: OrderKind.SELL,
         appData: APP_DATA,
         partiallyFillable: false,
         validTo,
-        from: receiver.address,
+        from: await signer.getAddress(),
       });
       const feePercent =
         (100 * Number(updatedQuote.quote.feeAmount.toString())) /
@@ -495,16 +495,20 @@ async function createOrders(
         continue;
       }
       feeAmount = updatedQuote.quote.feeAmount;
+      buyAmount = updatedQuote.quote.buyAmount;
+      sellAmount = updatedQuote.quote.sellAmount;
     } catch (error) {
       console.log(error, "Couldn't re-quote fee, hoping old fee is still good");
       feeAmount = inst.fee;
+      buyAmount = inst.receivedAmount;
+      sellAmount = inst.amountWithoutFee;
     }
 
     const order: Order = {
       sellToken,
       buyToken,
-      sellAmount: inst.amountWithoutFee,
-      buyAmount: inst.receivedAmount,
+      sellAmount,
+      buyAmount,
       feeAmount,
       kind: OrderKind.SELL,
       appData: APP_DATA,
