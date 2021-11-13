@@ -53,11 +53,15 @@ export const APP_DATA = keccak("GPv2 dump script");
 
 interface DumpInstruction {
   token: Erc20Token;
-  amountWithoutFee: BigNumber;
-  receivedAmount: BigNumber;
+  quote: Quote;
   balance: BigNumber;
-  fee: BigNumber;
   needsAllowance: boolean;
+}
+
+interface Quote {
+  sellAmount: BigNumber;
+  buyAmount: BigNumber;
+  feeAmount: BigNumber;
 }
 
 interface DisplayDumpInstruction {
@@ -278,9 +282,9 @@ export async function getDumpInstructions({
         const buyToken = isNativeToken(toToken)
           ? WRAPPED_NATIVE_TOKEN_ADDRESS[network] // todo: replace WETH address with BUY_ETH_ADDRESS when services support ETH estimates
           : toToken.address;
-        let fee, buyAmountAfterFee;
+        let quote;
         try {
-          const { quote } = await api.getQuote({
+          const quotedOrder = await api.getQuote({
             sellToken,
             buyToken,
             validTo,
@@ -290,8 +294,11 @@ export async function getDumpInstructions({
             kind: OrderKind.SELL,
             sellAmountBeforeFee: balance,
           });
-          fee = BigNumber.from(quote.feeAmount);
-          buyAmountAfterFee = BigNumber.from(quote.buyAmount);
+          quote = {
+            sellAmount: BigNumber.from(quotedOrder.quote.sellAmount),
+            buyAmount: BigNumber.from(quotedOrder.quote.buyAmount),
+            feeAmount: BigNumber.from(quotedOrder.quote.feeAmount),
+          };
         } catch (e) {
           if (
             (e as CallError)?.apiError?.errorType ===
@@ -309,9 +316,8 @@ export async function getDumpInstructions({
             throw e;
           }
         }
-        const amountWithoutFee = balance.sub(fee);
         const approxBalance = Number(balance.toString());
-        const approxFee = Number(fee.toString());
+        const approxFee = Number(quote.feeAmount.toString());
         const feePercent = (100 * approxFee) / approxBalance;
         if (feePercent > maxFeePercent) {
           consoleLog(
@@ -328,9 +334,7 @@ export async function getDumpInstructions({
         return {
           token,
           balance,
-          amountWithoutFee,
-          receivedAmount: buyAmountAfterFee,
-          fee,
+          quote,
           needsAllowance,
         };
       }),
@@ -340,9 +344,9 @@ export async function getDumpInstructions({
   // note: null entries have already been filtered out
   const instructions = computedInstructions as DumpInstruction[];
   instructions.sort((lhs, rhs) =>
-    lhs.receivedAmount.eq(rhs.receivedAmount)
+    lhs.quote.buyAmount.eq(rhs.quote.buyAmount)
       ? 0
-      : lhs.receivedAmount.lt(rhs.receivedAmount)
+      : lhs.quote.buyAmount.lt(rhs.quote.buyAmount)
       ? -1
       : 1,
   );
@@ -357,9 +361,8 @@ export async function getDumpInstructions({
 function formatInstruction(
   {
     token: fromToken,
+    quote,
     balance,
-    receivedAmount,
-    fee,
     needsAllowance: inputNeedsAllowance,
   }: DumpInstruction,
   toToken: Erc20Token | NativeToken,
@@ -368,15 +371,19 @@ function formatInstruction(
   const fromAddress = fromToken.address;
   const fromDecimals = fromToken.decimals ?? 0;
   const needsAllowance = inputNeedsAllowance ? "yes" : "";
-  const feePercent = fee.mul(10000).div(balance).lt(1)
+  const feePercent = quote.feeAmount.mul(10000).div(balance).lt(1)
     ? "<0.01"
-    : utils.formatUnits(fee.mul(10000).div(balance), 2);
+    : utils.formatUnits(quote.feeAmount.mul(10000).div(balance), 2);
   return {
     fromSymbol,
     fromAddress,
     needsAllowance,
     balance: formatTokenValue(balance, fromDecimals, 18),
-    receivedAmount: formatTokenValue(receivedAmount, toToken.decimals ?? 0, 18),
+    receivedAmount: formatTokenValue(
+      quote.buyAmount,
+      toToken.decimals ?? 0,
+      18,
+    ),
     feePercent,
   };
 }
@@ -466,7 +473,6 @@ async function createOrders(
   for (const inst of instructions) {
     const sellToken = inst.token.address;
     const buyToken = isNativeToken(toToken) ? BUY_ETH_ADDRESS : toToken.address;
-    let feeAmount, sellAmount, buyAmount;
     try {
       // Re-quote for up-to-date fee (in case approval took long)
       const updatedQuote = await api.getQuote({
@@ -481,12 +487,12 @@ async function createOrders(
       });
       const feePercent =
         (100 * Number(updatedQuote.quote.feeAmount.toString())) /
-        Number(inst.amountWithoutFee);
+        Number(inst.quote.sellAmount);
       if (feePercent > maxFeePercent) {
         console.log(
           ignoredTokenMessage(
             inst.token,
-            inst.amountWithoutFee,
+            inst.quote.sellAmount,
             `the trading fee is too large compared to the balance (${feePercent.toFixed(
               2,
             )}%).`,
@@ -494,22 +500,21 @@ async function createOrders(
         );
         continue;
       }
-      feeAmount = updatedQuote.quote.feeAmount;
-      buyAmount = updatedQuote.quote.buyAmount;
-      sellAmount = updatedQuote.quote.sellAmount;
+      inst.quote = {
+        sellAmount: BigNumber.from(updatedQuote.quote.sellAmount),
+        buyAmount: BigNumber.from(updatedQuote.quote.buyAmount),
+        feeAmount: BigNumber.from(updatedQuote.quote.feeAmount),
+      };
     } catch (error) {
       console.log(error, "Couldn't re-quote fee, hoping old fee is still good");
-      feeAmount = inst.fee;
-      buyAmount = inst.receivedAmount;
-      sellAmount = inst.amountWithoutFee;
     }
 
     const order: Order = {
       sellToken,
       buyToken,
-      sellAmount,
-      buyAmount,
-      feeAmount,
+      sellAmount: inst.quote.sellAmount,
+      buyAmount: inst.quote.buyAmount,
+      feeAmount: inst.quote.feeAmount,
       kind: OrderKind.SELL,
       appData: APP_DATA,
       // todo: switch to true when partially fillable orders will be
@@ -637,7 +642,7 @@ export async function dump({
   }
 
   let sumReceived = instructions.reduce(
-    (sum, inst) => sum.add(inst.receivedAmount),
+    (sum, inst) => sum.add(inst.quote.buyAmount),
     constants.Zero,
   );
   const needAllowances = instructions
