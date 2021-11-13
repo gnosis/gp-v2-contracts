@@ -278,59 +278,19 @@ export async function getDumpInstructions({
           );
           return null;
         }
-        const sellToken = token.address;
-        const buyToken = isNativeToken(toToken)
-          ? WRAPPED_NATIVE_TOKEN_ADDRESS[network] // todo: replace WETH address with BUY_ETH_ADDRESS when services support ETH estimates
-          : toToken.address;
-        let quote;
-        try {
-          const quotedOrder = await api.getQuote({
-            sellToken,
-            buyToken,
-            validTo,
-            appData: APP_DATA,
-            partiallyFillable: false,
-            from: user,
-            kind: OrderKind.SELL,
-            sellAmountBeforeFee: balance,
-          });
-          quote = {
-            sellAmount: BigNumber.from(quotedOrder.quote.sellAmount),
-            buyAmount: BigNumber.from(quotedOrder.quote.buyAmount),
-            feeAmount: BigNumber.from(quotedOrder.quote.feeAmount),
-          };
-        } catch (e) {
-          if (
-            (e as CallError)?.apiError?.errorType ===
-            "SellAmountDoesNotCoverFee"
-          ) {
-            consoleLog(
-              ignoredTokenMessage(
-                token,
-                balance,
-                "the trading fee is larger than the dumped amount.",
-              ),
-            );
-            return null;
-          } else {
-            throw e;
-          }
-        }
-        const approxBalance = Number(balance.toString());
-        const approxFee = Number(quote.feeAmount.toString());
-        const feePercent = (100 * approxFee) / approxBalance;
-        if (feePercent > maxFeePercent) {
-          consoleLog(
-            ignoredTokenMessage(
-              token,
-              balance,
-              `the trading fee is too large compared to the balance (${feePercent.toFixed(
-                2,
-              )}%).`,
-            ),
-          );
+        const quote = await getQuote({
+          sellToken: token,
+          buyToken: toToken,
+          api,
+          balance,
+          maxFeePercent,
+          validTo,
+          user,
+        });
+        if (quote === null) {
           return null;
         }
+
         return {
           token,
           balance,
@@ -356,6 +316,74 @@ export async function getDumpInstructions({
     toToken,
     transferToReceiver: await transferToReceiver,
   };
+}
+interface QuoteInput {
+  sellToken: Erc20Token;
+  buyToken: Erc20Token | NativeToken;
+  balance: BigNumber;
+  validTo: number;
+  maxFeePercent: number;
+  user: string;
+  api: Api;
+}
+
+// Returns null if the fee is not satisfying balance or maxFeePercent. May throw if an unexpected error occurs
+async function getQuote({
+  sellToken,
+  buyToken,
+  balance,
+  validTo,
+  maxFeePercent,
+  user,
+  api,
+}: QuoteInput): Promise<Quote | null> {
+  let quote;
+  try {
+    const quotedOrder = await api.getQuote({
+      sellToken: sellToken.address,
+      buyToken: isNativeToken(buyToken) ? BUY_ETH_ADDRESS : buyToken.address,
+      validTo,
+      appData: APP_DATA,
+      partiallyFillable: false,
+      from: user,
+      kind: OrderKind.SELL,
+      sellAmountBeforeFee: balance,
+    });
+    quote = {
+      sellAmount: BigNumber.from(quotedOrder.quote.sellAmount),
+      buyAmount: BigNumber.from(quotedOrder.quote.buyAmount),
+      feeAmount: BigNumber.from(quotedOrder.quote.feeAmount),
+    };
+  } catch (e) {
+    if ((e as CallError)?.apiError?.errorType === "SellAmountDoesNotCoverFee") {
+      console.log(
+        ignoredTokenMessage(
+          sellToken,
+          balance,
+          "the trading fee is larger than the dumped amount.",
+        ),
+      );
+      return null;
+    } else {
+      throw e;
+    }
+  }
+  const approxBalance = Number(balance.toString());
+  const approxFee = Number(quote.feeAmount.toString());
+  const feePercent = (100 * approxFee) / approxBalance;
+  if (feePercent > maxFeePercent) {
+    console.log(
+      ignoredTokenMessage(
+        sellToken,
+        balance,
+        `the trading fee is too large compared to the balance (${feePercent.toFixed(
+          2,
+        )}%).`,
+      ),
+    );
+    return null;
+  }
+  return quote;
 }
 
 function formatInstruction(
@@ -475,36 +503,18 @@ async function createOrders(
     const buyToken = isNativeToken(toToken) ? BUY_ETH_ADDRESS : toToken.address;
     try {
       // Re-quote for up-to-date fee (in case approval took long)
-      const updatedQuote = await api.getQuote({
-        sellToken,
-        buyToken,
-        sellAmountBeforeFee: inst.balance,
-        kind: OrderKind.SELL,
-        appData: APP_DATA,
-        partiallyFillable: false,
+      const updatedQuote = await getQuote({
+        sellToken: inst.token,
+        buyToken: toToken,
+        balance: inst.balance,
         validTo,
-        from: signer.address,
+        user: signer.address,
+        api,
+        maxFeePercent,
       });
-      const feePercent =
-        (100 * Number(updatedQuote.quote.feeAmount.toString())) /
-        Number(inst.quote.sellAmount);
-      if (feePercent > maxFeePercent) {
-        console.log(
-          ignoredTokenMessage(
-            inst.token,
-            inst.quote.sellAmount,
-            `the trading fee is too large compared to the balance (${feePercent.toFixed(
-              2,
-            )}%).`,
-          ),
-        );
-        continue;
+      if (updatedQuote !== null) {
+        inst.quote = updatedQuote;
       }
-      inst.quote = {
-        sellAmount: BigNumber.from(updatedQuote.quote.sellAmount),
-        buyAmount: BigNumber.from(updatedQuote.quote.buyAmount),
-        feeAmount: BigNumber.from(updatedQuote.quote.feeAmount),
-      };
     } catch (error) {
       console.log(error, "Couldn't re-quote fee, hoping old fee is still good");
     }

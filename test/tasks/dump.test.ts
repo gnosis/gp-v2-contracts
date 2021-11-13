@@ -264,7 +264,7 @@ describe("getDumpInstructions", () => {
         .returns(allowance);
       mockApiCalls({
         apiMock,
-        toToken: wrappedNativeToken,
+        toToken: BUY_ETH_ADDRESS,
         dumpedToken: dumped.address,
         balance,
         fee,
