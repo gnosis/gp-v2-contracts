@@ -188,6 +188,7 @@ export interface WithdrawAndDumpInput {
   leftover: string;
   validTo: number;
   maxFeePercent: number;
+  slippageBps: number;
   toToken: string;
   network: SupportedNetwork;
   usdReference: ReferenceToken;
@@ -227,6 +228,7 @@ export async function withdrawAndDump({
   leftover,
   validTo,
   maxFeePercent,
+  slippageBps,
   toToken,
   network,
   usdReference,
@@ -330,6 +332,7 @@ export async function withdrawAndDump({
   await dump({
     validTo,
     maxFeePercent,
+    slippageBps,
     dumpedTokens: tokensToDump,
     toToken,
     settlement,
@@ -449,6 +452,12 @@ const setupWithdrawServiceTask: () => void = () =>
       types.float,
     )
     .addOptionalParam(
+      "slippageBps",
+      "The slippage in basis points for selling the dumped tokens",
+      10,
+      types.int,
+    )
+    .addOptionalParam(
       "stateFilePath",
       "The path to the file where the state of the script is stored. This file will be updated after a run",
       "./state.json",
@@ -479,6 +488,7 @@ const setupWithdrawServiceTask: () => void = () =>
           toToken,
           validity,
           maxFeePercent,
+          slippageBps,
           stateFilePath,
           receiver: inputReceiver,
           dryRun,
@@ -548,6 +558,7 @@ const setupWithdrawServiceTask: () => void = () =>
           leftover,
           validTo,
           maxFeePercent,
+          slippageBps,
           toToken,
           network,
           usdReference,
