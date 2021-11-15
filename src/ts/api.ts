@@ -100,6 +100,7 @@ export interface CallError extends Error {
 
 export enum GetQuoteErrorType {
   SellAmountDoesNotCoverFee = "SellAmountDoesNotCoverFee",
+  NoLiquidity = "NoLiquidity",
   // other errors are added when necessary
 }
 

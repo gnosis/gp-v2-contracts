@@ -227,11 +227,13 @@ describe("getDumpInstructions", () => {
     expect(instructions).to.have.length(1);
     const {
       token: dumpedToken,
-      amountWithoutFee,
+      quote: {
+        sellAmount: amountWithoutFee,
+        buyAmount: receivedAmount,
+        feeAmount: returnedFee,
+      },
       needsAllowance,
-      receivedAmount,
       balance: returnedBalance,
-      fee: returnedFee,
     } = instructions[0];
     expect(dumpedToken.symbol).to.deep.equal("DUMPEDTOKEN");
     expect(dumpedToken.decimals).to.deep.equal(0xd);
@@ -262,7 +264,7 @@ describe("getDumpInstructions", () => {
         .returns(allowance);
       mockApiCalls({
         apiMock,
-        toToken: wrappedNativeToken,
+        toToken: BUY_ETH_ADDRESS,
         dumpedToken: dumped.address,
         balance,
         fee,
@@ -287,11 +289,13 @@ describe("getDumpInstructions", () => {
       expect(instructions).to.have.length(1);
       const {
         token: dumpedToken,
-        amountWithoutFee,
+        quote: {
+          sellAmount: amountWithoutFee,
+          buyAmount: receivedAmount,
+          feeAmount: returnedFee,
+        },
         needsAllowance,
-        receivedAmount,
         balance: returnedBalance,
-        fee: returnedFee,
       } = instructions[0];
       expect(dumpedToken.symbol).to.deep.equal("DUMPEDTOKEN");
       expect(dumpedToken.decimals).to.deep.equal(0xd);
@@ -522,6 +526,7 @@ describe("getDumpInstructions", () => {
       quote: {
         feeAmount: BigNumber.from(fee),
         buyAmount: BigNumber.from(1337),
+        sellAmount: balance.sub(fee),
       },
     };
     apiMock
@@ -702,6 +707,7 @@ describe("getDumpInstructions", () => {
           quote: {
             feeAmount: fee,
             buyAmount: boughtAmount,
+            sellAmount: balance.sub(fee),
           },
         };
         apiReturnValue = Promise.resolve(result);
@@ -773,11 +779,13 @@ describe("getDumpInstructions", () => {
       (
         {
           token,
-          amountWithoutFee,
+          quote: {
+            sellAmount: amountWithoutFee,
+            buyAmount: receivedAmount,
+            feeAmount: returnedFee,
+          },
           needsAllowance,
-          receivedAmount,
           balance: returnedBalance,
-          fee: returnedFee,
         },
         sortedIndex,
       ) => {
