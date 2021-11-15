@@ -20,7 +20,7 @@ import {
   signOrder,
   TypedDataDomain,
 } from "../ts";
-import { Api, CallError, Environment } from "../ts/api";
+import { Api, CallError, Environment, GetQuoteErrorType } from "../ts/api";
 
 import {
   getDeployedContract,
@@ -36,7 +36,6 @@ import {
   NativeToken,
   erc20Token,
   Erc20Token,
-  WRAPPED_NATIVE_TOKEN_ADDRESS,
   balanceOf,
   transfer,
   displayName,
@@ -355,12 +354,26 @@ async function getQuote({
       feeAmount: BigNumber.from(quotedOrder.quote.feeAmount),
     };
   } catch (e) {
-    if ((e as CallError)?.apiError?.errorType === "SellAmountDoesNotCoverFee") {
+    if (
+      (e as CallError)?.apiError?.errorType ===
+      GetQuoteErrorType.SellAmountDoesNotCoverFee
+    ) {
       console.log(
         ignoredTokenMessage(
           sellToken,
           balance,
           "the trading fee is larger than the dumped amount.",
+        ),
+      );
+      return null;
+    } else if (
+      (e as CallError)?.apiError?.errorType === GetQuoteErrorType.NoLiquidity
+    ) {
+      console.log(
+        ignoredTokenMessage(
+          sellToken,
+          balance,
+          "not enough liquidity to dump tokens.",
         ),
       );
       return null;
