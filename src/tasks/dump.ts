@@ -456,19 +456,60 @@ async function createAllowances(
 async function createOrders(
   instructions: DumpInstruction[],
   toToken: Erc20Token | NativeToken,
-  signer: Signer,
+  signer: SignerWithAddress,
   receiver: Receiver,
   domainSeparator: TypedDataDomain,
   validTo: number,
+  maxFeePercent: number,
   api: Api,
 ) {
   for (const inst of instructions) {
+    const sellToken = inst.token.address;
+    const buyToken = isNativeToken(toToken) ? BUY_ETH_ADDRESS : toToken.address;
+    let feeAmount, sellAmount, buyAmount;
+    try {
+      // Re-quote for up-to-date fee (in case approval took long)
+      const updatedQuote = await api.getQuote({
+        sellToken,
+        buyToken,
+        sellAmountBeforeFee: inst.balance,
+        kind: OrderKind.SELL,
+        appData: APP_DATA,
+        partiallyFillable: false,
+        validTo,
+        from: signer.address,
+      });
+      const feePercent =
+        (100 * Number(updatedQuote.quote.feeAmount.toString())) /
+        Number(inst.amountWithoutFee);
+      if (feePercent > maxFeePercent) {
+        console.log(
+          ignoredTokenMessage(
+            inst.token,
+            inst.amountWithoutFee,
+            `the trading fee is too large compared to the balance (${feePercent.toFixed(
+              2,
+            )}%).`,
+          ),
+        );
+        continue;
+      }
+      feeAmount = updatedQuote.quote.feeAmount;
+      buyAmount = updatedQuote.quote.buyAmount;
+      sellAmount = updatedQuote.quote.sellAmount;
+    } catch (error) {
+      console.log(error, "Couldn't re-quote fee, hoping old fee is still good");
+      feeAmount = inst.fee;
+      buyAmount = inst.receivedAmount;
+      sellAmount = inst.amountWithoutFee;
+    }
+
     const order: Order = {
-      sellToken: inst.token.address,
-      buyToken: isNativeToken(toToken) ? BUY_ETH_ADDRESS : toToken.address,
-      sellAmount: inst.amountWithoutFee,
-      buyAmount: inst.receivedAmount,
-      feeAmount: inst.fee,
+      sellToken,
+      buyToken,
+      sellAmount,
+      buyAmount,
+      feeAmount,
       kind: OrderKind.SELL,
       appData: APP_DATA,
       // todo: switch to true when partially fillable orders will be
@@ -659,6 +700,7 @@ export async function dump({
       receiver,
       domainSeparator,
       validTo,
+      maxFeePercent,
       api,
     );
 
