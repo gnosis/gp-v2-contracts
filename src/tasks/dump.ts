@@ -456,7 +456,7 @@ async function createAllowances(
 async function createOrders(
   instructions: DumpInstruction[],
   toToken: Erc20Token | NativeToken,
-  signer: Signer,
+  signer: SignerWithAddress,
   receiver: Receiver,
   domainSeparator: TypedDataDomain,
   validTo: number,
@@ -477,7 +477,7 @@ async function createOrders(
         appData: APP_DATA,
         partiallyFillable: false,
         validTo,
-        from: await signer.getAddress(),
+        from: signer.address,
       });
       const feePercent =
         (100 * Number(updatedQuote.quote.feeAmount.toString())) /
