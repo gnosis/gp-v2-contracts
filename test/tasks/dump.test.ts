@@ -162,6 +162,7 @@ describe("getDumpInstructions", () => {
       user: user.address,
       vaultRelayer: vaultRelayer,
       maxFeePercent: Infinity,
+      slippageBps: 0,
       receiver: {
         address: receiver.address,
         isSameAsUser: true,
@@ -802,6 +803,49 @@ describe("getDumpInstructions", () => {
       },
     );
   });
+
+  it("adds slippage to quote", async () => {
+    const to = await mockErc20(deployer);
+    await to.mock.symbol.returns("TOTOKEN");
+    await to.mock.decimals.returns(101);
+    const dumped = await mockErc20(deployer);
+    await dumped.mock.symbol.returns("DUMPEDTOKEN");
+    await dumped.mock.decimals.returns(0xd);
+
+    const balance = utils.parseEther("42");
+    const fee = utils.parseEther("1");
+    const allowance = utils.parseEther("31337");
+    const boughtAmount = utils.parseEther("100");
+    const slippageBps = 100;
+    const boughtAmountWithSlippage = utils.parseEther("99");
+
+    await dumped.mock.balanceOf.withArgs(user.address).returns(balance);
+    await dumped.mock.allowance
+      .withArgs(user.address, vaultRelayer)
+      .returns(allowance);
+    mockApiCalls({
+      apiMock,
+      toToken: to.address,
+      dumpedToken: dumped.address,
+      balance,
+      fee,
+      boughtAmount,
+      validTo: defaultDumpInstructions.validTo,
+      from: defaultDumpInstructions.user,
+    });
+
+    const { instructions } = await getDumpInstructions({
+      ...defaultDumpInstructions,
+      slippageBps,
+      dumpedTokens: [dumped.address],
+      toTokenAddress: to.address,
+    });
+    expect(instructions).to.have.length(1);
+    const {
+      quote: { buyAmount: receivedAmount },
+    } = instructions[0];
+    expect(receivedAmount).to.deep.equal(boughtAmountWithSlippage);
+  });
 });
 
 describe("Task: dump", () => {
@@ -910,6 +954,7 @@ describe("Task: dump", () => {
     await dump({
       validTo,
       maxFeePercent: Infinity,
+      slippageBps: 0,
       dumpedTokens: [weth.address, dai.address],
       toToken: weth.address,
       settlement,
@@ -946,6 +991,7 @@ describe("Task: dump", () => {
       await dump({
         validTo: 1337,
         maxFeePercent: Infinity,
+        slippageBps: 0,
         dumpedTokens: [weth.address],
         toToken: weth.address,
         settlement,

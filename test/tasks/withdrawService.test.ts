@@ -105,6 +105,7 @@ describe("Task: withdrawService", () => {
       leftover: "0",
       validTo: 3600,
       maxFeePercent: 100,
+      slippageBps: 0,
       toToken: toToken.address,
       // ignore network value
       network: undefined as unknown as SupportedNetwork,

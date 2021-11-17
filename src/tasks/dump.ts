@@ -2,6 +2,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import chalk from "chalk";
 import {
   BigNumber,
+  BigNumberish,
   constants,
   Contract,
   ContractTransaction,
@@ -180,6 +181,7 @@ export interface GetDumpInstructionInput {
   user: string;
   vaultRelayer: string;
   maxFeePercent: number;
+  slippageBps: number;
   validTo: number;
   receiver: Receiver;
   hre: HardhatRuntimeEnvironment;
@@ -211,6 +213,7 @@ export async function getDumpInstructions({
   user,
   vaultRelayer: vaultRelayer,
   maxFeePercent,
+  slippageBps,
   validTo,
   receiver,
   hre,
@@ -283,6 +286,7 @@ export async function getDumpInstructions({
           api,
           balance,
           maxFeePercent,
+          slippageBps,
           validTo,
           user,
         });
@@ -322,6 +326,7 @@ interface QuoteInput {
   balance: BigNumber;
   validTo: number;
   maxFeePercent: number;
+  slippageBps: number;
   user: string;
   api: Api;
 }
@@ -333,6 +338,7 @@ async function getQuote({
   balance,
   validTo,
   maxFeePercent,
+  slippageBps,
   user,
   api,
 }: QuoteInput): Promise<Quote | null> {
@@ -350,7 +356,10 @@ async function getQuote({
     });
     quote = {
       sellAmount: BigNumber.from(quotedOrder.quote.sellAmount),
-      buyAmount: BigNumber.from(quotedOrder.quote.buyAmount),
+      buyAmount: buyAmountWithSlippage(
+        quotedOrder.quote.buyAmount,
+        slippageBps,
+      ),
       feeAmount: BigNumber.from(quotedOrder.quote.feeAmount),
     };
   } catch (e) {
@@ -397,6 +406,16 @@ async function getQuote({
     return null;
   }
   return quote;
+}
+
+function buyAmountWithSlippage(
+  buyAmountWithoutSlippage: BigNumberish,
+  slippageBps: number,
+): BigNumber {
+  // reduce buy amount by slippage
+  return BigNumber.from(buyAmountWithoutSlippage)
+    .mul(10000 - slippageBps)
+    .div(10000);
 }
 
 function formatInstruction(
@@ -509,6 +528,7 @@ async function createOrders(
   domainSeparator: TypedDataDomain,
   validTo: number,
   maxFeePercent: number,
+  slippageBps: number,
   api: Api,
 ) {
   for (const inst of instructions) {
@@ -524,6 +544,7 @@ async function createOrders(
         user: signer.address,
         api,
         maxFeePercent,
+        slippageBps,
       });
       if (updatedQuote !== null) {
         inst.quote = updatedQuote;
@@ -602,6 +623,7 @@ async function transferSameTokenToReceiver(
 interface DumpInput {
   validTo: number;
   maxFeePercent: number;
+  slippageBps: number;
   dumpedTokens: string[];
   toToken: string;
   settlement: Contract;
@@ -618,6 +640,7 @@ interface DumpInput {
 export async function dump({
   validTo,
   maxFeePercent,
+  slippageBps,
   dumpedTokens,
   toToken: toTokenAddress,
   settlement,
@@ -651,6 +674,7 @@ export async function dump({
       user: signer.address,
       vaultRelayer: vaultRelayer,
       maxFeePercent,
+      slippageBps,
       validTo,
       receiver,
       hre,
@@ -729,6 +753,7 @@ export async function dump({
       domainSeparator,
       validTo,
       maxFeePercent,
+      slippageBps,
       api,
     );
 
@@ -771,6 +796,12 @@ const setupDumpTask: () => void = () =>
       types.float,
     )
     .addOptionalParam(
+      "slippageBps",
+      "The slippage in basis points for selling the dumped tokens",
+      10,
+      types.int,
+    )
+    .addOptionalParam(
       "apiUrl",
       "If set, the script contacts the API using the given url. Otherwise, the default prod url for the current network is used",
     )
@@ -793,6 +824,7 @@ const setupDumpTask: () => void = () =>
           toToken,
           dumpedTokens,
           maxFeePercent,
+          slippageBps,
           dryRun,
           receiver,
           validity,
@@ -842,6 +874,7 @@ const setupDumpTask: () => void = () =>
         await dump({
           validTo,
           maxFeePercent,
+          slippageBps,
           dumpedTokens,
           toToken,
           settlement,
