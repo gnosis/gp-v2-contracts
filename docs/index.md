@@ -2,7 +2,7 @@
 
 - [Architecture](architecture.md)
 
-## Thread Model
+## Threat Model
 
 Our set of contracts has an owner and multiple solvers. The owner is trusted (a DAO). The solvers could be unknown addresses: anyone can become a solver by staking some money. The owner is always able to withdraw the staked money at any time if the solver misbehaves. This means that the solvers should be considered untrusted while auditing the contract.
 Example of misbehaving is for example withdrawing all the fees from the settlement contract. This is considered to be ok since we are supposed to withdraw from the contract when the fee amount becomes too large.
