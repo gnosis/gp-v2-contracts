@@ -50,7 +50,7 @@
     "chai": "^4.3.4",
     "chai-as-promised": "^7.1.1",
     "chalk": "^4.1.2",
-    "debug": "^4.3.2",
+    "debug": "^4.3.3",
     "dotenv": "^10.0.0",
     "eslint": "^8.3.0",
     "eslint-config-prettier": "^8.3.0",
