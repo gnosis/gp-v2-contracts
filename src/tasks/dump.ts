@@ -182,7 +182,7 @@ export interface GetDumpInstructionInput {
   vaultRelayer: string;
   maxFeePercent: number;
   slippageBps: number;
-  validTo: number;
+  validity: number;
   receiver: Receiver;
   hre: HardhatRuntimeEnvironment;
   network: SupportedNetwork;
@@ -214,7 +214,7 @@ export async function getDumpInstructions({
   vaultRelayer: vaultRelayer,
   maxFeePercent,
   slippageBps,
-  validTo,
+  validity,
   receiver,
   hre,
   network,
@@ -287,7 +287,7 @@ export async function getDumpInstructions({
           balance,
           maxFeePercent,
           slippageBps,
-          validTo,
+          validTo: validTo(validity),
           user,
         });
         if (quote === null) {
@@ -418,6 +418,11 @@ function buyAmountWithSlippage(
     .div(10000);
 }
 
+function validTo(validity: number) {
+  const now = Math.floor(Date.now() / 1000);
+  return now + validity;
+}
+
 function formatInstruction(
   {
     token: fromToken,
@@ -526,7 +531,7 @@ async function createOrders(
   signer: SignerWithAddress,
   receiver: Receiver,
   domainSeparator: TypedDataDomain,
-  validTo: number,
+  validity: number,
   maxFeePercent: number,
   slippageBps: number,
   api: Api,
@@ -540,7 +545,7 @@ async function createOrders(
         sellToken: inst.token,
         buyToken: toToken,
         balance: inst.balance,
-        validTo,
+        validTo: validTo(validity),
         user: signer.address,
         api,
         maxFeePercent,
@@ -564,7 +569,7 @@ async function createOrders(
       // todo: switch to true when partially fillable orders will be
       // supported by the services
       partiallyFillable: false,
-      validTo,
+      validTo: validTo(validity),
       receiver: receiver.isSameAsUser ? undefined : receiver.address,
     };
     const signature = await signOrder(
@@ -621,7 +626,7 @@ async function transferSameTokenToReceiver(
 }
 
 interface DumpInput {
-  validTo: number;
+  validity: number;
   maxFeePercent: number;
   slippageBps: number;
   dumpedTokens: string[];
@@ -638,7 +643,7 @@ interface DumpInput {
   confirmationsAfterApproval?: number | undefined;
 }
 export async function dump({
-  validTo,
+  validity,
   maxFeePercent,
   slippageBps,
   dumpedTokens,
@@ -675,7 +680,7 @@ export async function dump({
       vaultRelayer: vaultRelayer,
       maxFeePercent,
       slippageBps,
-      validTo,
+      validity,
       receiver,
       hre,
       network,
@@ -751,7 +756,7 @@ export async function dump({
       signer,
       receiver,
       domainSeparator,
-      validTo,
+      validity,
       maxFeePercent,
       slippageBps,
       api,
@@ -762,9 +767,7 @@ export async function dump({
     }
 
     console.log(
-      `Done! The orders will expire in the next ${
-        (validTo - Math.floor(Date.now() / 1000)) / 60
-      } minutes.`,
+      `Done! The orders will expire in the next ${validity / 60} minutes.`,
     );
   }
 }
@@ -861,18 +864,9 @@ const setupDumpTask: () => void = () =>
         if (validity > MAX_ORDER_VALIDITY_SECONDS) {
           throw new Error("Order validity too large");
         }
-        // Check that the local time is consistent with that of the blockchain
-        // to avoid signing orders that are valid for too long
-        const now = Math.floor(Date.now() / 1000);
-        const blockTimestamp = (await hre.ethers.provider.getBlock("latest"))
-          .timestamp;
-        if (Math.abs(now - blockTimestamp) > MAX_LATEST_BLOCK_DELAY_SECONDS) {
-          throw new Error("Blockchain time is not consistent with local time.");
-        }
-        const validTo = now + validity;
 
         await dump({
-          validTo,
+          validity,
           maxFeePercent,
           slippageBps,
           dumpedTokens,
