@@ -63,7 +63,7 @@
     "hardhat": "^2.7.0",
     "hardhat-deploy": "^0.7.3",
     "hardhat-gas-reporter": "^1.0.6",
-    "prettier": "^2.5.0",
+    "prettier": "^2.5.1",
     "prettier-plugin-solidity": "^1.0.0-beta.19",
     "sinon": "^12.0.1",
     "solhint": "^3.3.6",
