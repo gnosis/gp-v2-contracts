@@ -98,9 +98,13 @@ describe("GPv2Order", () => {
       });
       expect(orderUid).to.equal(fillDistinctBytes(32 + 20 + 4, 1));
 
-      const { orderDigest: extractedOrderDigest, owner: extractedAddress } =
-        await orders.extractOrderUidParamsTest(orderUid);
+      const {
+        orderDigest: extractedOrderDigest,
+        owner: extractedAddress,
+        validTo: extractedValidTo,
+      } = await orders.extractOrderUidParamsTest(orderUid);
       expect(extractedOrderDigest).to.equal(orderDigest);
+      expect(extractedValidTo).to.equal(validTo);
       expect(extractedAddress).to.equal(address);
     });
 
