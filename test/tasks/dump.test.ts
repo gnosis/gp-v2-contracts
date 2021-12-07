@@ -11,7 +11,7 @@ import {
   Wallet,
 } from "ethers";
 import hre, { ethers, waffle } from "hardhat";
-import { mock, SinonMock } from "sinon";
+import { match, mock, SinonMock } from "sinon";
 
 import {
   APP_DATA,
@@ -52,7 +52,6 @@ interface MockApiCallsInput {
   fee: BigNumberish;
   boughtAmount: BigNumberish;
   from: string;
-  validTo: number;
 }
 function mockApiCalls({
   apiMock,
@@ -62,7 +61,6 @@ function mockApiCalls({
   fee,
   boughtAmount,
   from,
-  validTo,
 }: MockApiCallsInput): void {
   const result = {
     quote: {
@@ -76,7 +74,7 @@ function mockApiCalls({
     .withArgs({
       sellToken: dumpedToken,
       buyToken: toToken,
-      validTo,
+      validTo: match.any,
       appData: APP_DATA,
       partiallyFillable: false,
       from,
@@ -167,7 +165,7 @@ describe("getDumpInstructions", () => {
         address: receiver.address,
         isSameAsUser: true,
       },
-      validTo: Math.floor(Date.now() / 1000) + 30 * 60,
+      validity: 30 * 60,
       hre,
       network,
       api,
@@ -207,7 +205,6 @@ describe("getDumpInstructions", () => {
       balance,
       fee,
       boughtAmount,
-      validTo: defaultDumpInstructions.validTo,
       from: defaultDumpInstructions.user,
     });
 
@@ -270,7 +267,6 @@ describe("getDumpInstructions", () => {
         balance,
         fee,
         boughtAmount,
-        validTo: defaultDumpInstructions.validTo,
         from: defaultDumpInstructions.user,
       });
 
@@ -329,7 +325,6 @@ describe("getDumpInstructions", () => {
       balance,
       fee,
       boughtAmount,
-      validTo: defaultDumpInstructions.validTo,
       from: defaultDumpInstructions.user,
     });
 
@@ -444,7 +439,7 @@ describe("getDumpInstructions", () => {
       .withArgs({
         sellToken: dumped.address,
         buyToken: to.address,
-        validTo: defaultDumpInstructions.validTo,
+        validTo: match.any,
         appData: APP_DATA,
         partiallyFillable: false,
         from: defaultDumpInstructions.user,
@@ -484,7 +479,7 @@ describe("getDumpInstructions", () => {
       .withArgs({
         sellToken: dumped.address,
         buyToken: to.address,
-        validTo: defaultDumpInstructions.validTo,
+        validTo: match.any,
         appData: APP_DATA,
         partiallyFillable: false,
         from: defaultDumpInstructions.user,
@@ -535,7 +530,7 @@ describe("getDumpInstructions", () => {
       .withArgs({
         sellToken: dumped.address,
         buyToken: to.address,
-        validTo: defaultDumpInstructions.validTo,
+        validTo: match.any,
         appData: APP_DATA,
         partiallyFillable: false,
         from: defaultDumpInstructions.user,
@@ -718,7 +713,7 @@ describe("getDumpInstructions", () => {
         .withArgs({
           sellToken: dumped.address,
           buyToken: to.address,
-          validTo: defaultDumpInstructions.validTo,
+          validTo: match.any,
           appData: APP_DATA,
           partiallyFillable: false,
           from: defaultDumpInstructions.user,
@@ -830,7 +825,6 @@ describe("getDumpInstructions", () => {
       balance,
       fee,
       boughtAmount,
-      validTo: defaultDumpInstructions.validTo,
       from: defaultDumpInstructions.user,
     });
 
@@ -909,7 +903,6 @@ describe("Task: dump", () => {
   it("should dump tokens", async () => {
     // Dump dai and weth for weth to a different receiver
     const validity = 4242;
-    const validTo = Math.floor(Date.now() / 1000) + validity;
 
     const wethData = {
       balance: utils.parseEther("42"),
@@ -927,7 +920,6 @@ describe("Task: dump", () => {
       apiMock,
       toToken: weth.address,
       dumpedToken: dai.address,
-      validTo,
       from: signer.address,
     });
 
@@ -939,7 +931,6 @@ describe("Task: dump", () => {
       expect(order.feeAmount).to.deep.equal(daiData.fee);
       expect(order.kind).to.deep.equal(OrderKind.SELL);
       expect(order.receiver).to.deep.equal(receiver.address);
-      expect(order.validTo).to.equal(validTo);
       expect(order.partiallyFillable).to.equal(false);
       return "0xorderUid";
     };
@@ -952,7 +943,7 @@ describe("Task: dump", () => {
     });
 
     await dump({
-      validTo,
+      validity,
       maxFeePercent: Infinity,
       slippageBps: 0,
       dumpedTokens: [weth.address, dai.address],
@@ -989,7 +980,7 @@ describe("Task: dump", () => {
       });
 
       await dump({
-        validTo: 1337,
+        validity: 1337,
         maxFeePercent: Infinity,
         slippageBps: 0,
         dumpedTokens: [weth.address],

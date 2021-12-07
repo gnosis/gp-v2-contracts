@@ -2,7 +2,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { BigNumber, constants, Contract, utils, Wallet } from "ethers";
 import hre, { ethers, waffle } from "hardhat";
-import { mock, SinonMock } from "sinon";
+import { mock, SinonMock, match } from "sinon";
 
 import { APP_DATA } from "../../src/tasks/dump";
 import { SupportedNetwork } from "../../src/tasks/ts/deployment";
@@ -103,7 +103,7 @@ describe("Task: withdrawService", () => {
       settlementDeploymentBlock: 0,
       minValue: "0",
       leftover: "0",
-      validTo: 3600,
+      validity: 3600,
       maxFeePercent: 100,
       slippageBps: 0,
       toToken: toToken.address,
@@ -240,14 +240,13 @@ describe("Task: withdrawService", () => {
       },
     };
     const validity = 3600;
-    const validTo = Math.floor(Date.now() / 1000) + validity;
 
     apiMock
       .expects("getQuote")
       .withArgs({
         sellToken: usdc.address,
         buyToken: toToken.address,
-        validTo: validTo,
+        validTo: match.any,
         appData: APP_DATA,
         partiallyFillable: false,
         from: defaultParams.solver.address,
@@ -273,7 +272,7 @@ describe("Task: withdrawService", () => {
       .withArgs({
         sellToken: dai.address,
         buyToken: toToken.address,
-        validTo: validTo,
+        validTo: match.any,
         appData: APP_DATA,
         partiallyFillable: false,
         from: defaultParams.solver.address,
@@ -296,7 +295,7 @@ describe("Task: withdrawService", () => {
       .withArgs({
         sellToken: weth.address,
         buyToken: toToken.address,
-        validTo: validTo,
+        validTo: match.any,
         appData: APP_DATA,
         partiallyFillable: false,
         from: defaultParams.solver.address,
@@ -320,7 +319,6 @@ describe("Task: withdrawService", () => {
       expect(order.feeAmount).to.deep.equal(feeAmount);
       expect(order.kind).to.deep.equal(OrderKind.SELL);
       expect(order.receiver).to.deep.equal(receiver.address);
-      expect(order.validTo).to.equal(validTo);
       expect(order.partiallyFillable).to.equal(false);
     }
     api.placeOrder = async function ({ order }: PlaceOrderQuery) {
@@ -357,7 +355,7 @@ describe("Task: withdrawService", () => {
       state: initalState,
       minValue,
       leftover,
-      validTo,
+      validity,
       maxFeePercent,
     });
 
@@ -455,7 +453,7 @@ describe("Task: withdrawService", () => {
         .withArgs({
           sellToken: token.address,
           buyToken: toToken.address,
-          validTo: defaultParams.validTo,
+          validTo: match.any,
           appData: APP_DATA,
           partiallyFillable: false,
           from: defaultParams.solver.address,
