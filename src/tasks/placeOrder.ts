@@ -26,10 +26,11 @@ interface Args {
   from: string;
   to: string;
   amountAtoms: BigNumberish;
+  apiUrl: string | null;
 }
 
 async function placeOrder(
-  { orderType, from, to, amountAtoms }: Args,
+  { orderType, from, to, amountAtoms, apiUrl }: Args,
   hre: HardhatRuntimeEnvironment,
 ) {
   let amount: SellAmountBeforeFee | SellAmountAfterFee | BuyAmountAfterFee;
@@ -62,7 +63,7 @@ async function placeOrder(
     hre.getChainId(),
   ]);
 
-  const api = new Api(hre.network.name, Environment.Prod);
+  const api = new Api(hre.network.name, apiUrl || Environment.Prod);
   const quote = await api.getQuote({
     sellToken: from,
     buyToken: to,
@@ -106,6 +107,10 @@ const setupPlaceOrderTask: () => void = () => {
     .addParam(
       "amountAtoms",
       "Amount of token you are willing to buy/sell (depending on order type)",
+    )
+    .addOptionalParam(
+      "apiUrl",
+      "If set, the script contacts the API using the given url. Otherwise, the default prod url for the current network is used",
     )
     .setAction(placeOrder);
 };
