@@ -22,14 +22,19 @@ import { promiseAllWithRateLimit } from "./ts/rate_limits";
 import { balanceOf, erc20Token } from "./ts/tokens";
 import { ReferenceToken, REFERENCE_TOKEN } from "./ts/value";
 import { withdraw } from "./withdraw";
-import { getAllTradedTokens } from "./withdraw/traded_tokens";
+import {
+  getAllTradedTokens,
+  partialTradedTokensKey,
+  TradedTokens,
+  TradedTokensError,
+} from "./withdraw/traded_tokens";
 
 const MAX_ORDER_RETRIES_BEFORE_SKIPPING = 10;
 const MAX_CHECKED_TOKENS_PER_RUN = 200;
 
 export interface State {
   /**
-   * Latest block number when the balances were withdrawn in the previous run.
+   * Block number at which the current list of traded tokens was updated.
    */
   lastUpdateBlock: number;
   /**
@@ -264,24 +269,45 @@ export async function withdrawAndDump({
   // transactions were included.
   const maxReorgDistance = 20;
   const fromBlock = Math.max(0, state.lastUpdateBlock - maxReorgDistance);
-  let recentlyTradedTokens, latestBlock;
+  let tradedTokensWithBlock: TradedTokens;
+  let tokenRecoveryFailed = false;
   try {
-    ({ tokens: recentlyTradedTokens, toBlock: latestBlock } =
-      await getAllTradedTokens(settlement, fromBlock, "latest", hre));
+    tradedTokensWithBlock = await getAllTradedTokens(
+      settlement,
+      fromBlock,
+      "latest",
+      hre,
+    );
   } catch (error) {
     console.log(`Encountered soft error when retrieving traded tokens`);
-    console.log(error);
-    return bumpErrorCount({ ...state, ...stateUpdates });
+    if (
+      error instanceof Error &&
+      Object.keys(error).includes(partialTradedTokensKey)
+    ) {
+      tokenRecoveryFailed = true;
+      tradedTokensWithBlock = (error as TradedTokensError)[
+        partialTradedTokensKey
+      ];
+      delete (error as Error & Record<string, unknown>)[partialTradedTokensKey];
+      console.log(error);
+    } else {
+      console.log(error);
+      return bumpErrorCount({ ...state, ...stateUpdates });
+    }
   }
 
   const tradedTokens = state.tradedTokens.concat(
-    recentlyTradedTokens.filter(
+    tradedTokensWithBlock.tokens.filter(
       (token) =>
         !(state.tradedTokens.includes(token) || token === BUY_ETH_ADDRESS),
     ),
   );
   stateUpdates.tradedTokens = tradedTokens;
-  stateUpdates.lastUpdateBlock = latestBlock;
+  stateUpdates.lastUpdateBlock = tradedTokensWithBlock.toBlock;
+
+  if (tokenRecoveryFailed) {
+    return bumpErrorCount({ ...state, ...stateUpdates });
+  }
 
   const numCheckedTokens = Math.min(pagination, tradedTokens.length);
   // The index of the checked token wraps around after reaching the end of the

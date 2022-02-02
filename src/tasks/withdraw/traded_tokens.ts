@@ -8,6 +8,16 @@ const enum ProviderError {
   Timeout,
 }
 
+export interface TradedTokens {
+  tokens: string[];
+  toBlock: number;
+}
+
+export const partialTradedTokensKey = "partialTradedTokens" as const;
+export interface TradedTokensError extends Error {
+  [partialTradedTokensKey]: TradedTokens;
+}
+
 function decodeError(error: unknown): ProviderError | null {
   if (!(error instanceof Error)) {
     return null;
@@ -28,12 +38,16 @@ function decodeError(error: unknown): ProviderError | null {
 /// latest block for which traded tokens were searched. Note that the returned
 /// block value might not be exact in some circumstances like reorgs or
 /// load-balanced nodes.
+///
+/// If an unexpected node error is encountered, the thown error may include the
+/// tokens that were processed so far. See [TradedTokensError] for the error
+/// format.
 export async function getAllTradedTokens(
   settlement: Contract,
   fromBlock: number,
   toBlock: number | "latest",
   hre: HardhatRuntimeEnvironment,
-): Promise<{ tokens: string[]; toBlock: number }> {
+): Promise<TradedTokens> {
   let trades = null;
   let numericToBlock =
     toBlock === "latest" ? hre.ethers.provider.getBlockNumber() : toBlock;
@@ -66,16 +80,34 @@ export async function getAllTradedTokens(
       throw new Error("Too many events in the same block");
     }
     const mid = Math.floor(((await numericToBlock) + fromBlock) / 2);
-    const { tokens: firstHalf } = await getAllTradedTokens(
-      settlement,
-      fromBlock,
-      mid,
-      hre,
-    );
-    const { tokens: secondHalf, toBlock: numberSecondHalf } =
-      await getAllTradedTokens(settlement, mid + 1, toBlock, hre);
-    tokens = [...firstHalf, ...secondHalf];
-    numericToBlock = numberSecondHalf;
+
+    const firstHalf = await getAllTradedTokens(settlement, fromBlock, mid, hre);
+
+    let secondHalf: TradedTokens;
+    try {
+      secondHalf = await getAllTradedTokens(settlement, mid + 1, toBlock, hre);
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error;
+      }
+      if (!Object.keys(error).includes(partialTradedTokensKey)) {
+        (error as TradedTokensError)[partialTradedTokensKey] = firstHalf;
+      } else {
+        const partialSecondHalf = (error as TradedTokensError)[
+          partialTradedTokensKey
+        ];
+        const partialTradedTokens: TradedTokens = {
+          tokens: [...firstHalf.tokens, ...partialSecondHalf.tokens],
+          toBlock: partialSecondHalf.toBlock,
+        };
+        (error as TradedTokensError)[partialTradedTokensKey] =
+          partialTradedTokens;
+      }
+      throw error;
+    }
+
+    tokens = [...firstHalf.tokens, ...secondHalf.tokens];
+    numericToBlock = secondHalf.toBlock;
   } else {
     tokens = trades
       .map((trade) => {
