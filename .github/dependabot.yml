@@ -6,5 +6,4 @@ updates:
     interval: daily
     time: "02:00"
   ignore:
-  - dependency-name: "@gnosis.pm/util-contracts"
   - dependency-name: "@openzeppelin/contracts"
