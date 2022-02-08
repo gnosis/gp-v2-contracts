@@ -92,6 +92,11 @@ export default {
     hardhat: {
       blockGasLimit: 12.5e6,
     },
+    localhost: {
+      blockGasLimit: 12.5e6,
+      url: "http://127.0.0.1:8545",
+    },
+
     mainnet: {
       ...sharedNetworkConfig,
       url: `https://mainnet.infura.io/v3/${INFURA_KEY}`,
