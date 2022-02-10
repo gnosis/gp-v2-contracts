@@ -11,7 +11,11 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { BUY_ETH_ADDRESS } from "../ts";
 import { Api, Environment } from "../ts/api";
 
-import { dump, MAX_ORDER_VALIDITY_SECONDS } from "./dump";
+import {
+  assertNotDumpingToEth,
+  dump,
+  MAX_ORDER_VALIDITY_SECONDS,
+} from "./dump";
 import {
   getDeployedContract,
   isSupportedNetwork,
@@ -520,6 +524,9 @@ const setupWithdrawServiceTask: () => void = () =>
         },
         hre: HardhatRuntimeEnvironment,
       ) => {
+        // TODO: remove once ETH orders are fully supported.
+        assertNotDumpingToEth(toToken);
+
         const state = await getState(stateFilePath);
         console.debug(`Initial state: ${JSON.stringify(state)}`);
         const network = hre.network.name;
