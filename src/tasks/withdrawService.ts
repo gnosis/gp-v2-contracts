@@ -58,6 +58,11 @@ export interface State {
    * any transactions has been sent onchain.
    */
   softErrorCount?: number;
+  /**
+   * The chain id of the chain that was used to generate this state. The chain
+   * id is determined on the first run and cannot change.
+   */
+  chainId?: number;
 }
 
 interface PendingToken {
@@ -240,6 +245,25 @@ export async function withdrawAndDump({
   confirmationsAfterWithdrawing,
   pagination,
 }: WithdrawAndDumpInput): Promise<State> {
+  let chainId;
+  try {
+    ({ chainId } = await hre.ethers.provider.getNetwork());
+  } catch (error) {
+    console.log(
+      "Soft error encountered when retrieving information from the node",
+    );
+    console.log(error);
+    return bumpErrorCount(state);
+  }
+
+  if (state.chainId === undefined) {
+    state.chainId = chainId;
+  } else if (state.chainId !== chainId) {
+    throw new Error(
+      `Current state file was created on chain id ${state.chainId}, current chain id is ${chainId}.`,
+    );
+  }
+
   if (pagination === undefined) {
     pagination = MAX_CHECKED_TOKENS_PER_RUN;
   } else if (pagination > MAX_CHECKED_TOKENS_PER_RUN) {
