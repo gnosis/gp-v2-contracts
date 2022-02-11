@@ -12,7 +12,7 @@ import { BUY_ETH_ADDRESS } from "../ts";
 import { Api, Environment } from "../ts/api";
 
 import {
-  assertNotDumpingToEth,
+  assertNotBuyingNativeAsset,
   dump,
   MAX_ORDER_VALIDITY_SECONDS,
 } from "./dump";
@@ -525,7 +525,7 @@ const setupWithdrawServiceTask: () => void = () =>
         hre: HardhatRuntimeEnvironment,
       ) => {
         // TODO: remove once native asset orders are fully supported.
-        assertNotDumpingToEth(toToken);
+        assertNotBuyingNativeAsset(toToken);
 
         const state = await getState(stateFilePath);
         console.debug(`Initial state: ${JSON.stringify(state)}`);
