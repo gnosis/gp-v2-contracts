@@ -1,5 +1,6 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { expect } from "chai";
+import { expect, use } from "chai";
+import chaiAsPromised from "chai-as-promised";
 import { BigNumber, constants, Contract, utils, Wallet } from "ethers";
 import hre, { ethers, waffle } from "hardhat";
 import { mock, SinonMock, match } from "sinon";
@@ -20,6 +21,8 @@ import {
   mockQuerySellingEthForUsd,
   tradeTokensForNoFees,
 } from "./withdraw.test";
+
+use(chaiAsPromised);
 
 describe("Task: withdrawService", () => {
   let deployer: Wallet;
@@ -585,5 +588,67 @@ describe("Task: withdrawService", () => {
     expect(await weth.balanceOf(settlement.address)).to.deep.equal(
       constants.Zero,
     );
+  });
+
+  describe("validates chain id", function () {
+    let chainId: number;
+
+    beforeEach(async function () {
+      ({ chainId } = await ethers.provider.getNetwork());
+    });
+
+    it("throws if the state chain id is incorect", async () => {
+      const badChainId = 42;
+      expect(chainId).not.to.equal(badChainId);
+      const initalState: withdrawService.State = {
+        lastUpdateBlock: 0,
+        tradedTokens: [],
+        nextTokenToTrade: 0,
+        pendingTokens: [],
+        chainId: badChainId,
+      };
+
+      await expect(
+        withdrawService.withdrawAndDump({
+          ...(await withdrawAndDumpDefaultParams()),
+          state: initalState,
+        }),
+      ).to.eventually.be.rejectedWith(
+        `Current state file was created on chain id ${badChainId}, current chain id is ${chainId}.`,
+      );
+    });
+
+    it("fills in chain id if state has no chain id", async () => {
+      const initalState: withdrawService.State = {
+        lastUpdateBlock: 0,
+        tradedTokens: [],
+        nextTokenToTrade: 0,
+        pendingTokens: [],
+      };
+
+      const finalState = await withdrawService.withdrawAndDump({
+        ...(await withdrawAndDumpDefaultParams()),
+        state: initalState,
+      });
+
+      expect(finalState.chainId).to.equal(chainId);
+    });
+
+    it("succeeds with same chain id", async () => {
+      const initalState: withdrawService.State = {
+        lastUpdateBlock: 0,
+        tradedTokens: [],
+        nextTokenToTrade: 0,
+        pendingTokens: [],
+        chainId,
+      };
+
+      const finalState = await withdrawService.withdrawAndDump({
+        ...(await withdrawAndDumpDefaultParams()),
+        state: initalState,
+      });
+
+      expect(finalState.chainId).to.equal(chainId);
+    });
   });
 });
