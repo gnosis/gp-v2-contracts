@@ -524,7 +524,7 @@ const setupWithdrawServiceTask: () => void = () =>
         },
         hre: HardhatRuntimeEnvironment,
       ) => {
-        // TODO: remove once ETH orders are fully supported.
+        // TODO: remove once native asset orders are fully supported.
         assertNotDumpingToEth(toToken);
 
         const state = await getState(stateFilePath);
