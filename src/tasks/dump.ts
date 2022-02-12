@@ -625,6 +625,20 @@ async function transferSameTokenToReceiver(
   await receipt.wait();
 }
 
+export function assertNotBuyingNativeAsset(toToken: string | undefined) {
+  // This function checks that toToken is not the native asset (e.g., ETH).
+  // Technically, this script was built to support selling ETH. However, there
+  // are two requirement from the backend for it to work:
+  // 1. Sending native assets to smart contracts should be supported. At the
+  //    time of writing, this returns an error when creating the order.
+  // 2. Selling wrapped native assets for their unwrapped counterpart should be
+  //    supported. It currently returns an error about the fact that the token
+  //    is the same.
+  if ([undefined, BUY_ETH_ADDRESS].includes(toToken)) {
+    throw new Error("Receiving native asset is not supported yet.");
+  }
+}
+
 interface DumpInput {
   validity: number;
   maxFeePercent: number;
@@ -660,6 +674,9 @@ export async function dump({
   confirmationsAfterApproval,
 }: DumpInput): Promise<void> {
   const { ethers } = hre;
+
+  // TODO: remove once native asset orders are fully supported.
+  assertNotBuyingNativeAsset(toTokenAddress);
 
   const [chainId, vaultRelayer] = await Promise.all([
     ethers.provider.getNetwork().then((n) => n.chainId),
