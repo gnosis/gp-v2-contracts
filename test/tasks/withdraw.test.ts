@@ -8,6 +8,7 @@ import { SupportedNetwork } from "../../src/tasks/ts/deployment";
 import { ProviderGasEstimator } from "../../src/tasks/ts/gas";
 import { ReferenceToken } from "../../src/tasks/ts/value";
 import { withdraw } from "../../src/tasks/withdraw";
+import { excludeBufferTradableTokensFromList } from "../../src/tasks/withdraw/traded_tokens";
 import {
   OrderKind,
   SettlementEncoder,
@@ -254,6 +255,7 @@ describe("Task: withdraw", () => {
       api,
       gasEstimator: new ProviderGasEstimator(ethers.provider),
       dryRun: false,
+      withdrawBufferTradableTokens: true,
       doNotPrompt: true,
     });
 
@@ -360,6 +362,7 @@ describe("Task: withdraw", () => {
       api,
       gasEstimator: new ProviderGasEstimator(ethers.provider),
       dryRun: false,
+      withdrawBufferTradableTokens: true,
       doNotPrompt: true,
     });
 
@@ -367,5 +370,17 @@ describe("Task: withdraw", () => {
     expect(withdrawnTokens).to.include(weth.address);
     expect(await dai.balanceOf(receiver.address)).to.deep.equal(constants.Zero);
     expect(await weth.balanceOf(receiver.address)).to.deep.equal(wethBalance);
+  });
+});
+
+describe("excludeBufferTradableTokensFromList", () => {
+  it("should exclude the buffer tradable tokens from the list", async () => {
+    const originalTokenList = ["0x1234", "0x4321"];
+    const bufferTradableTokens = [originalTokenList[0]];
+    const resultList = excludeBufferTradableTokensFromList(
+      originalTokenList,
+      bufferTradableTokens,
+    );
+    expect(resultList).to.deep.equal([originalTokenList[1]]);
   });
 });

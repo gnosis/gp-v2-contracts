@@ -32,7 +32,11 @@ import {
   REFERENCE_TOKEN,
   usdValueOfEth,
 } from "./ts/value";
-import { getAllTradedTokens } from "./withdraw/traded_tokens";
+import {
+  BUFFER_TRADABLE_TOKENS,
+  excludeBufferTradableTokensFromList,
+  getAllTradedTokens,
+} from "./withdraw/traded_tokens";
 
 interface Withdrawal {
   token: Erc20Token;
@@ -397,6 +401,7 @@ interface WithdrawInput {
   hre: HardhatRuntimeEnvironment;
   api: Api;
   dryRun: boolean;
+  withdrawBufferTradableTokens: boolean;
   gasEstimator: IGasEstimator;
   doNotPrompt?: boolean | undefined;
   requiredConfirmations?: number | undefined;
@@ -416,6 +421,7 @@ async function prepareWithdrawals({
   hre,
   api,
   dryRun,
+  withdrawBufferTradableTokens,
   gasEstimator,
 }: WithdrawInput): Promise<{
   withdrawals: Withdrawal[];
@@ -457,6 +463,12 @@ async function prepareWithdrawals({
     ));
   }
 
+  if (!withdrawBufferTradableTokens) {
+    tokens = excludeBufferTradableTokensFromList(
+      tokens,
+      await BUFFER_TRADABLE_TOKENS,
+    );
+  }
   // TODO: add eth withdrawal
   // TODO: split large transaction in batches
   let withdrawals = await getWithdrawals({
@@ -625,6 +637,10 @@ const setupWithdrawTask: () => void = () =>
       "Just simulate the settlement instead of executing the transaction on the blockchain.",
     )
     .addFlag(
+      "withdrawBufferTradableTokens",
+      "Allows to withdraw also the buffers",
+    )
+    .addFlag(
       "blocknativeGasPrice",
       "Use BlockNative gas price estimates for transactions.",
     )
@@ -640,6 +656,7 @@ const setupWithdrawTask: () => void = () =>
           maxFeePercent,
           receiver: inputReceiver,
           dryRun,
+          withdrawBufferTradableTokens,
           tokens,
           apiUrl,
           blocknativeGasPrice,
@@ -684,6 +701,7 @@ const setupWithdrawTask: () => void = () =>
           hre,
           api,
           dryRun,
+          withdrawBufferTradableTokens,
           gasEstimator,
         });
       },

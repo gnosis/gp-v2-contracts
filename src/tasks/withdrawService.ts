@@ -205,6 +205,7 @@ export interface WithdrawAndDumpInput {
   hre: HardhatRuntimeEnvironment;
   api: Api;
   dryRun: boolean;
+  withdrawBufferTradableTokens: boolean;
   gasEstimator: IGasEstimator;
   confirmationsAfterWithdrawing?: number | undefined;
   pagination?: number | undefined;
@@ -245,6 +246,7 @@ export async function withdrawAndDump({
   hre,
   api,
   dryRun,
+  withdrawBufferTradableTokens,
   gasEstimator,
   confirmationsAfterWithdrawing,
   pagination,
@@ -360,6 +362,7 @@ export async function withdrawAndDump({
     hre,
     api,
     dryRun,
+    withdrawBufferTradableTokens,
     gasEstimator,
     doNotPrompt: true,
     // Wait for node to pick up updated balances before running the dump
@@ -527,6 +530,10 @@ const setupWithdrawServiceTask: () => void = () =>
       "Just simulate the settlement instead of executing the transaction on the blockchain",
     )
     .addFlag(
+      "withdrawBufferTradableTokens",
+      "Allows to withdraw also the buffers",
+    )
+    .addFlag(
       "blocknativeGasPrice",
       "Use BlockNative gas price estimates for transactions.",
     )
@@ -542,6 +549,7 @@ const setupWithdrawServiceTask: () => void = () =>
           stateFilePath,
           receiver: inputReceiver,
           dryRun,
+          withdrawBufferTradableTokens,
           tokensPerRun,
           apiUrl,
           blocknativeGasPrice,
@@ -608,6 +616,7 @@ const setupWithdrawServiceTask: () => void = () =>
           hre,
           api,
           dryRun,
+          withdrawBufferTradableTokens,
           gasEstimator,
           confirmationsAfterWithdrawing: 2,
           pagination: tokensPerRun,

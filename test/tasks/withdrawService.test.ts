@@ -117,6 +117,7 @@ describe("Task: withdrawService", () => {
       api,
       gasEstimator: new ProviderGasEstimator(ethers.provider),
       dryRun: false,
+      withdrawBufferTradableTokens: true,
     });
 
     // the script checks that the onchain time is not too far from the current

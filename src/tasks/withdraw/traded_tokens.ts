@@ -1,7 +1,36 @@
+import axios from "axios";
 import { Contract } from "ethers";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 import { BUY_ETH_ADDRESS } from "../../ts";
+
+export const BUFFER_TRADABLE_TOKENS: Promise<string[]> = axios
+  .get(
+    "https://raw.githubusercontent.com/gnosis/cow-dex-solver/main/data/token_list_for_buffer_trading.json",
+  )
+  .then((response) => {
+    const token_list: { symbol: string; decimals: number; address: string }[] =
+      response.data.tokens;
+    return token_list.map((tokenObject) => tokenObject.address);
+  })
+  .catch((err) => {
+    throw Error(`Warning: unable to recover buffer token list, due to: ${err}`);
+  });
+
+export function excludeBufferTradableTokensFromList(
+  tokens: string[],
+  bufferTradableTokenList: string[],
+) {
+  console.log("Excluding buffer tradable from withdraw list...");
+  const tokenListLength = tokens.length;
+  tokens = tokens.filter((token) => !bufferTradableTokenList.includes(token));
+  console.log(
+    "Removed",
+    tokenListLength - tokens.length,
+    "tokens from withdraw list as they are buffer tradable tokens",
+  );
+  return tokens;
+}
 
 const enum ProviderError {
   TooManyEvents,
