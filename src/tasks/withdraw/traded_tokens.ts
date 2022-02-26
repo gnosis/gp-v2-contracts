@@ -4,18 +4,26 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 import { BUY_ETH_ADDRESS } from "../../ts";
 
-export const BUFFER_TRADABLE_TOKENS: Promise<string[]> = axios
-  .get(
-    "https://raw.githubusercontent.com/gnosis/cow-dex-solver/main/data/token_list_for_buffer_trading.json",
-  )
-  .then((response) => {
-    const token_list: { symbol: string; decimals: number; address: string }[] =
-      response.data.tokens;
-    return token_list.map((tokenObject) => tokenObject.address);
-  })
-  .catch((err) => {
-    throw Error(`Warning: unable to recover buffer token list, due to: ${err}`);
-  });
+const OFFICIAL_BUFFER_TRADING_ALLOW_LIST =
+  "https://raw.githubusercontent.com/gnosis/cow-dex-solver/main/data/token_list_for_buffer_trading.json";
+
+export async function fetchBufferTradableTokens(): Promise<string[]> {
+  return axios
+    .get(OFFICIAL_BUFFER_TRADING_ALLOW_LIST)
+    .then((response) => {
+      const token_list: {
+        symbol: string;
+        decimals: number;
+        address: string;
+      }[] = response.data.tokens;
+      return token_list.map((tokenObject) => tokenObject.address);
+    })
+    .catch((err) => {
+      throw Error(
+        `Warning: unable to recover buffer token list, due to: ${err}`,
+      );
+    });
+}
 
 export function excludeBufferTradableTokensFromList(
   tokens: string[],
@@ -23,7 +31,10 @@ export function excludeBufferTradableTokensFromList(
 ) {
   console.log("Excluding buffer tradable from withdraw list...");
   const tokenListLength = tokens.length;
-  tokens = tokens.filter((token) => !bufferTradableTokenList.includes(token));
+  const excludedTokens = new Set(
+    bufferTradableTokenList.map((token) => token.toLowerCase()),
+  );
+  tokens = tokens.filter((token) => !excludedTokens.has(token.toLowerCase()));
   console.log(
     "Removed",
     tokenListLength - tokens.length,
