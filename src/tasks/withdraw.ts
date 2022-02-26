@@ -178,12 +178,15 @@ function ignoredTokenMessage(
   reason?: string,
 ) {
   const decimals = token.decimals ?? 18;
-  return `Ignored ${utils.formatUnits(amount, decimals)} units of ${token.symbol ?? "unknown token"
-    } (${token.address})${token.decimals === undefined
+  return `Ignored ${utils.formatUnits(amount, decimals)} units of ${
+    token.symbol ?? "unknown token"
+  } (${token.address})${
+    token.decimals === undefined
       ? ` (no decimals specified in the contract, assuming ${decimals})`
       : ""
-    } with value ${formatUsdValue(valueUsd, usdReference)} USD${reason ? `, ${reason}` : ""
-    }`;
+  } with value ${formatUsdValue(valueUsd, usdReference)} USD${
+    reason ? `, ${reason}` : ""
+  }`;
 }
 
 interface GetWithdrawalsInput {
@@ -545,7 +548,8 @@ async function prepareWithdrawals({
       transactionUsdCost,
       network,
       usdReference,
-    )} and will withdraw the balance of ${withdrawals.length
+    )} and will withdraw the balance of ${
+      withdrawals.length
     } tokens for an estimated total value of ${formatUsdValue(
       withdrawnValue,
       usdReference,
