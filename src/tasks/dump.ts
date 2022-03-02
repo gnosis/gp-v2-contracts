@@ -504,18 +504,19 @@ async function createAllowances(
   { gasEstimator, requiredConfirmations }: CreateAllowancesOptions,
 ) {
   let lastTransaction: ContractTransaction | undefined = undefined;
+  let current_nonce = await signer.getTransactionCount();
   for (const token of allowances) {
     console.log(
       `Approving vault relayer to trade token ${displayName(token)}...`,
     );
+    const fee = await gasEstimator.txGasPrice();
     lastTransaction = (await token.contract
       .connect(signer)
-      .approve(
-        vaultRelayer,
-        constants.MaxUint256,
-        await gasEstimator.txGasPrice(),
-      )) as ContractTransaction;
-    await lastTransaction.wait();
+      .approve(vaultRelayer, constants.MaxUint256, {
+        nonce: current_nonce,
+        ...fee,
+      })) as ContractTransaction;
+    current_nonce++;
   }
   if (lastTransaction !== undefined) {
     // note: the last approval is (excluded reorgs) the last that is included
