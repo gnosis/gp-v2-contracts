@@ -382,7 +382,9 @@ function formatGasCost(
   }
 }
 
-type SignerOrAddress = SignerWithAddress | { address: string };
+type SignerOrAddress =
+  | SignerWithAddress
+  | { address: string; _isSigner: false };
 
 async function getSignerOrAddress(
   { ethers }: HardhatRuntimeEnvironment,
@@ -393,12 +395,15 @@ async function getSignerOrAddress(
   return (
     signers.find(({ address }) => address === originAddress) ?? {
       address: originAddress,
+      // Take advantage of the fact that all Ethers signers have `_isSigner` set
+      // to `true`.
+      _isSigner: false,
     }
   );
 }
 
 function isSigner(solver: SignerOrAddress): solver is SignerWithAddress {
-  return "provider" in solver !== undefined;
+  return solver._isSigner;
 }
 
 interface WithdrawInput {
