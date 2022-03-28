@@ -3,7 +3,7 @@ import "@nomiclabs/hardhat-ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import axios from "axios";
 import chalk from "chalk";
-import { BigNumber, utils, constants, Contract } from "ethers";
+import { BigNumber, constants, Contract, utils } from "ethers";
 import { task, types } from "hardhat/config";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
@@ -15,7 +15,7 @@ import {
   isSupportedNetwork,
   SupportedNetwork,
 } from "./ts/deployment";
-import { IGasEstimator, createGasEstimator } from "./ts/gas";
+import { createGasEstimator, IGasEstimator } from "./ts/gas";
 import {
   DisappearingLogFunctions,
   promiseAllWithRateLimit,
@@ -25,11 +25,11 @@ import { Align, displayTable } from "./ts/table";
 import { Erc20Token, erc20Token } from "./ts/tokens";
 import { prompt } from "./ts/tui";
 import {
-  usdValue,
-  formatUsdValue,
   formatTokenValue,
-  ReferenceToken,
+  formatUsdValue,
   REFERENCE_TOKEN,
+  ReferenceToken,
+  usdValue,
   usdValueOfEth,
 } from "./ts/value";
 import { getAllTradedTokens } from "./withdraw/traded_tokens";
@@ -382,8 +382,32 @@ function formatGasCost(
   }
 }
 
+type SignerOrAddress =
+  | SignerWithAddress
+  | { address: string; _isSigner: false };
+
+async function getSignerOrAddress(
+  { ethers }: HardhatRuntimeEnvironment,
+  origin?: string,
+): Promise<SignerOrAddress> {
+  const signers = await ethers.getSigners();
+  const originAddress = ethers.utils.getAddress(origin ?? signers[0].address);
+  return (
+    signers.find(({ address }) => address === originAddress) ?? {
+      address: originAddress,
+      // Take advantage of the fact that all Ethers signers have `_isSigner` set
+      // to `true`.
+      _isSigner: false,
+    }
+  );
+}
+
+function isSigner(solver: SignerOrAddress): solver is SignerWithAddress {
+  return solver._isSigner;
+}
+
 interface WithdrawInput {
-  solver: SignerWithAddress;
+  solver: SignerOrAddress;
   tokens: string[] | undefined;
   minValue: string;
   leftover: string;
@@ -401,6 +425,7 @@ interface WithdrawInput {
   doNotPrompt?: boolean | undefined;
   requiredConfirmations?: number | undefined;
 }
+
 async function prepareWithdrawals({
   solver,
   tokens,
@@ -559,7 +584,15 @@ async function submitWithdrawals(
   }: WithdrawInput,
   finalSettlement: EncodedSettlement,
 ) {
-  if (!dryRun && (doNotPrompt || (await prompt(hre, "Submit?")))) {
+  if (!isSigner(solver)) {
+    const settlementData = settlement.interface.encodeFunctionData(
+      "settle",
+      finalSettlement,
+    );
+    console.log("Settlement transaction:");
+    console.log(`to:   ${settlement.address}`);
+    console.log(`data: ${settlementData}`);
+  } else if (!dryRun && (doNotPrompt || (await prompt(hre, "Submit?")))) {
     console.log("Executing the withdraw transaction on the blockchain...");
     const response = await settlement
       .connect(solver)
@@ -598,6 +631,10 @@ export async function withdraw(input: WithdrawInput): Promise<string[] | null> {
 const setupWithdrawTask: () => void = () =>
   task("withdraw", "Withdraw funds from the settlement contract")
     .addOptionalParam(
+      "origin",
+      "Address from which to withdraw. If not specified, it defaults to the first provided account",
+    )
+    .addOptionalParam(
       "minValue",
       "If specified, sets a minimum USD value required to withdraw the balance of a token.",
       "0",
@@ -635,6 +672,7 @@ const setupWithdrawTask: () => void = () =>
     .setAction(
       async (
         {
+          origin,
           minValue,
           leftover,
           maxFeePercent,
@@ -655,12 +693,13 @@ const setupWithdrawTask: () => void = () =>
         });
         const api = new Api(network, apiUrl ?? Environment.Prod);
         const receiver = utils.getAddress(inputReceiver);
-        const [authenticator, settlementDeployment, [solver]] =
-          await Promise.all([
+        const [authenticator, settlementDeployment, solver] = await Promise.all(
+          [
             getDeployedContract("GPv2AllowListAuthentication", hre),
             hre.deployments.get("GPv2Settlement"),
-            hre.ethers.getSigners(),
-          ]);
+            getSignerOrAddress(hre, origin),
+          ],
+        );
         const settlement = new Contract(
           settlementDeployment.address,
           settlementDeployment.abi,

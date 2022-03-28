@@ -794,7 +794,7 @@ const setupDumpTask: () => void = () =>
   task("dump")
     .addOptionalParam(
       "origin",
-      "Address from which to withdraw. If not specified, it defaults to the first provided account",
+      "Address from which to dump. If not specified, it defaults to the first provided account",
     )
     .addOptionalParam(
       "toToken",
