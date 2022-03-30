@@ -20,9 +20,9 @@ export enum Environment {
 export function apiUrl(environment: Environment, network: string): string {
   switch (environment) {
     case Environment.Dev:
-      return `https://protocol-${network}.dev.gnosisdev.com`;
+      return `https://barn.api.cow.fi/${network}`;
     case Environment.Prod:
-      return `https://protocol-${network}.gnosis.io`;
+      return `https://api.cow.fi/${network}`;
     default:
       throw new Error("Invalid environment");
   }
