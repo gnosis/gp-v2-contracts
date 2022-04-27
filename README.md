@@ -1,3 +1,5 @@
+**:warning: The team that worked on this project has spun out of Gnosis and continues development on a forked repo (01-04-2022) which is available here <https://github.com/cowprotocol/contracts>**
+
 # Gnosis Protocol V2
 
 This repository contains the Solidity smart contract code for the Gnosis Protocol version 2.
